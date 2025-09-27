@@ -13,7 +13,8 @@
       "@module/*": ["modules/*"],
       "@types/*": ["types/*"],
       "@utils/*": ["utils/*"],
-      "@middleware/*": ["middleware/*"]
+      "@middleware/*": ["middleware/*"],
+      "@services/*": ["services/*"]
     }
   },
   "include": ["src/**/*.ts"],

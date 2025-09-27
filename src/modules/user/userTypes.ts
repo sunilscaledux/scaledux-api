@@ -23,3 +23,22 @@ export interface UserDetail {
   created_at: Date;
   updated_at: Date;
 }
+
+export interface VerifyOtpInput {
+  email: string;
+  otp: string;
+}
+
+export interface ResendOtpInput {
+  email: string;
+}
+
+export interface OtpResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    email?: string;
+    otpId?: number;
+    expiresIn?: number;
+  } | null;
+}

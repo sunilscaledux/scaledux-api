@@ -18,9 +18,60 @@ model User {
   password          String
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
+  
+  // Relations has Many
+  otps              Otp[]
  
  @@index([email, phone])
  @@index([LastName, FirstName, email])
 
   @@map("users")
+}
+
+
+model TempUser {
+  id                Int       @id @default(autoincrement())
+  FirstName              String
+  LastName              String?  
+  email             String    @unique
+  phone             String?    @unique 
+  email_verified_at DateTime? 
+  phone_verified_at DateTime?
+  password          String
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+ 
+ @@index([email, phone])
+ @@index([LastName, FirstName, email])
+
+  @@map("temp_users")
+}
+
+model Otp {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  email      String?
+  phone      String?
+  otp_code   String
+  otp_type   OtpType
+  expires_at DateTime
+  verified   Boolean  @default(false)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  // Relations
+  user       User?    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@index([email, otp_type, verified])
+  @@index([phone, otp_type, verified])
+  @@index([expires_at])
+  
+  @@map("otps")
+}
+
+enum OtpType {
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+  LOGIN_VERIFICATION
 }
