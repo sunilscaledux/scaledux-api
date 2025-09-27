@@ -2,25 +2,23 @@ import { Request, Response } from 'express';
 import { registerUser } from './userService';
 import { RegisterInput } from './userTypes';
 import { registerUserSchema } from './userValidation';
+import { ApiResponse } from '@utils/ApiResponse';
 
 export async function register(req: Request, res: Response) {
-
-   const { error, value } = registerUserSchema.validate(req.body, {
+  const bodyToValidate = req.body || {};
+  
+  const { error, value } = registerUserSchema.validate(bodyToValidate, {
     abortEarly: false,
   });
-   
-    if (error) {
-    return res.status(400).json({
-      status: 'error',
-      errors: error.details.map((d) => d.message),
-    });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
   }
   
   try {
-    const body: RegisterInput = req.body;
+    const body: RegisterInput = value;
     const user = await registerUser(body);
-    res.status(201).json({ success: true, user });
+    return ApiResponse.created(res, user, 'User registered successfully');
   } catch (err: any) {
-    res.status(400).json({ success: false, message: err.message });
+    return ApiResponse.error(res, err.message);
   }
 }

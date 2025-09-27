@@ -14,10 +14,10 @@ export interface LoginInput {
 
 export interface UserDetail {
   id: number;
-  f_name: string;
-  l_name?: string;
+  FirstName: string;
+  LastName?: string|null;
   email: string;
-  phone?: string;
+  phone?: string|null;
   email_verified_at?: Date | null;
   phone_verified_at?: Date | null;
   created_at: Date;

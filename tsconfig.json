@@ -11,7 +11,8 @@
     "paths": {
       "@config/*": ["config/*"],
       "@module/*": ["modules/*"],
-      "@types/*": ["types/*"]
+      "@types/*": ["types/*"],
+      "@utils/*": ["utils/*"]
     }
   },
   "include": ["src/**/*.ts"],
