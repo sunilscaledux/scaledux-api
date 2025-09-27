@@ -12,7 +12,8 @@
       "@config/*": ["config/*"],
       "@module/*": ["modules/*"],
       "@types/*": ["types/*"],
-      "@utils/*": ["utils/*"]
+      "@utils/*": ["utils/*"],
+      "@middleware/*": ["middleware/*"]
     }
   },
   "include": ["src/**/*.ts"],
