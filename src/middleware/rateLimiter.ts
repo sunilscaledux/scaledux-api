@@ -1,13 +1,16 @@
 import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
 import { Request, Response } from 'express';
+import redisClient from '@config/radis';
 
-/**
- * Rate limiter for registration endpoint
- * Allows 5 registration attempts per 15 minutes per IP
- */
+
+
 export const registerRateLimiter = rateLimit({
+   store: new RedisStore({
+    sendCommand: (...args) => redisClient.call(...args),
+  }),
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: 5, 
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req: Request, res: Response) => {
