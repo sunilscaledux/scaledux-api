@@ -1,8 +1,8 @@
 export interface RegisterInput {
   FirstName: string;
-  LastName?: string;
-  email: string;
-  phone?: string;
+  LastName?: string | null;
+  email: string|null;
+  phone?: string | null;
   password: string;
 }
 
@@ -16,7 +16,7 @@ export interface UserDetail {
   id: number;
   FirstName: string;
   LastName?: string|null;
-  email: string;
+  email?: string|null;
   phone?: string|null;
   email_verified_at?: Date | null;
   phone_verified_at?: Date | null;
@@ -25,12 +25,12 @@ export interface UserDetail {
 }
 
 export interface VerifyOtpInput {
-  email: string;
+  identifier: string; // Can be email or phone
   otp: string;
 }
 
 export interface ResendOtpInput {
-  email: string;
+  identifier: string; // Can be email or phone
 }
 
 export interface OtpResponse {

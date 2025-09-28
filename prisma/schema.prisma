@@ -11,7 +11,7 @@ model User {
   id                Int       @id @default(autoincrement())
   FirstName              String
   LastName              String?  
-  email             String    @unique
+  email             String?    @unique
   phone             String?    @unique 
   email_verified_at DateTime? 
   phone_verified_at DateTime?
@@ -33,7 +33,7 @@ model TempUser {
   id                Int       @id @default(autoincrement())
   FirstName              String
   LastName              String?  
-  email             String    @unique
+  email             String?   @unique
   phone             String?    @unique 
   email_verified_at DateTime? 
   phone_verified_at DateTime?
