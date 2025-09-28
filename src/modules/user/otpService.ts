@@ -1,5 +1,5 @@
-import { prisma } from '../config/prisma';
-import { emailService } from './emailService';
+import { prisma } from '../../config/prisma';
+import { emailService } from '../../services/emailService';
 import crypto from 'crypto';
 
 export interface OtpData {
@@ -28,17 +28,22 @@ export class OtpService {
   }
 
   /**
-   * Generate and send email OTP
+   * Generate and send  OTP
    */
-  async generateEmailOtp(email: string, firstName?: string, userId?: number): Promise<{ success: boolean; message: string; otpId?: number }> {
+  async generateAndSendOtp(input: any, firstName?: string, userId?: number): Promise<{ success: boolean; message: string; otpId?: number }> {
     try {
       // Clean up expired OTPs for this email
-      await this.cleanupExpiredOtps(email, 'EMAIL_VERIFICATION');
+      await this.cleanupExpiredOtps(input.email, 'EMAIL_VERIFICATION');
 
       // Check if there's a recent valid OTP (within last 2 minutes to prevent spam)
       const recentOtp = await prisma.otp.findFirst({
         where: {
-          email,
+          OR:[
+            {
+              email:input.email,
+              phone:input.phone
+            }
+          ],
           otp_type: 'EMAIL_VERIFICATION',
           verified: false,
           created_at: {
@@ -62,18 +67,25 @@ export class OtpService {
       const otp = await prisma.otp.create({
         data: {
           user_id: userId,
-          email,
+          email:input.email,
+          phone:input.phone,
           otp_code: otpCode,
           otp_type: 'EMAIL_VERIFICATION',
           expires_at: expiresAt,
         }
       });
 
-      // Send email
-      const emailSent = await emailService.sendOtpEmail(email, otpCode, firstName);
+      
+      // Send otp
+      let emailSent=null;
+      if (input.email){
+       emailSent = await emailService.sendOtpEmail(input, otpCode, firstName);
+      }
 
+       if (input.phone){
+      //  TODO when we will have phone api
+       }
       if (!emailSent) {
-        // Delete the OTP if email failed to send
         await prisma.otp.delete({ where: { id: otp.id } });
         return {
           success: false,
@@ -97,14 +109,17 @@ export class OtpService {
   }
 
   /**
-   * Verify email OTP
+   * Verify OTP
    */
-  async verifyEmailOtp(email: string, otpCode: string): Promise<{ success: boolean; message: string; otpId?: number }> {
+  async verifyOtp(input:any, otpCode: string): Promise<{ success: boolean; message: string; otpId?: number }> {
     try {
       // Find valid OTP
       const otp = await prisma.otp.findFirst({
         where: {
-          email,
+          OR:{
+            email:input.email,
+            phone:input.phone
+          },
           otp_code: otpCode,
           otp_type: 'EMAIL_VERIFICATION',
           verified: false,
@@ -129,10 +144,18 @@ export class OtpService {
 
       // Update user's email_verified_at if user exists
       if (otp.user_id) {
-        await prisma.user.update({
+       if (input.email) {
+         await prisma.user.update({
           where: { id: otp.user_id },
           data: { email_verified_at: new Date() }
         });
+       }
+        if (input.phone) {
+         await prisma.user.update({
+          where: { id: otp.user_id },
+          data: { phone_verified_at: new Date() }
+        });
+       }
       }
 
       return {
@@ -153,12 +176,17 @@ export class OtpService {
   /**
    * Resend OTP
    */
-  async resendEmailOtp(email: string, firstName?: string): Promise<{ success: boolean; message: string }> {
+  async resendEmailOtp(input:any, firstName?: string): Promise<{ success: boolean; message: string }> {
     try {
       // Invalidate existing unverified OTPs
       await prisma.otp.updateMany({
         where: {
-          email,
+          OR:[
+            {
+              email:input.email,
+              phone:input.phone
+            }
+          ],
           otp_type: 'EMAIL_VERIFICATION',
           verified: false
         },
@@ -166,7 +194,7 @@ export class OtpService {
       });
 
       // Generate new OTP
-      const result = await this.generateEmailOtp(email, firstName);
+      const result = await this.generateAndSendOtp(input, firstName);
       return result;
 
     } catch (error) {
@@ -181,11 +209,16 @@ export class OtpService {
   /**
    * Clean up expired OTPs
    */
-  private async cleanupExpiredOtps(email: string, otpType: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'LOGIN_VERIFICATION'): Promise<void> {
+  private async cleanupExpiredOtps(input:any, otpType: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'LOGIN_VERIFICATION'): Promise<void> {
     try {
       await prisma.otp.deleteMany({
         where: {
-          email,
+          OR:[
+            {
+            email:input.email,
+            phone:input.phone
+            }
+          ],
           otp_type: otpType,
           expires_at: {
             lt: new Date() // Expired
@@ -235,6 +268,8 @@ export class OtpService {
       return false;
     }
   }
+
+
 }
 
 export const otpService = new OtpService();

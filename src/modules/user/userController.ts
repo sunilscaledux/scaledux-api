@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { checkUserExists,createTempUser, createUserAfterOtpVerification } from './userService';
+import { checkUserExists, createTempUser, createUserAfterOtpVerification, getTempUserByEmail, deleteTempUser } from './userService';
 import { RegisterInput, VerifyOtpInput, ResendOtpInput } from './userTypes';
 import { registerUserSchema, verifyOtpSchema, resendOtpSchema } from './userValidation';
 import { ApiResponse } from '@utils/ApiResponse';
-import { otpService } from '@services/otpService';
+import { otpService } from '@module/user/otpService';
 
 export async function register(req: Request, res: Response) {
   const bodyToValidate = req.body || {};
@@ -26,8 +26,10 @@ export async function register(req: Request, res: Response) {
     //store temp user
     await createTempUser(body)
     
+
     // Generate and send OTP
-     await otpService.generateEmailOtp(body.email, body.FirstName);
+    const input={email:body.email,phone:body.phone};
+     await otpService.generateAndSendOtp(input, body.FirstName);
     
     
     return ApiResponse.success(res, {
@@ -56,19 +58,24 @@ export async function verifyEmailOtp(req: Request, res: Response) {
     const { email, otp }: VerifyOtpInput = value;
     
     // Verify OTP
-    const verifyResult = await otpService.verifyEmailOtp(email, otp);
+    const verifyResult = await otpService.verifyOtp(email, otp);
     
     if (!verifyResult.success) {
       return ApiResponse.error(res, verifyResult.message);
     }
     
-    // Get stored registration data
-    const registrationData = checkUserExists(email);
+    // Get stored registration data from temp user
+    const registrationData = await getTempUserByEmailOrPhone(email);
     
+    if (!registrationData) {
+      return ApiResponse.error(res, 'Registration data not found. Please register again.');
+    }
     
     // Create user account
     const user = await createUserAfterOtpVerification(registrationData);
     
+    // Delete temp user after successful registration
+    await deleteTempUser(email);
     
     return ApiResponse.created(res, {
       user,

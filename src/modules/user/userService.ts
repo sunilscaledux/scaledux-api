@@ -4,35 +4,59 @@ import { RegisterInput, UserDetail } from './userTypes';
 
 export async function checkUserExists(email?: string, phone?: string): Promise<boolean> {
   const existingUser = await prisma.user.findFirst({
-    where: { OR: [{ email }, { phone: phone || undefined }] }
+    where: { OR: [{ email:email }, { phone: phone || undefined }] }
   });
-  return existingUser|{};
+  return !!existingUser;
 }
 
-export async function createTempUser(data: RegisterInput): Promise<UserDetail> {
-  
-
-  //delete temp user
-   await prisma.tempUser.deleteMany({
-    where:{
-      OR:[
-       { 
-        email:data.email,
-        phone:data.phone
-       }
-      ]
-    }
+export async function checkTempUserExists(email?: string, phone?: string): Promise<boolean> {
+  const existingTempUser = await prisma.tempUser.findFirst({
+    where: { OR: [{ email }, { phone: phone || undefined }] }
   });
-  
+  return !!existingTempUser;
+}
+
+export async function createTempUser(data: RegisterInput): Promise<any> {
+  // Delete existing temp user with same email/phone
+  await deleteTempUser(data)
 
   const hashedPassword = await bcrypt.hash(data.password, 10);
 
-  const user = await prisma.tempUser.create({
+  const tempUser = await prisma.tempUser.create({
     data: { ...data, password: hashedPassword }
   });
 
-  const { password, ...safeUser } = user;
-  return safeUser;
+  const { password, ...safeTempUser } = tempUser;
+  return safeTempUser;
+}
+
+export async function getTempUserByEmail(email: string): Promise<RegisterInput | null> {
+  const tempUser = await prisma.tempUser.findUnique({
+    where: { email }
+  });
+
+  if (!tempUser) return null;
+
+  return {
+    FirstName: tempUser.FirstName,
+    LastName: tempUser.LastName,
+    email: tempUser.email,
+    phone: tempUser.phone,
+    password: tempUser.password
+  };
+}
+
+export async function deleteTempUser(data:RegisterInput): Promise<void> {
+  await prisma.tempUser.deleteMany({
+    where: { 
+      OR:[
+        {
+          email:data.email,
+          phone:data.phone
+        }
+      ]
+     }
+  });
 }
 
 export async function createUserAfterOtpVerification(data: RegisterInput): Promise<UserDetail> {
