@@ -1,11 +1,6 @@
 import { Response } from 'express';
 import { ValidationError } from 'joi';
 
-export interface ApiResponseFormat<T = any> {
-  success: boolean;
-  message: string;
-  data: T | null;
-}
 
 // Type definitions for validation errors
 export type ValidationErrors = Record<string, string>;

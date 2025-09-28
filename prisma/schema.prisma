@@ -37,7 +37,7 @@ model TempUser {
   phone             String?    @unique 
   email_verified_at DateTime? 
   phone_verified_at DateTime?
-  password          String
+  password          String?
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
  

@@ -1,9 +1,16 @@
+export interface TempUserInput {
+  FirstName: string;
+  LastName?: string | null;
+  email: string;
+  terms?: boolean;
+  notification?: boolean;
+}
+
 export interface RegisterInput {
   FirstName: string;
   LastName?: string | null;
-  email: string|null;
-  phone?: string | null;
-  password: string;
+  email: string;
+  password?: string;
 }
 
 export interface LoginInput {
@@ -15,9 +22,9 @@ export interface LoginInput {
 export interface UserDetail {
   id: number;
   FirstName: string;
-  LastName?: string|null;
-  email?: string|null;
-  phone?: string|null;
+  LastName?: string | null;
+  email?: string | null;
+  phone?: string | null;
   email_verified_at?: Date | null;
   phone_verified_at?: Date | null;
   created_at: Date;
@@ -25,7 +32,7 @@ export interface UserDetail {
 }
 
 export interface VerifyOtpInput {
-  identifier: string; // Can be email or phone
+  email: string; // Can be email or phone
   otp: string;
 }
 

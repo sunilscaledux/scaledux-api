@@ -40,8 +40,8 @@ export const loginRateLimiter = rateLimit({
       return (redisClient as any)[command.toLowerCase()](...commandArgs);
     },
   }),
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Limit each IP to 10 requests per windowMs
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 5, // Limit each IP to 10 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
