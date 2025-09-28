@@ -59,24 +59,15 @@ export class OtpService {
         recentOtpConditions.push({ phone: cleanPhone });
       }
 
-      // Check if there's a recent valid OTP (within last 2 minutes to prevent spam)
-      const recentOtp = recentOtpConditions.length > 0 ? await prisma.otp.findFirst({
+       await prisma.otp.deleteMany({
         where: {
           OR: recentOtpConditions,
           otp_type: otpType,
-          verified: false,
-          created_at: {
-            gte: new Date(Date.now() - 2 * 60 * 1000) // 2 minutes ago
-          }
+          verified: false
         }
-      }) : null;
+      });
 
-      if (recentOtp) {
-        return {
-          success: false,
-          message: 'Please wait 2 minutes before requesting a new OTP'
-        };
-      }
+     
 
       // Generate new OTP
       const otpCode = this.generateOtpCode();
@@ -86,8 +77,8 @@ export class OtpService {
       const otp = await prisma.otp.create({
         data: {
           user_id: userId,
-          email: cleanEmail,
-          phone: cleanPhone,
+          email: input.email,
+          phone: input.phone,
           otp_code: otpCode,
           otp_type: otpType,
           expires_at: expiresAt,
@@ -98,12 +89,12 @@ export class OtpService {
       let sent = false;
       let message = '';
 
-      if (cleanEmail) {
-        sent = await emailService.sendOtpEmail(cleanEmail, otpCode, firstName);
+      if (input.email) {
+        sent = await emailService.sendOtpEmail(input.email, otpCode, firstName);
         message = sent ? 'OTP sent successfully to your email' : 'Failed to send OTP email. Please try again.';
-      } else if (cleanPhone) {
+      } else if (input.phone) {
         // TODO: Implement SMS service when available
-        // sent = await smsService.sendOtpSms(cleanPhone, otpCode, firstName);
+        // sent = await smsService.sendOtpSms(input.phone, otpCode, firstName);
         sent = true; // Temporary - assume success for phone
         message = 'OTP sent successfully to your phone';
       }
@@ -143,15 +134,7 @@ export class OtpService {
         };
       }
 
-      // Check rate limiting - max 5 attempts per 15 minutes
-      const attemptCount = await this.getOtpAttemptsCount(identifier, 15);
-      if (attemptCount >= 10) { // Allow more attempts for verification
-        return {
-          success: false,
-          message: 'Too many verification attempts. Please try again after 15 minutes.'
-        };
-      }
-
+     
       // Find valid OTP by email or phone
       const otp = await prisma.otp.findFirst({
         where: {
@@ -230,19 +213,15 @@ export class OtpService {
   /**
    * Resend OTP (Email or Phone)
    */
-  async resendEmailOtp(input: { email?: string | null; phone?: string | null }, firstName?: string): Promise<{ success: boolean; message: string }> {
+  async resendEmailOtp(input: { email?: string|null; phone?: string|null }, firstName?: string): Promise<{ success: boolean; message: string }> {
     try {
-      // Clean and validate input
-      const cleanEmail = input.email && input.email.trim() !== '' ? input.email.trim() : null;
-      const cleanPhone = input.phone && input.phone.trim() !== '' ? input.phone.trim() : null;
-      
       // Build conditions for invalidating existing OTPs
       const invalidateConditions = [];
-      if (cleanEmail) {
-        invalidateConditions.push({ email: cleanEmail });
+      if (input.email) {
+        invalidateConditions.push({ email: input.email });
       }
-      if (cleanPhone) {
-        invalidateConditions.push({ phone: cleanPhone });
+      if (input.phone) {
+        invalidateConditions.push({ phone: input.phone });
       }
 
       if (invalidateConditions.length === 0) {
@@ -253,7 +232,7 @@ export class OtpService {
       }
 
       // Determine OTP type
-      const otpType = cleanEmail ? 'EMAIL_VERIFICATION' : 'PHONE_VERIFICATION';
+      const otpType = input.email ? 'EMAIL_VERIFICATION' : 'PHONE_VERIFICATION';
 
       // Invalidate existing unverified OTPs
       await prisma.otp.updateMany({
@@ -266,7 +245,7 @@ export class OtpService {
       });
 
       // Generate new OTP
-      const result = await this.generateAndSendOtp({ email: cleanEmail, phone: cleanPhone }, firstName);
+      const result = await this.generateAndSendOtp(input, firstName);
       return result;
 
     } catch (error) {
@@ -278,7 +257,7 @@ export class OtpService {
     }
   }
 
-  /**
+  /** 
    * Clean up expired OTPs
    */
   private async cleanupExpiredOtps(input: { email?: string | null; phone?: string | null }, otpType: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'LOGIN_VERIFICATION'): Promise<void> {
@@ -309,31 +288,7 @@ export class OtpService {
     }
   }
 
-  /**
-   * Get OTP attempts count for rate limiting (Email or Phone)
-   */
-  async getOtpAttemptsCount(identifier: string, timeWindowMinutes: number = 60): Promise<number> {
-    try {
-      if (!identifier) return 0;
-
-      const count = await prisma.otp.count({
-        where: {
-          OR: [
-            { email: identifier },
-            { phone: identifier }
-          ],
-          created_at: {
-            gte: new Date(Date.now() - timeWindowMinutes * 60 * 1000)
-          }
-        }
-      });
-
-      return count;
-    } catch (error) {
-      console.error('Error getting OTP attempts count:', error);
-      return 0;
-    }
-  }
+ 
 
   /**
    * Check if identifier (email or phone) is already verified
