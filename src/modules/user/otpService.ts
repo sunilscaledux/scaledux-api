@@ -1,23 +1,12 @@
-import { prisma } from '../../config/prisma';
-import { emailService } from '../../services/emailService';
-import crypto from 'crypto';
+import { emailService } from "../../services/emailService";
+import { prisma } from "../../config/prisma";
 import { normalizeContact } from "./userService";
-
-export interface OtpData {
-  id: number;
-  email?: string;
-  phone?: string;
-  otp_code: string;
-  otp_type: 'EMAIL_VERIFICATION' | 'PHONE_VERIFICATION' | 'PASSWORD_RESET' | 'LOGIN_VERIFICATION';
-  expires_at: Date;
-  verified: boolean;
-}
 
 export class OtpService {
   /**
    * Generate a random OTP code
    */
-  public generateOtpCode(length: number = 6): string {
+  private generateOtpCode(length: number = 6): string {
     const digits = "0123456789";
     let otp = "";
 
@@ -29,19 +18,39 @@ export class OtpService {
   }
 
   /**
-   * Generate and send OTP (Email or Phone)
+   * Clean up expired OTPs for identifier
    */
-  async generateAndSendOtp(
-    email: string,
-    firstName?: string,
-    userId?: number
-  ): Promise<{ success: boolean; message: string; otpId?: number }> {
+  private async cleanupExpiredOtps(identifier: string): Promise<void> {
     try {
-      const { email: cleanEmail, phone: cleanPhone } = normalizeContact(email);
+      await prisma.otp.deleteMany({
+        where: {
+          OR: [{ email: identifier }, { phone: identifier }],
+          expires_at: {
+            lt: new Date(), // Expired
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error cleaning up expired OTPs:", error);
+    }
+  }
 
-      // Determine OTP type based on input
-      const otpType = cleanEmail ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION";
-      const identifier = cleanEmail || cleanPhone;
+  /**
+   * Generate, store and send OTP
+   */
+  async generateAndSendOtp(data: {
+    email?: string | null;
+    phone?: string | null;
+    otpType:
+      | "EMAIL_VERIFICATION"
+      | "PHONE_VERIFICATION"
+      | "PASSWORD_RESET"
+      | "LOGIN_VERIFICATION";
+    firstName?: string;
+    userId?: number;
+  }): Promise<{ success: boolean; message: string; otpId?: number }> {
+    try {
+      const identifier = data.email || data.phone;
 
       if (!identifier) {
         return {
@@ -50,41 +59,21 @@ export class OtpService {
         };
       }
 
-      // Clean up expired OTPs
-      await this.cleanupExpiredOtps(
-        { email: cleanEmail, phone: cleanPhone },
-        otpType
-      );
+      // Clean up expired OTPs first
+      await this.cleanupExpiredOtps(identifier);
 
-      // Build conditions for recent OTP check
-      const recentOtpConditions = [];
-      if (cleanEmail) {
-        recentOtpConditions.push({ email: cleanEmail });
-      }
-      if (cleanPhone) {
-        recentOtpConditions.push({ phone: cleanPhone });
-      }
-
-      await prisma.otp.deleteMany({
-        where: {
-          OR: recentOtpConditions,
-          otp_type: otpType,
-          verified: false,
-        },
-      });
-
-      // Generate new OTP
+      // Generate OTP code
       const otpCode = this.generateOtpCode();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
       // Save OTP to database
       const otp = await prisma.otp.create({
         data: {
-          user_id: userId,
-          email: input.email,
-          phone: input.phone,
+          user_id: data.userId,
+          email: data.email,
+          phone: data.phone,
           otp_code: otpCode,
-          otp_type: otpType,
+          otp_type: data.otpType,
           expires_at: expiresAt,
         },
       });
@@ -93,19 +82,20 @@ export class OtpService {
       let sent = false;
       let message = "";
 
-      if (input.email) {
-        sent = await emailService.sendOtpEmail(input.email, otpCode, firstName);
+      if (data.email) {
+        sent = await this.sendEmailOtp(data.email, otpCode, data.firstName);
         message = sent
           ? "OTP sent successfully to your email"
           : "Failed to send OTP email. Please try again.";
-      } else if (input.phone) {
-        // TODO: Implement SMS service when available
-        // sent = await smsService.sendOtpSms(input.phone, otpCode, firstName);
-        sent = true; // Temporary - assume success for phone
-        message = "OTP sent successfully to your phone";
+      } else if (data.phone) {
+        sent = await this.sendSmsOtp(data.phone, otpCode, data.firstName);
+        message = sent
+          ? "OTP sent successfully to your phone"
+          : "Failed to send OTP SMS. Please try again.";
       }
 
       if (!sent) {
+        // Delete OTP if sending failed
         await prisma.otp.delete({ where: { id: otp.id } });
         return {
           success: false,
@@ -119,7 +109,7 @@ export class OtpService {
         otpId: otp.id,
       };
     } catch (error) {
-      console.error("Error generating OTP:", error);
+      console.error("Error generating and sending OTP:", error);
       return {
         success: false,
         message: "Failed to generate OTP. Please try again.",
@@ -128,7 +118,7 @@ export class OtpService {
   }
 
   /**
-   * Verify OTP (Email or Phone) with rate limiting
+   * Verify OTP
    */
   async verifyOtp(
     identifier: string,
@@ -142,7 +132,7 @@ export class OtpService {
         };
       }
 
-      // Find valid OTP by email or phone
+      // Find valid OTP
       const otp = await prisma.otp.findFirst({
         where: {
           OR: [{ email: identifier }, { phone: identifier }],
@@ -155,7 +145,6 @@ export class OtpService {
       });
 
       if (!otp) {
-        // Log failed attempt for security monitoring
         console.warn(
           `Failed OTP verification attempt for identifier: ${identifier}`
         );
@@ -171,23 +160,7 @@ export class OtpService {
         data: { verified: true },
       });
 
-      // Update user's verification status if user exists
-      if (otp.user_id) {
-        if (otp.email) {
-          await prisma.user.update({
-            where: { id: otp.user_id },
-            data: { email_verified_at: new Date() },
-          });
-        }
-        if (otp.phone) {
-          await prisma.user.update({
-            where: { id: otp.user_id },
-            data: { phone_verified_at: new Date() },
-          });
-        }
-      }
-
-      // Invalidate any other unverified OTPs for this identifier
+      // Invalidate other unverified OTPs for this identifier
       await prisma.otp.updateMany({
         where: {
           OR: [{ email: identifier }, { phone: identifier }],
@@ -195,6 +168,18 @@ export class OtpService {
           id: { not: otp.id },
         },
         data: { verified: true },
+      });
+
+      //mark temp user verified
+      const input = normalizeContact(identifier);
+      const inputToVerified = input.email
+        ? { email_verified_at: new Date() }
+        : { phone_verified_at: new Date() };
+      await prisma.tempUser.updateMany({
+        where: {
+          OR: [{ email: identifier }, { phone: identifier }],
+        },
+        data: inputToVerified,
       });
 
       const verificationType = otp.email ? "Email" : "Phone";
@@ -213,45 +198,45 @@ export class OtpService {
   }
 
   /**
-   * Resend OTP (Email or Phone)
+   * Resend OTP
    */
-  async resendEmailOtp(
-    input: { email?: string | null; phone?: string | null },
-    firstName?: string
-  ): Promise<{ success: boolean; message: string }> {
+  async resendOtp(data: {
+    email?: string;
+    phone?: string;
+    firstName?: string;
+  }): Promise<{ success: boolean; message: string }> {
     try {
-      // Build conditions for invalidating existing OTPs
-      const invalidateConditions = [];
-      if (input.email) {
-        invalidateConditions.push({ email: input.email });
-      }
-      if (input.phone) {
-        invalidateConditions.push({ phone: input.phone });
-      }
+      const identifier = data.email || data.phone;
 
-      if (invalidateConditions.length === 0) {
+      if (!identifier) {
         return {
           success: false,
           message: "Email or phone number is required",
         };
       }
 
-      // Determine OTP type
-      const otpType = input.email ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION";
-
       // Invalidate existing unverified OTPs
       await prisma.otp.updateMany({
         where: {
-          OR: invalidateConditions,
-          otp_type: otpType,
+          OR: [{ email: identifier }, { phone: identifier }],
           verified: false,
         },
-        data: { verified: true }, // Mark as verified to invalidate
+        data: { verified: true },
       });
 
-      // Generate new OTP
-      const result = await this.generateAndSendOtp(input, firstName);
-      return result;
+      // Generate and send new OTP
+      const otpType = data.email ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION";
+      const result = await this.generateAndSendOtp({
+        email: data.email,
+        phone: data.phone,
+        otpType,
+        firstName: data.firstName,
+      });
+
+      return {
+        success: result.success,
+        message: result.message,
+      };
     } catch (error) {
       console.error("Error resending OTP:", error);
       return {
@@ -262,97 +247,40 @@ export class OtpService {
   }
 
   /**
-   * Clean up expired OTPs
+   * Send OTP via email
    */
-  private async cleanupExpiredOtps(
-    input: { email?: string | null; phone?: string | null },
-    otpType:
-      | "EMAIL_VERIFICATION"
-      | "PHONE_VERIFICATION"
-      | "PASSWORD_RESET"
-      | "LOGIN_VERIFICATION"
-  ): Promise<void> {
+  private async sendEmailOtp(
+    email: string,
+    otpCode: string,
+    firstName?: string
+  ): Promise<boolean> {
     try {
-      // Build conditions for cleanup
-      const cleanupConditions = [];
-      if (input.email && input.email.trim() !== "") {
-        cleanupConditions.push({ email: input.email });
-      }
-      if (input.phone && input.phone.trim() !== "") {
-        cleanupConditions.push({ phone: input.phone });
-      }
-
-      // Only cleanup if we have valid conditions
-      if (cleanupConditions.length > 0) {
-        await prisma.otp.deleteMany({
-          where: {
-            OR: cleanupConditions,
-            otp_type: otpType,
-            expires_at: {
-              lt: new Date(), // Expired
-            },
-          },
-        });
-      }
+      return await emailService.sendOtpEmail(email, otpCode, firstName);
     } catch (error) {
-      console.error("Error cleaning up expired OTPs:", error);
+      console.error("Error sending email OTP:", error);
+      return false;
     }
   }
 
   /**
-   * Check if identifier (email or phone) is already verified
+   * Send OTP via SMS (placeholder for future implementation)
    */
-  async isIdentifierVerified(
-    identifier: string
-  ): Promise<{ isVerified: boolean; type: "email" | "phone" | null }> {
+  private async sendSmsOtp(
+    phone: string,
+    otpCode: string,
+    firstName?: string
+  ): Promise<boolean> {
     try {
-      if (!identifier) {
-        return { isVerified: false, type: null };
-      }
-
-      // Check if it's an email (simple email pattern check)
-      const isEmail = identifier.includes("@");
-
-      if (isEmail) {
-        const user = await prisma.user.findUnique({
-          where: { email: identifier },
-          select: { email_verified_at: true },
-        });
-        return {
-          isVerified: !!user?.email_verified_at,
-          type: "email",
-        };
-      } else {
-        // Assume it's a phone number
-        const user = await prisma.user.findUnique({
-          where: { phone: identifier },
-          select: { phone_verified_at: true },
-        });
-        return {
-          isVerified: !!user?.phone_verified_at,
-          type: "phone",
-        };
-      }
+      // TODO: Implement SMS service when available
+      // return await smsService.sendOtpSms(phone, otpCode, firstName);
+      console.log(
+        `SMS OTP ${otpCode} would be sent to ${phone} for ${firstName}`
+      );
+      return true; // Temporary - assume success for phone
     } catch (error) {
-      console.error("Error checking identifier verification status:", error);
-      return { isVerified: false, type: null };
+      console.error("Error sending SMS OTP:", error);
+      return false;
     }
-  }
-
-  /**
-   * Check if email is already verified (backward compatibility)
-   */
-  async isEmailVerified(email: string): Promise<boolean> {
-    const result = await this.isIdentifierVerified(email);
-    return result.isVerified && result.type === "email";
-  }
-
-  /**
-   * Check if phone is already verified
-   */
-  async isPhoneVerified(phone: string): Promise<boolean> {
-    const result = await this.isIdentifierVerified(phone);
-    return result.isVerified && result.type === "phone";
   }
 }
 

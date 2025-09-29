@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import {
   checkUserExists,
   createTempUser,
-  createUserAfterOtpVerification,
   deleteTempUser,
   userLogin,
   normalizeContact,
@@ -38,7 +37,7 @@ export async function storeTempUser(req: Request, res: Response) {
   }
 
   try {
-    const body: TempUserInput = value;
+    const body = value as TempUserInput;
 
     const isUserExist = await checkUserExists(body.email);
     if (isUserExist) {
@@ -49,11 +48,12 @@ export async function storeTempUser(req: Request, res: Response) {
     await createTempUser(body);
 
     // Generate and send OTP
-    const input = { email: body.email };
-    const otpResult = await otpService.generateAndSendOtp(
-      input,
-      body.FirstName
-    );
+    const otpResult = await otpService.generateAndSendOtp({
+      email: contactInfo.email,
+      phone: contactInfo.phone, //phone from normalize contact
+      otpType: contactInfo.email ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION",
+      firstName: body.FirstName,
+    });
 
     if (!otpResult.success) {
       await deleteTempUser(body.email);
@@ -99,14 +99,13 @@ export async function register(req: Request, res: Response) {
     await createTempUser(body);
 
     // Generate and send OTP
-    const input = { email: body.email, phone: body.phone };
-    const otpResult = await otpService.generateAndSendOtp(
-      input,
-      body.FirstName
-    );
+    const otpResult = await otpService.generateAndSendOtp({
+      email: body.email,
+      otpType: "EMAIL_VERIFICATION",
+      firstName: body.FirstName,
+    });
 
     if (!otpResult.success) {
-      // Remove stored data if OTP generation fails
       await deleteTempUser(body.email);
       return ApiResponse.error(res, otpResult.message);
     }
@@ -178,7 +177,7 @@ export async function verifyEmailOtp(req: Request, res: Response) {
   try {
     const { email, otp }: VerifyOtpInput = value;
 
-    // Verify OTP - pass identifier (email or phone)
+    // Verify OTP using otpService
     const verifyResult = await otpService.verifyOtp(email, otp);
 
     if (!verifyResult.success) {
@@ -194,9 +193,6 @@ export async function verifyEmailOtp(req: Request, res: Response) {
         "Registration data not found. Please register again."
       );
     }
-
-    // Delete temp user after successful registration
-    await deleteTempUser(email);
 
     return ApiResponse.created(
       res,
@@ -234,17 +230,11 @@ export async function resendOtp(req: Request, res: Response) {
       );
     }
 
-    // Prepare input for OTP service
-    const input = {
+    // Resend OTP using otpService
+    const resendResult = await otpService.resendOtp({
       email: registrationData.email,
-      phone: registrationData.phone,
-    };
-
-    // Resend OTP
-    const resendResult = await otpService.resendEmailOtp(
-      input,
-      registrationData.FirstName
-    );
+      firstName: registrationData.FirstName,
+    });
 
     if (!resendResult.success) {
       return ApiResponse.error(res, resendResult.message);

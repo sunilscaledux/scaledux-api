@@ -15,4 +15,5 @@ router.post('/verify-email-otp', otpVerificationRateLimiter, verifyEmailOtp);
 router.post('/resend-otp', otpResendRateLimiter, resendOtp);
 router.post('/login', loginRateLimiter, login);
 
+
 export default router;
