@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import bcrypt from "bcrypt";
 import {
   checkUserExists,
   userLogin,
@@ -64,7 +65,56 @@ export async function initiateRegistration(req: Request, res: Response) {
 }
 
 export async function register(req: Request, res: Response) {
-  // return initiateRegistration(req, res);
+  const rawBody = req.body || {};
+  const contactInfo = normalizeContact(rawBody.email);
+
+  const { error, value } = registerUserSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  try {
+    const identifier = contactInfo.email || contactInfo.phone;
+    if (!identifier) {
+      return ApiResponse.error(res, "Valid email or phone number is required");
+    }
+
+    // Check if user already exists
+    const isUserExist = await checkUserExists(identifier);
+    if (isUserExist) {
+      const contactMethod = contactInfo.email ? "email" : "phone";
+      return ApiResponse.error(res, `This ${contactMethod} is already in use.`);
+    }
+
+    // Check if OTP is verified for this identifier
+    const registrationData = await otpService.getRegistrationData(identifier);
+    if (!registrationData || !registrationData.verified) {
+      return ApiResponse.error(
+        res,
+        "Please verify your email/phone number first before completing registration."
+      );
+    }
+
+    const user = await createUserAfterOtpVerification(rawBody);
+
+    return ApiResponse.created(
+      res,
+      {
+        user: {
+          id: user.id,
+          firstName: user.FirstName,
+          lastName: user.LastName,
+          email: user.email,
+          phone: user.phone,
+        },
+      },
+      "Registration completed successfully. You can now login."
+    );
+  } catch (err: any) {
+    return ApiResponse.error(res, err.message);
+  }
 }
 
 export async function login(req: Request, res: Response) {

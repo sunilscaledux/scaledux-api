@@ -8,22 +8,26 @@ import {
 
 
 export const registerUserSchema = Joi.object<RegisterInput>({
-  FirstName: Joi.string().min(2).max(50).required().messages({
+  FirstName: Joi.string().min(1).required().messages({
     "any.required": "First name is required",
-    "string.min": "First name must be at least 2 characters long",
-    "string.max": "First name cannot exceed 50 characters",
+    "string.min": "First name is required",
   }),
-  LastName: Joi.string().min(2).max(50).optional().allow(null, "").messages({
-    "string.min": "Last name must be at least 2 characters long",
-    "string.max": "Last name cannot exceed 50 characters",
+  LastName: Joi.string().min(1).required().messages({
+    "any.required": "Last name is required",
+    "string.min": "Last name is required",
   }),
-  email: Joi.string().optional().allow(null, "").messages({
-    "string.email": "Please enter a valid email address",
+  email: Joi.string().required().messages({
+    "any.required": "Email or phone number is required",
   }),
   password: Joi.string().min(8).required().messages({
     "any.required": "Password is required",
     "string.min": "Password must be at least 8 characters long",
   }),
+  terms: Joi.boolean().valid(true).required().messages({
+    "any.required": "You must accept the terms",
+    "any.only": "You must accept the terms",
+  }),
+  notification: Joi.boolean().optional(),
 });
 
 export const loginUserSchema = Joi.object<LoginInput>({

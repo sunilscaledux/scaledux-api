@@ -1,8 +1,10 @@
 export interface RegisterInput {
   FirstName: string;
-  LastName?: string | null;
+  LastName: string;
   email: string;
-  password?: string;
+  password: string;
+  terms: boolean;
+  notification?: boolean;
 }
 
 export interface LoginInput {

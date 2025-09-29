@@ -240,6 +240,9 @@ export class OtpService {
           otp_type: {
             in: ["EMAIL_VERIFICATION", "PHONE_VERIFICATION"],
           },
+          expires_at: {
+            gt: new Date(), // Not expired
+          },
         },
         orderBy: {
           created_at: "desc",

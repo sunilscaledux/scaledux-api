@@ -23,20 +23,27 @@ export async function checkUserExists(input: string): Promise<boolean> {
 export async function createUserAfterOtpVerification(
   data: RegisterInput
 ): Promise<UserDetail> {
-  // Double-check user doesn't exist
-  const userExists = await checkUserExists(data.email);
-  if (userExists) throw new Error("User already exists");
-  const verificationData: any = {
-    ...data,
-  };
+  const hashedPassword = await bcrypt.hash(data.password, 10);
+  const contactInfo = normalizeContact(data.email);
 
+  const userData = {
+    FirstName: data.FirstName,
+    LastName: data.LastName,
+    email: contactInfo.email || data.email,
+    phone: contactInfo.phone,
+    password: hashedPassword,
+    terms: data.terms,
+    notification: data.notification || false,
+    email_verified_at,
+    phone_verified_at,
+  };
   // Set verification timestamp for the method that was used
   if (data.email) {
-    verificationData.email_verified_at = new Date();
+    userData.email_verified_at = new Date();
   }
-  // if (data.phone) {
-  //   verificationData.phone_verified_at = new Date();
-  // }
+  if (data?.phone) {
+    userData.phone_verified_at = new Date();
+  }
 
   const user = await prisma.user.create({
     data: verificationData,
