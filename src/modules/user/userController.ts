@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import {
   checkUserExists,
   userLogin,
+  userOtpLogin,
   createUserAfterOtpVerification,
   normalizeContact,
 } from "./userService";
@@ -181,6 +182,125 @@ export async function verifyEmailOtp(req: Request, res: Response) {
         identifier: identifier,
       },
       "OTP verified successfully. You can now complete registration."
+    );
+  } catch (err: any) {
+    return ApiResponse.error(res, err.message);
+  }
+}
+
+export async function checkUserExistsForLogin(req: Request, res: Response) {
+  const rawBody = req.body || {};
+  const contactInfo = normalizeContact(rawBody.identifier);
+  const { error, value } = resendOtpSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  try {
+    const body: ResendOtpInput = value;
+    const contactMethod = contactInfo.email ? "email" : "phone";
+
+    const isUserExist = await checkUserExists(body.identifier);
+
+    if (!isUserExist) {
+      return ApiResponse.error(res, `No account found with this ${contactMethod}. Please sign up first.`);
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        identifier: body.identifier,
+        exists: true
+      },
+      `User found. Please enter your password.`
+    );
+  } catch (err: any) {
+    return ApiResponse.error(res, err.message);
+  }
+}
+
+export async function requestLoginOtp(req: Request, res: Response) {
+  const rawBody = req.body || {};
+  const contactInfo = normalizeContact(rawBody.identifier);
+  const { error, value } = resendOtpSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  try {
+    const body: ResendOtpInput = value;
+    const contactMethod = contactInfo.email ? "email" : "phone";
+
+    // Check if user exists first
+    const isUserExist = await checkUserExists(body.identifier);
+    if (!isUserExist) {
+      return ApiResponse.error(res, `No account found with this ${contactMethod}. Please sign up first.`);
+    }
+
+    // Generate and send OTP for login
+    const otpResult = await otpService.generateAndSendOtp({
+      email: contactInfo.email || undefined,
+      phone: contactInfo.phone || undefined,
+      otpType: contactInfo.email ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION",
+    });
+
+    if (!otpResult.success) {
+      return ApiResponse.error(res, otpResult.message);
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        identifier: body.identifier,
+        expiresIn: 600, // 10 minutes
+      },
+      `Login OTP sent successfully. Please check your ${contactMethod}.`
+    );
+  } catch (err: any) {
+    return ApiResponse.error(res, err.message);
+  }
+}
+
+export async function verifyLoginOtp(req: Request, res: Response) {
+  const bodyToValidate = req.body || {};
+
+  const { error, value } = verifyOtpSchema.validate(bodyToValidate, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  try {
+    const { identifier, otp }: VerifyOtpInput = value;
+
+    // Verify OTP using otpService
+    const response = await otpService.verifyOtp(identifier, otp);
+
+    if (!response.success) {
+      return ApiResponse.error(res, response.message);
+    }
+
+    // If OTP is verified, perform login (get user details)
+    const loginResult = await userOtpLogin(identifier);
+
+    if (!loginResult.success) {
+      return ApiResponse.error(res, loginResult.message);
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        user: loginResult.user,
+        token: loginResult.token,
+        expiresIn: "24h",
+      },
+      "OTP login successful"
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);

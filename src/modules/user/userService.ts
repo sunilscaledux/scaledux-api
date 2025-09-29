@@ -136,6 +136,64 @@ export async function userLogin(data: LoginInput): Promise<{
   }
 }
 
+export async function userOtpLogin(identifier: string): Promise<{
+  success: boolean;
+  message: string;
+  user?: UserDetail;
+  token?: string;
+}> {
+  try {
+    const contactInfo = normalizeContact(identifier);
+    
+    // Build conditions for finding user
+    const conditions = [];
+    if (contactInfo.email) {
+      conditions.push({ email: contactInfo.email });
+    }
+    if (contactInfo.phone) {
+      conditions.push({ phone: contactInfo.phone });
+    }
+
+    if (conditions.length === 0) {
+      return {
+        success: false,
+        message: "Email or phone number is required",
+      };
+    }
+
+    // Find user by email or phone
+    const user = await prisma.user.findFirst({
+      where: { OR: conditions },
+    });
+    
+    if (!user) {
+      return {
+        success: false,
+        message: "User not found",
+      };
+    }
+
+    // Generate JWT token
+    const token = generateJwtToken(user);
+
+    // Return safe user data (without password)
+    const { password: _, ...safeUser } = user;
+
+    return {
+      success: true,
+      message: "OTP login successful",
+      user: safeUser,
+      token,
+    };
+  } catch (error) {
+    console.error("OTP Login error:", error);
+    return {
+      success: false,
+      message: "Login failed. Please try again.",
+    };
+  }
+}
+
 export function normalizeContact(email: string) {
   const incoming = email;
 
