@@ -6,8 +6,6 @@ import {
   login,
   initiateRegistration,
   checkUserExistsForLogin,
-  requestLoginOtp,
-  verifyLoginOtp,
 } from "./userController";
 import {
   registerRateLimiter,
@@ -23,8 +21,6 @@ router.post('/register', registerRateLimiter, register);
 router.post('/verify-email-otp', otpVerificationRateLimiter, verifyEmailOtp);
 router.post('/resend-otp', otpResendRateLimiter, resendOtp);
 router.post('/check-user-exists', loginRateLimiter, checkUserExistsForLogin);
-router.post('/request-login-otp', otpResendRateLimiter, requestLoginOtp);
-router.post('/verify-login-otp', otpVerificationRateLimiter, verifyLoginOtp);
 router.post('/login', loginRateLimiter, login);
 
 

@@ -64,11 +64,18 @@ export async function userLogin(data: LoginInput): Promise<{
   token?: string;
 }> {
   try {
+    // Normalize the contact information
+    const contactInfo = normalizeContact(data.email || "");
+    
     // Build conditions for finding user
     const conditions = [];
-    if (data.email && data.email.trim() !== "") {
-      conditions.push({ email: data.email });
+    if (contactInfo.email) {
+      conditions.push({ email: contactInfo.email });
     }
+    if (contactInfo.phone) {
+      conditions.push({ phone: contactInfo.phone });
+    }
+    // Fallback for direct phone input
     if (data.phone && data.phone.trim() !== "") {
       conditions.push({ phone: data.phone });
     }
@@ -100,14 +107,22 @@ export async function userLogin(data: LoginInput): Promise<{
       };
     }
 
-    // Check if email/phone is verified (if provided)
-    if (data.email && !user.email_verified_at) {
+    // Check if the contact method used for login is verified
+    if (contactInfo.email && !user.email_verified_at) {
       return {
         success: false,
         message: "Please verify your email before logging in",
       };
     }
 
+    if (contactInfo.phone && !user.phone_verified_at) {
+      return {
+        success: false,
+        message: "Please verify your phone number before logging in",
+      };
+    }
+
+    // Check direct phone input verification
     if (data.phone && !user.phone_verified_at) {
       return {
         success: false,
@@ -170,6 +185,21 @@ export async function userOtpLogin(identifier: string): Promise<{
       return {
         success: false,
         message: "User not found",
+      };
+    }
+
+    // Check if the contact method used for login is verified
+    if (contactInfo.email && !user.email_verified_at) {
+      return {
+        success: false,
+        message: "Please verify your email before logging in",
+      };
+    }
+
+    if (contactInfo.phone && !user.phone_verified_at) {
+      return {
+        success: false,
+        message: "Please verify your phone number before logging in",
       };
     }
 

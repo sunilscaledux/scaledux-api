@@ -41,11 +41,7 @@ export class OtpService {
   async generateAndSendOtp(data: {
     email?: string | null;
     phone?: string | null;
-    otpType:
-      | "EMAIL_VERIFICATION"
-      | "PHONE_VERIFICATION"
-      | "PASSWORD_RESET"
-      | "LOGIN_VERIFICATION";
+    otpType: "REGISTRATION_VERIFICATION";
     userId?: number;
   }): Promise<{ success: boolean; message: string; otpId?: number }> {
     try {
@@ -117,7 +113,7 @@ export class OtpService {
   }
 
   /**
-   * Verify OTP
+   * Verify OTP for registration
    */
   async verifyOtp(
     identifier: string,
@@ -131,15 +127,35 @@ export class OtpService {
         };
       }
 
+      const contactInfo = normalizeContact(identifier);
+      
+      // Build where conditions for registration OTP only
+      const whereConditions: any = {
+        otp_code: otpCode,
+        verified: false,
+        expires_at: {
+          gt: new Date(), // Must not be expired
+        },
+        otp_type: "REGISTRATION_VERIFICATION"
+      };
+
+      // Add identifier conditions
+      if (contactInfo.email) {
+        whereConditions.email = contactInfo.email;
+      } else if (contactInfo.phone) {
+        whereConditions.phone = contactInfo.phone;
+      } else {
+        return {
+          success: false,
+          message: "Invalid email or phone format",
+        };
+      }
+
       // Find valid OTP
       const otp = await prisma.otp.findFirst({
-        where: {
-          OR: [{ email: identifier }, { phone: identifier }],
-          otp_code: otpCode,
-          verified: false,
-          expires_at: {
-            gt: new Date(), // Not expired
-          },
+        where: whereConditions,
+        orderBy: {
+          created_at: 'desc', // Get the most recent OTP
         },
       });
 
@@ -159,7 +175,10 @@ export class OtpService {
       // Invalidate other unverified OTPs for this identifier
       await prisma.otp.updateMany({
         where: {
-          OR: [{ email: identifier }, { phone: identifier }],
+          OR: [
+            { email: contactInfo.email },
+            { phone: contactInfo.phone }
+          ].filter(Boolean),
           verified: false,
           id: { not: otp.id },
         },
@@ -208,11 +227,10 @@ export class OtpService {
       });
 
       // Generate and send new OTP
-      const otpType = data.email ? "EMAIL_VERIFICATION" : "PHONE_VERIFICATION";
       const result = await this.generateAndSendOtp({
         email: data.email,
         phone: data.phone,
-        otpType,
+        otpType: "REGISTRATION_VERIFICATION",
       });
 
       return {
@@ -237,9 +255,7 @@ export class OtpService {
         where: {
           OR: [{ email: identifier }, { phone: identifier }],
           verified: true,
-          otp_type: {
-            in: ["EMAIL_VERIFICATION", "PHONE_VERIFICATION"],
-          },
+          otp_type: "REGISTRATION_VERIFICATION",
           expires_at: {
             gt: new Date(), // Not expired
           },
