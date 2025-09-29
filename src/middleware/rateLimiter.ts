@@ -13,20 +13,21 @@ export const registerRateLimiter = rateLimit({
     },
   }),
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, 
+  max: 20,
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       success: false,
-      message: 'Too many registration attempts. Please try again after 15 minutes.',
+      message:
+        "Too many registration attempts. Please try again after 15 minutes.",
       data: {
         retryAfter: 900, // 15 minutes in seconds
         limit: 5,
-        windowMs: 15 * 60 * 1000
-      }
+        windowMs: 15 * 60 * 1000,
+      },
     });
-  }
+  },
 });
 
 /**
@@ -69,20 +70,21 @@ export const otpVerificationRateLimiter = rateLimit({
     },
   }),
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, 
+  max: 15,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       success: false,
-      message: 'Too many OTP verification attempts. Please try again after 15 minutes.',
+      message:
+        "Too many OTP verification attempts. Please try again after 15 minutes.",
       data: {
         retryAfter: 900, // 15 minutes in seconds
         limit: 10,
-        windowMs: 15 * 60 * 1000
-      }
+        windowMs: 15 * 60 * 1000,
+      },
     });
-  }
+  },
 });
 
 /**
