@@ -1,11 +1,3 @@
-export interface TempUserInput {
-  FirstName: string;
-  LastName?: string | null;
-  email: string;
-  terms?: boolean;
-  notification?: boolean;
-}
-
 export interface RegisterInput {
   FirstName: string;
   LastName?: string | null;
@@ -32,7 +24,7 @@ export interface UserDetail {
 }
 
 export interface VerifyOtpInput {
-  email: string; // Can be email or phone
+  identifier: string; // Can be email or phone
   otp: string;
 }
 

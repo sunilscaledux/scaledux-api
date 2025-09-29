@@ -46,7 +46,6 @@ export class OtpService {
       | "PHONE_VERIFICATION"
       | "PASSWORD_RESET"
       | "LOGIN_VERIFICATION";
-    firstName?: string;
     userId?: number;
   }): Promise<{ success: boolean; message: string; otpId?: number }> {
     try {
@@ -83,12 +82,12 @@ export class OtpService {
       let message = "";
 
       if (data.email) {
-        sent = await this.sendEmailOtp(data.email, otpCode, data.firstName);
+        sent = await this.sendEmailOtp(data.email, otpCode);
         message = sent
           ? "OTP sent successfully to your email"
           : "Failed to send OTP email. Please try again.";
       } else if (data.phone) {
-        sent = await this.sendSmsOtp(data.phone, otpCode, data.firstName);
+        sent = await this.sendSmsOtp(data.phone, otpCode);
         message = sent
           ? "OTP sent successfully to your phone"
           : "Failed to send OTP SMS. Please try again.";
@@ -123,7 +122,7 @@ export class OtpService {
   async verifyOtp(
     identifier: string,
     otpCode: string
-  ): Promise<{ success: boolean; message: string; otpId?: number }> {
+  ): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       if (!identifier || !otpCode) {
         return {
@@ -145,9 +144,6 @@ export class OtpService {
       });
 
       if (!otp) {
-        console.warn(
-          `Failed OTP verification attempt for identifier: ${identifier}`
-        );
         return {
           success: false,
           message: "Invalid or expired OTP",
@@ -170,23 +166,11 @@ export class OtpService {
         data: { verified: true },
       });
 
-      //mark temp user verified
-      const input = normalizeContact(identifier);
-      const inputToVerified = input.email
-        ? { email_verified_at: new Date() }
-        : { phone_verified_at: new Date() };
-      await prisma.tempUser.updateMany({
-        where: {
-          OR: [{ email: identifier }, { phone: identifier }],
-        },
-        data: inputToVerified,
-      });
-
       const verificationType = otp.email ? "Email" : "Phone";
       return {
         success: true,
         message: `${verificationType} verified successfully`,
-        otpId: otp.id,
+        data: otp,
       };
     } catch (error) {
       console.error("Error verifying OTP:", error);
@@ -203,7 +187,6 @@ export class OtpService {
   async resendOtp(data: {
     email?: string;
     phone?: string;
-    firstName?: string;
   }): Promise<{ success: boolean; message: string }> {
     try {
       const identifier = data.email || data.phone;
@@ -230,7 +213,6 @@ export class OtpService {
         email: data.email,
         phone: data.phone,
         otpType,
-        firstName: data.firstName,
       });
 
       return {
@@ -247,15 +229,44 @@ export class OtpService {
   }
 
   /**
+   * Get registration data from the most recent verified OTP for identifier
+   */
+  async getRegistrationData(identifier: string): Promise<any | null> {
+    try {
+      const otp = await prisma.otp.findFirst({
+        where: {
+          OR: [{ email: identifier }, { phone: identifier }],
+          verified: true,
+          otp_type: {
+            in: ["EMAIL_VERIFICATION", "PHONE_VERIFICATION"],
+          },
+        },
+        orderBy: {
+          created_at: "desc",
+        },
+      });
+
+      if (!otp) return null;
+
+      // Return the contact info from the OTP record
+      return {
+        email: otp.email,
+        phone: otp.phone,
+        otpId: otp.id,
+        verified: otp.verified,
+      };
+    } catch (error) {
+      console.error("Error getting registration data:", error);
+      return null;
+    }
+  }
+
+  /**
    * Send OTP via email
    */
-  private async sendEmailOtp(
-    email: string,
-    otpCode: string,
-    firstName?: string
-  ): Promise<boolean> {
+  private async sendEmailOtp(email: string, otpCode: string): Promise<boolean> {
     try {
-      return await emailService.sendOtpEmail(email, otpCode, firstName);
+      return await emailService.sendOtpEmail(email, otpCode);
     } catch (error) {
       console.error("Error sending email OTP:", error);
       return false;
@@ -265,17 +276,11 @@ export class OtpService {
   /**
    * Send OTP via SMS (placeholder for future implementation)
    */
-  private async sendSmsOtp(
-    phone: string,
-    otpCode: string,
-    firstName?: string
-  ): Promise<boolean> {
+  private async sendSmsOtp(phone: string, otpCode: string): Promise<boolean> {
     try {
       // TODO: Implement SMS service when available
       // return await smsService.sendOtpSms(phone, otpCode, firstName);
-      console.log(
-        `SMS OTP ${otpCode} would be sent to ${phone} for ${firstName}`
-      );
+      console.log(`SMS OTP ${otpCode} would be sent to ${phone}`);
       return true; // Temporary - assume success for phone
     } catch (error) {
       console.error("Error sending SMS OTP:", error);

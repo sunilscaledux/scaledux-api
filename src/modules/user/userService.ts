@@ -1,11 +1,6 @@
 import { prisma } from "@config/prisma";
 import bcrypt from "bcrypt";
-import {
-  LoginInput,
-  RegisterInput,
-  TempUserInput,
-  UserDetail,
-} from "./userTypes";
+import { LoginInput, RegisterInput, UserDetail } from "./userTypes";
 import { generateJwtToken } from "@utils/jwtUtils";
 
 export async function checkUserExists(input: string): Promise<boolean> {
@@ -23,59 +18,6 @@ export async function checkUserExists(input: string): Promise<boolean> {
   });
 
   return !!existingUser;
-}
-
-export async function checkTempUserExists(input: string): Promise<boolean> {
-  const existingTempUser = await prisma.tempUser.findFirst({
-    where: {
-      OR: [
-        {
-          phone: input,
-        },
-        {
-          email: input,
-        },
-      ],
-    },
-  });
-
-  return !!existingTempUser;
-}
-
-export async function createTempUser(data: TempUserInput): Promise<any> {
-  const input = normalizeContact(data.email);
-  await deleteTempUser(data.email);
-  return await prisma.tempUser.create({
-    data: { ...data, ...input },
-  });
-}
-
-export async function getTempUser(input: string): Promise<any | null> {
-  const tempUser = await prisma.tempUser.findFirst({
-    where: {
-      OR: [{ email: input }, { phone: input }],
-    },
-  });
-
-  if (!tempUser) return null;
-
-  return tempUser;
-}
-
-export async function deleteTempUser(input: string): Promise<void> {
-  await prisma.user.deleteMany({
-    where: {
-      OR: [
-        {
-          phone: input,
-        },
-        {
-          email: input,
-        },
-      ],
-    },
-  });
-  return;
 }
 
 export async function createUserAfterOtpVerification(
