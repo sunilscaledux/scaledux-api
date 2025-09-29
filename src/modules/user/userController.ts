@@ -2,8 +2,8 @@ import { Request, Response } from 'express';
 import {
   checkUserExists,
   userLogin,
-  normalizeContact,
   createUserAfterOtpVerification,
+  normalizeContact,
 } from "./userService";
 import {
   RegisterInput,
@@ -32,10 +32,12 @@ export async function initiateRegistration(req: Request, res: Response) {
 
   try {
     const body: ResendOtpInput = value;
+    const contactMethod = contactInfo.email ? "email" : "phone";
 
     const isUserExist = await checkUserExists(body.identifier);
+
     if (isUserExist) {
-      return ApiResponse.error(res, "User already exists");
+      return ApiResponse.error(res, `This ${contactMethod} is already in use.`);
     }
 
     // Generate and send OTP with registration data
@@ -48,8 +50,6 @@ export async function initiateRegistration(req: Request, res: Response) {
     if (!otpResult.success) {
       return ApiResponse.error(res, otpResult.message);
     }
-
-    const contactMethod = contactInfo.email ? "email" : "phone";
 
     return ApiResponse.success(
       res,
