@@ -126,16 +126,6 @@ export class OtpService {
   }
 
   /**
-   * Verify OTP for registration (legacy method for backward compatibility)
-   */
-  async verifyOtp(
-    identifier: string,
-    otpCode: string
-  ): Promise<ServiceResponse> {
-    return this.verifyOtpByType(identifier, otpCode, "REGISTRATION_VERIFICATION");
-  }
-
-  /**
    * Generic method to verify OTP by type
    */
   async verifyOtpByType(

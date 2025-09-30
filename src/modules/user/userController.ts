@@ -169,8 +169,8 @@ export async function verifyEmailOtp(req: Request, res: Response) {
   try {
     const { identifier, otp }: VerifyOtpInput = value;
 
-    // Verify OTP using otpService
-    const response = await otpService.verifyOtp(identifier, otp);
+    // Verify OTP using otpService for registration
+    const response = await otpService.verifyOtpByType(identifier, otp, "REGISTRATION_VERIFICATION");
 
     if (!response.success) {
       return ApiResponse.error(res, response.message);
