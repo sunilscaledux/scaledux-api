@@ -2,15 +2,12 @@ import express from 'express';
 import {
   register,
   login,
+  logout,
   checkUserExistsForLogin,
   resetPassword,
-  // Unified OTP functions
   requestOtp,
   verifyOtp,
   resendOtpUnified,
-  // Keep only essential legacy functions
-  verifyEmailOtp,
-  initiateRegistration,
 } from "./userController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 
@@ -22,6 +19,7 @@ router.post("/resend-otp", otpRateLimiter, resendOtpUnified);
 
 router.post("/register", generalRateLimiter, register);
 router.post("/login", generalRateLimiter, login);
+router.post("/logout", generalRateLimiter, logout);
 router.post("/check-user-exists", generalRateLimiter, checkUserExistsForLogin);
 router.post("/reset-password", generalRateLimiter, resetPassword);
 

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { prisma } from "../../config/prisma";
 import {
   checkUserExists,
@@ -105,6 +106,28 @@ export async function register(req: Request, res: Response) {
 
     const user = await createUserAfterOtpVerification(rawBody);
 
+    // Generate JWT token for automatic login after registration
+    const token = jwt.sign(
+      { 
+        userId: user.id, 
+        email: user.email,
+        phone: user.phone 
+      },
+      process.env.JWT_SECRET || 'fallback-secret',
+      { expiresIn: '24h' }
+    );
+
+    // Set HTTP-only cookie for automatic login
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: "/",
+    };
+
+    res.cookie("auth_token", token, cookieOptions);
+
     return ApiResponse.created(
       res,
       {
@@ -115,8 +138,10 @@ export async function register(req: Request, res: Response) {
           email: user.email,
           phone: user.phone,
         },
+        authenticated: true,
+        expiresIn: "24h",
       },
-      "Registration completed successfully. You can now login."
+      "Registration completed successfully. You are now logged in."
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);
@@ -143,51 +168,25 @@ export async function login(req: Request, res: Response) {
       return ApiResponse.error(res, loginResult.message);
     }
 
+    // Set HTTP-only cookie for authentication
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      sameSite: "lax" as const,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      path: "/",
+    };
+
+    res.cookie("auth_token", loginResult.token, cookieOptions);
+
     return ApiResponse.success(
       res,
       {
         user: loginResult.user,
-        token: loginResult.token,
+        authenticated: true,
         expiresIn: "24h",
       },
       "Login successful"
-    );
-  } catch (err: any) {
-    return ApiResponse.error(res, err.message);
-  }
-}
-
-export async function verifyEmailOtp(req: Request, res: Response) {
-  const bodyToValidate = req.body || {};
-
-  const { error, value } = verifyOtpSchema.validate(bodyToValidate, {
-    abortEarly: false,
-  });
-
-  if (error) {
-    return ApiResponse.joiValidationError(res, error);
-  }
-
-  try {
-    const { identifier, otp }: VerifyOtpInput = value;
-
-    // Verify OTP using otpService for registration
-    const response = await otpService.verifyOtpByType(
-      identifier,
-      otp,
-      "REGISTRATION_VERIFICATION"
-    );
-
-    if (!response.success) {
-      return ApiResponse.error(res, response.message);
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        identifier: identifier,
-      },
-      "OTP verified successfully. You can now complete registration."
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);
@@ -584,9 +583,20 @@ export async function verifyOtp(req: Request, res: Response) {
           return ApiResponse.error(res, loginResult.message);
         }
 
+        // Set HTTP-only cookie for OTP login
+        const cookieOptions = {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax" as const,
+          maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          path: "/",
+        };
+
+        res.cookie("auth_token", loginResult.token, cookieOptions);
+
         responseData = {
           user: loginResult.user,
-          token: loginResult.token,
+          authenticated: true,
           expiresIn: "24h",
         };
         responseData.message = "Login successful";
@@ -728,5 +738,26 @@ export async function resetPassword(req: Request, res: Response) {
       res,
       "Failed to reset password. Please try again."
     );
+  }
+}
+
+export async function logout(req: Request, res: Response) {
+  try {
+    // Clear the authentication cookie
+    res.clearCookie("auth_token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+    });
+
+    return ApiResponse.success(
+      res,
+      { message: "Logged out successfully" },
+      "You have been logged out successfully"
+    );
+  } catch (error: any) {
+    console.error("Logout Error:", error);
+    return ApiResponse.error(res, "Failed to logout. Please try again.");
   }
 }
