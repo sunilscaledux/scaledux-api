@@ -56,7 +56,7 @@ export class OtpService {
     userId?: number;
   }): Promise<ServiceResponse> {
     try {
-      const identifier = data.email || data.phone;
+      const identifier = data.email;
 
       if (!identifier) {
         return {

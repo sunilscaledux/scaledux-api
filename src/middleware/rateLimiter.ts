@@ -13,7 +13,7 @@ export const otpRateLimiter = rateLimit({
     },
   }),
   windowMs: 15 * 60 * 1000, // 10 minutes
-  max: 15,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {
@@ -42,7 +42,7 @@ export const generalRateLimiter = rateLimit({
     },
   }),
   windowMs: 5 * 60 * 1000, // 15 minutes
-  max: 15, // Limit each IP to 100 requests per windowMs
+  max: 50, // Limit each IP to 100 requests per windowMs
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req: Request, res: Response) => {

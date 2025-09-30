@@ -35,28 +35,11 @@ export const loginUserSchema = Joi.object<LoginInput>({
     "any.required": "Email is required",
     "string.email": "Please enter valid email address",
   }),
-  phone: Joi.string()
-    .pattern(/^[0-9]{7,15}$/)
-    .optional()
-    .allow(null, "")
-    .messages({
-      "string.pattern.base":
-        "Phone number must contain only digits (7-15 characters)",
-    }),
   password: Joi.string().required().messages({
     "any.required": "Password is required",
     "string.min": "Password must be at least 8 characters long",
   }),
 })
-  .custom((value, helpers) => {
-    if (!value.email && !value.phone) {
-      return helpers.error("custom.emailOrPhone");
-    }
-    return value;
-  })
-  .messages({
-    "custom.emailOrPhone": "Either email or phone number is required",
-  });
 
 export const verifyOtpSchema = Joi.object<VerifyOtpInput>({
   identifier: Joi.string().required().messages({
@@ -74,9 +57,53 @@ export const verifyOtpSchema = Joi.object<VerifyOtpInput>({
 });
 
 export const resendOtpSchema = Joi.object<ResendOtpInput>({
-  identifier: Joi.string().required()
+  identifier: Joi.string().required().messages({
+    "any.required": "Email or phone number is required",
+  }),
+});
+
+export const unifiedOtpRequestSchema = Joi.object({
+  identifier: Joi.string().required().messages({
+    "any.required": "Email or phone number is required",
+  }),
+  type: Joi.string()
+    .valid("registration", "login", "forgot-password")
+    .required()
     .messages({
-      'any.required': 'Email or phone number is required'
-    })
+      "any.required": "OTP type is required",
+      "any.only": "OTP type must be: registration, login, or forgot-password",
+    }),
+});
+
+export const unifiedVerifyOtpSchema = Joi.object({
+  identifier: Joi.string().required().messages({
+    "any.required": "Email or phone number is required",
+  }),
+  otp: Joi.string()
+    .length(6)
+    .pattern(/^[0-9]+$/)
+    .required()
+    .messages({
+      "any.required": "OTP is required",
+      "string.length": "OTP must be exactly 6 digits",
+      "string.pattern.base": "OTP must contain only numbers",
+    }),
+  type: Joi.string()
+    .valid("registration", "login", "forgot-password")
+    .required()
+    .messages({
+      "any.required": "OTP type is required",
+      "any.only": "OTP type must be: registration, login, or forgot-password",
+    }),
+});
+
+export const resetPasswordSchema = Joi.object({
+  identifier: Joi.string().required().messages({
+    "any.required": "Email or phone number is required",
+  }),
+  password: Joi.string().min(8).required().messages({
+    "any.required": "Password is required",
+    "string.min": "Password must be at least 8 characters long",
+  }),
 });
 

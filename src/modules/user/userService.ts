@@ -64,20 +64,14 @@ export async function userLogin(data: LoginInput): Promise<{
   token?: string;
 }> {
   try {
-    // Normalize the contact information
     const contactInfo = normalizeContact(data.email || "");
-    
-    // Build conditions for finding user
+
     const conditions = [];
     if (contactInfo.email) {
       conditions.push({ email: contactInfo.email });
     }
     if (contactInfo.phone) {
       conditions.push({ phone: contactInfo.phone });
-    }
-    // Fallback for direct phone input
-    if (data.phone && data.phone.trim() !== "") {
-      conditions.push({ phone: data.phone });
     }
 
     if (conditions.length === 0) {
@@ -116,14 +110,6 @@ export async function userLogin(data: LoginInput): Promise<{
     }
 
     if (contactInfo.phone && !user.phone_verified_at) {
-      return {
-        success: false,
-        message: "Please verify your phone number before logging in",
-      };
-    }
-
-    // Check direct phone input verification
-    if (data.phone && !user.phone_verified_at) {
       return {
         success: false,
         message: "Please verify your phone number before logging in",

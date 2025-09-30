@@ -1,38 +1,30 @@
 import express from 'express';
 import {
   register,
-  verifyEmailOtp,
-  resendOtp,
   login,
-  initiateRegistration,
   checkUserExistsForLogin,
-  requestLoginOtp,
-  verifyLoginOtp,
-  requestForgotPasswordOtp,
-  verifyForgotPasswordOtp,
+  resetPassword,
+  // Unified OTP functions
+  requestOtp,
+  verifyOtp,
+  resendOtpUnified,
+  // Keep only essential legacy functions
+  verifyEmailOtp,
+  initiateRegistration,
 } from "./userController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 
 const router = express.Router();
 
-router.post("/initial-registration", generalRateLimiter, initiateRegistration);
+router.post("/request-otp", otpRateLimiter, requestOtp);
+router.post("/verify-otp", otpRateLimiter, verifyOtp);
+router.post("/resend-otp", otpRateLimiter, resendOtpUnified);
+
 router.post("/register", generalRateLimiter, register);
-router.post("/verify-email-otp", otpRateLimiter, verifyEmailOtp);
-router.post("/resend-otp", otpRateLimiter, resendOtp);
-router.post("/check-user-exists", generalRateLimiter, checkUserExistsForLogin);
 router.post("/login", generalRateLimiter, login);
-router.post("/request-login-otp", otpRateLimiter, requestLoginOtp);
-router.post("/verify-login-otp", otpRateLimiter, verifyLoginOtp);
-router.post(
-  "/request-forgot-password-otp",
-  generalRateLimiter,
-  requestForgotPasswordOtp
-);
-router.post(
-  "/verify-forgot-password-otp",
-  otpRateLimiter,
-  verifyForgotPasswordOtp
-);
+router.post("/check-user-exists", generalRateLimiter, checkUserExistsForLogin);
+router.post("/reset-password", generalRateLimiter, resetPassword);
+
 
 
 export default router;
