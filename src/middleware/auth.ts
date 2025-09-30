@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyJwtToken, extractTokenFromHeader } from '@utils/jwtUtils';
+import jwt from "jsonwebtoken";
 import { ApiResponse } from '@utils/ApiResponse';
 
 // Extend Request interface to include user
@@ -12,23 +12,47 @@ declare global {
 }
 
 /**
- * Authentication middleware
- * Verifies JWT token and adds user to request object
+ * Cookie-based authentication middleware
+ * Verifies JWT token from cookies and adds user to request object
  */
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
-    const authHeader = req.headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
+    const token = req.cookies?.auth_token;
 
     if (!token) {
-      return ApiResponse.unauthorized(res, 'Access token is required');
+      return ApiResponse.unauthorized(res, "Authentication required");
     }
 
-    const decoded = verifyJwtToken(token);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "fallback-secret"
+    );
     req.user = decoded;
     next();
   } catch (error) {
     return ApiResponse.unauthorized(res, 'Invalid or expired token');
+  }
+}
+
+/**
+ * Middleware to prevent authenticated users from accessing auth routes
+ */
+export function preventAuthenticatedAccess(req: Request, res: Response, next: NextFunction) {
+  try {
+    const token = req.cookies?.auth_token;
+
+    if (token) {
+      // Verify token is valid
+      jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
+      // User is authenticated, they shouldn't access auth routes
+      return ApiResponse.error(res, 'Already authenticated', 403);
+    }
+
+    // No token or invalid token, allow access to auth routes
+    next();
+  } catch (error) {
+    // Invalid token, allow access to auth routes
+    next();
   }
 }
 
@@ -38,12 +62,14 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
  */
 export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const authHeader = req.headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
+    const token = req.cookies?.auth_token;
 
     if (token) {
       try {
-        const decoded = verifyJwtToken(token);
+        const decoded = jwt.verify(
+          token,
+          process.env.JWT_SECRET || "fallback-secret"
+        );
         req.user = decoded;
       } catch (error) {
         // Token is invalid, but we don't fail the request

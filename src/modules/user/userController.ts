@@ -121,7 +121,7 @@ export async function register(req: Request, res: Response) {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: "lax" as "lax" | "strict" | "none",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       path: "/",
     };
@@ -172,12 +172,16 @@ export async function login(req: Request, res: Response) {
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: "lax" as const,
+      sameSite: (process.env.NODE_ENV === "production" ? "lax" : "lax") as "lax" | "strict" | "none",
       maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: "/",
+      path: "/"
     };
 
     res.cookie("auth_token", loginResult.token, cookieOptions);
+
+    // Debug: Log cookie setting
+    console.log("Setting cookie with options:", cookieOptions);
+    console.log("Token length:", loginResult.token?.length);
 
     return ApiResponse.success(
       res,
@@ -185,6 +189,10 @@ export async function login(req: Request, res: Response) {
         user: loginResult.user,
         authenticated: true,
         expiresIn: "24h",
+        debug: {
+          cookieSet: true,
+          tokenLength: loginResult.token?.length
+        }
       },
       "Login successful"
     );
@@ -587,7 +595,7 @@ export async function verifyOtp(req: Request, res: Response) {
         const cookieOptions = {
           httpOnly: true,
           secure: process.env.NODE_ENV === "production",
-          sameSite: "lax" as const,
+          sameSite: "lax" as "lax" | "strict" | "none",
           maxAge: 24 * 60 * 60 * 1000, // 24 hours
           path: "/",
         };
@@ -747,7 +755,7 @@ export async function logout(req: Request, res: Response) {
     res.clearCookie("auth_token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      sameSite: "lax" as "lax" | "strict" | "none",
       path: "/",
     });
 
@@ -759,5 +767,85 @@ export async function logout(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Logout Error:", error);
     return ApiResponse.error(res, "Failed to logout. Please try again.");
+  }
+}
+
+export async function testCookies(req: Request, res: Response) {
+  try {
+    // Set a test cookie
+    res.cookie("test_cookie", "test_value", {
+      httpOnly: false, // Make it visible in browser for testing
+      secure: false,
+      sameSite: "lax" as "lax" | "strict" | "none",
+      maxAge: 60 * 1000, // 1 minute
+      path: "/"
+    });
+
+    return ApiResponse.success(
+      res,
+      {
+        message: "Test cookie set",
+        receivedCookies: req.cookies,
+        headers: req.headers
+      },
+      "Cookie test successful"
+    );
+  } catch (error: any) {
+    console.error("Test Cookies Error:", error);
+    return ApiResponse.error(res, "Failed to test cookies");
+  }
+}
+
+export async function getCurrentUser(req: Request, res: Response) {
+  try {
+    // Debug: Log cookies received
+    console.log("Cookies received:", req.cookies);
+    console.log("Auth token from cookie:", req.cookies?.auth_token);
+    
+    // User is already attached to req by authenticateToken middleware
+    const user = req.user;
+
+    if (!user) {
+      return ApiResponse.unauthorized(res, "Not authenticated");
+    }
+
+    // Get full user details from database
+    const userDetails = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: {
+        id: true,
+        FirstName: true,
+        LastName: true,
+        email: true,
+        phone: true,
+        email_verified_at: true,
+        phone_verified_at: true,
+        status: true
+      }
+    });
+
+    if (!userDetails) {
+      return ApiResponse.error(res, "User not found");
+    }
+
+    return ApiResponse.success(
+      res,
+      {
+        user: {
+          id: userDetails.id,
+          firstName: userDetails.FirstName,
+          lastName: userDetails.LastName,
+          email: userDetails.email,
+          phone: userDetails.phone,
+          emailVerified: !!userDetails.email_verified_at,
+          phoneVerified: !!userDetails.phone_verified_at,
+          status: userDetails.status
+        }
+      },
+      "User details retrieved successfully"
+    );
+  } catch (error: any) {
+    console.error("Get Current User Error:", error);
+    return ApiResponse.error(res, "Failed to get user details");
   }
 }
