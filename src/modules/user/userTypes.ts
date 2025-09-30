@@ -33,13 +33,3 @@ export interface VerifyOtpInput {
 export interface ResendOtpInput {
   identifier: string; // Can be email or phone
 }
-
-export interface OtpResponse {
-  success: boolean;
-  message: string;
-  data?: {
-    email?: string;
-    otpId?: number;
-    expiresIn?: number;
-  } | null;
-}

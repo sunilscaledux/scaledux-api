@@ -1,6 +1,7 @@
 import { emailService } from "../../services/emailService";
 import { prisma } from "../../config/prisma";
 import { normalizeContact } from "./userService";
+import { ServiceResponse } from "../../utils/ApiResponse";
 
 export class OtpService {
   /**
@@ -18,17 +19,27 @@ export class OtpService {
   }
 
   /**
-   * Clean up expired OTPs for identifier
+   * Clean up expired OTPs for identifier and specific type
    */
-  private async cleanupExpiredOtps(identifier: string): Promise<void> {
+  private async cleanupExpiredOtps(
+    identifier: string, 
+    otpType?: "REGISTRATION_VERIFICATION" | "LOGIN_VERIFICATION" | "FORGOT_PASSWORD_VERIFICATION"
+  ): Promise<void> {
     try {
-      await prisma.otp.deleteMany({
-        where: {
-          OR: [{ email: identifier }, { phone: identifier }],
-          expires_at: {
-            lt: new Date(), // Expired
-          },
+      const whereCondition: any = {
+        OR: [{ email: identifier }, { phone: identifier }],
+        expires_at: {
+          lt: new Date(), // Expired
         },
+      };
+
+      // Add OTP type filter if specified
+      if (otpType) {
+        whereCondition.otp_type = otpType;
+      }
+
+      await prisma.otp.deleteMany({
+        where: whereCondition,
       });
     } catch (error) {
       console.error("Error cleaning up expired OTPs:", error);
@@ -41,9 +52,9 @@ export class OtpService {
   async generateAndSendOtp(data: {
     email?: string | null;
     phone?: string | null;
-    otpType: "REGISTRATION_VERIFICATION";
+    otpType: "REGISTRATION_VERIFICATION" | "LOGIN_VERIFICATION" | "FORGOT_PASSWORD_VERIFICATION";
     userId?: number;
-  }): Promise<{ success: boolean; message: string; otpId?: number }> {
+  }): Promise<ServiceResponse> {
     try {
       const identifier = data.email || data.phone;
 
@@ -55,7 +66,7 @@ export class OtpService {
       }
 
       // Clean up expired OTPs first
-      await this.cleanupExpiredOtps(identifier);
+      await this.cleanupExpiredOtps(identifier, data.otpType);
 
       // Generate OTP code
       const otpCode = this.generateOtpCode();
@@ -78,7 +89,7 @@ export class OtpService {
       let message = "";
 
       if (data.email) {
-        // sent = await this.sendEmailOtp(data.email, otpCode);
+        sent = await this.sendEmailOtp(data.email, otpCode);
         message = sent
           ? "OTP sent successfully to your email"
           : "Failed to send OTP email. Please try again.";
@@ -101,7 +112,9 @@ export class OtpService {
       return {
         success: true,
         message,
-        otpId: otp.id,
+        data: {
+          otpId: otp.id,
+        },
       };
     } catch (error) {
       console.error("Error generating and sending OTP:", error);
@@ -113,12 +126,23 @@ export class OtpService {
   }
 
   /**
-   * Verify OTP for registration
+   * Verify OTP for registration (legacy method for backward compatibility)
    */
   async verifyOtp(
     identifier: string,
     otpCode: string
-  ): Promise<{ success: boolean; message: string; data?: any }> {
+  ): Promise<ServiceResponse> {
+    return this.verifyOtpByType(identifier, otpCode, "REGISTRATION_VERIFICATION");
+  }
+
+  /**
+   * Generic method to verify OTP by type
+   */
+  async verifyOtpByType(
+    identifier: string,
+    otpCode: string,
+    otpType: "REGISTRATION_VERIFICATION" | "LOGIN_VERIFICATION" | "FORGOT_PASSWORD_VERIFICATION"
+  ): Promise<ServiceResponse> {
     try {
       if (!identifier || !otpCode) {
         return {
@@ -129,14 +153,14 @@ export class OtpService {
 
       const contactInfo = normalizeContact(identifier);
       
-      // Build where conditions for registration OTP only
+      // Build where conditions for the specified OTP type
       const whereConditions: any = {
         otp_code: otpCode,
         verified: false,
         expires_at: {
           gt: new Date(), // Must not be expired
         },
-        otp_type: "REGISTRATION_VERIFICATION"
+        otp_type: otpType
       };
 
       // Add identifier conditions
@@ -160,9 +184,14 @@ export class OtpService {
       });
 
       if (!otp) {
+        const typeMessages = {
+          "REGISTRATION_VERIFICATION": "Invalid or expired registration OTP",
+          "LOGIN_VERIFICATION": "Invalid or expired login OTP",
+          "FORGOT_PASSWORD_VERIFICATION": "Invalid or expired password reset OTP"
+        };
         return {
           success: false,
-          message: "Invalid or expired OTP",
+          message: typeMessages[otpType],
         };
       }
 
@@ -172,7 +201,7 @@ export class OtpService {
         data: { verified: true },
       });
 
-      // Invalidate other unverified OTPs for this identifier
+      // Invalidate other unverified OTPs of the same type for this identifier
       await prisma.otp.updateMany({
         where: {
           OR: [
@@ -180,15 +209,22 @@ export class OtpService {
             { phone: contactInfo.phone }
           ].filter(Boolean),
           verified: false,
+          otp_type: otpType,
           id: { not: otp.id },
         },
         data: { verified: true },
       });
 
       const verificationType = otp.email ? "Email" : "Phone";
+      const successMessages = {
+        "REGISTRATION_VERIFICATION": `${verificationType} verified successfully`,
+        "LOGIN_VERIFICATION": `${verificationType} login OTP verified successfully`,
+        "FORGOT_PASSWORD_VERIFICATION": `${verificationType} password reset OTP verified successfully`
+      };
+      
       return {
         success: true,
-        message: `${verificationType} verified successfully`,
+        message: successMessages[otpType],
         data: otp,
       };
     } catch (error) {
@@ -201,12 +237,25 @@ export class OtpService {
   }
 
   /**
-   * Resend OTP
+   * Resend OTP (legacy method for backward compatibility - defaults to registration)
    */
   async resendOtp(data: {
     email?: string;
     phone?: string;
-  }): Promise<{ success: boolean; message: string }> {
+  }): Promise<ServiceResponse> {
+    return this.resendOtpByType(data, "REGISTRATION_VERIFICATION");
+  }
+
+  /**
+   * Generic method to resend OTP by type
+   */
+  async resendOtpByType(
+    data: {
+      email?: string;
+      phone?: string;
+    },
+    otpType: "REGISTRATION_VERIFICATION" | "LOGIN_VERIFICATION" | "FORGOT_PASSWORD_VERIFICATION"
+  ): Promise<ServiceResponse> {
     try {
       const identifier = data.email || data.phone;
 
@@ -217,11 +266,12 @@ export class OtpService {
         };
       }
 
-      // Invalidate existing unverified OTPs
+      // Invalidate existing unverified OTPs of the same type
       await prisma.otp.updateMany({
         where: {
           OR: [{ email: identifier }, { phone: identifier }],
           verified: false,
+          otp_type: otpType,
         },
         data: { verified: true },
       });
@@ -230,7 +280,7 @@ export class OtpService {
       const result = await this.generateAndSendOtp({
         email: data.email,
         phone: data.phone,
-        otpType: "REGISTRATION_VERIFICATION",
+        otpType: otpType,
       });
 
       return {
@@ -306,6 +356,7 @@ export class OtpService {
       return false;
     }
   }
+
 }
 
 export const otpService = new OtpService();
