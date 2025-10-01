@@ -1,23 +1,37 @@
 import jwt from "jsonwebtoken";
 
-export function generateTokenAndSetCookie(user: any) {
+export function generateTokenAndSetCookie(
+  user: any,
+  rememberMe: boolean = false
+) {
+  // Set expiration based on rememberMe flag
+  const tokenExpiry = rememberMe ? "7d" : "24h";
+  const cookieMaxAge = rememberMe
+    ? 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
+    : 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
   const token = jwt.sign(
     {
       userId: user.id,
       email: user.email,
       phone: user.phone,
+      rememberMe: rememberMe,
     },
     process.env.JWT_SECRET || "fallback-secret",
-    { expiresIn: "24h" }
+    { expiresIn: tokenExpiry }
   );
 
   const cookieOptions = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as "lax" | "strict" | "none",
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: cookieMaxAge,
     path: "/",
   };
 
-  return { token, cookieOptions };
+  console.log(
+    `🍪 Token generated with ${rememberMe ? "7 days" : "24 hours"} expiry`
+  );
+
+  return { token, cookieOptions, expiresIn: tokenExpiry };
 }

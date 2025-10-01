@@ -110,7 +110,10 @@ export async function register(req: Request, res: Response) {
     }
 
     // Generate token, set cookie, and get token for response
-    const { token, cookieOptions } = generateTokenAndSetCookie(userResult.data);
+    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
+      userResult.data,
+      false
+    );
     res.cookie("auth_token", token, cookieOptions);
 
     return ApiResponse.created(
@@ -125,7 +128,7 @@ export async function register(req: Request, res: Response) {
         },
         token,
         authenticated: true,
-        expiresIn: "24h",
+        expiresIn: expiresIn,
       },
       userResult.message
     );
@@ -154,9 +157,10 @@ export async function login(req: Request, res: Response) {
       return ApiResponse.error(res, loginResult.message);
     }
 
-    // Generate token and cookie options
-    const { token, cookieOptions } = generateTokenAndSetCookie(
-      loginResult.data
+    // Generate token and cookie options with rememberMe
+    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
+      loginResult.data,
+      body.rememberMe || false
     );
     res.cookie("auth_token", token, cookieOptions);
 
@@ -166,7 +170,8 @@ export async function login(req: Request, res: Response) {
         user: loginResult.data,
         token,
         authenticated: true,
-        expiresIn: "24h",
+        expiresIn: expiresIn,
+        rememberMe: body.rememberMe || false,
       },
       loginResult.message
     );
@@ -391,9 +396,9 @@ export async function verifyOtp(req: Request, res: Response) {
           );
         }
 
-        // Generate token, set cookie, and get token for response
-        const { token, cookieOptions } = generateTokenAndSetCookie(
-          loginResult.data
+        const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
+          loginResult.data,
+          false
         );
         res.cookie("auth_token", token, cookieOptions);
 
@@ -401,7 +406,7 @@ export async function verifyOtp(req: Request, res: Response) {
           user: loginResult.data,
           token,
           authenticated: true,
-          expiresIn: "24h",
+          expiresIn: expiresIn,
         };
         responseData.message = "Login successful";
         break;

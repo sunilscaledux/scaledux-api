@@ -39,6 +39,7 @@ export const loginUserSchema = Joi.object<LoginInput>({
     "any.required": "Password is required",
     "string.min": "Password must be at least 8 characters long",
   }),
+  rememberMe: Joi.boolean().optional().default(false),
 })
 
 export const verifyOtpSchema = Joi.object<VerifyOtpInput>({
