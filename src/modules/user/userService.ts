@@ -22,39 +22,56 @@ export async function checkUserExists(input: string): Promise<boolean> {
 
 export async function createUserAfterOtpVerification(
   data: RegisterInput
-): Promise<UserDetail> {
-  // Double-check user doesn't exist
-  const userExists = await checkUserExists(data.email);
-  if (userExists) throw new Error("User already exists");
+): Promise<ServiceResponse> {
+  try {
+    // Double-check user doesn't exist
+    const userExists = await checkUserExists(data.email);
+    if (userExists) {
+      return {
+        success: false,
+        message: "User already exists"
+      };
+    }
 
-  const hashedPassword = await bcrypt.hash(data.password, 10);
-  const contactInfo = normalizeContact(data.email);
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const contactInfo = normalizeContact(data.email);
 
-  const userData: any = {
-    FirstName: data.FirstName,
-    LastName: data.LastName,
-    email: contactInfo.email || data.email,
-    phone: contactInfo.phone,
-    password: hashedPassword,
-    terms: data.terms,
-    notification: data.notification || false,
-    status: 1, // Active status
-  };
+    const userData: any = {
+      FirstName: data.FirstName,
+      LastName: data.LastName,
+      email: contactInfo.email || data.email,
+      phone: contactInfo.phone,
+      password: hashedPassword,
+      terms: data.terms,
+      notification: data.notification || false,
+      status: 1, 
+    };
 
-  // Set verification timestamp for the method that was used
-  if (contactInfo.email || data.email) {
-    userData.email_verified_at = new Date();
+    // Set verification timestamp for the method that was used
+    if (contactInfo.email || data.email) {
+      userData.email_verified_at = new Date();
+    }
+    if (contactInfo.phone) {
+      userData.phone_verified_at = new Date();
+    }
+
+    const user = await prisma.user.create({
+      data: userData,
+    });
+
+    const { password, ...safeUser } = user;
+    return {
+      success: true,
+      message: "User created successfully",
+      data: safeUser
+    };
+  } catch (error) {
+    console.error("Create user error:", error);
+    return {
+      success: false,
+      message: "Failed to create user. Please try again."
+    };
   }
-  if (contactInfo.phone) {
-    userData.phone_verified_at = new Date();
-  }
-
-  const user = await prisma.user.create({
-    data: userData,
-  });
-
-  const { password, ...safeUser } = user;
-  return safeUser;
 }
 
 export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
@@ -128,12 +145,9 @@ export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
   }
 }
 
-export async function userOtpLogin(identifier: string): Promise<{
-  success: boolean;
-  message: string;
-  user?: UserDetail;
-  token?: string;
-}> {
+export async function userOtpLogin(
+  identifier: string
+): Promise<ServiceResponse> {
   try {
     const contactInfo = normalizeContact(identifier);
 
@@ -186,7 +200,7 @@ export async function userOtpLogin(identifier: string): Promise<{
     return {
       success: true,
       message: "OTP login successful",
-      user: safeUser,
+      data: safeUser,
     };
   } catch (error) {
     console.error("OTP Login error:", error);

@@ -104,26 +104,30 @@ export async function register(req: Request, res: Response) {
       );
     }
 
-    const user = await createUserAfterOtpVerification(rawBody);
+    const userResult = await createUserAfterOtpVerification(rawBody);
+    if (!userResult.success) {
+      return ApiResponse.error(res, userResult.message);
+    }
 
     // Generate token, set cookie, and get token for response
-    const { token, cookieOptions } = generateTokenAndSetCookie(user);
+    const { token, cookieOptions } = generateTokenAndSetCookie(userResult.data);
     res.cookie("auth_token", token, cookieOptions);
+
     return ApiResponse.created(
       res,
       {
         user: {
-          id: user.id,
-          firstName: user.FirstName,
-          lastName: user.LastName,
-          email: user.email,
-          phone: user.phone,
+          id: userResult.data.id,
+          firstName: userResult.data.FirstName,
+          lastName: userResult.data.LastName,
+          email: userResult.data.email,
+          phone: userResult.data.phone,
         },
         token,
         authenticated: true,
         expiresIn: "24h",
       },
-      "Registration completed successfully. You are now logged in."
+      userResult.message
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);
@@ -152,19 +156,19 @@ export async function login(req: Request, res: Response) {
 
     // Generate token and cookie options
     const { token, cookieOptions } = generateTokenAndSetCookie(
-      loginResult.data?.user
+      loginResult.data
     );
     res.cookie("auth_token", token, cookieOptions);
 
     return ApiResponse.success(
       res,
       {
-        user: loginResult.data?.user,
+        user: loginResult.data,
         token,
         authenticated: true,
         expiresIn: "24h",
       },
-      "Login successful"
+      loginResult.message
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);
@@ -242,183 +246,6 @@ export async function resendOtp(req: Request, res: Response) {
         expiresIn: 600, // 10 minutes
       },
       `OTP resent successfully. Please check your ${verificationType}.`
-    );
-  } catch (err: any) {
-    return ApiResponse.error(res, err.message);
-  }
-}
-
-export async function requestLoginOtp(req: Request, res: Response) {
-  const rawBody = req.body || {};
-  const contactInfo = normalizeContact(rawBody.identifier);
-  const { error, value } = resendOtpSchema.validate(rawBody, {
-    abortEarly: false,
-  });
-  if (error) {
-    return ApiResponse.joiValidationError(res, error);
-  }
-
-  try {
-    const body: ResendOtpInput = value;
-    const contactMethod = contactInfo.email ? "email" : "phone";
-
-    // Check if user exists
-    const isUserExist = await checkUserExists(body.identifier);
-    if (!isUserExist) {
-      return ApiResponse.error(
-        res,
-        `No account found with this ${contactMethod}. Please sign up first.`
-      );
-    }
-
-    // Generate and send OTP for login
-    const otpResult = await otpService.generateAndSendOtp({
-      email: contactInfo.email || undefined,
-      phone: contactInfo.phone || undefined,
-      otpType: "LOGIN_VERIFICATION",
-    });
-
-    if (!otpResult.success) {
-      return ApiResponse.error(res, otpResult.message);
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        identifier: body.identifier,
-        expiresIn: 600, // 10 minutes
-      },
-      `Login OTP sent successfully. Please check your ${contactMethod}.`
-    );
-  } catch (err: any) {
-    return ApiResponse.error(res, err.message);
-  }
-}
-
-export async function verifyLoginOtp(req: Request, res: Response) {
-  const bodyToValidate = req.body || {};
-
-  const { error, value } = verifyOtpSchema.validate(bodyToValidate, {
-    abortEarly: false,
-  });
-
-  if (error) {
-    return ApiResponse.joiValidationError(res, error);
-  }
-
-  try {
-    const { identifier, otp }: VerifyOtpInput = value;
-
-    // Verify OTP using otpService for login
-    const response = await otpService.verifyOtpByType(
-      identifier,
-      otp,
-      "LOGIN_VERIFICATION"
-    );
-
-    if (!response.success) {
-      return ApiResponse.error(res, response.message);
-    }
-
-    // Perform OTP login to get user and token
-    const loginResult = await userOtpLogin(identifier);
-    if (!loginResult.success) {
-      return ApiResponse.error(res, loginResult.message);
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        user: loginResult.user,
-        token: loginResult.token,
-        expiresIn: "24h",
-      },
-      "Login successful"
-    );
-  } catch (err: any) {
-    return ApiResponse.error(res, err.message);
-  }
-}
-
-export async function requestForgotPasswordOtp(req: Request, res: Response) {
-  const rawBody = req.body || {};
-  const contactInfo = normalizeContact(rawBody.identifier);
-  const { error, value } = resendOtpSchema.validate(rawBody, {
-    abortEarly: false,
-  });
-  if (error) {
-    return ApiResponse.joiValidationError(res, error);
-  }
-
-  try {
-    const body: ResendOtpInput = value;
-    const contactMethod = contactInfo.email ? "email" : "phone";
-
-    // Check if user exists
-    const isUserExist = await checkUserExists(body.identifier);
-    if (!isUserExist) {
-      return ApiResponse.error(
-        res,
-        `No account found with this ${contactMethod}. Please sign up first.`
-      );
-    }
-
-    // Generate and send OTP for forgot password
-    const otpResult = await otpService.generateAndSendOtp({
-      email: contactInfo.email || undefined,
-      phone: contactInfo.phone || undefined,
-      otpType: "FORGOT_PASSWORD_VERIFICATION",
-    });
-
-    if (!otpResult.success) {
-      return ApiResponse.error(res, otpResult.message);
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        identifier: body.identifier,
-        expiresIn: 600, // 10 minutes
-      },
-      `Password reset OTP sent successfully. Please check your ${contactMethod}.`
-    );
-  } catch (err: any) {
-    return ApiResponse.error(res, err.message);
-  }
-}
-
-export async function verifyForgotPasswordOtp(req: Request, res: Response) {
-  const bodyToValidate = req.body || {};
-
-  const { error, value } = verifyOtpSchema.validate(bodyToValidate, {
-    abortEarly: false,
-  });
-
-  if (error) {
-    return ApiResponse.joiValidationError(res, error);
-  }
-
-  try {
-    const { identifier, otp }: VerifyOtpInput = value;
-
-    // Verify OTP using otpService for forgot password
-    const response = await otpService.verifyOtpByType(
-      identifier,
-      otp,
-      "FORGOT_PASSWORD_VERIFICATION"
-    );
-
-    if (!response.success) {
-      return ApiResponse.error(res, response.message);
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        identifier: identifier,
-        verified: true,
-      },
-      "Password reset OTP verified successfully. You can now reset your password."
     );
   } catch (err: any) {
     return ApiResponse.error(res, err.message);
@@ -557,7 +384,7 @@ export async function verifyOtp(req: Request, res: Response) {
       case "login":
         // Perform OTP login to get user and token
         const loginResult = await userOtpLogin(identifier);
-        if (!loginResult.success || !loginResult.user) {
+        if (!loginResult.success || !loginResult.data) {
           return ApiResponse.error(
             res,
             loginResult.message || "User not found"
@@ -566,12 +393,12 @@ export async function verifyOtp(req: Request, res: Response) {
 
         // Generate token, set cookie, and get token for response
         const { token, cookieOptions } = generateTokenAndSetCookie(
-          loginResult.user
+          loginResult.data
         );
         res.cookie("auth_token", token, cookieOptions);
 
         responseData = {
-          user: loginResult.user,
+          user: loginResult.data,
           token,
           authenticated: true,
           expiresIn: "24h",
