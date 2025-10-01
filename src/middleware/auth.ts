@@ -1,8 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from "jsonwebtoken";
 import { ApiResponse } from '@utils/ApiResponse';
-
-// Extend Request interface to include user
 declare global {
   namespace Express {
     interface Request {
@@ -11,10 +9,6 @@ declare global {
   }
 }
 
-/**
- * Cookie-based authentication middleware
- * Verifies JWT token from cookies and adds user to request object
- */
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     const token = req.cookies?.auth_token;
@@ -48,7 +42,6 @@ export function preventAuthenticatedAccess(req: Request, res: Response, next: Ne
       return ApiResponse.error(res, 'Already authenticated', 403);
     }
 
-    // No token or invalid token, allow access to auth routes
     next();
   } catch (error) {
     // Invalid token, allow access to auth routes

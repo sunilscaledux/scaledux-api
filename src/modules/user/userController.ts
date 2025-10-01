@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { prisma } from "../../config/prisma";
+import { generateTokenAndSetCookie } from "@utils/jwtUtils";
 import {
   checkUserExists,
   userLogin,
@@ -106,28 +106,9 @@ export async function register(req: Request, res: Response) {
 
     const user = await createUserAfterOtpVerification(rawBody);
 
-    // Generate JWT token for automatic login after registration
-    const token = jwt.sign(
-      { 
-        userId: user.id, 
-        email: user.email,
-        phone: user.phone 
-      },
-      process.env.JWT_SECRET || 'fallback-secret',
-      { expiresIn: '24h' }
-    );
-
-    // Set HTTP-only cookie for automatic login
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as "lax" | "strict" | "none",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      path: "/",
-    };
-
+    // Generate token, set cookie, and get token for response
+    const { token, cookieOptions } = generateTokenAndSetCookie(user);
     res.cookie("auth_token", token, cookieOptions);
-
     return ApiResponse.created(
       res,
       {
@@ -138,6 +119,7 @@ export async function register(req: Request, res: Response) {
           email: user.email,
           phone: user.phone,
         },
+        token,
         authenticated: true,
         expiresIn: "24h",
       },
@@ -168,31 +150,19 @@ export async function login(req: Request, res: Response) {
       return ApiResponse.error(res, loginResult.message);
     }
 
-    // Set HTTP-only cookie for authentication
-    const cookieOptions = {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
-      sameSite: (process.env.NODE_ENV === "production" ? "lax" : "lax") as "lax" | "strict" | "none",
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: "/"
-    };
-
-    res.cookie("auth_token", loginResult.token, cookieOptions);
-
-    // Debug: Log cookie setting
-    console.log("Setting cookie with options:", cookieOptions);
-    console.log("Token length:", loginResult.token?.length);
+    // Generate token and cookie options
+    const { token, cookieOptions } = generateTokenAndSetCookie(
+      loginResult.data?.user
+    );
+    res.cookie("auth_token", token, cookieOptions);
 
     return ApiResponse.success(
       res,
       {
-        user: loginResult.user,
+        user: loginResult.data?.user,
+        token,
         authenticated: true,
         expiresIn: "24h",
-        debug: {
-          cookieSet: true,
-          tokenLength: loginResult.token?.length
-        }
       },
       "Login successful"
     );
@@ -587,23 +557,22 @@ export async function verifyOtp(req: Request, res: Response) {
       case "login":
         // Perform OTP login to get user and token
         const loginResult = await userOtpLogin(identifier);
-        if (!loginResult.success) {
-          return ApiResponse.error(res, loginResult.message);
+        if (!loginResult.success || !loginResult.user) {
+          return ApiResponse.error(
+            res,
+            loginResult.message || "User not found"
+          );
         }
 
-        // Set HTTP-only cookie for OTP login
-        const cookieOptions = {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax" as "lax" | "strict" | "none",
-          maxAge: 24 * 60 * 60 * 1000, // 24 hours
-          path: "/",
-        };
-
-        res.cookie("auth_token", loginResult.token, cookieOptions);
+        // Generate token, set cookie, and get token for response
+        const { token, cookieOptions } = generateTokenAndSetCookie(
+          loginResult.user
+        );
+        res.cookie("auth_token", token, cookieOptions);
 
         responseData = {
           user: loginResult.user,
+          token,
           authenticated: true,
           expiresIn: "24h",
         };

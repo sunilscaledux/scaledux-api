@@ -1,7 +1,7 @@
 import { prisma } from "@config/prisma";
 import bcrypt from "bcrypt";
 import { LoginInput, RegisterInput, UserDetail } from "./userTypes";
-import { generateJwtToken } from "@utils/jwtUtils";
+import { ServiceResponse } from "@utils/ApiResponse";
 
 export async function checkUserExists(input: string): Promise<boolean> {
   const existingUser = await prisma.user.findFirst({
@@ -57,12 +57,7 @@ export async function createUserAfterOtpVerification(
   return safeUser;
 }
 
-export async function userLogin(data: LoginInput): Promise<{
-  success: boolean;
-  message: string;
-  user?: UserDetail;
-  token?: string;
-}> {
+export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
   try {
     const contactInfo = normalizeContact(data.email || "");
 
@@ -116,17 +111,13 @@ export async function userLogin(data: LoginInput): Promise<{
       };
     }
 
-    // Generate JWT token
-    const token = generateJwtToken(user);
-
     // Return safe user data (without password)
     const { password: _, ...safeUser } = user;
 
     return {
       success: true,
       message: "Login successful",
-      user: safeUser,
-      token,
+      data: safeUser,
     };
   } catch (error) {
     console.error("Login error:", error);
@@ -145,7 +136,7 @@ export async function userOtpLogin(identifier: string): Promise<{
 }> {
   try {
     const contactInfo = normalizeContact(identifier);
-    
+
     // Build conditions for finding user
     const conditions = [];
     if (contactInfo.email) {
@@ -166,7 +157,7 @@ export async function userOtpLogin(identifier: string): Promise<{
     const user = await prisma.user.findFirst({
       where: { OR: conditions },
     });
-    
+
     if (!user) {
       return {
         success: false,
@@ -189,9 +180,6 @@ export async function userOtpLogin(identifier: string): Promise<{
       };
     }
 
-    // Generate JWT token
-    const token = generateJwtToken(user);
-
     // Return safe user data (without password)
     const { password: _, ...safeUser } = user;
 
@@ -199,7 +187,6 @@ export async function userOtpLogin(identifier: string): Promise<{
       success: true,
       message: "OTP login successful",
       user: safeUser,
-      token,
     };
   } catch (error) {
     console.error("OTP Login error:", error);
