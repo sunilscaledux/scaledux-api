@@ -36,23 +36,16 @@ export function preventAuthenticatedAccess(req: Request, res: Response, next: Ne
     const token = req.cookies?.auth_token;
 
     if (token) {
-      // Verify token is valid
-      jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret');
-      // User is authenticated, they shouldn't access auth routes
-      return ApiResponse.error(res, 'Already authenticated', 403);
+      jwt.verify(token, process.env.JWT_SECRET || "fallback-secret");
+      return ApiResponse.error(res, "Already authenticated", 403);
     }
 
     next();
   } catch (error) {
-    // Invalid token, allow access to auth routes
     next();
   }
 }
 
-/**
- * Optional authentication middleware
- * Adds user to request if token is valid, but doesn't require it
- */
 export function optionalAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const token = req.cookies?.auth_token;

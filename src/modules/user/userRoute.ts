@@ -22,17 +22,18 @@ router.post("/resend-otp", otpRateLimiter, preventAuthenticatedAccess, resendOtp
 
 router.post("/register", generalRateLimiter, preventAuthenticatedAccess, register);
 router.post("/login", generalRateLimiter, preventAuthenticatedAccess, login);
-router.post("/check-user-exists", generalRateLimiter, preventAuthenticatedAccess, checkUserExistsForLogin);
-
+router.post(
+  "/check-user-exists",
+  generalRateLimiter,
+  preventAuthenticatedAccess,
+  checkUserExistsForLogin
+);
 router.post("/reset-password", generalRateLimiter, resetPassword);
 
-router.post("/logout", generalRateLimiter, authenticateToken, logout);
-
-router.get("/auth/me", generalRateLimiter, authenticateToken, getCurrentUser);
+router.post("/logout", authenticateToken, logout);
+router.get("/auth/me", authenticateToken, getCurrentUser);
 
 // Test cookies  - no authentication required
 router.get("/test-cookies", testCookies);
-
-
 
 export default router;
