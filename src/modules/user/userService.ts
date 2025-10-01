@@ -105,7 +105,10 @@ export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      data.password,
+      user.password || ""
+    );
     if (!isPasswordValid) {
       return {
         success: false,
