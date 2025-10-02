@@ -17,6 +17,7 @@ CREATE TABLE "public"."users" (
     "notification" BOOLEAN NOT NULL DEFAULT false,
     "terms" BOOLEAN NOT NULL DEFAULT true,
     "googleId" TEXT,
+    "linkedinId" TEXT,
     "profileImage" TEXT,
     "provider" TEXT,
 
@@ -49,6 +50,9 @@ CREATE UNIQUE INDEX "users_phone_key" ON "public"."users"("phone");
 CREATE UNIQUE INDEX "users_googleId_key" ON "public"."users"("googleId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_linkedinId_key" ON "public"."users"("linkedinId");
+
+-- CreateIndex
 CREATE INDEX "users_email_phone_idx" ON "public"."users"("email", "phone");
 
 -- CreateIndex
@@ -56,6 +60,9 @@ CREATE INDEX "users_LastName_FirstName_email_idx" ON "public"."users"("LastName"
 
 -- CreateIndex
 CREATE INDEX "users_googleId_idx" ON "public"."users"("googleId");
+
+-- CreateIndex
+CREATE INDEX "users_linkedinId_idx" ON "public"."users"("linkedinId");
 
 -- CreateIndex
 CREATE INDEX "otps_email_otp_type_verified_idx" ON "public"."otps"("email", "otp_type", "verified");

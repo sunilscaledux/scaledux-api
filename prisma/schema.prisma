@@ -15,24 +15,24 @@ model User {
     phone             String?   @unique
     email_verified_at DateTime?
     phone_verified_at DateTime?
-    password          String?   // Make password optional for OAuth users
+    password          String?   
     status            Int       @default(1)
     created_at        DateTime  @default(now())
     updated_at        DateTime  @updatedAt
     notification      Boolean   @default(false)
     terms             Boolean   @default(true)
     
-    // OAuth fields
     googleId          String?   @unique
+    linkedinId        String?   @unique
     profileImage      String?
-    provider          String?   // 'local', 'google', 'linkedin', etc.
+    provider          String?  
 
-    // Relations has Many
     otps Otp[]
 
     @@index([email, phone])
     @@index([LastName, FirstName, email])
     @@index([googleId])
+    @@index([linkedinId])
     @@map("users")
 }
 

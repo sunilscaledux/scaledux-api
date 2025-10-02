@@ -12,6 +12,7 @@ import {
   resendOtpUnified,
 } from "./userController";
 import { googleCallback } from "../auth/googleAuthController";
+import { linkedinCallback } from "../auth/linkedinAuthController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 import { authenticateToken, preventAuthenticatedAccess } from "@middleware/auth";
 
@@ -36,6 +37,9 @@ router.get("/auth/me", authenticateToken, getCurrentUser);
 
 // Google OAuth callback
 router.post("/auth/google-callback", generalRateLimiter, googleCallback);
+
+// LinkedIn OAuth callback
+router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);
 
 // Test cookies  - no authentication required
 router.get("/test-cookies", testCookies);
