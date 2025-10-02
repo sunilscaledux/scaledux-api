@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "public"."OtpType" AS ENUM ('EMAIL_VERIFICATION', 'PHONE_VERIFICATION', 'PASSWORD_RESET', 'LOGIN_VERIFICATION');
+CREATE TYPE "public"."OtpType" AS ENUM ('REGISTRATION_VERIFICATION', 'LOGIN_VERIFICATION', 'FORGOT_PASSWORD_VERIFICATION');
 
 -- CreateTable
 CREATE TABLE "public"."users" (
@@ -10,28 +10,17 @@ CREATE TABLE "public"."users" (
     "phone" TEXT,
     "email_verified_at" TIMESTAMP(3),
     "phone_verified_at" TIMESTAMP(3),
-    "password" TEXT NOT NULL,
-    "status" INTEGER NOT NULL,
+    "password" TEXT,
+    "status" INTEGER NOT NULL DEFAULT 1,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
+    "notification" BOOLEAN NOT NULL DEFAULT false,
+    "terms" BOOLEAN NOT NULL DEFAULT true,
+    "googleId" TEXT,
+    "profileImage" TEXT,
+    "provider" TEXT,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."temp_users" (
-    "id" SERIAL NOT NULL,
-    "FirstName" TEXT NOT NULL,
-    "LastName" TEXT,
-    "email" TEXT,
-    "phone" TEXT,
-    "email_verified_at" TIMESTAMP(3),
-    "phone_verified_at" TIMESTAMP(3),
-    "password" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "temp_users_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -57,22 +46,16 @@ CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
 CREATE UNIQUE INDEX "users_phone_key" ON "public"."users"("phone");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_googleId_key" ON "public"."users"("googleId");
+
+-- CreateIndex
 CREATE INDEX "users_email_phone_idx" ON "public"."users"("email", "phone");
 
 -- CreateIndex
 CREATE INDEX "users_LastName_FirstName_email_idx" ON "public"."users"("LastName", "FirstName", "email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "temp_users_email_key" ON "public"."temp_users"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "temp_users_phone_key" ON "public"."temp_users"("phone");
-
--- CreateIndex
-CREATE INDEX "temp_users_email_phone_idx" ON "public"."temp_users"("email", "phone");
-
--- CreateIndex
-CREATE INDEX "temp_users_LastName_FirstName_email_idx" ON "public"."temp_users"("LastName", "FirstName", "email");
+CREATE INDEX "users_googleId_idx" ON "public"."users"("googleId");
 
 -- CreateIndex
 CREATE INDEX "otps_email_otp_type_verified_idx" ON "public"."otps"("email", "otp_type", "verified");

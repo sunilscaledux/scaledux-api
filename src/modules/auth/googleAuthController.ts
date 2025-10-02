@@ -55,7 +55,6 @@ export async function googleCallback(req: Request, res: Response) {
     );
 
     const googleUser = userResponse.data;
-    console.log('🔐 Google user info:', googleUser);
 
     // Step 3: Check if user exists with this email
     let user = await prisma.user.findUnique({
@@ -70,12 +69,10 @@ export async function googleCallback(req: Request, res: Response) {
           data: {
             googleId: googleUser.id,
             profileImage: googleUser.picture || user.profileImage,
-            provider: 'google',
-          }
+            provider: "google",
+          },
         });
       }
-      
-      console.log('✅ Existing user logged in via Google:', user.email);
     } else {
       // Create new user from Google OAuth
       const [firstName, ...lastNameParts] = googleUser.name.split(' ');
@@ -88,11 +85,10 @@ export async function googleCallback(req: Request, res: Response) {
           email: googleUser.email,
           googleId: googleUser.id,
           // profileImage: googleUser.picture,
-          provider: 'google',
-          email_verified_at: new Date(), // Google emails are pre-verified
+          provider: "google",
+          email_verified_at: new Date(),
           status: 1,
-          // No password needed for OAuth users
-        }
+        },
       });
 
       console.log('✅ New user created via Google OAuth:', user.email);

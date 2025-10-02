@@ -556,7 +556,7 @@ export async function logout(req: Request, res: Response) {
     res.clearCookie("auth_token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as "lax" | "strict" | "none",
+      sameSite: "none",
       path: "/",
     });
 
@@ -577,9 +577,9 @@ export async function testCookies(req: Request, res: Response) {
     res.cookie("test_cookie", "test_value", {
       httpOnly: false, // Make it visible in browser for testing
       secure: false,
-      sameSite: "lax" as "lax" | "strict" | "none",
+      sameSite: "none",
       maxAge: 60 * 1000, // 1 minute
-      path: "/"
+      path: "/",
     });
 
     return ApiResponse.success(
@@ -587,7 +587,7 @@ export async function testCookies(req: Request, res: Response) {
       {
         message: "Test cookie set",
         receivedCookies: req.cookies,
-        headers: req.headers
+        headers: req.headers,
       },
       "Cookie test successful"
     );
