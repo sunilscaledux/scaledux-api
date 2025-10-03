@@ -10,7 +10,7 @@
      "baseUrl": "./src",
     "paths": {
       "@config/*": ["config/*"],
-      "@module/*": ["modules/*"],
+      "@module/*": ["module/*"],
       "@types/*": ["types/*"],
       "@utils/*": ["utils/*"],
       "@middleware/*": ["middleware/*"],

@@ -11,8 +11,8 @@ import {
   verifyOtp,
   resendOtpUnified,
 } from "./userController";
-import { googleCallback } from "../auth/googleAuthController";
-import { linkedinCallback } from "../auth/linkedinAuthController";
+import { googleCallback } from "@module/auth/googleAuthController";
+import { linkedinCallback } from "@module/auth/linkedinAuthController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 import { authenticateToken, preventAuthenticatedAccess } from "@middleware/auth";
 
