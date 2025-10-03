@@ -7,14 +7,15 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "outDir": "./dist",
-     "baseUrl": "./src",
+    "rootDir": "./src",
+    "baseUrl": "./",
     "paths": {
-      "@config/*": ["config/*"],
-      "@module/*": ["module/*"],
-      "@types/*": ["types/*"],
-      "@utils/*": ["utils/*"],
-      "@middleware/*": ["middleware/*"],
-      "@services/*": ["services/*"]
+      "@config/*": ["src/config/*"],
+      "@module/*": ["src/module/*"],
+      "@types/*": ["src/types/*"],
+      "@utils/*": ["src/utils/*"],
+      "@middleware/*": ["src/middleware/*"],
+      "@services/*": ["src/services/*"]
     }
   },
   "include": ["src/**/*.ts"],
