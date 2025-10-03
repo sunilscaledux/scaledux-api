@@ -17,7 +17,8 @@
     "nodemailer": "^6.9.8",
     "pg": "^8.16.3",
     "rate-limit-redis": "^4.2.2",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "zeptomail": "^6.2.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
