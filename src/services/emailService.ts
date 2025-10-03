@@ -29,7 +29,9 @@ class EmailService {
   async sendEmail(options: EmailOptions): Promise<boolean> {
     try {
       const mailOptions = {
-        from: `"${process.env.APP_NAME || 'ScaleDux'}" <${process.env.SMTP_USER}>`,
+        from: `"${process.env.APP_NAME || "ScaleDux"}" <${
+          process.env.SMTP_SENDER
+        }>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
