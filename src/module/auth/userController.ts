@@ -26,7 +26,7 @@ import {
   resetPasswordSchema,
 } from "./userValidation";
 import { ApiResponse } from "@utils/ApiResponse";
-import { otpService } from "@module/user/otpService";
+import { otpService } from "@module/auth/otpService";
 
 export async function initiateRegistration(req: Request, res: Response) {
   const rawBody = req.body || {};

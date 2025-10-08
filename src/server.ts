@@ -4,7 +4,7 @@ import './moduleAlias';
 import express from 'express';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
-import userRoutes from '@module/user/userRoute';
+import userRoutes from "@module/auth/userRoute";
 import cors from 'cors';
 
 

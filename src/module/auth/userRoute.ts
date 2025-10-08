@@ -10,7 +10,7 @@ import {
   requestOtp,
   verifyOtp,
   resendOtpUnified,
-} from "./userController";
+} from "@module/auth/userController";
 import { googleCallback } from "@module/auth/googleAuthController";
 import { linkedinCallback } from "@module/auth/linkedinAuthController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
