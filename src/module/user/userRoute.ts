@@ -35,13 +35,10 @@ router.post("/reset-password", generalRateLimiter, resetPassword);
 router.post("/logout", authenticateToken, logout);
 router.get("/auth/me", authenticateToken, getCurrentUser);
 
-// Google OAuth callback
 router.post("/auth/google-callback", generalRateLimiter, googleCallback);
 
-// LinkedIn OAuth callback
 router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);
 
-// Test cookies  - no authentication required
 router.get("/test-cookies", testCookies);
 
 export default router;
