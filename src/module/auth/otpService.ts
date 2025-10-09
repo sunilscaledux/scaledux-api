@@ -1,6 +1,6 @@
 import { emailService } from "../../services/emailService";
 import { prisma } from "../../config/prisma";
-import { normalizeContact } from "./userService";
+import { normalizeContact } from "./AuthService";
 import { ServiceResponse } from "../../utils/ApiResponse";
 
 export class OtpService {

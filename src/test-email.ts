@@ -6,6 +6,7 @@ import { emailService } from '@services/emailService';
 
 dotenv.config();
 
+
 async function testEmail() {
   console.log('🧪 Testing ZeptoMail integration...');
   
