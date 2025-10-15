@@ -27,6 +27,7 @@ import {
 } from "./AuthValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import { otpService } from "@module/auth/otpService";
+import { getFileUrl } from '@utils/General';
 
 export async function initiateRegistration(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -599,10 +600,6 @@ export async function testCookies(req: Request, res: Response) {
 
 export async function getCurrentUser(req: Request, res: Response) {
   try {
-    // Debug: Log cookies received
-    console.log("Cookies received:", req.cookies);
-    console.log("Auth token from cookie:", req.cookies?.auth_token);
-    
     // User is already attached to req by authenticateToken middleware
     const user = req.user;
 
@@ -612,7 +609,7 @@ export async function getCurrentUser(req: Request, res: Response) {
 
     // Get full user details from database
     const userDetails = await prisma.user.findUnique({
-      where: { id: user.userId },
+      where: { id: user.id },
       select: {
         id: true,
         FirstName: true,
@@ -621,8 +618,10 @@ export async function getCurrentUser(req: Request, res: Response) {
         phone: true,
         email_verified_at: true,
         phone_verified_at: true,
-        status: true
-      }
+        coverImage: true,
+        profileImage: true,
+        status: true,
+      },
     });
 
     if (!userDetails) {
@@ -632,16 +631,16 @@ export async function getCurrentUser(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       {
-        user: {
-          id: userDetails.id,
-          firstName: userDetails.FirstName,
-          lastName: userDetails.LastName,
-          email: userDetails.email,
-          phone: userDetails.phone,
-          emailVerified: !!userDetails.email_verified_at,
-          phoneVerified: !!userDetails.phone_verified_at,
-          status: userDetails.status
-        }
+        id: userDetails.id,
+        firstName: userDetails.FirstName,
+        lastName: userDetails.LastName,
+        email: userDetails.email,
+        coverImage: getFileUrl(userDetails.coverImage),
+        profileImage:  getFileUrl(userDetails.profileImage),
+        phone: userDetails.phone,
+        emailVerified: !!userDetails.email_verified_at,
+        phoneVerified: !!userDetails.phone_verified_at,
+        status: userDetails.status,
       },
       "User details retrieved successfully"
     );

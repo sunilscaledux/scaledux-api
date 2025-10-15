@@ -5,12 +5,13 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import userRoutes from "@module/auth/AuthRoute";
-import cors from 'cors';
+import profileRoutes from "@module/profile/ProfileRoute";
 
+import cors from "cors";
+import path from "path";
 
 dotenv.config();
 const app = express();
-
 
 app.use(
   cors({
@@ -22,10 +23,12 @@ app.use(
   })
 );
 
-
 app.use(express.json());
 app.use(cookieParser());
-app.use('/api/v1', userRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+
+app.use("/api/v1", userRoutes);
+app.use("/api/v1", profileRoutes);
 
 app.listen(process.env.PORT, () => {
   console.log("server is working");

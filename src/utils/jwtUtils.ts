@@ -12,7 +12,7 @@ export function generateTokenAndSetCookie(
 
   const token = jwt.sign(
     {
-      userId: user.id,
+      id: user.id,
       email: user.email,
       phone: user.phone,
       rememberMe: rememberMe,
