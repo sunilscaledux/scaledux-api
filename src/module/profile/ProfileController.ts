@@ -39,7 +39,7 @@ export async function uploadProfileImage(req: Request, res: Response) {
     }
 
     const userId = req.user.id;
-    const imageUrl = req.file.path;
+    const imageUrl = getRelativePath(req.file.path);
 
     // Update user's profile image in database
     const user = await prisma.user.update({
@@ -70,7 +70,6 @@ export async function uploadCoverImage(req: Request, res: Response) {
 
     const userId = req.user.id;
     const imageUrl = getRelativePath(req.file.path);
-    console.log(userId, imageUrl);
     // Update user's cover image in database
     const user = await prisma.user.update({
       where: { id: userId },

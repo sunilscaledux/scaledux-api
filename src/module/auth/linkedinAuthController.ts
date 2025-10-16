@@ -3,6 +3,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie } from '../../utils/jwtUtils';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import { ulid } from 'ulid';
 
 const prisma = new PrismaClient();
 
@@ -230,6 +231,7 @@ export async function linkedinCallback(req: Request, res: Response) {
       // Create new user from LinkedIn OAuth
       user = await prisma.user.create({
         data: {
+          uniqueId:ulid(),
           FirstName: firstName,
           LastName: lastName,
           email: userEmail,

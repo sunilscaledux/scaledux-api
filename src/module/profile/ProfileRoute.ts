@@ -11,12 +11,12 @@ const router = Router();
 
 router.put("/profile/update", authenticateToken, updateProfileSummary);
 
-// router.post(
-//   "/profile/upload-profile-image",
-//   authenticateToken,
-//   profileUpload.single("profileImage"),
-//   uploadProfileImage
-// );
+router.post(
+  "/profile/upload-profile-image",
+  authenticateToken,
+  FileUpload({ uploadPath: `profile` }).single("profileImage"),
+  uploadProfileImage
+);
 
 // Cover image upload route
 router.post(

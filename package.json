@@ -19,6 +19,7 @@
     "nodemailer": "^6.9.8",
     "pg": "^8.16.3",
     "rate-limit-redis": "^4.2.2",
+    "ulid": "^3.0.1",
     "winston": "^3.17.0",
     "zeptomail": "^6.2.1"
   },

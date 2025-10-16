@@ -3,6 +3,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie } from '../../utils/jwtUtils';
 import { PrismaClient } from '@prisma/client';
 import axios from 'axios';
+import { ulid } from 'ulid';
 
 const prisma = new PrismaClient();
 
@@ -84,7 +85,7 @@ export async function googleCallback(req: Request, res: Response) {
           LastName: lastName,
           email: googleUser.email,
           googleId: googleUser.id,
-          // profileImage: googleUser.picture,
+          uniqueId: ulid(),
           provider: "google",
           email_verified_at: new Date(),
           status: 1,

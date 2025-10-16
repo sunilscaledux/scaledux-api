@@ -2,6 +2,7 @@ import { prisma } from "@config/prisma";
 import bcrypt from "bcrypt";
 import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { ulid } from "ulid";
 
 export async function checkUserExists(input: string): Promise<boolean> {
   const existingUser = await prisma.user.findFirst({
@@ -38,13 +39,14 @@ export async function createUserAfterOtpVerification(
 
     const userData: any = {
       FirstName: data.FirstName,
+      uniqueId: ulid(),
       LastName: data.LastName,
       email: contactInfo.email || data.email,
       phone: contactInfo.phone,
       password: hashedPassword,
       terms: data.terms,
       notification: data.notification || false,
-      status: 1, 
+      status: 1,
     };
 
     // Set verification timestamp for the method that was used

@@ -613,6 +613,7 @@ export async function getCurrentUser(req: Request, res: Response) {
       select: {
         id: true,
         FirstName: true,
+        uniqueId: true,
         LastName: true,
         email: true,
         phone: true,
@@ -632,11 +633,12 @@ export async function getCurrentUser(req: Request, res: Response) {
       res,
       {
         id: userDetails.id,
+        uniqueId: userDetails.uniqueId,
         firstName: userDetails.FirstName,
         lastName: userDetails.LastName,
         email: userDetails.email,
         coverImage: getFileUrl(userDetails.coverImage),
-        profileImage:  getFileUrl(userDetails.profileImage),
+        profileImage: getFileUrl(userDetails.profileImage),
         phone: userDetails.phone,
         emailVerified: !!userDetails.email_verified_at,
         phoneVerified: !!userDetails.phone_verified_at,
