@@ -622,6 +622,8 @@ export async function getCurrentUser(req: Request, res: Response) {
         coverImage: true,
         profileImage: true,
         status: true,
+        title: true,
+        about: true,
       },
     });
 
@@ -643,6 +645,8 @@ export async function getCurrentUser(req: Request, res: Response) {
         emailVerified: !!userDetails.email_verified_at,
         phoneVerified: !!userDetails.phone_verified_at,
         status: userDetails.status,
+        title: userDetails.title,
+        about: userDetails.about,
       },
       "User details retrieved successfully"
     );

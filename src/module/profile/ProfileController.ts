@@ -22,14 +22,12 @@ export async function updateProfileSummary(req: Request, res: Response) {
       id: userId,
     },
     data: {
-      FirstName: value.FirstName,
-      LastName: value.LastName,
       title: value.title,
       about: value.about,
     },
   });
 
-  return ApiResponse.success(res, user, "Profile updated successfully");
+  return ApiResponse.success(res, user, "Profile summary updated successfully");
 }
 
 export async function uploadProfileImage(req: Request, res: Response) {

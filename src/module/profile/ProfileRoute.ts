@@ -9,7 +9,7 @@ import { handleMulterError, FileUpload } from "@middleware/fileupload";
 
 const router = Router();
 
-router.put("/profile/update", authenticateToken, updateProfileSummary);
+router.put("/profile/summary", authenticateToken, updateProfileSummary);
 
 router.post(
   "/profile/upload-profile-image",
