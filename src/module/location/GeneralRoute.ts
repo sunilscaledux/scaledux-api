@@ -1,0 +1,34 @@
+import { Router } from "express"
+import {
+  getCountries,
+  getStatesByCountry,
+  getAllCountriesWithStates,
+  getLanguages,
+  getLanguagesByCountry,
+  warmLocationCache,
+  invalidateLocationCache,
+} from "./GeneralController"
+
+const router = Router()
+
+// Country and State endpoints
+router.get("/countries", getCountries)
+router.get("/countries/:countryId/states", getStatesByCountry)
+router.get("/countries-with-states", getAllCountriesWithStates)
+
+// Language endpoints
+router.get("/languages", getLanguages)
+router.get("/languages/country/:countryCode", getLanguagesByCountry)
+
+// Cache management endpoints
+router.post("/cache/warm", warmLocationCache)
+router.delete("/cache/invalidate", async (req, res) => {
+  try {
+    await invalidateLocationCache()
+    res.json({ success: true, message: "Cache invalidated successfully" })
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Failed to invalidate cache" })
+  }
+})
+
+export default router
