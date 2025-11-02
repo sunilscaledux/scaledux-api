@@ -20,3 +20,8 @@ export interface PersonalInfoInput{
         url: string
     }>
 }
+
+export interface HourlyRateInput{
+    hourly_rate: number,
+    currency: string
+}

@@ -653,23 +653,32 @@ export async function getCurrentUser(req: Request, res: Response) {
         address_line_2: userDetails.address_line_2,
         zipCode: userDetails.zipCode,
         // Send relation data with proper structure
-        country: userDetails.country ? {
-          id: userDetails.country.id,
-          name: userDetails.country.name,
-          code: userDetails.country.code,
-          flag: userDetails.country.flag ? getFileUrl(userDetails.country.flag) : null
-        } : null,
-        state: userDetails.state ? {
-          id: userDetails.state.id,
-          name: userDetails.state.name,
-          code: userDetails.state.code
-        } : null,
+        country: userDetails.country
+          ? {
+              id: userDetails.country.id,
+              name: userDetails.country.name,
+              code: userDetails.country.code,
+              flag: userDetails.country.flag
+                ? getFileUrl(userDetails.country.flag)
+                : null,
+            }
+          : null,
+        state: userDetails.state
+          ? {
+              id: userDetails.state.id,
+              name: userDetails.state.name,
+              code: userDetails.state.code,
+            }
+          : null,
         city: userDetails.city,
         website: userDetails.website,
         hideEmail: userDetails.hideEmail,
         hidePhone: userDetails.hidePhone,
         links: userDetails.links,
+        currency: userDetails.currency,
+        hourly_rate: userDetails.hourly_rate,
       },
+
       "User details retrieved successfully"
     );
   } catch (error: any) {

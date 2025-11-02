@@ -3,6 +3,7 @@ import {
   updateProfileSummary,
   updatePersonalInfo,
   updatePrivacySettings,
+  updateHourlyRate,
   uploadProfileImage,
   uploadCoverImage,
 } from "./ProfileController";
@@ -14,6 +15,7 @@ const router = Router();
 router.put("/profile/summary", authenticateToken, updateProfileSummary);
 router.put("/profile/personal-info", authenticateToken, updatePersonalInfo);
 router.put("/profile/privacy-settings", authenticateToken, updatePrivacySettings);
+router.put("/profile/hourly-rate", authenticateToken, updateHourlyRate);
 
 router.post(
   "/profile/upload-profile-image",

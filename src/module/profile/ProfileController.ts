@@ -1,7 +1,7 @@
 import {Request,Response} from 'express'
-import { ProfileSummaryInput, PersonalInfoInput } from './ProfileType'
+import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from './ProfileType'
 import { prisma } from "@config/prisma";
-import { updateSummarySchema, updatePersonalInfoSchema } from "./ProfileValidation";
+import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from "./ProfileValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getFileUrl, getRelativePath } from "@utils/General";
 
@@ -151,5 +151,35 @@ export async function uploadCoverImage(req: Request, res: Response) {
   } catch (error) {
     console.error("Error uploading cover image:", error);
     return ApiResponse.error(res, "Failed to upload cover image", 500);
+  }
+}
+
+export async function updateHourlyRate(req: Request, res: Response) {
+  const rawBody = req.body || {};
+
+  const { value, error } = updateHourlyRateSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  const userId = req.user.id;
+
+  try {
+    const user = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        hourly_rate: value.hourly_rate,
+        currency: value.currency,
+      },
+    });
+
+    return ApiResponse.success(res, user, "Hourly rate updated successfully");
+  } catch (error: any) {
+    console.error("Update Hourly Rate Error:", error);
+    return ApiResponse.error(res, "Failed to update hourly rate");
   }
 }

@@ -1,5 +1,5 @@
 import Joi from "joi";
-import { ProfileSummaryInput, PersonalInfoInput } from "./ProfileType";
+import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from "./ProfileType";
 
 export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
   title: Joi.string().required(),
@@ -22,4 +22,9 @@ export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
       url: Joi.string().uri().required()
     })
   ).optional(),
+});
+
+export const updateHourlyRateSchema = Joi.object<HourlyRateInput>({
+  hourly_rate: Joi.number().positive().required(),
+  currency: Joi.string().required(),
 });

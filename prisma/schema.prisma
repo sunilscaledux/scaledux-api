@@ -37,6 +37,8 @@ model User {
   website           String?
   zipCode           String?
   links             Json?
+  hourly_rate       Float?
+  currency          String?
   country_id        Int?
   state_id          Int?
   otps              Otp[]
