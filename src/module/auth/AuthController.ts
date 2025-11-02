@@ -611,6 +611,14 @@ export async function getCurrentUser(req: Request, res: Response) {
     const userDetails = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
+        currency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true
+          }
+        },
         country: {
           select: {
             id: true,
@@ -675,7 +683,14 @@ export async function getCurrentUser(req: Request, res: Response) {
         hideEmail: userDetails.hideEmail,
         hidePhone: userDetails.hidePhone,
         links: userDetails.links,
-        currency: userDetails.currency,
+        currency: userDetails.currency
+          ? {
+              id: userDetails.currency.id,
+              name: userDetails.currency.name,
+              code: userDetails.currency.code,
+              symbol: userDetails.currency.symbol,
+            }
+          : null,
         hourly_rate: userDetails.hourly_rate,
       },
 

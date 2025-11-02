@@ -173,7 +173,7 @@ export async function updateHourlyRate(req: Request, res: Response) {
       },
       data: {
         hourly_rate: value.hourly_rate,
-        currency: value.currency,
+        currency_id: value.currency_id,
       },
     });
 

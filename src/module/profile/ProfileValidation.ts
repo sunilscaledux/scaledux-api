@@ -25,6 +25,13 @@ export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
 });
 
 export const updateHourlyRateSchema = Joi.object<HourlyRateInput>({
-  hourly_rate: Joi.number().positive().required(),
-  currency: Joi.string().required(),
+  hourly_rate: Joi.number().positive().required().messages({
+    'number.positive': 'Hourly rate must be a positive number',
+    'any.required': 'Hourly rate is required'
+  }),
+  currency_id: Joi.number().integer().positive().required().messages({
+    'number.base': 'Please select a valid currency',
+    'number.positive': 'Please select a valid currency',
+    'any.required': 'Currency selection is required'
+  }),
 });

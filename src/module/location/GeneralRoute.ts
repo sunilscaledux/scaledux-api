@@ -5,6 +5,8 @@ import {
   getAllCountriesWithStates,
   getLanguages,
   getLanguagesByCountry,
+  getCurrencies,
+  getCountriesWithCurrencies,
   warmLocationCache,
   invalidateLocationCache,
 } from "./GeneralController"
@@ -19,6 +21,10 @@ router.get("/countries-with-states", getAllCountriesWithStates)
 // Language endpoints
 router.get("/languages", getLanguages)
 router.get("/languages/country/:countryCode", getLanguagesByCountry)
+
+// Currency endpoints
+router.get("/currencies", getCurrencies)
+router.get("/countries-with-currencies", getCountriesWithCurrencies)
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)

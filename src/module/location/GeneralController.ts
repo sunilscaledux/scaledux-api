@@ -263,3 +263,84 @@ export async function warmLocationCache(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to warm cache")
   }
 }
+
+// Currency related functions
+export async function getCurrencies(req: Request, res: Response) {
+  try {
+    const cacheKey = 'currencies:all'
+    
+    // Try to get from Redis cache first
+    const cachedCurrencies = await redisClient.get(cacheKey)
+    if (cachedCurrencies) {
+      console.log('📦 Currencies retrieved from cache')
+      return ApiResponse.success(res, JSON.parse(cachedCurrencies), "Currencies retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const currencies = await prisma.currency.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        symbol: true,
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache the result for 24 hours
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(currencies))
+    console.log('💾 Currencies cached for 24 hours')
+
+    return ApiResponse.success(res, currencies, "Currencies retrieved successfully")
+  } catch (error: any) {
+    console.error("Get currencies error:", error)
+    return ApiResponse.error(res, "Failed to retrieve currencies")
+  }
+}
+
+export async function getCountriesWithCurrencies(req: Request, res: Response) {
+  try {
+    const cacheKey = 'countries:with-currencies:all'
+    
+    // Try to get from Redis cache first
+    const cachedData = await redisClient.get(cacheKey)
+    if (cachedData) {
+      console.log('📦 Countries with currencies retrieved from cache')
+      return ApiResponse.success(res, JSON.parse(cachedData), "Countries with currencies retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const countries = await prisma.country.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        flag: true,
+        currency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          }
+        }
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Map flag paths to full URLs using getFileUrl
+    const countriesWithUrls = countries.map(country => ({
+      ...country,
+      flag: country.flag ? getFileUrl(country.flag) : null
+    }))
+
+    // Cache the result for 24 hours
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(countriesWithUrls))
+    console.log('💾 Countries with currencies cached for 24 hours')
+
+    return ApiResponse.success(res, countriesWithUrls, "Countries with currencies retrieved successfully")
+  } catch (error: any) {
+    console.error("Get countries with currencies error:", error)
+    return ApiResponse.error(res, "Failed to retrieve countries with currencies")
+  }
+}

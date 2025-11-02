@@ -23,5 +23,5 @@ export interface PersonalInfoInput{
 
 export interface HourlyRateInput{
     hourly_rate: number,
-    currency: string
+    currency_id: number
 }

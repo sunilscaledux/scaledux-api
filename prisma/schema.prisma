@@ -38,10 +38,11 @@ model User {
   zipCode           String?
   links             Json?
   hourly_rate       Float?
-  currency          String?
+  currency_id         Int?
   country_id        Int?
   state_id          Int?
   otps              Otp[]
+  currency          Currency? @relation(fields: [currency_id], references: [id])
   country           Country?  @relation(fields: [country_id], references: [id])
   state             State?    @relation(fields: [state_id], references: [id])
 
@@ -72,14 +73,16 @@ model Otp {
 }
 
 model Country {
-  id         Int      @id @default(autoincrement())
-  name       String   @unique
-  code       String   @unique
-  flag       String?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  states     State[]
-  users      User[]
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  code        String    @unique
+  flag        String?
+  currency_id Int?
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  currency    Currency? @relation(fields: [currency_id], references: [id])
+  states      State[]
+  users       User[]
 
   @@map("countries")
 }
@@ -96,6 +99,19 @@ model State {
 
   @@unique([name, country_id])
   @@map("states")
+}
+
+model Currency {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique
+  code       String    @unique
+  symbol     String
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  countries  Country[]
+  users      User[]
+
+  @@map("currencies")
 }
 
 model Language {
