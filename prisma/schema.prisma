@@ -9,7 +9,7 @@ generator client {
 
 model User {
     id                Int       @id @default(autoincrement())
-    uniqueId          String   @unique
+    uniqueId          String    @unique
     FirstName         String
     LastName          String?
     email             String?   @unique
@@ -31,9 +31,20 @@ model User {
     hidePhone         Boolean   @default(false)
     title             String?
     about             String?
-
-    otps Otp[]
-
+    address           String?
+    address_line_2    String?
+    zipCode           String?
+    countryId         Int?
+    stateId           Int?
+    city              String?
+    website           String?
+    links             Json?
+    
+    // Relations
+    country           Country? @relation(fields: [countryId], references: [id])
+    state             State?   @relation(fields: [stateId], references: [id])
+    
+    otps     Otp[]
     @@index([email, phone])
     @@index([LastName, FirstName, email])
     @@index([googleId])
@@ -67,3 +78,47 @@ enum OtpType {
     LOGIN_VERIFICATION
     FORGOT_PASSWORD_VERIFICATION
 }
+
+model Country {
+    id          Int     @id @default(autoincrement())
+    name        String  @unique
+    code        String  @unique // ISO country code like "IN", "US"
+    flag        String? // URL or path to flag image
+    created_at  DateTime @default(now())
+    updated_at  DateTime @updatedAt
+    
+    states      State[]
+    users       User[]
+    
+    @@map("countries")
+}
+
+model State {
+    id          Int     @id @default(autoincrement())
+    name        String
+    code        String? // State code like "MH", "KA"
+    country_id  Int
+    created_at  DateTime @default(now())
+    updated_at  DateTime @updatedAt
+    
+    country     Country @relation(fields: [country_id], references: [id], onDelete: Cascade)
+    users       User[]
+    
+    @@unique([name, country_id])
+    @@map("states")
+}
+
+model Language {
+    id              Int     @id @default(autoincrement())
+    name            String  @unique
+    native_name     String? // Language name in its own script
+    code            String  @unique // ISO 639-1 code like "hi", "en", "ne"
+    country_code    String? // Associated country code
+    is_active       Boolean @default(true)
+    created_at      DateTime @default(now())
+    updated_at      DateTime @updatedAt
+    
+    @@map("languages")
+}
+
+

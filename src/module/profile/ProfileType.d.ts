@@ -4,3 +4,19 @@ export interface ProfileSummaryInput{
     title:string,
     about:string
 }
+
+export interface PersonalInfoInput{
+    address?: string,
+    address_line_2?: string,
+    zipCode?: string,
+    countryId?: number,
+    stateId?: number,
+    city?: string,
+    website?: string,
+    hideEmail?: boolean,
+    hidePhone?: boolean,
+    links?: Array<{
+        platform: string,
+        url: string
+    }>
+}

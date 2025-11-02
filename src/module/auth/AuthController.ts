@@ -624,6 +624,17 @@ export async function getCurrentUser(req: Request, res: Response) {
         status: true,
         title: true,
         about: true,
+        address: true,
+        address_line_2: true,
+        zipCode: true,
+        // Keep old fields for backward compatibility until migration
+        country: true,
+        state: true,
+        city: true,
+        website: true,
+        hideEmail: true,
+        hidePhone: true,
+        links: true,
       },
     });
 
@@ -647,6 +658,16 @@ export async function getCurrentUser(req: Request, res: Response) {
         status: userDetails.status,
         title: userDetails.title,
         about: userDetails.about,
+        address: userDetails.address,
+        address_line_2: userDetails.address_line_2,
+        zipCode: userDetails.zipCode,
+        country: userDetails.country,
+        state: userDetails.state,
+        city: userDetails.city,
+        website: userDetails.website,
+        hideEmail: userDetails.hideEmail,
+        hidePhone: userDetails.hidePhone,
+        links: userDetails.links,
       },
       "User details retrieved successfully"
     );

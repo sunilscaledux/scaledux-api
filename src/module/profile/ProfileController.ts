@@ -1,7 +1,7 @@
 import {Request,Response} from 'express'
-import { ProfileSummaryInput } from './ProfileType'
+import { ProfileSummaryInput, PersonalInfoInput } from './ProfileType'
 import { prisma } from "@config/prisma";
-import { updateSummarySchema } from "./ProfileValidation";
+import { updateSummarySchema, updatePersonalInfoSchema } from "./ProfileValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getFileUrl, getRelativePath } from "@utils/General";
 
@@ -28,6 +28,75 @@ export async function updateProfileSummary(req: Request, res: Response) {
   });
 
   return ApiResponse.success(res, user, "Profile summary updated successfully");
+}
+
+export async function updatePersonalInfo(req: Request, res: Response) {
+  const rawBody = req.body || {};
+
+  const { value, error } = updatePersonalInfoSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  const userId = req.user.id;
+
+  const user = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      address: value.address,
+      address_line_2: value.address_line_2,
+      zipCode: value.zipCode,
+      // Temporarily use old field names until migration
+      country: value.countryId ? value.countryId.toString() : null,
+      state: value.stateId ? value.stateId.toString() : null,
+      city: value.city,
+      website: value.website,
+      hideEmail: value.hideEmail,
+      hidePhone: value.hidePhone,
+      links: value.links,
+    },
+  });
+
+  return ApiResponse.success(res, user, "Personal information updated successfully");
+}
+
+export async function updatePrivacySettings(req: Request, res: Response) {
+  const rawBody = req.body || {};
+
+  // Simple validation for privacy settings
+  const { hideEmail, hidePhone } = rawBody;
+  
+  if (hideEmail !== undefined && typeof hideEmail !== 'boolean') {
+    return ApiResponse.error(res, "hideEmail must be a boolean", 400);
+  }
+  
+  if (hidePhone !== undefined && typeof hidePhone !== 'boolean') {
+    return ApiResponse.error(res, "hidePhone must be a boolean", 400);
+  }
+
+  const userId = req.user.id;
+
+  try {
+    const updateData: any = {};
+    if (hideEmail !== undefined) updateData.hideEmail = hideEmail;
+    if (hidePhone !== undefined) updateData.hidePhone = hidePhone;
+
+    const user = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: updateData,
+    });
+
+    return ApiResponse.success(res, user, "Privacy settings updated successfully");
+  } catch (error: any) {
+    console.error("Update Privacy Settings Error:", error);
+    return ApiResponse.error(res, "Failed to update privacy settings");
+  }
 }
 
 export async function uploadProfileImage(req: Request, res: Response) {
