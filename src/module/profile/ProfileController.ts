@@ -50,9 +50,9 @@ export async function updatePersonalInfo(req: Request, res: Response) {
       address: value.address,
       address_line_2: value.address_line_2,
       zipCode: value.zipCode,
-      // Temporarily use old field names until migration
-      country: value.countryId ? value.countryId.toString() : null,
-      state: value.stateId ? value.stateId.toString() : null,
+      // Use new snake_case foreign key fields
+      country_id: value.countryId,
+      state_id: value.stateId,
       city: value.city,
       website: value.website,
       hideEmail: value.hideEmail,

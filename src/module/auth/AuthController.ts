@@ -607,35 +607,26 @@ export async function getCurrentUser(req: Request, res: Response) {
       return ApiResponse.unauthorized(res, "Not authenticated");
     }
 
-    // Get full user details from database
+    // Get full user details from database with relations
     const userDetails = await prisma.user.findUnique({
       where: { id: user.id },
-      select: {
-        id: true,
-        FirstName: true,
-        uniqueId: true,
-        LastName: true,
-        email: true,
-        phone: true,
-        email_verified_at: true,
-        phone_verified_at: true,
-        coverImage: true,
-        profileImage: true,
-        status: true,
-        title: true,
-        about: true,
-        address: true,
-        address_line_2: true,
-        zipCode: true,
-        // Keep old fields for backward compatibility until migration
-        country: true,
-        state: true,
-        city: true,
-        website: true,
-        hideEmail: true,
-        hidePhone: true,
-        links: true,
-      },
+      include: {
+        country: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            flag: true
+          }
+        },
+        state: {
+          select: {
+            id: true,
+            name: true,
+            code: true
+          }
+        }
+      }
     });
 
     if (!userDetails) {
@@ -661,8 +652,18 @@ export async function getCurrentUser(req: Request, res: Response) {
         address: userDetails.address,
         address_line_2: userDetails.address_line_2,
         zipCode: userDetails.zipCode,
-        country: userDetails.country,
-        state: userDetails.state,
+        // Send relation data with proper structure
+        country: userDetails.country ? {
+          id: userDetails.country.id,
+          name: userDetails.country.name,
+          code: userDetails.country.code,
+          flag: userDetails.country.flag ? getFileUrl(userDetails.country.flag) : null
+        } : null,
+        state: userDetails.state ? {
+          id: userDetails.state.id,
+          name: userDetails.state.name,
+          code: userDetails.state.code
+        } : null,
         city: userDetails.city,
         website: userDetails.website,
         hideEmail: userDetails.hideEmail,
