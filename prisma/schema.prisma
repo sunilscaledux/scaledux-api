@@ -31,6 +31,7 @@ model User {
   uniqueId          String    @unique
   otps              Otp[]
   personalInfo      PersonalInfo?
+  education         Education[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -63,6 +64,26 @@ model PersonalInfo {
   state          State?    @relation(fields: [state_id], references: [id])
 
   @@map("personal_info")
+}
+
+model Education {
+  id            Int      @id @default(autoincrement())
+  user_id       Int
+  school        String
+  degree        String
+  area_of_study String
+  start_month   String
+  start_year    String
+  end_month     String?
+  end_year      String?
+  is_ongoing    Boolean  @default(false)
+  description   String?
+  skills        Json?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("education")
 }
 
 model Otp {
