@@ -17,13 +17,27 @@ export async function updateProfileSummary(req: Request, res: Response) {
 
   const userId = req.user.id;
 
-  const user = await prisma.user.update({
+  // Upsert personal info with title and about
+  const personalInfo = await prisma.personalInfo.upsert({
     where: {
-      id: userId,
+      user_id: userId,
     },
-    data: {
+    update: {
       title: value.title,
       about: value.about,
+    },
+    create: {
+      user_id: userId,
+      title: value.title,
+      about: value.about,
+    },
+  });
+
+  // Get user with personal info for response
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      personalInfo: true,
     },
   });
 
@@ -42,22 +56,39 @@ export async function updatePersonalInfo(req: Request, res: Response) {
 
   const userId = req.user.id;
 
-  const user = await prisma.user.update({
+  // Upsert personal info with all personal data including links
+  const personalInfo = await prisma.personalInfo.upsert({
     where: {
-      id: userId,
+      user_id: userId,
     },
-    data: {
+    update: {
       address: value.address,
       address_line_2: value.address_line_2,
       zipCode: value.zipCode,
-      // Use new snake_case foreign key fields
       country_id: value.countryId,
       state_id: value.stateId,
       city: value.city,
       website: value.website,
-      hideEmail: value.hideEmail,
-      hidePhone: value.hidePhone,
       links: value.links,
+    },
+    create: {
+      user_id: userId,
+      address: value.address,
+      address_line_2: value.address_line_2,
+      zipCode: value.zipCode,
+      country_id: value.countryId,
+      state_id: value.stateId,
+      city: value.city,
+      website: value.website,
+      links: value.links,
+    },
+  });
+
+  // Get user for response
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      personalInfo: true,
     },
   });
 
@@ -167,13 +198,27 @@ export async function updateHourlyRate(req: Request, res: Response) {
   const userId = req.user.id;
 
   try {
-    const user = await prisma.user.update({
+    // Upsert personal info with hourly rate and currency
+    const personalInfo = await prisma.personalInfo.upsert({
       where: {
-        id: userId,
+        user_id: userId,
       },
-      data: {
+      update: {
         hourly_rate: value.hourly_rate,
         currency_id: value.currency_id,
+      },
+      create: {
+        user_id: userId,
+        hourly_rate: value.hourly_rate,
+        currency_id: value.currency_id,
+      },
+    });
+
+    // Get user for response
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        personalInfo: true,
       },
     });
 

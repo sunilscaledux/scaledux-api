@@ -611,27 +611,31 @@ export async function getCurrentUser(req: Request, res: Response) {
     const userDetails = await prisma.user.findUnique({
       where: { id: user.id },
       include: {
-        currency: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            symbol: true
-          }
-        },
-        country: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            flag: true
-          }
-        },
-        state: {
-          select: {
-            id: true,
-            name: true,
-            code: true
+        personalInfo: {
+          include: {
+            currency: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                symbol: true
+              }
+            },
+            country: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                flag: true
+              }
+            },
+            state: {
+              select: {
+                id: true,
+                name: true,
+                code: true
+              }
+            }
           }
         }
       }
@@ -655,43 +659,44 @@ export async function getCurrentUser(req: Request, res: Response) {
         emailVerified: !!userDetails.email_verified_at,
         phoneVerified: !!userDetails.phone_verified_at,
         status: userDetails.status,
-        title: userDetails.title,
-        about: userDetails.about,
-        address: userDetails.address,
-        address_line_2: userDetails.address_line_2,
-        zipCode: userDetails.zipCode,
-        // Send relation data with proper structure
-        country: userDetails.country
+        // Get personal info data from personalInfo relation
+        title: userDetails.personalInfo?.title || null,
+        about: userDetails.personalInfo?.about || null,
+        address: userDetails.personalInfo?.address || null,
+        address_line_2: userDetails.personalInfo?.address_line_2 || null,
+        zipCode: userDetails.personalInfo?.zipCode || null,
+        // Send relation data with proper structure from personalInfo
+        country: userDetails.personalInfo?.country
           ? {
-              id: userDetails.country.id,
-              name: userDetails.country.name,
-              code: userDetails.country.code,
-              flag: userDetails.country.flag
-                ? getFileUrl(userDetails.country.flag)
+              id: userDetails.personalInfo.country.id,
+              name: userDetails.personalInfo.country.name,
+              code: userDetails.personalInfo.country.code,
+              flag: userDetails.personalInfo.country.flag
+                ? getFileUrl(userDetails.personalInfo.country.flag)
                 : null,
             }
           : null,
-        state: userDetails.state
+        state: userDetails.personalInfo?.state
           ? {
-              id: userDetails.state.id,
-              name: userDetails.state.name,
-              code: userDetails.state.code,
+              id: userDetails.personalInfo.state.id,
+              name: userDetails.personalInfo.state.name,
+              code: userDetails.personalInfo.state.code,
             }
           : null,
-        city: userDetails.city,
-        website: userDetails.website,
+        city: userDetails.personalInfo?.city || null,
+        website: userDetails.personalInfo?.website || null,
         hideEmail: userDetails.hideEmail,
         hidePhone: userDetails.hidePhone,
-        links: userDetails.links,
-        currency: userDetails.currency
+        links: userDetails.personalInfo?.links || null,
+        currency: userDetails.personalInfo?.currency
           ? {
-              id: userDetails.currency.id,
-              name: userDetails.currency.name,
-              code: userDetails.currency.code,
-              symbol: userDetails.currency.symbol,
+              id: userDetails.personalInfo.currency.id,
+              name: userDetails.personalInfo.currency.name,
+              code: userDetails.personalInfo.currency.code,
+              symbol: userDetails.personalInfo.currency.symbol,
             }
           : null,
-        hourly_rate: userDetails.hourly_rate,
+        hourly_rate: userDetails.personalInfo?.hourly_rate || null,
       },
 
       "User details retrieved successfully"

@@ -28,29 +28,40 @@ model User {
   coverImage        String?
   hideEmail         Boolean   @default(false)
   hidePhone         Boolean   @default(false)
-  about             String?
-  title             String?
   uniqueId          String    @unique
-  address           String?
-  address_line_2    String?
-  city              String?
-  website           String?
-  zipCode           String?
-  links             Json?
-  hourly_rate       Float?
-  currency_id         Int?
-  country_id        Int?
-  state_id          Int?
   otps              Otp[]
-  currency          Currency? @relation(fields: [currency_id], references: [id])
-  country           Country?  @relation(fields: [country_id], references: [id])
-  state             State?    @relation(fields: [state_id], references: [id])
+  personalInfo      PersonalInfo?
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
   @@index([googleId])
   @@index([linkedinId])
   @@map("users")
+}
+
+model PersonalInfo {
+  id             Int       @id @default(autoincrement())
+  user_id        Int       @unique
+  title          String?
+  about          String?
+  address        String?
+  address_line_2 String?
+  city           String?
+  website        String?
+  zipCode        String?
+  hourly_rate    Float?
+  links          Json?
+  currency_id    Int?
+  country_id     Int?
+  state_id       Int?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+  user           User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  currency       Currency? @relation(fields: [currency_id], references: [id])
+  country        Country?  @relation(fields: [country_id], references: [id])
+  state          State?    @relation(fields: [state_id], references: [id])
+
+  @@map("personal_info")
 }
 
 model Otp {
@@ -73,43 +84,43 @@ model Otp {
 }
 
 model Country {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  code        String    @unique
-  flag        String?
-  currency_id Int?
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  currency    Currency? @relation(fields: [currency_id], references: [id])
-  states      State[]
-  users       User[]
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  code         String         @unique
+  flag         String?
+  currency_id  Int?
+  created_at   DateTime       @default(now())
+  updated_at   DateTime       @updatedAt
+  currency     Currency?      @relation(fields: [currency_id], references: [id])
+  states       State[]
+  personalInfo PersonalInfo[]
 
   @@map("countries")
 }
 
 model State {
-  id         Int      @id @default(autoincrement())
-  name       String
-  code       String?
-  country_id Int
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  country    Country  @relation(fields: [country_id], references: [id], onDelete: Cascade)
-  users      User[]
+  id           Int            @id @default(autoincrement())
+  name         String
+  code         String?
+  country_id   Int
+  created_at   DateTime       @default(now())
+  updated_at   DateTime       @updatedAt
+  country      Country        @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  personalInfo PersonalInfo[]
 
   @@unique([name, country_id])
   @@map("states")
 }
 
 model Currency {
-  id         Int       @id @default(autoincrement())
-  name       String    @unique
-  code       String    @unique
-  symbol     String
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
-  countries  Country[]
-  users      User[]
+  id           Int            @id @default(autoincrement())
+  name         String         @unique
+  code         String         @unique
+  symbol       String
+  created_at   DateTime       @default(now())
+  updated_at   DateTime       @updatedAt
+  countries    Country[]
+  personalInfo PersonalInfo[]
 
   @@map("currencies")
 }
