@@ -4,6 +4,7 @@ import {
   updatePersonalInfo,
   updatePrivacySettings,
   updateHourlyRate,
+  updateLanguages,
   uploadProfileImage,
   uploadCoverImage,
 } from "./ProfileController";
@@ -16,6 +17,7 @@ router.put("/profile/summary", authenticateToken, updateProfileSummary);
 router.put("/profile/personal-info", authenticateToken, updatePersonalInfo);
 router.put("/profile/privacy-settings", authenticateToken, updatePrivacySettings);
 router.put("/profile/hourly-rate", authenticateToken, updateHourlyRate);
+router.put("/profile/languages", authenticateToken, updateLanguages);
 
 router.post(
   "/profile/upload-profile-image",

@@ -228,3 +228,45 @@ export async function updateHourlyRate(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to update hourly rate");
   }
 }
+
+export async function updateLanguages(req: Request, res: Response) {
+  const rawBody = req.body || {};
+
+  // Simple validation for languages
+  const { languages } = rawBody;
+  
+  if (languages && !Array.isArray(languages)) {
+    return ApiResponse.error(res, "Languages must be an array", 400);
+  }
+
+  const userId = req.user.id;
+
+  try {
+    // Upsert personal info with languages
+    const personalInfo = await prisma.personalInfo.upsert({
+      where: {
+        user_id: userId,
+      },
+      update: {
+        languages: languages,
+      },
+      create: {
+        user_id: userId,
+        languages: languages,
+      },
+    });
+
+    // Get user with personal info for response
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        personalInfo: true,
+      },
+    });
+
+    return ApiResponse.success(res, user, "Languages updated successfully");
+  } catch (error: any) {
+    console.error("Update Languages Error:", error);
+    return ApiResponse.error(res, "Failed to update languages");
+  }
+}

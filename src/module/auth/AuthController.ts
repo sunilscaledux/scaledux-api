@@ -688,6 +688,7 @@ export async function getCurrentUser(req: Request, res: Response) {
         hideEmail: userDetails.hideEmail,
         hidePhone: userDetails.hidePhone,
         links: userDetails.personalInfo?.links || null,
+        languages: userDetails.personalInfo?.languages || null,
         currency: userDetails.personalInfo?.currency
           ? {
               id: userDetails.personalInfo.currency.id,
