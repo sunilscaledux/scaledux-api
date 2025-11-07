@@ -34,6 +34,7 @@ model User {
   education         Education[]
   licenses          License[]
   workExperiences   WorkExperience[]
+  achievements      Achievement[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -195,6 +196,23 @@ model WorkExperience {
   user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("work_experiences")
+}
+
+model Achievement {
+  id                Int      @id @default(autoincrement())
+  user_id           Int
+  title             String
+  description       String?
+  company           String
+  completed_month   String
+  completed_year    String
+  achievement_link  String?
+  media_files       Json?    // Array of media file objects with type, url, name
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("achievements")
 }
 
 enum OtpType {

@@ -8,8 +8,9 @@ import userRoutes from "@module/auth/AuthRoute";
 import profileRoutes from "@module/profile/ProfileRoute";
 import generalRoutes from "@module/location/GeneralRoute";
 import educationRoutes from "@module/education/EducationRoute";
-import licenseRoutes from "@module/license/LicenseRoute";
-import workExperienceRoutes from "@module/work-experience/WorkExperienceRoute";
+import licenseRoutes from './module/license/LicenseRoute';
+import workExperienceRoutes from './module/work-experience/WorkExperienceRoute';
+import achievementRoutes from './module/achievement/AchievementRoute';
 
 import cors from "cors";
 import path from "path";
@@ -37,6 +38,7 @@ app.use("/api/v1", generalRoutes);
 app.use("/api/v1", educationRoutes);
 app.use("/api/v1/licenses", licenseRoutes);
 app.use("/api/v1/work-experiences", workExperienceRoutes);
+app.use("/api/v1/achievements", achievementRoutes);
 
 app.listen(process.env.PORT, () => {
   console.log("server is working");
