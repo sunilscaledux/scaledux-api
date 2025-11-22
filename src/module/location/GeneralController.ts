@@ -28,6 +28,21 @@ export async function invalidateLocationCache(countryId?: string) {
   }
 }
 
+// Cache invalidation endpoint
+export async function invalidateCache(req: Request, res: Response) {
+  try {
+    await invalidateLocationCache()
+    
+    return ApiResponse.success(res, { 
+      message: 'Cache invalidated successfully',
+      timestamp: new Date().toISOString()
+    }, "Cache invalidated successfully")
+  } catch (error: any) {
+    console.error("Cache invalidation error:", error)
+    return ApiResponse.error(res, "Failed to invalidate cache")
+  }
+}
+
 // Country related functions
 export async function getCountries(req: Request, res: Response) {
   try {
@@ -45,12 +60,13 @@ export async function getCountries(req: Request, res: Response) {
         id: true,
         name: true,
         code: true,
+        phone_code: true,
         flag: true,
       },
       orderBy: {
-        name: 'asc'
-      }
-    })
+        name: "asc",
+      },
+    });
 
     // Map flag paths to full URLs using getFileUrl
     const countries = countriesData.map(country => ({
@@ -217,14 +233,26 @@ export async function warmLocationCache(req: Request, res: Response) {
     
     // Warm countries cache
     const countries = await prisma.country.findMany({
-      select: { id: true, name: true, code: true, flag: true },
+      select: { id: true, name: true, code: true, phone_code: true, flag: true },
       orderBy: { name: 'asc' }
     })
-    await redisClient.setex('countries:all', 864000, JSON.stringify(countries))
+    
+    // Map flag paths to full URLs using getFileUrl
+    const countriesWithUrls = countries.map(country => ({
+      ...country,
+      flag: country.flag ? getFileUrl(country.flag) : null
+    }))
+    
+    await redisClient.setex('countries:all', 864000, JSON.stringify(countriesWithUrls))
     
     // Warm countries with states cache
     const countriesWithStates = await prisma.country.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        phone_code: true,
+        flag: true,
         states: {
           select: { id: true, name: true, code: true },
           orderBy: { name: 'asc' }
@@ -232,7 +260,14 @@ export async function warmLocationCache(req: Request, res: Response) {
       },
       orderBy: { name: 'asc' }
     })
-    await redisClient.setex('countries:with-states:all', 864000, JSON.stringify(countriesWithStates))
+    
+    // Map flag paths to full URLs using getFileUrl
+    const countriesWithStatesAndUrls = countriesWithStates.map(country => ({
+      ...country,
+      flag: country.flag ? getFileUrl(country.flag) : null
+    }))
+    
+    await redisClient.setex('countries:with-states:all', 864000, JSON.stringify(countriesWithStatesAndUrls))
     
     // Warm states cache for each country
     for (const country of countries) {

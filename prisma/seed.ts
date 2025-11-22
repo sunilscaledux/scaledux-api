@@ -195,54 +195,70 @@ async function main() {
   
   // Create India
   const india = await prisma.country.upsert({
-    where: { code: 'IN' },
-    update: { currency_id: currencyMap.get('INR').id },
+    where: { code: "IN" },
+    update: {
+      currency_id: currencyMap.get("INR").id,
+      phone_code: "+91",
+    },
     create: {
-      name: 'India',
-      code: 'IN',
-      flag: '/flags/india.svg',
-      currency_id: currencyMap.get('INR').id
-    }
-  })
-  console.log('Created country:', india.name)
+      name: "India",
+      code: "IN",
+      phone_code: "+91",
+      flag: "/flags/india.svg",
+      currency_id: currencyMap.get("INR").id,
+    },
+  });
+  console.log("Created country:", india.name);
 
   // Create Nepal
   const nepal = await prisma.country.upsert({
-    where: { code: 'NP' },
-    update: { currency_id: currencyMap.get('NPR').id },
+    where: { code: "NP" },
+    update: {
+      currency_id: currencyMap.get("NPR").id,
+      phone_code: "+977",
+    },
     create: {
-      name: 'Nepal',
-      code: 'NP',
-      flag: '/flags/nepal.svg',
-      currency_id: currencyMap.get('NPR').id
-    }
-  })
+      name: "Nepal",
+      code: "NP",
+      phone_code: "+977",
+      flag: "country/nepal.svg",
+      currency_id: currencyMap.get("NPR").id,
+    },
+  });
   console.log('Created country:', nepal.name)
 
   // Create United States
   const usa = await prisma.country.upsert({
-    where: { code: 'US' },
-    update: { currency_id: currencyMap.get('USD').id },
+    where: { code: "US" },
+    update: {
+      currency_id: currencyMap.get("USD").id,
+      phone_code: "+1",
+    },
     create: {
-      name: 'United States',
-      code: 'US',
-      flag: '/flags/usa.svg',
-      currency_id: currencyMap.get('USD').id
-    }
-  })
-  console.log('Created country:', usa.name)
+      name: "United States",
+      code: "US",
+      phone_code: "+1",
+      flag: "country/usa.svg",
+      currency_id: currencyMap.get("USD").id,
+    },
+  });
+  console.log("Created country:", usa.name);
 
   // Create United Kingdom
   const uk = await prisma.country.upsert({
-    where: { code: 'GB' },
-    update: { currency_id: currencyMap.get('GBP').id },
+    where: { code: "GB" },
+    update: {
+      currency_id: currencyMap.get("GBP").id,
+      phone_code: "+44",
+    },
     create: {
-      name: 'United Kingdom',
-      code: 'GB',
-      flag: '/flags/uk.svg',
-      currency_id: currencyMap.get('GBP').id
-    }
-  })
+      name: "United Kingdom",
+      code: "GB",
+      phone_code: "+44",
+      flag: "country/uk.svg",
+      currency_id: currencyMap.get("GBP").id,
+    },
+  });
   console.log('Created country:', uk.name)
 
   // Create states for each country

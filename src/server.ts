@@ -12,6 +12,7 @@ import licenseRoutes from './module/license/LicenseRoute';
 import workExperienceRoutes from './module/work-experience/WorkExperienceRoute';
 import achievementRoutes from './module/achievement/AchievementRoute';
 import expertiseRoutes from './module/expertise/ExpertiseRoute';
+import verifyRoutes from './module/verify/VerifyRoute';
 
 import cors from "cors";
 import path from "path";
@@ -41,6 +42,7 @@ app.use("/api/v1/licenses", licenseRoutes);
 app.use("/api/v1/work-experiences", workExperienceRoutes);
 app.use("/api/v1/achievements", achievementRoutes);
 app.use("/api/v1/expertises", expertiseRoutes);
+app.use("/api/v1/verify", verifyRoutes);
 
 app.listen(process.env.PORT, () => {
   console.log("server is working");

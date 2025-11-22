@@ -9,6 +9,7 @@ import {
   getCountriesWithCurrencies,
   warmLocationCache,
   invalidateLocationCache,
+  invalidateCache,
   getExpertiseCategories,
   getSpecialtiesByCategory,
   getSkillsBySpecialty,
@@ -36,13 +37,6 @@ router.get("/specialties/:specialtyId/skills", getSkillsBySpecialty)
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)
-router.delete("/cache/invalidate", async (req, res) => {
-  try {
-    await invalidateLocationCache()
-    res.json({ success: true, message: "Cache invalidated successfully" })
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to invalidate cache" })
-  }
-})
+router.delete("/cache/invalidate", invalidateCache)
 
 export default router

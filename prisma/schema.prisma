@@ -188,6 +188,7 @@ model Country {
   id           Int            @id @default(autoincrement())
   name         String         @unique
   code         String         @unique
+  phone_code   String?        // Phone country code like +91, +1, +44
   flag         String?
   currency_id  Int?
   created_at   DateTime       @default(now())
@@ -279,5 +280,6 @@ enum OtpType {
   REGISTRATION_VERIFICATION
   LOGIN_VERIFICATION
   FORGOT_PASSWORD_VERIFICATION
+  PHONE_VERIFICATION
 }
 
