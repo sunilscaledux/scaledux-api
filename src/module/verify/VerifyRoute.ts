@@ -4,7 +4,7 @@ import {
   verifyPhoneOTP,
   getPhoneVerificationStatus,
   updatePhoneNumber
-} from "./VerifyController"
+} from "./VerifyPhoneController"
 import {
   getEmailVerificationStatus,
   sendEmailOTP,
