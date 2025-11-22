@@ -22,7 +22,6 @@ export async function invalidateLocationCache(countryId?: string) {
     
     if (keysToDelete.length > 0) {
       await redisClient.del(...keysToDelete)
-      console.log('🗑️  Location cache invalidated:', keysToDelete)
     }
   } catch (error) {
     console.error('Cache invalidation error:', error)
@@ -37,7 +36,6 @@ export async function getCountries(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedCountries = await redisClient.get(cacheKey)
     if (cachedCountries) {
-      console.log('📦 Countries retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedCountries), "Countries retrieved successfully")
     }
 
@@ -62,7 +60,6 @@ export async function getCountries(req: Request, res: Response) {
 
     // Store in Redis cache for 24 hours (864000 seconds)
     await redisClient.setex(cacheKey, 864000, JSON.stringify(countries))
-    console.log('💾 Countries cached in Redis')
 
     return ApiResponse.success(res, countries, "Countries retrieved successfully")
   } catch (error: any) {
@@ -84,7 +81,6 @@ export async function getStatesByCountry(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedStates = await redisClient.get(cacheKey)
     if (cachedStates) {
-      console.log(`📦 States for country ${countryId} retrieved from cache`)
       return ApiResponse.success(res, JSON.parse(cachedStates), "States retrieved successfully")
     }
 
@@ -105,7 +101,6 @@ export async function getStatesByCountry(req: Request, res: Response) {
 
     // Store in Redis cache for 24 hours (864000 seconds)
     await redisClient.setex(cacheKey, 864000, JSON.stringify(states))
-    console.log(`💾 States for country ${countryId} cached in Redis`)
 
     return ApiResponse.success(res, states, "States retrieved successfully")
   } catch (error: any) {
@@ -121,7 +116,6 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedData = await redisClient.get(cacheKey)
     if (cachedData) {
-      console.log('📦 Countries with states retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedData), "Countries with states retrieved successfully")
     }
 
@@ -152,7 +146,6 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
 
     // Store in Redis cache for 24 hours (864000 seconds)
     await redisClient.setex(cacheKey, 864000*30, JSON.stringify(countries))
-    console.log('💾 Countries with states cached in Redis')
 
     return ApiResponse.success(res, countries, "Countries with states retrieved successfully")
   } catch (error: any) {
@@ -221,7 +214,6 @@ export async function getLanguagesByCountry(req: Request, res: Response) {
 // Cache warming endpoint
 export async function warmLocationCache(req: Request, res: Response) {
   try {
-    console.log('🔥 Starting cache warming...')
     
     // Warm countries cache
     const countries = await prisma.country.findMany({
@@ -252,7 +244,6 @@ export async function warmLocationCache(req: Request, res: Response) {
       await redisClient.setex(`states:country:${country.id}`, 864000, JSON.stringify(states))
     }
     
-    console.log('🔥 Cache warming completed successfully')
     return ApiResponse.success(res, { 
       message: 'Cache warmed successfully',
       countriesCount: countries.length,
@@ -272,7 +263,6 @@ export async function getCurrencies(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedCurrencies = await redisClient.get(cacheKey)
     if (cachedCurrencies) {
-      console.log('📦 Currencies retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedCurrencies), "Currencies retrieved successfully")
     }
 
@@ -289,7 +279,6 @@ export async function getCurrencies(req: Request, res: Response) {
 
     // Cache the result for 24 hours
     await redisClient.setex(cacheKey, 864000, JSON.stringify(currencies))
-    console.log('💾 Currencies cached for 24 hours')
 
     return ApiResponse.success(res, currencies, "Currencies retrieved successfully")
   } catch (error: any) {
@@ -305,7 +294,6 @@ export async function getCountriesWithCurrencies(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedData = await redisClient.get(cacheKey)
     if (cachedData) {
-      console.log('📦 Countries with currencies retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedData), "Countries with currencies retrieved successfully")
     }
 
@@ -336,7 +324,6 @@ export async function getCountriesWithCurrencies(req: Request, res: Response) {
 
     // Cache the result for 24 hours
     await redisClient.setex(cacheKey, 864000, JSON.stringify(countriesWithUrls))
-    console.log('💾 Countries with currencies cached for 24 hours')
 
     return ApiResponse.success(res, countriesWithUrls, "Countries with currencies retrieved successfully")
   } catch (error: any) {
@@ -353,7 +340,6 @@ export async function getExpertiseCategories(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedCategories = await redisClient.get(cacheKey)
     if (cachedCategories) {
-      console.log('📦 Expertise categories retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedCategories), "Expertise categories retrieved successfully")
     }
 
@@ -365,7 +351,6 @@ export async function getExpertiseCategories(req: Request, res: Response) {
 
     // Cache for 24 hours
     await redisClient.setex(cacheKey, 864000, JSON.stringify(categories))
-    console.log('💾 Expertise categories cached')
 
     return ApiResponse.success(res, categories, "Expertise categories retrieved successfully")
   } catch (error: any) {
@@ -387,7 +372,6 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedSpecialties = await redisClient.get(cacheKey)
     if (cachedSpecialties) {
-      console.log('📦 Specialties retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedSpecialties), "Specialties retrieved successfully")
     }
 
@@ -402,7 +386,6 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
 
     // Cache for 24 hours
     await redisClient.setex(cacheKey, 864000, JSON.stringify(specialties))
-    console.log('💾 Specialties cached')
 
     return ApiResponse.success(res, specialties, "Specialties retrieved successfully")
   } catch (error: any) {
@@ -424,7 +407,6 @@ export async function getSkillsBySpecialty(req: Request, res: Response) {
     // Try to get from Redis cache first
     const cachedSkills = await redisClient.get(cacheKey)
     if (cachedSkills) {
-      console.log('📦 Skills retrieved from cache')
       return ApiResponse.success(res, JSON.parse(cachedSkills), "Skills retrieved successfully")
     }
 
@@ -439,7 +421,6 @@ export async function getSkillsBySpecialty(req: Request, res: Response) {
 
     // Cache for 24 hours
     await redisClient.setex(cacheKey, 864000, JSON.stringify(skills))
-    console.log('💾 Skills cached')
 
     return ApiResponse.success(res, skills, "Skills retrieved successfully")
   } catch (error: any) {
