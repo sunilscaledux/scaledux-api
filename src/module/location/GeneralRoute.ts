@@ -9,6 +9,9 @@ import {
   getCountriesWithCurrencies,
   warmLocationCache,
   invalidateLocationCache,
+  getExpertiseCategories,
+  getSpecialtiesByCategory,
+  getSkillsBySpecialty,
 } from "./GeneralController"
 
 const router = Router()
@@ -25,6 +28,11 @@ router.get("/languages/country/:countryCode", getLanguagesByCountry)
 // Currency endpoints
 router.get("/currencies", getCurrencies)
 router.get("/countries-with-currencies", getCountriesWithCurrencies)
+
+// Expertise endpoints (hierarchical)
+router.get("/expertise-categories", getExpertiseCategories)
+router.get("/expertise-categories/:categoryId/specialties", getSpecialtiesByCategory)
+router.get("/specialties/:specialtyId/skills", getSkillsBySpecialty)
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)

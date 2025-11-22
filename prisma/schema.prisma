@@ -35,6 +35,7 @@ model User {
   licenses          License[]
   workExperiences   WorkExperience[]
   achievements      Achievement[]
+  expertises        UserExpertise[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -103,6 +104,65 @@ model License {
   user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("licenses")
+}
+
+model ExpertiseCategory {
+  id          Int             @id @default(autoincrement())
+  name        String          @unique
+  description String?
+  is_active   Boolean         @default(true)
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+  expertises  UserExpertise[]
+  specialties Specialty[]
+
+  @@map("expertise_categories")
+}
+
+model Specialty {
+  id                    Int               @id @default(autoincrement())
+  name                  String
+  description           String?
+  expertise_category_id Int
+  is_active             Boolean           @default(true)
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  expertiseCategory     ExpertiseCategory @relation(fields: [expertise_category_id], references: [id])
+  expertises            UserExpertise[]
+  skills                Skill[]
+
+  @@unique([name, expertise_category_id])
+  @@map("specialties")
+}
+
+model Skill {
+  id           Int       @id @default(autoincrement())
+  name         String
+  description  String?
+  specialty_id Int
+  is_active    Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  specialty    Specialty @relation(fields: [specialty_id], references: [id])
+
+  @@unique([name, specialty_id])
+  @@map("skills")
+}
+
+model UserExpertise {
+  id                    Int               @id @default(autoincrement())
+  user_id               Int
+  expertise_category_id Int
+  specialty_id          Int
+  description           String?
+  skills                Json? // Array of skill names
+  created_at            DateTime          @default(now())
+  updated_at            DateTime          @updatedAt
+  user                  User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  expertiseCategory     ExpertiseCategory @relation(fields: [expertise_category_id], references: [id])
+  specialty             Specialty         @relation(fields: [specialty_id], references: [id])
+
+  @@map("user_expertises")
 }
 
 model Otp {
@@ -220,3 +280,4 @@ enum OtpType {
   LOGIN_VERIFICATION
   FORGOT_PASSWORD_VERIFICATION
 }
+
