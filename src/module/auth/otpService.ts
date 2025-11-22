@@ -175,9 +175,9 @@ export class OtpService {
 
       if (!otp) {
         const typeMessages = {
-          "REGISTRATION_VERIFICATION": "Invalid or expired registration OTP",
-          "LOGIN_VERIFICATION": "Invalid or expired login OTP",
-          "FORGOT_PASSWORD_VERIFICATION": "Invalid or expired password reset OTP"
+          REGISTRATION_VERIFICATION: "Invalid or expired  OTP",
+          LOGIN_VERIFICATION: "Invalid or expired  OTP",
+          FORGOT_PASSWORD_VERIFICATION: "Invalid or expired  OTP",
         };
         return {
           success: false,
