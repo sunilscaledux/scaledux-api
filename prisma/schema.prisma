@@ -26,16 +26,19 @@ model User {
   profileImage      String?
   provider          String?
   coverImage        String?
-  hideEmail         Boolean   @default(false)
-  hidePhone         Boolean   @default(false)
-  uniqueId          String    @unique
-  otps              Otp[]
-  personalInfo      PersonalInfo?
-  education         Education[]
-  licenses          License[]
-  workExperiences   WorkExperience[]
-  achievements      Achievement[]
-  expertises        UserExpertise[]
+  hideEmail                    Boolean   @default(false)
+  hidePhone                    Boolean   @default(false)
+  identity_verified_at         DateTime?
+  identity_verification_status String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
+  uniqueId                     String    @unique
+  otps                         Otp[]
+  personalInfo                 PersonalInfo?
+  education                    Education[]
+  licenses                     License[]
+  workExperiences              WorkExperience[]
+  achievements                 Achievement[]
+  expertises                   UserExpertise[]
+  identityVerifications        IdentityVerification[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -276,10 +279,43 @@ model Achievement {
   @@map("achievements")
 }
 
+model IdentityVerification {
+  id                        Int       @id @default(autoincrement())
+  user_id                   Int
+  first_name                String
+  last_name                 String
+  date_of_birth             DateTime
+  nationality               String?
+  id_type                   String    // passport, driver_license, national_id, etc.
+  id_number                 String
+  id_expiry_date            DateTime?
+  issuing_country           String
+  id_document_urls          Json      // Array of document image URLs
+  selfie_urls               Json      // Array of selfie image URLs
+  address_line_1            String
+  address_line_2            String?
+  city                      String
+  state                     String?
+  postal_code               String?
+  address_country           String
+  proof_of_address_consent  String?
+  status                    String    @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
+  submitted_at              DateTime?
+  reviewed_at               DateTime?
+  reviewed_by               Int?
+  rejection_reason          String?
+  created_at                DateTime  @default(now())
+  updated_at                DateTime  @updatedAt
+  user                      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, status])
+  @@index([status])
+  @@map("identity_verifications")
+}
+
 enum OtpType {
   REGISTRATION_VERIFICATION
   LOGIN_VERIFICATION
   FORGOT_PASSWORD_VERIFICATION
   PHONE_VERIFICATION
 }
-
