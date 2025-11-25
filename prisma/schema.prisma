@@ -299,6 +299,10 @@ model IdentityVerification {
   postal_code               String?
   address_country           String
   proof_of_address_consent  String?
+  address_proof_urls        Json?     // Array of address proof document URLs
+  document_type             String?   // bank-statement, utility-bill
+  institution_name          String?   // Bank or utility company name
+  document_date_issued      DateTime? // Date when document was issued
   status                    String    @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   submitted_at              DateTime?
   reviewed_at               DateTime?

@@ -698,6 +698,9 @@ export async function getCurrentUser(req: Request, res: Response) {
             }
           : null,
         hourly_rate: userDetails.personalInfo?.hourly_rate || null,
+        // Identity verification status
+        identity_verification_status: userDetails.identity_verification_status || 'PENDING',
+        identity_verified_at: userDetails.identity_verified_at,
       },
 
       "User details retrieved successfully"

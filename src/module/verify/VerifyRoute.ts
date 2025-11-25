@@ -17,8 +17,10 @@ import {
   getIdentityVerificationDetails,
   uploadIdDocuments,
   uploadSelfieImages,
+  uploadAddressProof,
   deleteIdDocument,
-  deleteSelfieImage
+  deleteSelfieImage,
+  deleteAddressProof
 } from "./IdentityVerifyController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
@@ -49,7 +51,7 @@ router.get("/identity/details", authenticateToken, getIdentityVerificationDetail
 router.post(
   "/identity/upload-id-documents",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 5 }).array("idDocuments"),
+  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("idDocuments"),
   uploadIdDocuments,
   handleMulterError
 )
@@ -57,13 +59,22 @@ router.post(
 router.post(
   "/identity/upload-selfie",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 3 }).array("selfieImages"),
+  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("selfieImages"),
   uploadSelfieImages,
+  handleMulterError
+)
+
+router.post(
+  "/identity/upload-address-proof",
+  authenticateToken,
+  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("addressProof"),
+  uploadAddressProof,
   handleMulterError
 )
 
 // Identity verification file delete routes
 router.delete("/identity/delete-id-document", authenticateToken, deleteIdDocument)
 router.delete("/identity/delete-selfie", authenticateToken, deleteSelfieImage)
+router.delete("/identity/delete-address-proof", authenticateToken, deleteAddressProof)
 
 export default router

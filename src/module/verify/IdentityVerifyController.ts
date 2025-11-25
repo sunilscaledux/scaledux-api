@@ -21,7 +21,15 @@ export async function getIdentityVerificationStatus(req: Request, res: Response)
       select: {
         id: true,
         identity_verified_at: true,
-        identity_verification_status: true
+        identity_verification_status: true,
+        identityVerifications: {
+          orderBy: { created_at: 'desc' },
+          take: 1,
+          select: {
+            rejection_reason: true,
+            status: true
+          }
+        }
       }
     })
 
@@ -31,11 +39,13 @@ export async function getIdentityVerificationStatus(req: Request, res: Response)
 
     const isVerified = !!user.identity_verified_at
     const status = user.identity_verification_status || 'PENDING'
+    const latestVerification = user.identityVerifications[0]
 
     return ApiResponse.success(res, {
       isVerified,
       status, // PENDING, UNDER_REVIEW, APPROVED, REJECTED
-      verifiedAt: user.identity_verified_at
+      verifiedAt: user.identity_verified_at,
+      rejectionReason: latestVerification?.rejection_reason || null
     }, "Identity verification status retrieved successfully")
 
   } catch (error: any) {
@@ -92,20 +102,25 @@ export async function submitIdentityVerification(req: Request, res: Response) {
       return ApiResponse.error(res, "Identity is already verified", 400)
     }
 
-    // Check if there's a pending submission
-    const existingSubmission = await prisma.identityVerification.findFirst({
+    // Check for existing verification (any status)
+    const existingVerification = await prisma.identityVerification.findFirst({
       where: { 
-        user_id: userId,
-        status: { in: ['PENDING', 'UNDER_REVIEW'] }
-      }
+        user_id: userId
+      },
+      orderBy: { created_at: 'desc' }
     })
 
-    if (existingSubmission) {
+    // If there's a pending submission, don't allow new submission
+    if (existingVerification && ['PENDING', 'UNDER_REVIEW'].includes(existingVerification.status)) {
       return ApiResponse.error(res, "You already have a pending identity verification submission", 400)
     }
 
-    // Create identity verification record
-    const identityVerification = await prisma.identityVerification.create({
+    let identityVerification
+
+    if (existingVerification) {
+      // Update existing verification (for rejected or any other status)
+      identityVerification = await prisma.identityVerification.update({
+        where: { id: existingVerification.id },
       data: {
         user_id: userId,
         // Customer Information
@@ -133,10 +148,57 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         address_country: proofOfAddress.country,
         proof_of_address_consent: proofOfAddress.proofConcent || null,
         
+        // Address Proof Documents (only if user selected "No" for consent)
+        address_proof_urls: proofOfAddress.uploadedAddressProofs || null,
+        document_type: proofOfAddress.documentType || null,
+        institution_name: proofOfAddress.institutionName || null,
+        document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
+        
         status: 'UNDER_REVIEW',
         submitted_at: new Date()
       }
-    })
+      })
+    } else {
+      // Create new verification
+      identityVerification = await prisma.identityVerification.create({
+        data: {
+          user_id: userId,
+          // Customer Information
+          first_name: customerInformation.firstName,
+          last_name: customerInformation.lastName,
+          date_of_birth: new Date(customerInformation.dob),
+          nationality: customerInformation.country,
+          
+          // ID Information
+          id_type: idInformation.idType,
+          id_number: idInformation.idNumber,
+          id_expiry_date: idInformation.idExpiryDate ? new Date(idInformation.idExpiryDate) : null,
+          issuing_country: idInformation.issuingCountry,
+          id_document_urls: idInformation.idImage,
+          
+          // Selfie/Keycode Verification
+          selfie_urls: keycodeVerification.picture,
+          
+          // Proof of Address
+          address_line_1: proofOfAddress.address1,
+          address_line_2: proofOfAddress.address2 || null,
+          city: proofOfAddress.city,
+          state: proofOfAddress.state || null,
+          postal_code: proofOfAddress.zipCode || null,
+          address_country: proofOfAddress.country,
+          proof_of_address_consent: proofOfAddress.proofConcent || null,
+          
+          // Address Proof Documents (only if user selected "No" for consent)
+          address_proof_urls: proofOfAddress.uploadedAddressProofs || null,
+          document_type: proofOfAddress.documentType || null,
+          institution_name: proofOfAddress.institutionName || null,
+          document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
+          
+          status: 'UNDER_REVIEW',
+          submitted_at: new Date()
+        }
+      })
+    }
 
     // Update user status
     await prisma.user.update({
@@ -195,10 +257,10 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         idNumber: verification.id_number,
         idExpiryDate: verification.id_expiry_date,
         issuingCountry: verification.issuing_country,
-        idImage: verification.id_document_urls
+        idImage: verification.id_document_urls ? (verification.id_document_urls as string[]).map((url: string) => getFileUrl(url)) : []
       },
       keycodeVerification: {
-        picture: verification.selfie_urls
+        picture: verification.selfie_urls ? (verification.selfie_urls as string[]).map((url: string) => getFileUrl(url)) : []
       },
       proofOfAddress: {
         address1: verification.address_line_1,
@@ -207,7 +269,11 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         state: verification.state,
         zipCode: verification.postal_code,
         country: verification.address_country,
-        proofConcent: verification.proof_of_address_consent
+        proofConcent: verification.proof_of_address_consent,
+        uploadedAddressProofs: verification.address_proof_urls,
+        documentType: verification.document_type,
+        institutionName: verification.institution_name,
+        dateIssued: verification.document_date_issued
       }
     }, "Identity verification details retrieved successfully")
 
@@ -231,14 +297,13 @@ export async function uploadIdDocuments(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    // Process uploaded files and get their relative paths and full URLs
+    // Process uploaded files and get their relative paths
     const documentPaths = req.files.map((file: any) => getRelativePath(file.path))
-    const documentUrls = documentPaths.map((path: string) => getFileUrl(path))
 
     return ApiResponse.success(
       res,
       { 
-        documentUrls,
+        documentUrls: documentPaths, // Return relative paths for storage
         documentPaths // Also return paths for deletion
       },
       "ID documents uploaded successfully"
@@ -263,14 +328,13 @@ export async function uploadSelfieImages(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    // Process uploaded files and get their relative paths and full URLs
+    // Process uploaded files and get their relative paths
     const selfiePaths = req.files.map((file: any) => getRelativePath(file.path))
-    const selfieUrls = selfiePaths.map((path: string) => getFileUrl(path))
 
     return ApiResponse.success(
       res,
       { 
-        selfieUrls,
+        selfieUrls: selfiePaths, // Return relative paths for storage
         selfiePaths // Also return paths for deletion
       },
       "Selfie images uploaded successfully"
@@ -348,5 +412,71 @@ export async function deleteSelfieImage(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Error deleting selfie image:", error)
     return ApiResponse.error(res, "Failed to delete selfie image", 500)
+  }
+}
+
+/**
+ * Upload address proof documents
+ */
+export async function uploadAddressProof(req: Request, res: Response) {
+  try {
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return ApiResponse.error(res, "No files uploaded", 400)
+    }
+
+    const userId = req.user?.id
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401)
+    }
+
+    // Process uploaded files and get their relative paths
+    const proofPaths = req.files.map((file: any) => getRelativePath(file.path))
+
+    return ApiResponse.success(
+      res,
+      { 
+        proofUrls: proofPaths, // Return relative paths for storage
+        proofPaths // Also return paths for deletion
+      },
+      "Address proof documents uploaded successfully"
+    )
+  } catch (error: any) {
+    console.error("Error uploading address proof:", error)
+    return ApiResponse.error(res, "Failed to upload address proof", 500)
+  }
+}
+
+/**
+ * Delete address proof document
+ */
+export async function deleteAddressProof(req: Request, res: Response) {
+  try {
+    const { filePath } = req.body
+    const userId = req.user?.id
+
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401)
+    }
+
+    if (!filePath) {
+      return ApiResponse.error(res, "File path is required", 400)
+    }
+
+    // Construct full file path
+    const fullPath = path.join(process.cwd(), filePath)
+
+    // Check if file exists and delete it
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath)
+    }
+
+    return ApiResponse.success(
+      res,
+      { deletedPath: filePath },
+      "Address proof deleted successfully"
+    )
+  } catch (error: any) {
+    console.error("Error deleting address proof:", error)
+    return ApiResponse.error(res, "Failed to delete address proof", 500)
   }
 }
