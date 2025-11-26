@@ -11,8 +11,8 @@ import {
   verifyOtp,
   resendOtpUnified,
 } from "@module/auth/AuthController";
-import { googleCallback } from "./GoogleAuthController";
-import { linkedinCallback } from "./LinkedinAuthController";
+import * as GoogleAuth from "@module/auth/GoogleAuthController";
+import * as LinkedinAuth from "@module/auth/LinkedinAuthController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 import { authenticateToken, preventAuthenticatedAccess } from "@middleware/auth";
 
@@ -34,8 +34,8 @@ router.post("/reset-password", generalRateLimiter, resetPassword);
 
 router.post("/logout", authenticateToken, logout);
 router.get("/auth/me", authenticateToken, getCurrentUser);
-router.post("/auth/google-callback", generalRateLimiter, googleCallback);
-router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);
+router.post("/auth/google-callback", generalRateLimiter, GoogleAuth.googleCallback);
+router.post("/auth/linkedin-callback", generalRateLimiter, LinkedinAuth.linkedinCallback);
 router.get("/test-cookies", testCookies);
 
 export default router;
