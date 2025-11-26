@@ -1,37 +1,44 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.emailService = void 0;
-const nodemailer_1 = require("nodemailer");
+const { SendMailClient } = require("zeptomail");
 class EmailService {
     constructor() {
-        this.transporter = (0, nodemailer_1.createTransport)({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
+        const url = process.env.ZEPTO_URL || "api.zeptomail.in/";
+        const token = process.env.ZEPTO_TOKEN;
+        if (!token) {
+            throw new Error("ZEPTO_TOKEN is required in environment variables");
+        }
+        this.client = new SendMailClient({ url, token });
     }
     /**
      * Send email
      */
     async sendEmail(options) {
         try {
-            const mailOptions = {
-                from: `"${process.env.APP_NAME || 'ScaleDux'}" <${process.env.SMTP_USER}>`,
-                to: options.to,
+            const mailData = {
+                from: {
+                    address: process.env.ZEPTO_FROM_EMAIL || "noreply@scaledux.com",
+                    name: process.env.APP_NAME || "ScaleDux",
+                },
+                to: [
+                    {
+                        email_address: {
+                            address: options.to,
+                            name: "",
+                        },
+                    },
+                ],
                 subject: options.subject,
-                html: options.html,
-                text: options.text,
+                htmlbody: options.html || "",
+                textbody: options.text || "",
             };
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log('Email sent successfully:', info.messageId);
+            const response = await this.client.sendMail(mailData);
+            console.log("Email sent successfully via ZeptoMail:", response);
             return true;
         }
         catch (error) {
-            console.error('Failed to send email:', error);
+            console.error("Failed to send email via ZeptoMail:", error);
             return false;
         }
     }
@@ -39,7 +46,7 @@ class EmailService {
      * Send OTP verification email
      */
     async sendOtpEmail(email, otp, firstName) {
-        const subject = 'Verify Your Email Address';
+        const subject = "Verify Your Email Address";
         const html = this.generateOtpEmailTemplate(otp, firstName);
         return await this.sendEmail({
             to: email,
@@ -51,7 +58,7 @@ class EmailService {
      * Send welcome email after successful verification
      */
     async sendWelcomeEmail(email, firstName) {
-        const subject = 'Welcome to ScaleDux!';
+        const subject = "Welcome to ScaleDux!";
         const html = this.generateWelcomeEmailTemplate(firstName);
         return await this.sendEmail({
             to: email,
@@ -86,7 +93,7 @@ class EmailService {
             <h1>📧 Verify Your Email Address</h1>
           </div>
           <div class="content">
-            <h2>Hello ${firstName || 'there'}!</h2>
+            <h2>Hello ${firstName || "there"}!</h2>
             <p>Thank you for registering with <strong>ScaleDux</strong>. To complete your registration, please verify your email address using the OTP code below:</p>
             
             <div class="otp-code">${otp}</div>
@@ -161,12 +168,23 @@ class EmailService {
      */
     async testConnection() {
         try {
-            await this.transporter.verify();
-            console.log('Email service is ready');
-            return true;
+            // Send a test email to verify the configuration
+            const testResult = await this.sendEmail({
+                to: process.env.ZEPTO_FROM_EMAIL || "test@scaledux.com",
+                subject: "ZeptoMail Test Email",
+                html: "<div><b>ZeptoMail service is working correctly!</b></div>",
+            });
+            if (testResult) {
+                console.log("ZeptoMail service is ready");
+                return true;
+            }
+            else {
+                console.error("ZeptoMail test failed");
+                return false;
+            }
         }
         catch (error) {
-            console.error('Email service configuration error:', error);
+            console.error("ZeptoMail service configuration error:", error);
             return false;
         }
     }

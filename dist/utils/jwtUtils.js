@@ -12,7 +12,7 @@ function generateTokenAndSetCookie(user, rememberMe = false) {
         ? 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
         : 24 * 60 * 60 * 1000; // 24 hours in milliseconds
     const token = jsonwebtoken_1.default.sign({
-        userId: user.id,
+        id: user.id,
         email: user.email,
         phone: user.phone,
         rememberMe: rememberMe,

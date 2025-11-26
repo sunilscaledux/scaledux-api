@@ -8,6 +8,7 @@ const ApiResponse_1 = require("../../utils/ApiResponse");
 const jwtUtils_1 = require("../../utils/jwtUtils");
 const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
+const ulid_1 = require("ulid");
 const prisma = new client_1.PrismaClient();
 async function googleCallback(req, res) {
     try {
@@ -55,7 +56,7 @@ async function googleCallback(req, res) {
                     LastName: lastName,
                     email: googleUser.email,
                     googleId: googleUser.id,
-                    // profileImage: googleUser.picture,
+                    uniqueId: (0, ulid_1.ulid)(),
                     provider: "google",
                     email_verified_at: new Date(),
                     status: 1,
