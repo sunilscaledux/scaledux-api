@@ -297,14 +297,15 @@ export async function uploadIdDocuments(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    // Process uploaded files and get their relative paths
+    // Process uploaded files and get their relative paths and full URLs
     const documentPaths = req.files.map((file: any) => getRelativePath(file.path))
+    const documentUrls = documentPaths.map((path: string) => getFileUrl(path))
 
     return ApiResponse.success(
       res,
       { 
-        documentUrls: documentPaths, // Return relative paths for storage
-        documentPaths // Also return paths for deletion
+        documentUrls, // Return full URLs for frontend display
+        documentPaths // Return relative paths for storage
       },
       "ID documents uploaded successfully"
     )
@@ -328,14 +329,15 @@ export async function uploadSelfieImages(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    // Process uploaded files and get their relative paths
+    // Process uploaded files and get their relative paths and full URLs
     const selfiePaths = req.files.map((file: any) => getRelativePath(file.path))
+    const selfieUrls = selfiePaths.map((path: string) => getFileUrl(path))
 
     return ApiResponse.success(
       res,
       { 
-        selfieUrls: selfiePaths, // Return relative paths for storage
-        selfiePaths // Also return paths for deletion
+        selfieUrls, // Return full URLs for frontend display
+        selfiePaths // Return relative paths for storage
       },
       "Selfie images uploaded successfully"
     )
@@ -429,14 +431,15 @@ export async function uploadAddressProof(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    // Process uploaded files and get their relative paths
+    // Process uploaded files and get their relative paths and full URLs
     const proofPaths = req.files.map((file: any) => getRelativePath(file.path))
+    const proofUrls = proofPaths.map((path: string) => getFileUrl(path))
 
     return ApiResponse.success(
       res,
       { 
-        proofUrls: proofPaths, // Return relative paths for storage
-        proofPaths // Also return paths for deletion
+        proofUrls, // Return full URLs for frontend display
+        proofPaths // Return relative paths for storage
       },
       "Address proof documents uploaded successfully"
     )

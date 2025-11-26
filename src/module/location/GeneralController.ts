@@ -220,12 +220,13 @@ export async function getLanguagesByCountry(req: Request, res: Response) {
       }
     })
 
-    return ApiResponse.success(res, languages, "Languages retrieved successfully")
+    return ApiResponse.success(res, languages, "Languages by country retrieved successfully")
   } catch (error: any) {
     console.error("Get Languages by Country Error:", error)
-    return ApiResponse.error(res, "Failed to get languages")
+    return ApiResponse.error(res, "Failed to get languages by country")
   }
 }
+
 
 // Cache warming endpoint
 export async function warmLocationCache(req: Request, res: Response) {
@@ -429,15 +430,15 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
   }
 }
 
-export async function getSkillsBySpecialty(req: Request, res: Response) {
+export async function getSkillsByCategory(req: Request, res: Response) {
   try {
-    const specialtyId = parseInt(req.params.specialtyId)
+    const categoryId = parseInt(req.params.categoryId)
     
-    if (!specialtyId) {
-      return ApiResponse.error(res, "Specialty ID is required", 400)
+    if (!categoryId) {
+      return ApiResponse.error(res, "Category ID is required", 400)
     }
 
-    const cacheKey = `expertise:skills:specialty:${specialtyId}`
+    const cacheKey = `expertise:skills:category:${categoryId}`
     
     // Try to get from Redis cache first
     const cachedSkills = await redisClient.get(cacheKey)
@@ -448,7 +449,7 @@ export async function getSkillsBySpecialty(req: Request, res: Response) {
     // If not in cache, fetch from database
     const skills = await prisma.skill.findMany({
       where: { 
-        specialty_id: specialtyId,
+        expertise_category_id: categoryId,
         is_active: true 
       },
       orderBy: { name: 'asc' }

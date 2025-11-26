@@ -460,88 +460,73 @@ async function main() {
     console.log('Created specialty:', createdSpecialty.name)
   }
 
-  // Seed Skills with Specialty Relations
+  // Seed Skills with Category Relations
   console.log('Seeding skills...')
   
-  // Get specialties for relations
-  const frontendSpecialty = await prisma.specialty.findFirst({ where: { name: 'Frontend Development' } })
-  const backendSpecialty = await prisma.specialty.findFirst({ where: { name: 'Backend Development' } })
-  const mobileSpecialty = await prisma.specialty.findFirst({ where: { name: 'Mobile Development' } })
-  const devopsSpecialty = await prisma.specialty.findFirst({ where: { name: 'DevOps' } })
-  const uiDesignSpecialty = await prisma.specialty.findFirst({ where: { name: 'UI Design' } })
-  const uxDesignSpecialty = await prisma.specialty.findFirst({ where: { name: 'UX Design' } })
-  const digitalMarketingSpecialty = await prisma.specialty.findFirst({ where: { name: 'Digital Marketing' } })
-  const dataAnalysisSpecialty = await prisma.specialty.findFirst({ where: { name: 'Data Analysis' } })
-  const mlSpecialty = await prisma.specialty.findFirst({ where: { name: 'Machine Learning' } })
+  // Get categories for relations
+  const techCat = await prisma.expertiseCategory.findFirst({ where: { name: 'Technology' } })
+  const designCat = await prisma.expertiseCategory.findFirst({ where: { name: 'Design' } })
+  const marketingCat = await prisma.expertiseCategory.findFirst({ where: { name: 'Marketing' } })
+  const dataCat = await prisma.expertiseCategory.findFirst({ where: { name: 'Data Science' } })
 
-  const skillsWithSpecialties = [
-    // Frontend Development Skills
-    { name: 'React', description: 'JavaScript library for building user interfaces', specialty_id: frontendSpecialty!.id },
-    { name: 'Vue.js', description: 'Progressive JavaScript framework', specialty_id: frontendSpecialty!.id },
-    { name: 'Angular', description: 'TypeScript-based web application framework', specialty_id: frontendSpecialty!.id },
-    { name: 'JavaScript', description: 'Programming language for web development', specialty_id: frontendSpecialty!.id },
-    { name: 'TypeScript', description: 'Typed superset of JavaScript', specialty_id: frontendSpecialty!.id },
-    { name: 'HTML5', description: 'Markup language for web pages', specialty_id: frontendSpecialty!.id },
-    { name: 'CSS3', description: 'Style sheet language', specialty_id: frontendSpecialty!.id },
-    { name: 'Tailwind CSS', description: 'Utility-first CSS framework', specialty_id: frontendSpecialty!.id },
+  const skillsWithCategories = [
+    // Technology Skills
+    { name: 'React', description: 'JavaScript library for building user interfaces', expertise_category_id: techCat!.id },
+    { name: 'Vue.js', description: 'Progressive JavaScript framework', expertise_category_id: techCat!.id },
+    { name: 'Angular', description: 'TypeScript-based web application framework', expertise_category_id: techCat!.id },
+    { name: 'JavaScript', description: 'Programming language for web development', expertise_category_id: techCat!.id },
+    { name: 'TypeScript', description: 'Typed superset of JavaScript', expertise_category_id: techCat!.id },
+    { name: 'HTML5', description: 'Markup language for web pages', expertise_category_id: techCat!.id },
+    { name: 'CSS3', description: 'Style sheet language', expertise_category_id: techCat!.id },
+    { name: 'Tailwind CSS', description: 'Utility-first CSS framework', expertise_category_id: techCat!.id },
+    { name: 'Node.js', description: 'JavaScript runtime for server-side development', expertise_category_id: techCat!.id },
+    { name: 'Express.js', description: 'Web framework for Node.js', expertise_category_id: techCat!.id },
+    { name: 'Python', description: 'High-level programming language', expertise_category_id: techCat!.id },
+    { name: 'Django', description: 'Python web framework', expertise_category_id: techCat!.id },
+    { name: 'Java', description: 'Object-oriented programming language', expertise_category_id: techCat!.id },
+    { name: 'Spring Boot', description: 'Java framework for microservices', expertise_category_id: techCat!.id },
+    { name: 'React Native', description: 'Framework for building mobile apps', expertise_category_id: techCat!.id },
+    { name: 'Flutter', description: 'UI toolkit for mobile apps', expertise_category_id: techCat!.id },
+    { name: 'Swift', description: 'Programming language for iOS', expertise_category_id: techCat!.id },
+    { name: 'Kotlin', description: 'Programming language for Android', expertise_category_id: techCat!.id },
+    { name: 'Docker', description: 'Containerization platform', expertise_category_id: techCat!.id },
+    { name: 'Kubernetes', description: 'Container orchestration platform', expertise_category_id: techCat!.id },
+    { name: 'AWS', description: 'Amazon Web Services cloud platform', expertise_category_id: techCat!.id },
+    { name: 'Jenkins', description: 'Automation server for CI/CD', expertise_category_id: techCat!.id },
 
-    // Backend Development Skills
-    { name: 'Node.js', description: 'JavaScript runtime for server-side development', specialty_id: backendSpecialty!.id },
-    { name: 'Express.js', description: 'Web framework for Node.js', specialty_id: backendSpecialty!.id },
-    { name: 'Python', description: 'High-level programming language', specialty_id: backendSpecialty!.id },
-    { name: 'Django', description: 'Python web framework', specialty_id: backendSpecialty!.id },
-    { name: 'Java', description: 'Object-oriented programming language', specialty_id: backendSpecialty!.id },
-    { name: 'Spring Boot', description: 'Java framework for microservices', specialty_id: backendSpecialty!.id },
+    // Design Skills
+    { name: 'Figma', description: 'Design and prototyping tool', expertise_category_id: designCat!.id },
+    { name: 'Adobe XD', description: 'User experience design software', expertise_category_id: designCat!.id },
+    { name: 'Sketch', description: 'Digital design toolkit', expertise_category_id: designCat!.id },
+    { name: 'Prototyping', description: 'Creating interactive mockups', expertise_category_id: designCat!.id },
+    { name: 'User Research', description: 'Understanding user needs and behaviors', expertise_category_id: designCat!.id },
+    { name: 'Wireframing', description: 'Creating structural blueprints', expertise_category_id: designCat!.id },
+    { name: 'Usability Testing', description: 'Evaluating user experience', expertise_category_id: designCat!.id },
+    { name: 'Information Architecture', description: 'Organizing and structuring content', expertise_category_id: designCat!.id },
 
-    // Mobile Development Skills
-    { name: 'React Native', description: 'Framework for building mobile apps', specialty_id: mobileSpecialty!.id },
-    { name: 'Flutter', description: 'UI toolkit for mobile apps', specialty_id: mobileSpecialty!.id },
-    { name: 'Swift', description: 'Programming language for iOS', specialty_id: mobileSpecialty!.id },
-    { name: 'Kotlin', description: 'Programming language for Android', specialty_id: mobileSpecialty!.id },
+    // Marketing Skills
+    { name: 'Google Analytics', description: 'Web analytics service', expertise_category_id: marketingCat!.id },
+    { name: 'Google Ads', description: 'Online advertising platform', expertise_category_id: marketingCat!.id },
+    { name: 'Facebook Ads', description: 'Social media advertising', expertise_category_id: marketingCat!.id },
+    { name: 'SEO', description: 'Search engine optimization', expertise_category_id: marketingCat!.id },
 
-    // DevOps Skills
-    { name: 'Docker', description: 'Containerization platform', specialty_id: devopsSpecialty!.id },
-    { name: 'Kubernetes', description: 'Container orchestration platform', specialty_id: devopsSpecialty!.id },
-    { name: 'AWS', description: 'Amazon Web Services cloud platform', specialty_id: devopsSpecialty!.id },
-    { name: 'Jenkins', description: 'Automation server for CI/CD', specialty_id: devopsSpecialty!.id },
-
-    // UI Design Skills
-    { name: 'Figma', description: 'Design and prototyping tool', specialty_id: uiDesignSpecialty!.id },
-    { name: 'Adobe XD', description: 'User experience design software', specialty_id: uiDesignSpecialty!.id },
-    { name: 'Sketch', description: 'Digital design toolkit', specialty_id: uiDesignSpecialty!.id },
-    { name: 'Prototyping', description: 'Creating interactive mockups', specialty_id: uiDesignSpecialty!.id },
-
-    // UX Design Skills
-    { name: 'User Research', description: 'Understanding user needs and behaviors', specialty_id: uxDesignSpecialty!.id },
-    { name: 'Wireframing', description: 'Creating structural blueprints', specialty_id: uxDesignSpecialty!.id },
-    { name: 'Usability Testing', description: 'Evaluating user experience', specialty_id: uxDesignSpecialty!.id },
-    { name: 'Information Architecture', description: 'Organizing and structuring content', specialty_id: uxDesignSpecialty!.id },
-
-    // Digital Marketing Skills
-    { name: 'Google Analytics', description: 'Web analytics service', specialty_id: digitalMarketingSpecialty!.id },
-    { name: 'Google Ads', description: 'Online advertising platform', specialty_id: digitalMarketingSpecialty!.id },
-    { name: 'Facebook Ads', description: 'Social media advertising', specialty_id: digitalMarketingSpecialty!.id },
-    { name: 'SEO', description: 'Search engine optimization', specialty_id: digitalMarketingSpecialty!.id },
-
-    // Data Analysis Skills
-    { name: 'SQL', description: 'Database query language', specialty_id: dataAnalysisSpecialty!.id },
-    { name: 'Excel', description: 'Spreadsheet application', specialty_id: dataAnalysisSpecialty!.id },
-    { name: 'Tableau', description: 'Data visualization software', specialty_id: dataAnalysisSpecialty!.id },
-    { name: 'Power BI', description: 'Business analytics tool', specialty_id: dataAnalysisSpecialty!.id },
-
-    // Machine Learning Skills
-    { name: 'TensorFlow', description: 'Machine learning framework', specialty_id: mlSpecialty!.id },
-    { name: 'PyTorch', description: 'Deep learning framework', specialty_id: mlSpecialty!.id },
-    { name: 'Pandas', description: 'Data manipulation library', specialty_id: mlSpecialty!.id },
-    { name: 'Scikit-learn', description: 'Machine learning library', specialty_id: mlSpecialty!.id }
+    // Data Science Skills
+    { name: 'SQL', description: 'Database query language', expertise_category_id: dataCat!.id },
+    { name: 'Excel', description: 'Spreadsheet application', expertise_category_id: dataCat!.id },
+    { name: 'Tableau', description: 'Data visualization software', expertise_category_id: dataCat!.id },
+    { name: 'Power BI', description: 'Business analytics tool', expertise_category_id: dataCat!.id },
+    { name: 'TensorFlow', description: 'Machine learning framework', expertise_category_id: dataCat!.id },
+    { name: 'PyTorch', description: 'Deep learning framework', expertise_category_id: dataCat!.id },
+    { name: 'Pandas', description: 'Data manipulation library', expertise_category_id: dataCat!.id },
+    { name: 'Scikit-learn', description: 'Machine learning library', expertise_category_id: dataCat!.id }
   ]
 
-  for (const skill of skillsWithSpecialties) {
+  for (const skill of skillsWithCategories) {
     const createdSkill = await prisma.skill.upsert({
       where: { 
-        name_specialty_id: {
+        name_expertise_category_id: {
           name: skill.name,
-          specialty_id: skill.specialty_id
+          expertise_category_id: skill.expertise_category_id
         }
       },
       update: {},

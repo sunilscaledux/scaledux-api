@@ -701,6 +701,9 @@ export async function getCurrentUser(req: Request, res: Response) {
         // Identity verification status
         identity_verification_status: userDetails.identity_verification_status || 'PENDING',
         identity_verified_at: userDetails.identity_verified_at,
+        // Agency verification status
+        agency_verification_status: userDetails.agency_verification_status || 'PENDING',
+        // agency_verified_at: userDetails.agency_verified_at, // TODO: Uncomment after migration
       },
 
       "User details retrieved successfully"

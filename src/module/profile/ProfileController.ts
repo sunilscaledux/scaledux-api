@@ -137,21 +137,22 @@ export async function uploadProfileImage(req: Request, res: Response) {
     }
 
     const userId = req.user.id;
-    const imageUrl = getRelativePath(req.file.path);
+    const imagePath = getRelativePath(req.file.path);
+    const imageUrl = getFileUrl(imagePath);
 
-    // Update user's profile image in database
+    // Update user's profile image in database (store relative path)
     const user = await prisma.user.update({
       where: {
         id: userId,
       },
       data: {
-        profileImage: imageUrl,
+        profileImage: imagePath,
       },
     });
 
     return ApiResponse.success(
       res,
-      { imageUrl },
+      { imageUrl }, // Return full URL for frontend
       "Profile image uploaded successfully"
     );
   } catch (error) {
@@ -167,16 +168,18 @@ export async function uploadCoverImage(req: Request, res: Response) {
     }
 
     const userId = req.user.id;
-    const imageUrl = getRelativePath(req.file.path);
-    // Update user's cover image in database
+    const imagePath = getRelativePath(req.file.path);
+    const imageUrl = getFileUrl(imagePath);
+    
+    // Update user's cover image in database (store relative path)
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { coverImage: imageUrl },
+      data: { coverImage: imagePath },
     });
 
     return ApiResponse.success(
       res,
-      { imageUrl },
+      { imageUrl }, // Return full URL for frontend
       "Cover image uploaded successfully"
     );
   } catch (error) {

@@ -22,6 +22,14 @@ import {
   deleteSelfieImage,
   deleteAddressProof
 } from "./IdentityVerifyController"
+import {
+  getAgencyVerificationStatus,
+  submitAgencyVerification,
+  getAgencyVerificationDetails,
+  uploadAgencyDocuments,
+  deleteAgencyDocument,
+  updateAgencyVerificationStatus
+} from "./AgencyVerifyController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
@@ -76,5 +84,25 @@ router.post(
 router.delete("/identity/delete-id-document", authenticateToken, deleteIdDocument)
 router.delete("/identity/delete-selfie", authenticateToken, deleteSelfieImage)
 router.delete("/identity/delete-address-proof", authenticateToken, deleteAddressProof)
+
+// Agency verification routes
+router.get("/agency/status", authenticateToken, getAgencyVerificationStatus)
+router.post("/agency/submit", authenticateToken, submitAgencyVerification)
+router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
+
+// Agency verification file upload routes
+router.post(
+  "/agency/upload-documents",
+  authenticateToken,
+  FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5 }).array("documents"),
+  uploadAgencyDocuments,
+  handleMulterError
+)
+
+// Agency verification file delete routes
+router.delete("/agency/delete-document", authenticateToken, deleteAgencyDocument)
+
+// Admin route to approve/reject agency verification
+router.put("/agency/update-status", authenticateToken, updateAgencyVerificationStatus)
 
 export default router

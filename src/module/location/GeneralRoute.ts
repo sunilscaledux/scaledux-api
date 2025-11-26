@@ -12,7 +12,7 @@ import {
   invalidateCache,
   getExpertiseCategories,
   getSpecialtiesByCategory,
-  getSkillsBySpecialty,
+  getSkillsByCategory,
 } from "./GeneralController"
 
 const router = Router()
@@ -33,7 +33,7 @@ router.get("/countries-with-currencies", getCountriesWithCurrencies)
 // Expertise endpoints (hierarchical)
 router.get("/expertise-categories", getExpertiseCategories)
 router.get("/expertise-categories/:categoryId/specialties", getSpecialtiesByCategory)
-router.get("/specialties/:specialtyId/skills", getSkillsBySpecialty)
+router.get("/expertise-categories/:categoryId/skills", getSkillsByCategory)
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)
