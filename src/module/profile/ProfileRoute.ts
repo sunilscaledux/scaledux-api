@@ -8,6 +8,7 @@ import {
   updateAgencySettings,
   uploadProfileImage,
   uploadCoverImage,
+  getPublicProfile,
 } from "./ProfileController";
 import { authenticateToken } from "@middleware/auth";
 import { handleMulterError, FileUpload } from "@middleware/fileupload";
@@ -36,5 +37,8 @@ router.post(
   uploadCoverImage,
   handleMulterError
 );
+
+// Public profile route (no authentication required)
+router.get("/profile/:uniqueId", getPublicProfile);
 
 export default router;

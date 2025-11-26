@@ -306,3 +306,148 @@ export async function updateAgencySettings(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to update agency settings");
   }
 }
+
+export async function getPublicProfile(req: Request, res: Response) {
+  try {
+    const { uniqueId } = req.params;
+
+    if (!uniqueId) {
+      return ApiResponse.error(res, "Unique ID is required", 400);
+    }
+
+    // Find user by unique_id first
+    const user = await prisma.user.findUnique({
+      where: { uniqueId: uniqueId },
+      include: {
+        personalInfo: {
+          include: {
+            country: {
+              select: { id: true, name: true, code: true, flag: true }
+            },
+            state: {
+              select: { id: true, name: true, code: true }
+            },
+            currency: {
+              select: { id: true, name: true, code: true, symbol: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return ApiResponse.error(res, "Profile not found", 404);
+    }
+
+    // Fetch related data separately to avoid TypeScript issues
+    const [educations, workExperiences, userExpertises, licenses] = await Promise.all([
+      prisma.education.findMany({
+        where: { user_id: user.id },
+        orderBy: { start_year: 'desc' },
+        select: {
+          id: true,
+          school: true,
+          degree: true,
+          area_of_study: true,
+          start_month: true,
+          start_year: true,
+          end_month: true,
+          end_year: true,
+          is_ongoing: true,
+          description: true,
+          skills: true
+        }
+      }),
+      prisma.workExperience.findMany({
+        where: { user_id: user.id },
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true,
+          company: true,
+          role: true,
+          company_website: true,
+          start_month: true,
+          start_year: true,
+          end_month: true,
+          end_year: true,
+          is_current: true,
+          description: true
+        }
+      }),
+      prisma.userExpertise.findMany({
+        where: { user_id: user.id },
+        include: {
+          expertiseCategory: {
+            select: { id: true, name: true, description: true }
+          },
+          specialty: {
+            select: { id: true, name: true, description: true }
+          }
+        },
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.license.findMany({
+        where: { user_id: user.id },
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true,
+          institute: true,
+          license_name: true,
+          completed_month: true,
+          completed_year: true,
+          description: true,
+          skills: true
+        }
+      })
+    ]);
+
+    // Format the response to match the expected structure
+    const formattedUser = {
+      id: user.id,
+      uniqueId: user.uniqueId,
+      firstName: user.FirstName,
+      lastName: user.LastName,
+      email: user.email,
+      phone: user.phone,
+      profileImage: user.profileImage ? getFileUrl(user.profileImage) : null,
+      coverImage: user.coverImage ? getFileUrl(user.coverImage) : null,
+      hideEmail: user.hideEmail,
+      hidePhone: user.hidePhone,
+      identity_verification_status: user.identity_verification_status,
+      identity_verified_at: user.identity_verified_at,
+      agency_verification_status: user.agency_verification_status,
+      
+      // Personal info
+      title: user.personalInfo?.title || null,
+      about: user.personalInfo?.about || null,
+      address: user.personalInfo?.address || null,
+      zipCode: user.personalInfo?.zipCode || null,
+      city: user.personalInfo?.city || null,
+      state: user.personalInfo?.state?.name || null,
+      country: user.personalInfo?.country?.name || null,
+      website: user.personalInfo?.website || null,
+      hourly_rate: user.personalInfo?.hourly_rate || null,
+      currency: user.personalInfo?.currency || null,
+      links: user.personalInfo?.links || [],
+      
+      // Professional data (from separate queries)
+      educations: educations || [],
+      workExperiences: workExperiences || [],
+      userExpertises: userExpertises || [],
+      licenses: licenses || [],
+      
+      // Statistics
+      stats: {
+        totalEducations: educations?.length || 0,
+        totalExperiences: workExperiences?.length || 0,
+        totalExpertises: userExpertises?.length || 0,
+        totalLicenses: licenses?.length || 0
+      }
+    };
+
+    return ApiResponse.success(res, formattedUser, "Complete public profile retrieved successfully");
+  } catch (error: any) {
+    console.error("Get Public Profile Error:", error);
+    return ApiResponse.error(res, "Failed to retrieve public profile");
+  }
+}
