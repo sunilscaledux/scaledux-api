@@ -29,7 +29,7 @@ interface GoogleUserInfo {
   picture: string;
 }
 
-export async function googleCallback(req: Request, res: Response) {
+const googleCallback = async (req: Request, res: Response) => {
   try {
     const { code, redirectUri }: GoogleCallbackRequest = req.body;
 
@@ -122,3 +122,5 @@ export async function googleCallback(req: Request, res: Response) {
     return ApiResponse.error(res, 'Google authentication failed');
   }
 }
+
+export { googleCallback };

@@ -43,7 +43,7 @@ interface LinkedInEmailInfo {
   }>;
 }
 
-export async function linkedinCallback(req: Request, res: Response) {
+const linkedinCallback = async (req: Request, res: Response) => {
   try {
     const { code, redirectUri }: LinkedInCallbackRequest = req.body;
 
@@ -315,3 +315,5 @@ export async function linkedinCallback(req: Request, res: Response) {
     return ApiResponse.error(res, errorMessage);
   }
 }
+
+export { linkedinCallback };
