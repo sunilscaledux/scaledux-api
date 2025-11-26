@@ -42,6 +42,7 @@ model User {
   identityVerifications        IdentityVerification[]
   agencyVerifications          AgencyVerification[]
   agency_verification_status   String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
+  show_as_agency               Boolean   @default(false)
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])

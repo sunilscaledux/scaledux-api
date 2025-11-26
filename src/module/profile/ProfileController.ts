@@ -273,3 +273,36 @@ export async function updateLanguages(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to update languages");
   }
 }
+
+export async function updateAgencySettings(req: Request, res: Response) {
+  const rawBody = req.body || {};
+
+  // Simple validation for agency settings
+  const { show_as_agency, agencyName, cin } = rawBody;
+  
+  if (show_as_agency !== undefined && typeof show_as_agency !== 'boolean') {
+    return ApiResponse.error(res, "show_as_agency must be a boolean", 400);
+  }
+
+  const userId = req.user.id;
+
+  try {
+    const updateData: any = {};
+    if (show_as_agency !== undefined) updateData.show_as_agency = show_as_agency;
+
+    const user = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: updateData,
+      include: {
+        personalInfo: true,
+      },
+    });
+
+    return ApiResponse.success(res, user, "Agency settings updated successfully");
+  } catch (error: any) {
+    console.error("Update Agency Settings Error:", error);
+    return ApiResponse.error(res, "Failed to update agency settings");
+  }
+}
