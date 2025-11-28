@@ -464,3 +464,141 @@ export async function getSkillsByCategory(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to retrieve skills")
   }
 }
+
+// Industry related functions
+export async function getIndustries(req: Request, res: Response) {
+  try {
+    const cacheKey = 'industries:all'
+    
+    // Try to get from Redis cache first
+    const cachedIndustries = await redisClient.get(cacheKey)
+    if (cachedIndustries) {
+      return ApiResponse.success(res, JSON.parse(cachedIndustries), "Industries retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const industries = await prisma.industry.findMany({
+      where: { is_active: true },
+      select: {
+        id: true,
+        name: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache for 24 hours
+    await redisClient.setex(cacheKey, 864000, JSON.stringify(industries))
+
+    return ApiResponse.success(res, industries, "Industries retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Industries Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve industries")
+  }
+}
+
+// Skills search function for large datasets
+export async function searchSkills(req: Request, res: Response) {
+  try {
+    const { q: query, limit = 20 } = req.query
+    
+    if (!query || typeof query !== 'string' || query.trim().length < 2) {
+      return ApiResponse.error(res, "Search query must be at least 2 characters", 400)
+    }
+
+    const searchLimit = Math.min(parseInt(limit as string) || 20, 100) // Max 100 results
+
+    // Search skills with case-insensitive partial matching
+    const skills = await prisma.skill.findMany({
+      where: {
+        is_active: true,
+        name: {
+          contains: query.trim(),
+          mode: 'insensitive'
+        }
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        expertiseCategory: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: [
+        {
+          name: 'asc'
+        }
+      ],
+      take: searchLimit
+    })
+
+    return ApiResponse.success(res, skills, `Found ${skills.length} skills matching "${query}"`)
+  } catch (error: any) {
+    console.error("Search Skills Error:", error)
+    return ApiResponse.error(res, "Failed to search skills")
+  }
+}
+
+// Get all skills (with pagination for large datasets)
+export async function getAllSkills(req: Request, res: Response) {
+  try {
+    const { page = 1, limit = 50 } = req.query
+    const pageNum = Math.max(parseInt(page as string) || 1, 1)
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100) // Max 100 per page
+    const skip = (pageNum - 1) * limitNum
+
+    const cacheKey = `skills:all:page:${pageNum}:limit:${limitNum}`
+    
+    // Try to get from Redis cache first
+    const cachedData = await redisClient.get(cacheKey)
+    if (cachedData) {
+      return ApiResponse.success(res, JSON.parse(cachedData), "Skills retrieved successfully")
+    }
+
+    // Get total count and skills
+    const [totalCount, skills] = await Promise.all([
+      prisma.skill.count({
+        where: { is_active: true }
+      }),
+      prisma.skill.findMany({
+        where: { is_active: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          expertiseCategory: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        },
+        orderBy: { name: 'asc' },
+        skip,
+        take: limitNum
+      })
+    ])
+
+    const result = {
+      skills,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limitNum)
+      }
+    }
+
+    // Cache for 1 hour (shorter cache for paginated data)
+    await redisClient.setex(cacheKey, 3600, JSON.stringify(result))
+
+    return ApiResponse.success(res, result, "Skills retrieved successfully")
+  } catch (error: any) {
+    console.error("Get All Skills Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve skills")
+  }
+}

@@ -13,6 +13,9 @@ import {
   getExpertiseCategories,
   getSpecialtiesByCategory,
   getSkillsByCategory,
+  getIndustries,
+  searchSkills,
+  getAllSkills,
 } from "./GeneralController"
 
 const router = Router()
@@ -34,6 +37,13 @@ router.get("/countries-with-currencies", getCountriesWithCurrencies)
 router.get("/expertise-categories", getExpertiseCategories)
 router.get("/expertise-categories/:categoryId/specialties", getSpecialtiesByCategory)
 router.get("/expertise-categories/:categoryId/skills", getSkillsByCategory)
+
+// Industry endpoints
+router.get("/industries", getIndustries)
+
+// Skills endpoints (for large datasets)
+router.get("/skills/search", searchSkills) // GET /skills/search?q=javascript&limit=20
+router.get("/skills", getAllSkills) // GET /skills?page=1&limit=50
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)

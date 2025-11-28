@@ -43,6 +43,7 @@ model User {
   agencyVerifications          AgencyVerification[]
   agency_verification_status   String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   show_as_agency               Boolean   @default(false)
+  portfolios                   Portfolio[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -154,6 +155,18 @@ model Skill {
 
   @@unique([name, expertise_category_id])
   @@map("skills")
+}
+
+model Industry {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?
+  is_active   Boolean   @default(true)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  portfolios  Portfolio[]
+
+  @@map("industries")
 }
 
 model UserExpertise {
@@ -339,6 +352,37 @@ model AgencyVerification {
   @@index([user_id, status])
   @@index([status])
   @@map("agency_verifications")
+}
+
+model Portfolio {
+  id                 Int       @id @default(autoincrement())
+  unique_id          String    @unique @default(uuid())
+  user_id            Int
+  title              String
+  description        String    @db.Text
+  company_name       String
+  hide_company_name  Boolean   @default(false)
+  industry_id        Int
+  role               String?
+  project_skills     Json      // Array of skill names
+  thumbnail_urls     Json?     // Array of thumbnail image URLs
+  media_urls         Json?     // Array of media file URLs
+  project_link       String?
+  completion_month   String
+  completion_year    String
+  references         Json?     // Array of reference URLs
+  status             String    @default("DRAFT") // DRAFT, PUBLISHED
+  deleted_at         DateTime? // Soft delete timestamp
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  user               User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  industry           Industry  @relation(fields: [industry_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([status])
+  @@index([industry_id])
+  @@index([deleted_at])
+  @@map("portfolios")
 }
 
 enum OtpType {
