@@ -45,8 +45,8 @@ export const createPortfolioSchema = Joi.object({
       return value
     }
     
-    // Validate URL format (www.example.com)
-    const urlPattern = /^www\.[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
+    // Validate URL format (example.com or www.example.com)
+    const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
     if (!urlPattern.test(value.trim())) {
       return helpers.error('string.pattern.base')
     }
@@ -54,7 +54,7 @@ export const createPortfolioSchema = Joi.object({
     return value.trim()
   }).messages({
     'string.base': 'Project link must be a string',
-    'string.pattern.base': 'Invalid website format. Eg www.scaledux.com'
+    'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
   }),
   completionMonth: Joi.string().optional().allow('').messages({
     'string.base': 'Completion month must be a string'
@@ -69,15 +69,15 @@ export const createPortfolioSchema = Joi.object({
           return value
         }
         
-        // Validate URL format (www.example.com)
-        const urlPattern = /^www\.[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
+        // Validate URL format (example.com or www.example.com)
+        const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
         if (!urlPattern.test(value.trim())) {
           return helpers.error('string.pattern.base')
         }
         
         return value.trim()
       }).messages({
-        'string.pattern.base': 'Invalid website format. Eg www.scaledux.com'
+        'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
       })
     })
   ).optional().allow(null).messages({
@@ -128,8 +128,8 @@ export const updatePortfolioSchema = Joi.object({
       return value
     }
     
-    // Validate URL format (www.example.com)
-    const urlPattern = /^www\.[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
+    // Validate URL format (example.com or www.example.com)
+    const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
     if (!urlPattern.test(value.trim())) {
       return helpers.error('string.pattern.base')
     }
@@ -137,7 +137,7 @@ export const updatePortfolioSchema = Joi.object({
     return value.trim()
   }).messages({
     'string.base': 'Project link must be a string',
-    'string.pattern.base': 'Invalid website format. Eg www.scaledux.com'
+    'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
   }),
   completionMonth: Joi.string().optional().allow('').messages({
     'string.base': 'Completion month must be a string'
@@ -152,15 +152,15 @@ export const updatePortfolioSchema = Joi.object({
           return value
         }
         
-        // Validate URL format (www.example.com)
-        const urlPattern = /^www\.[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
+        // Validate URL format (example.com or www.example.com)
+        const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
         if (!urlPattern.test(value.trim())) {
           return helpers.error('string.pattern.base')
         }
         
         return value.trim()
       }).messages({
-        'string.pattern.base': 'Invalid website format. Eg www.scaledux.com'
+        'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
       })
     })
   ).optional().allow(null).messages({

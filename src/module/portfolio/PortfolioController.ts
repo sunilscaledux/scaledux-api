@@ -29,6 +29,15 @@ export async function getUserPortfolios(req: Request, res: Response) {
         ...whereClause,
         deleted_at: null // Only get non-deleted portfolios
       },
+      include: {
+        industry: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
+      },
       orderBy: { created_at: 'desc' }
     })
 
@@ -68,6 +77,15 @@ export async function getPortfolioById(req: Request, res: Response) {
         unique_id: id,
         user_id: userId,
         deleted_at: null // Only get non-deleted portfolio
+      },
+      include: {
+        industry: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        }
       }
     })
 
@@ -266,8 +284,8 @@ export async function uploadThumbnail(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       { 
-        thumbnailUrls,
-        thumbnailPaths
+        thumbnailPaths,  // Relative paths for storage
+        thumbnailUrls    // Full URLs for immediate display
       },
       "Thumbnail uploaded successfully"
     )
@@ -297,8 +315,8 @@ export async function uploadMedia(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       { 
-        mediaUrls,
-        mediaPaths
+        mediaPaths,  // Relative paths for storage
+        mediaUrls    // Full URLs for immediate display
       },
       "Media files uploaded successfully"
     )
