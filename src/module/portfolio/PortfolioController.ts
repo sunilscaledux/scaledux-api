@@ -2,7 +2,12 @@ import { Request, Response } from 'express'
 import { prisma } from '@config/prisma'
 import { ApiResponse } from '@utils/ApiResponse'
 import { getRelativePath, getFileUrl } from '@utils/General'
-import { createPortfolioSchema, updatePortfolioSchema } from './PortfolioValidation'
+import { 
+  createPortfolioSchema, 
+  updatePortfolioSchema, 
+  createDraftPortfolioSchema, 
+  updateDraftPortfolioSchema 
+} from './PortfolioValidation'
 import { CreatePortfolioInput, UpdatePortfolioInput } from './PortfolioType'
 import fs from 'fs'
 import path from 'path'
@@ -123,8 +128,12 @@ export async function createPortfolio(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
+    // Choose validation schema based on status
+    const isDraft = req.body.status === 'DRAFT'
+    const schema = isDraft ? createDraftPortfolioSchema : createPortfolioSchema
+    
     // Validate request body
-    const { error, value } = createPortfolioSchema.validate(req.body)
+    const { error, value } = schema.validate(req.body)
 
     if (error) {
       return ApiResponse.error(res, error.details[0].message, 400)
@@ -152,7 +161,12 @@ export async function createPortfolio(req: Request, res: Response) {
       }
     })
 
-    return ApiResponse.success(res, portfolio, "Portfolio created successfully", 201)
+    // Different success message based on status
+    const successMessage = portfolioData.status === 'DRAFT' 
+      ? "Portfolio drafted successfully" 
+      : "Portfolio created successfully"
+    
+    return ApiResponse.success(res, portfolio, successMessage, 201)
 
   } catch (error: any) {
     console.error("Create Portfolio Error:", error)
@@ -172,8 +186,12 @@ export async function updatePortfolio(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
+    // Choose validation schema based on status
+    const isDraft = req.body.status === 'DRAFT'
+    const schema = isDraft ? updateDraftPortfolioSchema : updatePortfolioSchema
+    
     // Validate request body
-    const { error, value } = updatePortfolioSchema.validate(req.body)
+    const { error, value } = schema.validate(req.body)
 
     if (error) {
       return ApiResponse.error(res, error.details[0].message, 400)
@@ -214,7 +232,12 @@ export async function updatePortfolio(req: Request, res: Response) {
       }
     })
 
-    return ApiResponse.success(res, portfolio, "Portfolio updated successfully")
+    // Different success message based on status
+    const successMessage = (portfolioData.status || existingPortfolio.status) === 'DRAFT' 
+      ? "Portfolio drafted successfully" 
+      : "Portfolio updated successfully"
+    
+    return ApiResponse.success(res, portfolio, successMessage)
 
   } catch (error: any) {
     console.error("Update Portfolio Error:", error)

@@ -32,7 +32,7 @@ export const createPortfolioSchema = Joi.object({
   }),
   projectSkills: Joi.array().items(Joi.string()).min(2).messages({
     'array.base': 'Project skills must be an array',
-    'array.min': 'Select minimum 5 skills'
+    'array.min': 'Select minimum 2 skills'
   }),
   thumbnail: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Thumbnail must be an array'
@@ -115,7 +115,7 @@ export const updatePortfolioSchema = Joi.object({
   }),
   projectSkills: Joi.array().items(Joi.string()).optional().min(2).messages({
     'array.base': 'Project skills must be an array',
-    'array.min': 'Select minimum 5 skills'
+    'array.min': 'Select minimum 2 skills'
   }),
   thumbnail: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Thumbnail must be an array'
@@ -170,4 +170,47 @@ export const updatePortfolioSchema = Joi.object({
     'string.base': 'Status must be a string',
     'any.only': 'Status must be either DRAFT or PUBLISHED'
   })
+})
+
+// Draft schema - no validation required for drafts
+export const createDraftPortfolioSchema = Joi.object({
+  title: Joi.string().optional().allow('').max(50),
+  description: Joi.string().optional().allow(''),
+  companyName: Joi.string().optional().allow('').max(50),
+  hideCompanyName: Joi.boolean().optional().default(false),
+  industryId: Joi.number().integer().positive().optional(),
+  role: Joi.string().optional().allow('').max(50),
+  projectSkills: Joi.array().items(Joi.string()).optional(),
+  thumbnail: Joi.array().items(Joi.string()).optional().allow(null),
+  media: Joi.array().items(Joi.string()).optional().allow(null),
+  projectLink: Joi.string().optional().allow(''),
+  completionMonth: Joi.string().optional().allow(''),
+  completionYear: Joi.string().optional().allow(''),
+  references: Joi.array().items(
+    Joi.object({
+      url: Joi.string().optional().allow('')
+    })
+  ).optional().allow(null),
+  status: Joi.string().valid('DRAFT', 'PUBLISHED').optional().default('DRAFT')
+})
+
+export const updateDraftPortfolioSchema = Joi.object({
+  title: Joi.string().optional().allow('').max(50),
+  description: Joi.string().optional().allow(''),
+  companyName: Joi.string().optional().allow('').max(50),
+  hideCompanyName: Joi.boolean().optional(),
+  industryId: Joi.number().integer().positive().optional(),
+  role: Joi.string().optional().allow('').max(50),
+  projectSkills: Joi.array().items(Joi.string()).optional(),
+  thumbnail: Joi.array().items(Joi.string()).optional().allow(null),
+  media: Joi.array().items(Joi.string()).optional().allow(null),
+  projectLink: Joi.string().optional().allow(''),
+  completionMonth: Joi.string().optional().allow(''),
+  completionYear: Joi.string().optional().allow(''),
+  references: Joi.array().items(
+    Joi.object({
+      url: Joi.string().optional().allow('')
+    })
+  ).optional().allow(null),
+  status: Joi.string().valid('DRAFT', 'PUBLISHED').optional()
 })
