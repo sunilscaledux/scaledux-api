@@ -468,7 +468,7 @@ export async function getSkillsByCategory(req: Request, res: Response) {
 // Industry related functions
 export async function getIndustries(req: Request, res: Response) {
   try {
-    const cacheKey = 'industries:all'
+    const cacheKey = "industries";
     
     // Try to get from Redis cache first
     const cachedIndustries = await redisClient.get(cacheKey)
