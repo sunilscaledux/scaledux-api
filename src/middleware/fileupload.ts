@@ -31,8 +31,12 @@ const documentFileFilter = (req: any, file: any, cb: any) => {
 const createStorage = (uploadPath: string) => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
-        const userId = req.user?.id || "anonymous";
-      const finalPath = path.join('uploads/' +userId.toString(),uploadPath);
+      const userIdentifier = req.user?.unique_id || req.user?.id || "anonymous";
+      const finalPath = path.join(
+        "uploads",
+        userIdentifier.toString(),
+        uploadPath
+      );
       if (!fs.existsSync(finalPath)) {
         fs.mkdirSync(finalPath, { recursive: true });
       }

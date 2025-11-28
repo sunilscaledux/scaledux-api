@@ -13,6 +13,7 @@ export function generateTokenAndSetCookie(
   const token = jwt.sign(
     {
       id: user.id,
+      unique_id: user.unique_id || user.id, // Fallback to id if unique_id is not available
       email: user.email,
       phone: user.phone,
       rememberMe: rememberMe,
