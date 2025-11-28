@@ -399,7 +399,7 @@ export async function duplicatePortfolio(req: Request, res: Response) {
         completion_month: originalPortfolio.completion_month,
         completion_year: originalPortfolio.completion_year,
         references: originalPortfolio.references as any,
-        status: 'DRAFT' // Always create duplicates as drafts
+        status: originalPortfolio.status // Preserve original status (PUBLISHED stays PUBLISHED)
       }
     })
 
