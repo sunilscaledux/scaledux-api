@@ -12,7 +12,6 @@ import {
 } from "./ProfileController";
 import {
   getProfileCompletion,
-  recalculateProfileCompletion,
 } from "./ProfileCompletionController";
 import { authenticateToken } from "@middleware/auth";
 import { handleMulterError, FileUpload } from "@middleware/fileupload";
@@ -47,6 +46,5 @@ router.get("/profile/:uniqueId", getPublicProfile);
 
 // Profile completion routes
 router.get("/profile/completion/status", authenticateToken, getProfileCompletion);
-router.post("/profile/completion/recalculate", authenticateToken, recalculateProfileCompletion);
 
 export default router;

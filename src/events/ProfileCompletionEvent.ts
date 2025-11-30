@@ -1,15 +1,7 @@
-import { EventEmitter } from 'events';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const profileEventEmitter = new EventEmitter();
 
-export interface ProfileCompletionData {
-  userId: number;
-  field: string;
-  isCompleted: boolean;
-  percentage: number;
-}
 
 // Profile completion percentages
 export const PROFILE_COMPLETION_WEIGHTS = {
@@ -33,7 +25,9 @@ export const PROFILE_COMPLETION_WEIGHTS = {
 /**
  * Calculate profile completion percentage based on user data
  */
-export const calculateProfileCompletion = async (userId: number): Promise<{
+export const calculateProfileCompletion = async (
+  userId: number
+): Promise<{
   totalPercentage: number;
   completedFields: Record<string, boolean>;
   fieldPercentages: Record<string, number>;
@@ -54,7 +48,7 @@ export const calculateProfileCompletion = async (userId: number): Promise<{
     });
 
     if (!user) {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
 
     const completedFields: Record<string, boolean> = {};
@@ -97,9 +91,11 @@ export const calculateProfileCompletion = async (userId: number): Promise<{
     completedFields.licenseCertifications = (user.licenses?.length || 0) > 0;
 
     // Languages (2%)
-    const hasLanguages = user.personalInfo?.languages && 
-      Array.isArray(user.personalInfo.languages) && 
-      (user.personalInfo.languages as any[]).length > 0;
+    const hasLanguages = !!(
+      user.personalInfo?.languages &&
+      Array.isArray(user.personalInfo.languages) &&
+      (user.personalInfo.languages as any[]).length > 0
+    );
     completedFields.languages = hasLanguages;
 
     // Achievements (2%)
@@ -112,14 +108,16 @@ export const calculateProfileCompletion = async (userId: number): Promise<{
     completedFields.phoneVerification = !!user.phone_verified_at;
 
     // Identity Verification (14%)
-    completedFields.identityVerification = 
-      user.identity_verification_status === 'APPROVED' && !!user.identity_verified_at;
+    completedFields.identityVerification =
+      user.identity_verification_status === "APPROVED" &&
+      !!user.identity_verified_at;
 
     // Calculate total percentage
     let totalPercentage = 0;
     Object.entries(completedFields).forEach(([field, isCompleted]) => {
       if (isCompleted) {
-        totalPercentage += fieldPercentages[field as keyof typeof fieldPercentages] || 0;
+        totalPercentage +=
+          fieldPercentages[field as keyof typeof fieldPercentages] || 0;
       }
     });
 
@@ -129,51 +127,12 @@ export const calculateProfileCompletion = async (userId: number): Promise<{
       fieldPercentages,
     };
   } catch (error) {
-    console.error('Error calculating profile completion:', error);
+    console.error("Error calculating profile completion:", error);
     throw error;
   }
 };
 
-/**
- * Update profile completion and emit event
- */
-export const updateProfileCompletion = async (userId: number, field: string) => {
-  try {
-    const completion = await calculateProfileCompletion(userId);
-    
-    // Emit profile completion update event
-    profileEventEmitter.emit('profileCompletionUpdated', {
-      userId,
-      field,
-      totalPercentage: completion.totalPercentage,
-      completedFields: completion.completedFields,
-    });
-
-    console.log(`📊 Profile completion updated for user ${userId}: ${completion.totalPercentage}%`);
-    
-    return completion;
-  } catch (error) {
-    console.error('Error updating profile completion:', error);
-    throw error;
-  }
-};
-
-/**
- * Event listeners for profile completion updates
- */
-profileEventEmitter.on('profileCompletionUpdated', (data) => {
-  // You can add additional logic here like:
-  // - Send notifications
-  // - Update analytics
-  // - Trigger achievements
-  // - Update user rankings
-  console.log(`🎉 Profile completion event: User ${data.userId} - ${data.totalPercentage}%`);
-});
-
-export { profileEventEmitter };
 export default {
   calculateProfileCompletion,
-  updateProfileCompletion,
-  profileEventEmitter,
   PROFILE_COMPLETION_WEIGHTS,
 };

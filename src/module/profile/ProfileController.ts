@@ -4,7 +4,6 @@ import { prisma } from "@config/prisma";
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from "./ProfileValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getFileUrl, getRelativePath } from "@utils/General";
-import { updateProfileCompletion } from "../../events/ProfileCompletionEvent";
 
 export async function updateProfileSummary(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -41,9 +40,6 @@ export async function updateProfileSummary(req: Request, res: Response) {
       personalInfo: true,
     },
   });
-
-  // Trigger profile completion update
-  await updateProfileCompletion(userId, 'profileSummary');
 
   return ApiResponse.success(res, user, "Profile summary updated successfully");
 }
@@ -95,9 +91,6 @@ export async function updatePersonalInfo(req: Request, res: Response) {
       personalInfo: true,
     },
   });
-
-  // Trigger profile completion update
-  await updateProfileCompletion(userId, 'personalInfo');
 
   return ApiResponse.success(res, user, "Personal information updated successfully");
 }
@@ -157,9 +150,6 @@ export async function uploadProfileImage(req: Request, res: Response) {
       },
     });
 
-    // Trigger profile completion update
-    await updateProfileCompletion(userId, 'profilePicture');
-
     return ApiResponse.success(
       res,
       { imageUrl }, // Return full URL for frontend
@@ -186,9 +176,6 @@ export async function uploadCoverImage(req: Request, res: Response) {
       where: { id: userId },
       data: { coverImage: imagePath },
     });
-
-    // Trigger profile completion update
-    await updateProfileCompletion(userId, 'profileCover');
 
     return ApiResponse.success(
       res,
@@ -238,9 +225,6 @@ export async function updateHourlyRate(req: Request, res: Response) {
       },
     });
 
-    // Trigger profile completion update
-    await updateProfileCompletion(userId, 'hourlyRate');
-
     return ApiResponse.success(res, user, "Hourly rate updated successfully");
   } catch (error: any) {
     console.error("Update Hourly Rate Error:", error);
@@ -282,9 +266,6 @@ export async function updateLanguages(req: Request, res: Response) {
         personalInfo: true,
       },
     });
-
-    // Trigger profile completion update
-    await updateProfileCompletion(userId, 'languages');
 
     return ApiResponse.success(res, user, "Languages updated successfully");
   } catch (error: any) {
