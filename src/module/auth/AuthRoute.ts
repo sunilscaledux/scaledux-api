@@ -13,6 +13,7 @@ import {
 } from "@module/auth/AuthController";
 import { googleCallback } from "@module/auth/AuthGoogleController";
 import { linkedinCallback } from "@module/auth/AuthLinkedinController";
+import { importLinkedInProfile } from "@module/auth/AuthLinkedinProfileController";
 import { generalRateLimiter, otpRateLimiter } from "@middleware/rateLimiter";
 import { authenticateToken, preventAuthenticatedAccess } from "@middleware/auth";
 
@@ -36,6 +37,7 @@ router.post("/logout", authenticateToken, logout);
 router.get("/auth/me", authenticateToken, getCurrentUser);
 router.post("/auth/google-callback", generalRateLimiter, googleCallback);
 router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);
+router.post("/auth/linkedin-import-profile", authenticateToken, importLinkedInProfile);
 router.get("/test-cookies", testCookies);
 
 export default router;
