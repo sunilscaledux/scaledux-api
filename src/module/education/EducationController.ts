@@ -3,6 +3,7 @@ import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
 import { prisma } from "@config/prisma";
 import { createEducationSchema, updateEducationSchema } from "./EducationValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { updateProfileCompletion } from "../../events/ProfileCompletionEvent";
 
 export async function createEducation(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -32,6 +33,9 @@ export async function createEducation(req: Request, res: Response) {
         skills: value.skills || []
       }
     });
+
+    // Trigger profile completion update
+    await updateProfileCompletion(userId, 'education');
 
     return ApiResponse.success(res, education, "Education added successfully");
   } catch (error: any) {
@@ -106,6 +110,9 @@ export async function updateEducation(req: Request, res: Response) {
       }
     });
 
+    // Trigger profile completion update
+    await updateProfileCompletion(userId, 'education');
+
     return ApiResponse.success(res, education, "Education updated successfully");
   } catch (error: any) {
     console.error("Update Education Error:", error);
@@ -139,6 +146,9 @@ export async function deleteEducation(req: Request, res: Response) {
         id: educationId
       }
     });
+
+    // Trigger profile completion update
+    await updateProfileCompletion(userId, 'education');
 
     return ApiResponse.success(res, null, "Education deleted successfully");
   } catch (error: any) {

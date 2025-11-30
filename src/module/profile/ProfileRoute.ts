@@ -10,6 +10,10 @@ import {
   uploadCoverImage,
   getPublicProfile,
 } from "./ProfileController";
+import {
+  getProfileCompletion,
+  recalculateProfileCompletion,
+} from "./ProfileCompletionController";
 import { authenticateToken } from "@middleware/auth";
 import { handleMulterError, FileUpload } from "@middleware/fileupload";
 
@@ -40,5 +44,9 @@ router.post(
 
 // Public profile route (no authentication required)
 router.get("/profile/:uniqueId", getPublicProfile);
+
+// Profile completion routes
+router.get("/profile/completion/status", authenticateToken, getProfileCompletion);
+router.post("/profile/completion/recalculate", authenticateToken, recalculateProfileCompletion);
 
 export default router;

@@ -3,6 +3,7 @@ import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseT
 import { prisma } from "@config/prisma";
 import { createUserExpertiseSchema, updateUserExpertiseSchema } from "./ExpertiseValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { updateProfileCompletion } from "../../events/ProfileCompletionEvent";
 
 export async function createUserExpertise(req: Request, res: Response) {
   const rawBody = req.body || {};
