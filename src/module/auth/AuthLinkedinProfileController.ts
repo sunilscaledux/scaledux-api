@@ -63,82 +63,93 @@ interface LinkedInSkillsData {
  */
 const importLinkedInProfile = async (req: Request, res: Response) => {
   try {
-    const { access_token } = req.body;
+    const { access_token, code, redirectUri } = req.body;
     const userId = req.user?.id;
-
-    if (!access_token) {
-      return ApiResponse.error(res, "LinkedIn access token is required");
-    }
 
     if (!userId) {
       return ApiResponse.error(res, "User authentication required");
     }
 
+    let finalAccessToken = access_token;
+
+    // If we have a code instead of access_token, exchange it
+    if (code && !access_token) {
+      console.log("🔄 Exchanging LinkedIn authorization code for access token");
+      
+      const tokenParams = {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: process.env.LINKEDIN_CLIENT_ID!,
+        client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+      };
+
+      try {
+        const tokenResponse = await axios.post(
+          "https://www.linkedin.com/oauth/v2/accessToken",
+          new URLSearchParams(tokenParams),
+          {
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+          }
+        );
+        finalAccessToken = tokenResponse.data.access_token;
+        console.log("✅ Access token obtained from code exchange");
+      } catch (tokenError: any) {
+        console.error("❌ Token exchange failed:", tokenError.response?.data);
+        return ApiResponse.error(res, "Failed to exchange LinkedIn authorization code");
+      }
+    }
+
+    if (!finalAccessToken) {
+      return ApiResponse.error(res, "LinkedIn access token or authorization code is required");
+    }
+
     console.log("🔄 Importing LinkedIn profile data for user:", userId);
 
-    // Fetch basic profile information
-    const profileResponse = await axios.get<LinkedInProfileData>(
-      'https://api.linkedin.com/v2/people/~:(id,firstName,lastName,headline,summary,profilePicture(displayImage~:playableStreams))',
-      {
-        headers: {
-          Authorization: `Bearer ${access_token}`,
-        },
-      }
-    );
-
-    const profileData = profileResponse.data;
-    console.log("✅ LinkedIn profile data fetched");
-
-    // Fetch positions/experience
+    // Fetch basic profile information (only what's available with basic scopes)
+    let profileData: any = {};
     let experienceData: any[] = [];
-    try {
-      const positionsResponse = await axios.get(
-        'https://api.linkedin.com/v2/positions?q=members&members=~&projection=(elements*(title,companyName,description,startDate,endDate,isCurrent))',
-        {
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        }
-      );
-      experienceData = positionsResponse.data.elements || [];
-      console.log("✅ LinkedIn experience data fetched:", experienceData.length, "positions");
-    } catch (error) {
-      console.log("⚠️ Could not fetch LinkedIn positions (may require additional permissions)");
-    }
-
-    // Fetch education
     let educationData: any[] = [];
+    let skillsData: any[] = [];
+
     try {
-      const educationResponse = await axios.get<LinkedInEducationData>(
-        'https://api.linkedin.com/v2/educations?q=members&members=~&projection=(elements*(schoolName,degreeName,fieldOfStudy,startDate,endDate))',
+      // Try basic profile first (most likely to work)
+      const profileResponse = await axios.get(
+        'https://api.linkedin.com/v2/people/~',
         {
           headers: {
-            Authorization: `Bearer ${access_token}`,
+            Authorization: `Bearer ${finalAccessToken}`,
           },
         }
       );
-      educationData = educationResponse.data.elements || [];
-      console.log("✅ LinkedIn education data fetched:", educationData.length, "entries");
-    } catch (error) {
-      console.log("⚠️ Could not fetch LinkedIn education (may require additional permissions)");
+      profileData = profileResponse.data;
+      console.log("✅ LinkedIn basic profile data fetched");
+    } catch (error: any) {
+      console.log("⚠️ Could not fetch basic LinkedIn profile:", error.response?.data);
     }
 
-    // Fetch skills
-    let skillsData: any[] = [];
+    // Try to get email (separate endpoint)
     try {
-      const skillsResponse = await axios.get<LinkedInSkillsData>(
-        'https://api.linkedin.com/v2/skills?q=members&members=~&projection=(elements*(name))',
+      const emailResponse = await axios.get(
+        'https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))',
         {
           headers: {
-            Authorization: `Bearer ${access_token}`,
+            Authorization: `Bearer ${finalAccessToken}`,
           },
         }
       );
-      skillsData = skillsResponse.data.elements || [];
-      console.log("✅ LinkedIn skills data fetched:", skillsData.length, "skills");
-    } catch (error) {
-      console.log("⚠️ Could not fetch LinkedIn skills (may require additional permissions)");
+      if (emailResponse.data?.elements?.[0]?.['handle~']?.emailAddress) {
+        profileData.email = emailResponse.data.elements[0]['handle~'].emailAddress;
+        console.log("✅ LinkedIn email fetched");
+      }
+    } catch (error: any) {
+      console.log("⚠️ Could not fetch LinkedIn email:", error.response?.data);
     }
+
+    // Note: Experience, Education, and Skills are no longer available for most apps
+    console.log("ℹ️ LinkedIn API restrictions: Experience, Education, and Skills data not available for third-party apps");
 
     // Extract names
     const firstName = Object.values(profileData.firstName?.localized || {})[0] as string || '';
@@ -270,10 +281,11 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           profileImage: updatedUser.profileImage,
         },
         imported: {
-          basicInfo: true,
-          education: educationData.length,
-          experience: experienceData.length,
-          skills: skillsData.length,
+          basicInfo: firstName || lastName ? true : false,
+          email: profileData.email ? true : false,
+          education: 0, // Not available with current LinkedIn API
+          experience: 0, // Not available with current LinkedIn API  
+          skills: 0, // Not available with current LinkedIn API
         },
       },
       "LinkedIn profile imported successfully"
