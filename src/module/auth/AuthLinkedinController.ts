@@ -44,6 +44,7 @@ interface LinkedInEmailInfo {
 }
 
 const linkedinCallback = async (req: Request, res: Response) => {
+  const startTime = Date.now();
   try {
     const { code, redirectUri }: LinkedInCallbackRequest = req.body;
 
@@ -56,6 +57,11 @@ const linkedinCallback = async (req: Request, res: Response) => {
       code: code.substring(0, 10) + "...",
       redirectUri,
     });
+    console.log("🔧 Environment check:", {
+      clientId: process.env.LINKEDIN_CLIENT_ID,
+      hasSecret: !!process.env.LINKEDIN_CLIENT_SECRET
+    });
+    console.log("⏱️ Processing time so far:", Date.now() - startTime, "ms");
 
     // Validate environment variables
     if (
