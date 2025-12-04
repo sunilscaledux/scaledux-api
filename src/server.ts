@@ -21,15 +21,42 @@ import path from "path";
 dotenv.config();
 const app = express();
 
+// Enhanced CORS configuration
 app.use(
   cors({
-    origin: true, // Allow all origins
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      // Allow all origins
+      return callback(null, true);
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie", "X-Requested-With", "Accept", "Origin"],
-    exposedHeaders: ["Set-Cookie"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With", 
+      "Content-Type", 
+      "Accept", 
+      "Authorization", 
+      "Cookie",
+      "Cache-Control",
+      "Access-Control-Request-Method",
+      "Access-Control-Request-Headers"
+    ],
+    exposedHeaders: ["Set-Cookie", "Authorization"],
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+    preflightContinue: false
   })
 );
+
+// Additional manual CORS headers for extra compatibility
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Vary', 'Origin');
+  next();
+});
 
 app.use(express.json());
 app.use(cookieParser());
@@ -46,8 +73,10 @@ app.use("/api/v1/expertises", expertiseRoutes);
 app.use("/api/v1/verify", verifyRoutes);
 app.use("/api/v1/portfolios", portfolioRoutes);
 
-app.listen(process.env.PORT, () => {
-  console.log("server is working");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
 });
 
 export default app;
