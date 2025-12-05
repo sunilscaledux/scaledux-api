@@ -15,53 +15,18 @@ import expertiseRoutes from './module/expertise/ExpertiseRoute';
 import verifyRoutes from './module/verify/VerifyRoute';
 import portfolioRoutes from './module/portfolio/PortfolioRoute';
 
-import cors from "cors";
 import path from "path";
+import { corsMiddleware } from "@middleware/cors";
 
 dotenv.config();
 const app = express();
 
-// Enhanced CORS configuration
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      // Allow all origins
-      return callback(null, true);
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-    allowedHeaders: [
-      "Origin",
-      "X-Requested-With", 
-      "Content-Type", 
-      "Accept", 
-      "Authorization", 
-      "Cookie",
-      "Cache-Control",
-      "Access-Control-Request-Method",
-      "Access-Control-Request-Headers"
-    ],
-    exposedHeaders: ["Set-Cookie", "Authorization"],
-    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
-    preflightContinue: false
-  })
-);
-
-// Additional manual CORS headers for extra compatibility
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Vary', 'Origin');
-  next();
-});
+// Setup CORS middleware
+app.use(corsMiddleware());
 
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
-
 app.use("/api/v1", userRoutes);
 app.use("/api/v1", profileRoutes);
 app.use("/api/v1", generalRoutes);
@@ -73,9 +38,8 @@ app.use("/api/v1/expertises", expertiseRoutes);
 app.use("/api/v1/verify", verifyRoutes);
 app.use("/api/v1/portfolios", portfolioRoutes);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
   console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
 });
 
