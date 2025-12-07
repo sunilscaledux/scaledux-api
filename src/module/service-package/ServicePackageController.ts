@@ -15,6 +15,8 @@ const parseServicePackageJson = (pkg: any) => {
     industry: typeof pkg.industry === 'string' ? JSON.parse(pkg.industry) : (pkg.industry || []),
     keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : (pkg.keywords || []),
     scope: typeof pkg.scope === 'string' ? JSON.parse(pkg.scope) : pkg.scope,
+    extraAddOns: typeof pkg.extraAddOns === 'string' ? JSON.parse(pkg.extraAddOns) : (pkg.extraAddOns || null),
+    packageDescription: pkg.packageDescription || pkg.description || '',
     deliverables: typeof pkg.deliverables === 'string' ? JSON.parse(pkg.deliverables) : pkg.deliverables,
     faqs: typeof pkg.faqs === 'string' ? JSON.parse(pkg.faqs) : pkg.faqs,
     links: typeof pkg.links === 'string' ? JSON.parse(pkg.links) : pkg.links,
@@ -119,9 +121,11 @@ export async function createServicePackage(req: Request, res: Response) {
       industry,
       keywords,
       scope,
+      extraAddOns,
       hasBasic,
       hasStandard,
       hasPremium,
+      packageDescription,
       deliverables,
       faqs,
       links,
@@ -163,9 +167,11 @@ export async function createServicePackage(req: Request, res: Response) {
         // industry: JSON.stringify(industry || []), // Temporarily commented until DB migration
         // keywords: JSON.stringify(keywords || []), // Temporarily commented until DB migration
         scope: JSON.stringify(scope || {}),
+        // extraAddOns: JSON.stringify(extraAddOns || null), // Temporarily commented until DB migration
         has_basic: hasBasic || false,
         has_standard: hasStandard || false,
         has_premium: hasPremium || false,
+        // packageDescription: packageDescription || '', // Temporarily commented until DB migration
         deliverables: JSON.stringify(deliverables || []),
         faqs: JSON.stringify(faqs || []),
         links: JSON.stringify(links || []),
@@ -204,9 +210,11 @@ export async function updateServicePackage(req: Request, res: Response) {
       industry,
       keywords,
       scope,
+      extraAddOns,
       hasBasic,
       hasStandard,
       hasPremium,
+      packageDescription,
       deliverables,
       faqs,
       links,
@@ -248,9 +256,11 @@ export async function updateServicePackage(req: Request, res: Response) {
     // if (industry !== undefined) updateData.industry = JSON.stringify(industry) // Temporarily commented until DB migration
     // if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords) // Temporarily commented until DB migration
     if (scope !== undefined) updateData.scope = JSON.stringify(scope)
+    // if (extraAddOns !== undefined) updateData.extraAddOns = JSON.stringify(extraAddOns) // Temporarily commented until DB migration
     if (hasBasic !== undefined) updateData.has_basic = hasBasic
     if (hasStandard !== undefined) updateData.has_standard = hasStandard
     if (hasPremium !== undefined) updateData.has_premium = hasPremium
+    // if (packageDescription !== undefined) updateData.packageDescription = packageDescription // Temporarily commented until DB migration
     if (deliverables !== undefined) updateData.deliverables = JSON.stringify(deliverables)
     if (faqs !== undefined) updateData.faqs = JSON.stringify(faqs)
     if (links !== undefined) updateData.links = JSON.stringify(links)
