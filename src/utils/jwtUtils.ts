@@ -22,16 +22,17 @@ export function generateTokenAndSetCookie(
     { expiresIn: tokenExpiry }
   );
 
-  const isProduction = process.env.NODE_ENV === "production";
+ const isProduction = process.env.NODE_ENV === "production";
 
-  const cookieOptions = {
-    httpOnly: true,
-    secure: isProduction, // local = false, staging = true
-    sameSite: isProduction ? "none" : "lax", // local works on lax, staging requires none
-    maxAge: cookieMaxAge,
-    path: "/",
-    domain: isProduction ? ".scaledux.com" : undefined,
-  };
+ const cookieOptions = {
+   httpOnly: true,
+   secure: isProduction,
+   sameSite: (isProduction ? "none" : "lax") as "none" | "lax",
+   maxAge: cookieMaxAge,
+   path: "/",
+   domain: isProduction ? ".scaledux.com" : undefined,
+ };
+
 
   console.log(
     `🍪 Token generated with ${rememberMe ? "7 days" : "24 hours"} expiry`
