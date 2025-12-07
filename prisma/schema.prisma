@@ -44,6 +44,7 @@ model User {
   agency_verification_status   String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   show_as_agency               Boolean   @default(false)
   portfolios                   Portfolio[]
+  servicePackages              ServicePackage[]
 
   @@index([email, phone])
   @@index([LastName, FirstName, email])
@@ -391,3 +392,128 @@ enum OtpType {
   FORGOT_PASSWORD_VERIFICATION
   PHONE_VERIFICATION
 }
+
+
+model ServiceCategory {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique @db.VarChar(100)
+  description   String?  @db.Text
+  icon          String?  @db.VarChar(100)
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  
+  // Relations
+  subCategories   ServiceSubCategory[]
+  keywords        ServiceKeyword[]
+  servicePackages ServicePackage[]
+  
+  // Indexes
+  @@index([is_active])
+  @@map("service_categories")
+}
+
+model ServiceSubCategory {
+  id          Int      @id @default(autoincrement())
+  category_id Int
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  
+  // Relations
+  category        ServiceCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  keywords        ServiceKeyword[]
+  servicePackages ServicePackage[]
+  
+  // Indexes
+  @@index([category_id])
+  @@index([is_active])
+  @@unique([category_id, name], name: "category_id_name")
+  @@map("service_sub_categories")
+}
+
+model ServiceKeyword {
+  id               Int      @id @default(autoincrement())
+  category_id      Int
+  sub_category_id  Int?
+  name             String   @db.VarChar(100)
+  popularity_score Int      @default(0)
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+  
+  // Relations
+  category         ServiceCategory    @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  subCategory      ServiceSubCategory? @relation(fields: [sub_category_id], references: [id], onDelete: SetNull)
+  
+  // Indexes
+  @@index([category_id])
+  @@index([sub_category_id])
+  @@index([is_active])
+  @@index([popularity_score])
+  @@index([name])
+  @@unique([category_id, name], name: "category_id_name")
+  @@map("service_keywords")
+}
+
+model ServicePackage {
+  id                  Int      @id @default(autoincrement())
+  user_id             Int
+  title               String   @db.VarChar(200)
+  category_id         Int
+  sub_category_id     Int?
+  
+  // JSON columns for dynamic data
+  features            Json     @default("[]")     // Array of feature strings
+  industry            Json     @default("[]")     // Array of industry strings  
+  keywords            Json     @default("[]")     // Array of keyword strings (fetched from category)
+  scope               Json     @default("{}")     // Complex scope object with tiers
+  deliverables        Json     @default("[]")     // Array of {deliverable, deliverDay}
+  faqs                Json     @default("[]")     // Array of {question, answer}
+  links               Json     @default("[]")     // Array of {url}
+  requirements        Json     @default("[]")     // Array of {requirement}
+  
+  // Boolean flags for pricing tiers
+  has_basic           Boolean  @default(false)
+  has_standard        Boolean  @default(false)
+  has_premium         Boolean  @default(false)
+  
+  // Status and timestamps
+  status              String   @default("DRAFT") @db.VarChar(20) // DRAFT, PUBLISHED, PAUSED
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+  
+  // Relations
+  user                User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  category            ServiceCategory     @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  subCategory         ServiceSubCategory? @relation(fields: [sub_category_id], references: [id], onDelete: SetNull)
+  media               ServicePackageMedia[]
+  
+  // Indexes
+  @@index([user_id])
+  @@index([category_id])
+  @@index([sub_category_id])
+  @@index([status])
+  @@map("service_packages")
+}
+
+model ServicePackageMedia {
+  id                  Int            @id @default(autoincrement())
+  service_package_id  Int
+  file_name          String         @db.VarChar(255)
+  original_name      String         @db.VarChar(255)
+  file_path          String         @db.VarChar(500)
+  file_size          Int
+  mime_type          String         @db.VarChar(100)
+  created_at         DateTime       @default(now())
+  
+  // Relations
+  servicePackage     ServicePackage @relation(fields: [service_package_id], references: [id], onDelete: Cascade)
+  
+  // Indexes
+  @@index([service_package_id])
+  @@map("service_package_media")
+}
+

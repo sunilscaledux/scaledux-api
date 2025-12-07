@@ -602,3 +602,122 @@ export async function getAllSkills(req: Request, res: Response) {
     return ApiResponse.error(res, "Failed to retrieve skills")
   }
 }
+
+// Service Category related functions
+export async function getServiceCategories(req: Request, res: Response) {
+  try {
+    const cacheKey = 'service:categories:all'
+    
+    // Try to get from Redis cache first
+    const cachedCategories = await redisClient.get(cacheKey)
+    if (cachedCategories) {
+      return ApiResponse.success(res, JSON.parse(cachedCategories), "Service categories retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const categories = await prisma.serviceCategory.findMany({
+      where: { is_active: true },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        icon: true
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache for 24 hours
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(categories))
+
+    return ApiResponse.success(res, categories, "Service categories retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Service Categories Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve service categories")
+  }
+}
+
+export async function getServiceSubCategories(req: Request, res: Response) {
+  try {
+    const categoryId = parseInt(req.params.categoryId)
+    
+    if (!categoryId) {
+      return ApiResponse.error(res, "Category ID is required", 400)
+    }
+
+    const cacheKey = `service:subcategories:category:${categoryId}`
+    
+    // Try to get from Redis cache first
+    const cachedSubCategories = await redisClient.get(cacheKey)
+    if (cachedSubCategories) {
+      return ApiResponse.success(res, JSON.parse(cachedSubCategories), "Service subcategories retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const subCategories = await prisma.serviceSubCategory.findMany({
+      where: { 
+        category_id: categoryId,
+        is_active: true 
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache for 24 hours
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(subCategories))
+
+    return ApiResponse.success(res, subCategories, "Service subcategories retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Service SubCategories Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve service subcategories")
+  }
+}
+
+export async function getServiceKeywords(req: Request, res: Response) {
+  try {
+    const categoryId = parseInt(req.params.categoryId)
+    const { limit = 50 } = req.query
+    
+    if (!categoryId) {
+      return ApiResponse.error(res, "Category ID is required", 400)
+    }
+
+    const limitNum = Math.min(parseInt(limit as string) || 50, 100) // Max 100, default 50
+    const cacheKey = `service:keywords:category:${categoryId}:limit:${limitNum}`
+    
+    // Try to get from Redis cache first
+    const cachedKeywords = await redisClient.get(cacheKey)
+    if (cachedKeywords) {
+      return ApiResponse.success(res, JSON.parse(cachedKeywords), "Service keywords retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const keywords = await prisma.serviceKeyword.findMany({
+      where: { 
+        category_id: categoryId,
+        is_active: true 
+      },
+      select: {
+        id: true,
+        name: true,
+        popularity_score: true
+      },
+      orderBy: [
+        { popularity_score: 'desc' },
+        { name: 'asc' }
+      ],
+      take: limitNum
+    })
+
+    // Cache for 2 hours (shorter for keywords as they might change more frequently)
+    await redisClient.setex(cacheKey, 7200, JSON.stringify(keywords))
+
+    return ApiResponse.success(res, keywords, "Service keywords retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Service Keywords Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve service keywords")
+  }
+}

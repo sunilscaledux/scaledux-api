@@ -16,6 +16,9 @@ import {
   getIndustries,
   searchSkills,
   getAllSkills,
+  getServiceCategories,
+  getServiceSubCategories,
+  getServiceKeywords,
 } from "./GeneralController"
 
 const router = Router()
@@ -44,6 +47,11 @@ router.get("/industries", getIndustries)
 // Skills endpoints (for large datasets)
 router.get("/skills/search", searchSkills) // GET /skills/search?q=javascript&limit=20
 router.get("/skills", getAllSkills) // GET /skills?page=1&limit=50
+
+// Service Category endpoints
+router.get("/service-categories", getServiceCategories)
+router.get("/service-categories/:categoryId/subcategories", getServiceSubCategories)
+router.get("/service-categories/:categoryId/keywords", getServiceKeywords) // GET /service-categories/1/keywords?limit=50
 
 // Cache management endpoints
 router.post("/cache/warm", warmLocationCache)

@@ -14,6 +14,8 @@ import achievementRoutes from './module/achievement/AchievementRoute';
 import expertiseRoutes from './module/expertise/ExpertiseRoute';
 import verifyRoutes from './module/verify/VerifyRoute';
 import portfolioRoutes from './module/portfolio/PortfolioRoute';
+import servicePackageRoutes from './module/service-package/ServicePackageRoute';
+import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -37,6 +39,8 @@ app.use("/api/v1/achievements", achievementRoutes);
 app.use("/api/v1/expertises", expertiseRoutes);
 app.use("/api/v1/verify", verifyRoutes);
 app.use("/api/v1/portfolios", portfolioRoutes);
+app.use("/api/v1/service-packages", servicePackageRoutes);
+app.use("/api/v1/service-categories", serviceCategoryRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

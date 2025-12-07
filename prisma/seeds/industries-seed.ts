@@ -1,7 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient()
-
 const industries = [
   { name: 'Technology', description: 'Software, IT, Tech Services' },
   { name: 'Healthcare', description: 'Medical, Health Services, Pharmaceuticals' },
@@ -25,8 +23,8 @@ const industries = [
   { name: 'Marketing & Advertising', description: 'Digital Marketing, PR' }
 ]
 
-async function main() {
-  console.log('🌱 Seeding industries...')
+export async function seedIndustries(prisma: PrismaClient) {
+  console.log('🏭 Starting Industries seeding...')
   
   for (const industry of industries) {
     await prisma.industry.upsert({
@@ -34,17 +32,9 @@ async function main() {
       update: {},
       create: industry
     })
+    console.log(`  🏢 Created/Updated industry: ${industry.name}`)
   }
-  
-  console.log('✅ Industries seeded successfully!')
+
+  console.log('✅ Industries seeding completed!')
   console.log(`📊 Total industries: ${industries.length}`)
 }
-
-main()
-  .catch((e) => {
-    console.error('❌ Error seeding industries:', e)
-    process.exit(1)
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
