@@ -25,11 +25,11 @@ export function generateTokenAndSetCookie(
   const isProduction = process.env.NODE_ENV === "production";
   const cookieOptions = {
     httpOnly: true,
-    secure: true, // always HTTPS
-    sameSite: "none", // allow cross-origin (local frontend)
+    secure: true,
+    sameSite: "none" as "none" | "lax" | "strict",
     maxAge: cookieMaxAge,
     path: "/",
-    domain: undefined, // localhost frontend doesn't need domain
+    domain: undefined,
   };
   //  const cookieOptions = {
   //    httpOnly: true,
