@@ -22,12 +22,15 @@ export function generateTokenAndSetCookie(
     { expiresIn: tokenExpiry }
   );
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax" as "lax" | "strict" | "none",
+    secure: isProduction, // local = false, staging = true
+    sameSite: isProduction ? "none" : "lax", // local works on lax, staging requires none
     maxAge: cookieMaxAge,
     path: "/",
+    domain: isProduction ? ".scaledux.com" : undefined,
   };
 
   console.log(
