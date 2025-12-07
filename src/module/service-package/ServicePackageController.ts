@@ -12,13 +12,18 @@ const parseServicePackageJson = (pkg: any) => {
   return {
     ...pkg,
     features: typeof pkg.features === 'string' ? JSON.parse(pkg.features) : pkg.features,
-    industry: typeof pkg.industry === 'string' ? JSON.parse(pkg.industry) : pkg.industry,
-    keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : pkg.keywords,
+    industry: typeof pkg.industry === 'string' ? JSON.parse(pkg.industry) : (pkg.industry || []),
+    keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : (pkg.keywords || []),
     scope: typeof pkg.scope === 'string' ? JSON.parse(pkg.scope) : pkg.scope,
     deliverables: typeof pkg.deliverables === 'string' ? JSON.parse(pkg.deliverables) : pkg.deliverables,
     faqs: typeof pkg.faqs === 'string' ? JSON.parse(pkg.faqs) : pkg.faqs,
     links: typeof pkg.links === 'string' ? JSON.parse(pkg.links) : pkg.links,
     requirements: typeof pkg.requirements === 'string' ? JSON.parse(pkg.requirements) : pkg.requirements,
+    // Parse new media fields - provide defaults until DB migration
+    thumbnail: typeof pkg.thumbnail === 'string' ? JSON.parse(pkg.thumbnail) : (pkg.thumbnail || []),
+    images: typeof pkg.images === 'string' ? JSON.parse(pkg.images) : (pkg.images || []),
+    video: typeof pkg.video === 'string' ? JSON.parse(pkg.video) : (pkg.video || []),
+    documents: typeof pkg.documents === 'string' ? JSON.parse(pkg.documents) : (pkg.documents || []),
   }
 }
 
@@ -37,7 +42,6 @@ export async function getUserServicePackages(req: Request, res: Response) {
       where: { user_id: userId },
       orderBy: { created_at: 'desc' },
       include: {
-        media: true,
         category: {
           select: {
             id: true,
@@ -56,19 +60,10 @@ export async function getUserServicePackages(req: Request, res: Response) {
       }
     })
 
-    // Transform media URLs and parse JSON fields
-    const packagesWithMedia = servicePackages.map(pkg => {
-      const parsedPkg = parseServicePackageJson(pkg)
-      return {
-        ...parsedPkg,
-        media: pkg.media.map(media => ({
-          ...media,
-          url: getFileUrl(media.file_path)
-        }))
-      }
-    })
+    // Parse JSON fields
+    const parsedPackages = servicePackages.map(pkg => parseServicePackageJson(pkg))
 
-    return ApiResponse.success(res, packagesWithMedia, "Service packages retrieved successfully")
+    return ApiResponse.success(res, parsedPackages, "Service packages retrieved successfully")
 
   } catch (error: any) {
     console.error("Get Service Packages Error:", error)
@@ -92,9 +87,6 @@ export async function getServicePackageById(req: Request, res: Response) {
       where: { 
         id: parseInt(id),
         user_id: userId 
-      },
-      include: {
-        media: true
       }
     })
 
@@ -102,17 +94,10 @@ export async function getServicePackageById(req: Request, res: Response) {
       return ApiResponse.error(res, "Service package not found", 404)
     }
 
-    // Transform media URLs and parse JSON fields
+    // Parse JSON fields
     const parsedPkg = parseServicePackageJson(servicePackage)
-    const packageWithMedia = {
-      ...parsedPkg,
-      media: servicePackage.media.map(media => ({
-        ...media,
-        url: getFileUrl(media.file_path)
-      }))
-    }
 
-    return ApiResponse.success(res, packageWithMedia, "Service package retrieved successfully")
+    return ApiResponse.success(res, parsedPkg, "Service package retrieved successfully")
 
   } catch (error: any) {
     console.error("Get Service Package Error:", error)
@@ -141,7 +126,12 @@ export async function createServicePackage(req: Request, res: Response) {
       faqs,
       links,
       requirements,
-      status = 'DRAFT'
+      status = 'DRAFT',
+      // New media fields
+      thumbnail,
+      images,
+      video,
+      documents
     } = req.body
 
     if (!userId) {
@@ -170,8 +160,8 @@ export async function createServicePackage(req: Request, res: Response) {
         category_id: parseInt(categoryId),
         sub_category_id: subCategoryId ? parseInt(subCategoryId) : null,
         features: JSON.stringify(features || []),
-        industry: JSON.stringify(industry || []),
-        keywords: JSON.stringify(keywords || []),
+        // industry: JSON.stringify(industry || []), // Temporarily commented until DB migration
+        // keywords: JSON.stringify(keywords || []), // Temporarily commented until DB migration
         scope: JSON.stringify(scope || {}),
         has_basic: hasBasic || false,
         has_standard: hasStandard || false,
@@ -180,10 +170,12 @@ export async function createServicePackage(req: Request, res: Response) {
         faqs: JSON.stringify(faqs || []),
         links: JSON.stringify(links || []),
         requirements: JSON.stringify(requirements || []),
+        // New media fields - temporarily commented until DB migration
+        // thumbnail: JSON.stringify(thumbnail || []),
+        // images: JSON.stringify(images || []),
+        // video: JSON.stringify(video || []),
+        // documents: JSON.stringify(documents || []),
         status
-      },
-      include: {
-        media: true
       }
     })
 
@@ -219,7 +211,12 @@ export async function updateServicePackage(req: Request, res: Response) {
       faqs,
       links,
       requirements,
-      status
+      status,
+      // New media fields
+      thumbnail,
+      images,
+      video,
+      documents
     } = req.body
 
     if (!userId) {
@@ -248,8 +245,8 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (categoryId !== undefined) updateData.category_id = parseInt(categoryId)
     if (subCategoryId !== undefined) updateData.sub_category_id = subCategoryId ? parseInt(subCategoryId) : null
     if (features !== undefined) updateData.features = JSON.stringify(features)
-    if (industry !== undefined) updateData.industry = JSON.stringify(industry)
-    if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords)
+    // if (industry !== undefined) updateData.industry = JSON.stringify(industry) // Temporarily commented until DB migration
+    // if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords) // Temporarily commented until DB migration
     if (scope !== undefined) updateData.scope = JSON.stringify(scope)
     if (hasBasic !== undefined) updateData.has_basic = hasBasic
     if (hasStandard !== undefined) updateData.has_standard = hasStandard
@@ -259,13 +256,15 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (links !== undefined) updateData.links = JSON.stringify(links)
     if (requirements !== undefined) updateData.requirements = JSON.stringify(requirements)
     if (status !== undefined) updateData.status = status
+    // Update new media fields - temporarily commented until DB migration
+    // if (thumbnail !== undefined) updateData.thumbnail = JSON.stringify(thumbnail)
+    // if (images !== undefined) updateData.images = JSON.stringify(images)
+    // if (video !== undefined) updateData.video = JSON.stringify(video)
+    // if (documents !== undefined) updateData.documents = JSON.stringify(documents)
 
     const servicePackage = await prisma.servicePackage.update({
       where: { id: parseInt(id) },
-      data: updateData,
-      include: {
-        media: true
-      }
+      data: updateData
     })
 
     // Parse JSON fields before returning
@@ -295,9 +294,6 @@ export async function deleteServicePackage(req: Request, res: Response) {
       where: { 
         id: parseInt(id),
         user_id: userId 
-      },
-      include: {
-        media: true
       }
     })
 
@@ -305,15 +301,7 @@ export async function deleteServicePackage(req: Request, res: Response) {
       return ApiResponse.error(res, "Service package not found", 404)
     }
 
-    // Delete associated media files
-    for (const media of existingPackage.media) {
-      const filePath = path.join(process.cwd(), 'uploads', media.file_path)
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath)
-      }
-    }
-
-    // Delete service package (cascade will delete media records)
+    // Delete service package
     await prisma.servicePackage.delete({
       where: { id: parseInt(id) }
     })
@@ -327,9 +315,9 @@ export async function deleteServicePackage(req: Request, res: Response) {
 }
 
 /**
- * Upload service package media
+ * Upload service package media - TEMPORARILY DISABLED until new media system
  */
-export async function uploadServicePackageMedia(req: Request, res: Response) {
+/* export async function uploadServicePackageMedia(req: Request, res: Response) {
   try {
     const userId = req.user?.id
     const files = req.files as Express.Multer.File[]
@@ -357,12 +345,12 @@ export async function uploadServicePackageMedia(req: Request, res: Response) {
     console.error("Upload Service Package Media Error:", error)
     return ApiResponse.error(res, "Failed to upload media")
   }
-}
+} */
 
 /**
- * Delete service package media file
+ * Delete service package media file - TEMPORARILY DISABLED until new media system
  */
-export async function deleteServicePackageMedia(req: Request, res: Response) {
+/* export async function deleteServicePackageMedia(req: Request, res: Response) {
   try {
     const userId = req.user?.id
     const { fileName } = req.body
@@ -406,4 +394,4 @@ export async function deleteServicePackageMedia(req: Request, res: Response) {
     console.error("Delete Service Package Media Error:", error)
     return ApiResponse.error(res, "Failed to delete media file")
   }
-}
+} */

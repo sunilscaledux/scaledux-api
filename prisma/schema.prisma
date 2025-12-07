@@ -467,13 +467,19 @@ model ServicePackage {
   
   // JSON columns for dynamic data
   features            Json     @default("[]")     // Array of feature strings
-  industry            Json     @default("[]")     // Array of industry strings  
-  keywords            Json     @default("[]")     // Array of keyword strings (fetched from category)
+  industries          Json     @default("[]")     // Array of industry IDs
+  keywords            Json     @default("[]")     // Array of keyword IDs
   scope               Json     @default("{}")     // Complex scope object with tiers
   deliverables        Json     @default("[]")     // Array of {deliverable, deliverDay}
   faqs                Json     @default("[]")     // Array of {question, answer}
   links               Json     @default("[]")     // Array of {url}
   requirements        Json     @default("[]")     // Array of {requirement}
+  
+  // Media fields from Gallery form
+  thumbnail           Json     @default("[]")     // Array of thumbnail URLs
+  images              Json     @default("[]")     // Array of image URLs
+  video               Json     @default("[]")     // Array of video URLs
+  documents           Json     @default("[]")     // Array of document URLs
   
   // Boolean flags for pricing tiers
   has_basic           Boolean  @default(false)
@@ -489,7 +495,6 @@ model ServicePackage {
   user                User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   category            ServiceCategory     @relation(fields: [category_id], references: [id], onDelete: Restrict)
   subCategory         ServiceSubCategory? @relation(fields: [sub_category_id], references: [id], onDelete: SetNull)
-  media               ServicePackageMedia[]
   
   // Indexes
   @@index([user_id])
@@ -499,21 +504,4 @@ model ServicePackage {
   @@map("service_packages")
 }
 
-model ServicePackageMedia {
-  id                  Int            @id @default(autoincrement())
-  service_package_id  Int
-  file_name          String         @db.VarChar(255)
-  original_name      String         @db.VarChar(255)
-  file_path          String         @db.VarChar(500)
-  file_size          Int
-  mime_type          String         @db.VarChar(100)
-  created_at         DateTime       @default(now())
-  
-  // Relations
-  servicePackage     ServicePackage @relation(fields: [service_package_id], references: [id], onDelete: Cascade)
-  
-  // Indexes
-  @@index([service_package_id])
-  @@map("service_package_media")
-}
 

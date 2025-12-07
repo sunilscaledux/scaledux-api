@@ -4,12 +4,12 @@ import {
   getServicePackageById,
   createServicePackage,
   updateServicePackage,
-  deleteServicePackage,
-  uploadServicePackageMedia,
-  deleteServicePackageMedia
+  deleteServicePackage
+  // uploadServicePackageMedia, // Temporarily disabled
+  // deleteServicePackageMedia  // Temporarily disabled
 } from "./ServicePackageController"
 import { authenticateToken } from "@middleware/auth"
-import { FileUpload, handleMulterError } from "@middleware/fileupload"
+// import { FileUpload, handleMulterError } from "@middleware/fileupload" // Temporarily disabled
 
 const router = Router()
 
@@ -23,8 +23,8 @@ router.post("/", createServicePackage)
 router.put("/:id", updateServicePackage)
 router.delete("/:id", deleteServicePackage)
 
-// Service package media upload routes
-router.post(
+// Service package media upload routes - TEMPORARILY DISABLED
+/* router.post(
   "/upload-media",
   FileUpload({ 
     uploadPath: "service-packages/media", 
@@ -37,6 +37,6 @@ router.post(
 )
 
 // Service package media delete route
-router.delete("/delete-media", deleteServicePackageMedia)
+router.delete("/delete-media", deleteServicePackageMedia) */
 
 export default router
