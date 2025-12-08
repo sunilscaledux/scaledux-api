@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from '@config/prisma'
 import { ApiResponse } from '@utils/ApiResponse'
 import { getRelativePath, getFileUrl } from '@utils/General'
+import { ulid } from 'ulid'
 import fs from 'fs'
 import path from 'path'
 
@@ -79,7 +80,7 @@ export async function getUserServicePackages(req: Request, res: Response) {
 export async function getServicePackageById(req: Request, res: Response) {
   try {
     const userId = req.user?.id
-    const { id } = req.params
+    const { id } = req.params // This is now unique_id
 
     if (!userId) {
       return ApiResponse.error(res, "User not authenticated", 401)
@@ -87,13 +88,13 @@ export async function getServicePackageById(req: Request, res: Response) {
 
     const servicePackage = await prisma.servicePackage.findFirst({
       where: { 
-        id: parseInt(id),
+        unique_id: id,
         user_id: userId 
       }
     })
 
     if (!servicePackage) {
-      return ApiResponse.error(res, "Service package not found", 404)
+      return ApiResponse.error(res, "Service package not found or you don't have permission to access it", 404)
     }
 
     // Parse JSON fields
@@ -159,12 +160,13 @@ export async function createServicePackage(req: Request, res: Response) {
     // Create service package with JSON data
     const servicePackage = await prisma.servicePackage.create({
       data: {
+        unique_id: ulid(),
         user_id: userId,
         title,
         category_id: parseInt(categoryId),
         sub_category_id: subCategoryId ? parseInt(subCategoryId) : null,
         features: JSON.stringify(features || []),
-        industries: JSON.stringify(industry || []), // Fixed: use 'industries' to match schema
+        industries: JSON.stringify(industry || []), 
         keywords: JSON.stringify(keywords || []), // Fixed: uncommented as schema has this field
         scope: JSON.stringify(scope || {}),
         extra_add_ons: JSON.stringify(extraAddOns || []),
@@ -234,13 +236,13 @@ export async function updateServicePackage(req: Request, res: Response) {
     // Check if service package exists and belongs to user
     const existingPackage = await prisma.servicePackage.findFirst({
       where: { 
-        id: parseInt(id),
+        unique_id: id,
         user_id: userId 
       }
     })
 
     if (!existingPackage) {
-      return ApiResponse.error(res, "Service package not found", 404)
+      return ApiResponse.error(res, "Service package not found or you don't have permission to edit it", 404)
     }
 
     // Update service package with JSON data
@@ -273,7 +275,7 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (documents !== undefined) updateData.documents = JSON.stringify(documents)
 
     const servicePackage = await prisma.servicePackage.update({
-      where: { id: parseInt(id) },
+      where: { unique_id: id },
       data: updateData
     })
 
@@ -302,18 +304,18 @@ export async function deleteServicePackage(req: Request, res: Response) {
     // Check if service package exists and belongs to user
     const existingPackage = await prisma.servicePackage.findFirst({
       where: { 
-        id: parseInt(id),
+        unique_id: id,
         user_id: userId 
       }
     })
 
     if (!existingPackage) {
-      return ApiResponse.error(res, "Service package not found", 404)
+      return ApiResponse.error(res, "Service package not found or you don't have permission to delete it", 404)
     }
 
     // Delete service package
     await prisma.servicePackage.delete({
-      where: { id: parseInt(id) }
+      where: { unique_id: id }
     })
 
     return ApiResponse.success(res, null, "Service package deleted successfully")
