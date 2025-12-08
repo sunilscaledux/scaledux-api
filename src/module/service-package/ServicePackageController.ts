@@ -16,7 +16,7 @@ const parseServicePackageJson = (pkg: any) => {
     keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : (pkg.keywords || []),
     scope: typeof pkg.scope === 'string' ? JSON.parse(pkg.scope) : pkg.scope,
     extraAddOns: typeof pkg.extraAddOns === 'string' ? JSON.parse(pkg.extraAddOns) : (pkg.extraAddOns || null),
-    packageDescription: pkg.packageDescription || pkg.description || '',
+    packageDescription: pkg.package_description || pkg.packageDescription || '',
     deliverables: typeof pkg.deliverables === 'string' ? JSON.parse(pkg.deliverables) : pkg.deliverables,
     faqs: typeof pkg.faqs === 'string' ? JSON.parse(pkg.faqs) : pkg.faqs,
     links: typeof pkg.links === 'string' ? JSON.parse(pkg.links) : pkg.links,
@@ -171,7 +171,7 @@ export async function createServicePackage(req: Request, res: Response) {
         has_basic: hasBasic || false,
         has_standard: hasStandard || false,
         has_premium: hasPremium || false,
-        // packageDescription: packageDescription || '', // Temporarily commented until DB migration
+        package_description: packageDescription || null,
         deliverables: JSON.stringify(deliverables || []),
         faqs: JSON.stringify(faqs || []),
         links: JSON.stringify(links || []),
@@ -260,7 +260,7 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (hasBasic !== undefined) updateData.has_basic = hasBasic
     if (hasStandard !== undefined) updateData.has_standard = hasStandard
     if (hasPremium !== undefined) updateData.has_premium = hasPremium
-    // if (packageDescription !== undefined) updateData.packageDescription = packageDescription // Temporarily commented until DB migration
+    if (packageDescription !== undefined) updateData.package_description = packageDescription
     if (deliverables !== undefined) updateData.deliverables = JSON.stringify(deliverables)
     if (faqs !== undefined) updateData.faqs = JSON.stringify(faqs)
     if (links !== undefined) updateData.links = JSON.stringify(links)

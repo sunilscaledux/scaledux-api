@@ -464,6 +464,7 @@ model ServicePackage {
   title               String   @db.VarChar(200)
   category_id         Int
   sub_category_id     Int?
+  package_description String?  @db.Text       // Rich text description from Tiptap editor
   
   // JSON columns for dynamic data
   features            Json     @default("[]")     // Array of feature strings
