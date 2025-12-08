@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '@config/prisma'
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl } from '@utils/General'
+import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
 import { ulid } from 'ulid'
 import fs from 'fs'
 import path from 'path'
@@ -40,21 +40,11 @@ const parseServicePackageJson = (pkg: any) => {
       typeof pkg.requirements === "string"
         ? JSON.parse(pkg.requirements)
         : pkg.requirements,
-    // Parse media fields (already full URLs from upload)
-    thumbnail:
-      typeof pkg.thumbnail === "string"
-        ? JSON.parse(pkg.thumbnail)
-        : pkg.thumbnail || [],
-    images:
-      typeof pkg.images === "string"
-        ? JSON.parse(pkg.images)
-        : pkg.images || [],
-    video:
-      typeof pkg.video === "string" ? JSON.parse(pkg.video) : pkg.video || [],
-    documents:
-      typeof pkg.documents === "string"
-        ? JSON.parse(pkg.documents)
-        : pkg.documents || [],
+    // Parse media fields and convert relative paths to full URLs
+    thumbnail: (typeof pkg.thumbnail === "string" ? JSON.parse(pkg.thumbnail) : (pkg.thumbnail || [])).map((path: string) => getFileUrl(path)),
+    images: (typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || [])).map((path: string) => getFileUrl(path)),
+    video: (typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || [])).map((path: string) => getFileUrl(path)),
+    documents: (typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || [])).map((path: string) => getFileUrl(path)),
   };
 };
 
@@ -218,11 +208,11 @@ export async function createServicePackage(req: Request, res: Response) {
         faqs: JSON.stringify(faqs || []),
         links: JSON.stringify(links || []),
         requirements: JSON.stringify(requirements || []),
-        // Media fields - store full URLs directly from upload response
-        thumbnail: JSON.stringify(thumbnail || []),
-        images: JSON.stringify(images || []),
-        video: JSON.stringify(video || []),
-        documents: JSON.stringify(documents || []),
+        // Media fields - extract relative paths from frontend URLs for storage
+        thumbnail: JSON.stringify((thumbnail || []).map(extractRelativePath)),
+        images: JSON.stringify((images || []).map(extractRelativePath)),
+        video: JSON.stringify((video || []).map(extractRelativePath)),
+        documents: JSON.stringify((documents || []).map(extractRelativePath)),
         status,
       },
     });
@@ -323,13 +313,15 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (requirements !== undefined)
       updateData.requirements = JSON.stringify(requirements);
     if (status !== undefined) updateData.status = status;
-    // Update media fields - store URLs directly (getFileUrl handles both relative and full URLs)
+    // Update media fields - extract relative paths from frontend URLs for storage
     if (thumbnail !== undefined)
-      updateData.thumbnail = JSON.stringify(thumbnail);
-    if (images !== undefined) updateData.images = JSON.stringify(images);
-    if (video !== undefined) updateData.video = JSON.stringify(video);
+      updateData.thumbnail = JSON.stringify((thumbnail || []).map(extractRelativePath));
+    if (images !== undefined) 
+      updateData.images = JSON.stringify((images || []).map(extractRelativePath));
+    if (video !== undefined) 
+      updateData.video = JSON.stringify((video || []).map(extractRelativePath));
     if (documents !== undefined)
-      updateData.documents = JSON.stringify(documents);
+      updateData.documents = JSON.stringify((documents || []).map(extractRelativePath));
 
     const servicePackage = await prisma.servicePackage.update({
       where: { unique_id: id },
