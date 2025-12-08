@@ -19,10 +19,11 @@ router.use(authenticateToken)
 
 // Service package CRUD routes
 router.get("/", getUserServicePackages)
-router.get("/:id", getServicePackageById)
 router.post("/", createServicePackage)
-router.put("/:id", updateServicePackage)
-router.delete("/:id", deleteServicePackage)
+
+// Specific routes MUST come before generic /:id routes
+// Service package file delete route
+router.delete("/delete-file", deleteServicePackageFile)
 
 // Service package media upload routes
 router.post(
@@ -50,7 +51,9 @@ router.post(
   handleMulterError
 )
 
-// Service package file delete route
-router.delete("/delete-file", deleteServicePackageFile)
+// Generic /:id routes MUST come after specific routes
+router.get("/:id", getServicePackageById)
+router.put("/:id", updateServicePackage)
+router.delete("/:id", deleteServicePackage)
 
 export default router

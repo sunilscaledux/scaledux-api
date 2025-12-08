@@ -460,7 +460,7 @@ model ServiceKeyword {
 
 model ServicePackage {
   id                  Int      @id @default(autoincrement())
-  unique_id           String?   @unique
+  unique_id           String   @unique
   user_id             Int
   title               String   @db.VarChar(200)
   category_id         Int
