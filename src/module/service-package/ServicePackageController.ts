@@ -12,7 +12,7 @@ const parseServicePackageJson = (pkg: any) => {
   return {
     ...pkg,
     features: typeof pkg.features === 'string' ? JSON.parse(pkg.features) : pkg.features,
-    industry: typeof pkg.industry === 'string' ? JSON.parse(pkg.industry) : (pkg.industry || []),
+    industry: typeof pkg.industries === 'string' ? JSON.parse(pkg.industries) : (pkg.industries || []), // Map 'industries' from DB to 'industry' for frontend
     keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : (pkg.keywords || []),
     scope: typeof pkg.scope === 'string' ? JSON.parse(pkg.scope) : pkg.scope,
     extraAddOns: typeof pkg.extra_add_ons === 'string' ? JSON.parse(pkg.extra_add_ons) : (pkg.extra_add_ons || null),
@@ -164,8 +164,8 @@ export async function createServicePackage(req: Request, res: Response) {
         category_id: parseInt(categoryId),
         sub_category_id: subCategoryId ? parseInt(subCategoryId) : null,
         features: JSON.stringify(features || []),
-        // industry: JSON.stringify(industry || []), // Temporarily commented until DB migration
-        // keywords: JSON.stringify(keywords || []), // Temporarily commented until DB migration
+        industries: JSON.stringify(industry || []), // Fixed: use 'industries' to match schema
+        keywords: JSON.stringify(keywords || []), // Fixed: uncommented as schema has this field
         scope: JSON.stringify(scope || {}),
         extra_add_ons: JSON.stringify(extraAddOns || []),
         has_basic: hasBasic || false,
@@ -253,8 +253,8 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (categoryId !== undefined) updateData.category_id = parseInt(categoryId)
     if (subCategoryId !== undefined) updateData.sub_category_id = subCategoryId ? parseInt(subCategoryId) : null
     if (features !== undefined) updateData.features = JSON.stringify(features)
-    // if (industry !== undefined) updateData.industry = JSON.stringify(industry) // Temporarily commented until DB migration
-    // if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords) // Temporarily commented until DB migration
+    if (industry !== undefined) updateData.industries = JSON.stringify(industry) // Fixed: use 'industries' to match schema
+    if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords) // Fixed: uncommented as schema has this field
     if (scope !== undefined) updateData.scope = JSON.stringify(scope)
     if (extraAddOns !== undefined) updateData.extra_add_ons = JSON.stringify(extraAddOns)
     if (hasBasic !== undefined) updateData.has_basic = hasBasic
