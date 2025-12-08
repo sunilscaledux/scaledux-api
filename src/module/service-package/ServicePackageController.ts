@@ -15,7 +15,7 @@ const parseServicePackageJson = (pkg: any) => {
     industry: typeof pkg.industry === 'string' ? JSON.parse(pkg.industry) : (pkg.industry || []),
     keywords: typeof pkg.keywords === 'string' ? JSON.parse(pkg.keywords) : (pkg.keywords || []),
     scope: typeof pkg.scope === 'string' ? JSON.parse(pkg.scope) : pkg.scope,
-    extraAddOns: typeof pkg.extraAddOns === 'string' ? JSON.parse(pkg.extraAddOns) : (pkg.extraAddOns || null),
+    extraAddOns: typeof pkg.extra_add_ons === 'string' ? JSON.parse(pkg.extra_add_ons) : (pkg.extra_add_ons || null),
     packageDescription: pkg.package_description || pkg.packageDescription || '',
     deliverables: typeof pkg.deliverables === 'string' ? JSON.parse(pkg.deliverables) : pkg.deliverables,
     faqs: typeof pkg.faqs === 'string' ? JSON.parse(pkg.faqs) : pkg.faqs,
@@ -167,7 +167,7 @@ export async function createServicePackage(req: Request, res: Response) {
         // industry: JSON.stringify(industry || []), // Temporarily commented until DB migration
         // keywords: JSON.stringify(keywords || []), // Temporarily commented until DB migration
         scope: JSON.stringify(scope || {}),
-        // extraAddOns: JSON.stringify(extraAddOns || null), // Temporarily commented until DB migration
+        extra_add_ons: JSON.stringify(extraAddOns || []),
         has_basic: hasBasic || false,
         has_standard: hasStandard || false,
         has_premium: hasPremium || false,
@@ -256,7 +256,7 @@ export async function updateServicePackage(req: Request, res: Response) {
     // if (industry !== undefined) updateData.industry = JSON.stringify(industry) // Temporarily commented until DB migration
     // if (keywords !== undefined) updateData.keywords = JSON.stringify(keywords) // Temporarily commented until DB migration
     if (scope !== undefined) updateData.scope = JSON.stringify(scope)
-    // if (extraAddOns !== undefined) updateData.extraAddOns = JSON.stringify(extraAddOns) // Temporarily commented until DB migration
+    if (extraAddOns !== undefined) updateData.extra_add_ons = JSON.stringify(extraAddOns)
     if (hasBasic !== undefined) updateData.has_basic = hasBasic
     if (hasStandard !== undefined) updateData.has_standard = hasStandard
     if (hasPremium !== undefined) updateData.has_premium = hasPremium

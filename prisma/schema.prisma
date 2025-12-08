@@ -471,6 +471,7 @@ model ServicePackage {
   industries          Json     @default("[]")     // Array of industry IDs
   keywords            Json     @default("[]")     // Array of keyword IDs
   scope               Json     @default("{}")     // Complex scope object with tiers
+  extra_add_ons       Json     @default("[]")     // Array of extra add-ons with pricing
   deliverables        Json     @default("[]")     // Array of {deliverable, deliverDay}
   faqs                Json     @default("[]")     // Array of {question, answer}
   links               Json     @default("[]")     // Array of {url}
