@@ -428,7 +428,8 @@ export async function uploadServicePackageThumbnail(req: Request, res: Response)
 export async function deleteServicePackageFile(req: Request, res: Response) {
   try {
     const userId = req.user?.id
-    const { filePath } = req.body
+    // Try both query params and body for compatibility
+    const filePath = req.query.filePath as string || req.body.filePath
 
     if (!userId) {
       return ApiResponse.error(res, "User not authenticated", 401)
