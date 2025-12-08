@@ -4,12 +4,13 @@ import {
   getServicePackageById,
   createServicePackage,
   updateServicePackage,
-  deleteServicePackage
-  // uploadServicePackageMedia, // Temporarily disabled
-  // deleteServicePackageMedia  // Temporarily disabled
+  deleteServicePackage,
+  uploadServicePackageMedia,
+  uploadServicePackageThumbnail,
+  deleteServicePackageFile
 } from "./ServicePackageController"
 import { authenticateToken } from "@middleware/auth"
-// import { FileUpload, handleMulterError } from "@middleware/fileupload" // Temporarily disabled
+import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
@@ -23,8 +24,8 @@ router.post("/", createServicePackage)
 router.put("/:id", updateServicePackage)
 router.delete("/:id", deleteServicePackage)
 
-// Service package media upload routes - TEMPORARILY DISABLED
-/* router.post(
+// Service package media upload routes
+router.post(
   "/upload-media",
   FileUpload({ 
     uploadPath: "service-packages/media", 
@@ -36,7 +37,20 @@ router.delete("/:id", deleteServicePackage)
   handleMulterError
 )
 
-// Service package media delete route
-router.delete("/delete-media", deleteServicePackageMedia) */
+// Service package thumbnail upload route
+router.post(
+  "/upload-thumbnail",
+  FileUpload({ 
+    uploadPath: "service-packages/thumbnails", 
+    fileFilter: "image", 
+    maxSize: 10, 
+    maxFiles: 5 
+  }).array("thumbnail"),
+  uploadServicePackageThumbnail,
+  handleMulterError
+)
+
+// Service package file delete route
+router.delete("/delete-file", deleteServicePackageFile)
 
 export default router

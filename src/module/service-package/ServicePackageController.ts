@@ -21,11 +21,11 @@ const parseServicePackageJson = (pkg: any) => {
     faqs: typeof pkg.faqs === 'string' ? JSON.parse(pkg.faqs) : pkg.faqs,
     links: typeof pkg.links === 'string' ? JSON.parse(pkg.links) : pkg.links,
     requirements: typeof pkg.requirements === 'string' ? JSON.parse(pkg.requirements) : pkg.requirements,
-    // Parse new media fields - provide defaults until DB migration
-    thumbnail: typeof pkg.thumbnail === 'string' ? JSON.parse(pkg.thumbnail) : (pkg.thumbnail || []),
-    images: typeof pkg.images === 'string' ? JSON.parse(pkg.images) : (pkg.images || []),
-    video: typeof pkg.video === 'string' ? JSON.parse(pkg.video) : (pkg.video || []),
-    documents: typeof pkg.documents === 'string' ? JSON.parse(pkg.documents) : (pkg.documents || []),
+    // Parse media fields and convert relative paths to full URLs
+    thumbnail: (typeof pkg.thumbnail === 'string' ? JSON.parse(pkg.thumbnail) : (pkg.thumbnail || [])).map((path: string) => getFileUrl(path)),
+    images: (typeof pkg.images === 'string' ? JSON.parse(pkg.images) : (pkg.images || [])).map((path: string) => getFileUrl(path)),
+    video: (typeof pkg.video === 'string' ? JSON.parse(pkg.video) : (pkg.video || [])).map((path: string) => getFileUrl(path)),
+    documents: (typeof pkg.documents === 'string' ? JSON.parse(pkg.documents) : (pkg.documents || [])).map((path: string) => getFileUrl(path)),
   }
 }
 
@@ -176,11 +176,11 @@ export async function createServicePackage(req: Request, res: Response) {
         faqs: JSON.stringify(faqs || []),
         links: JSON.stringify(links || []),
         requirements: JSON.stringify(requirements || []),
-        // New media fields - temporarily commented until DB migration
-        // thumbnail: JSON.stringify(thumbnail || []),
-        // images: JSON.stringify(images || []),
-        // video: JSON.stringify(video || []),
-        // documents: JSON.stringify(documents || []),
+        // Media fields - store URLs directly (getFileUrl handles both relative and full URLs)
+        thumbnail: JSON.stringify(thumbnail || []),
+        images: JSON.stringify(images || []),
+        video: JSON.stringify(video || []),
+        documents: JSON.stringify(documents || []),
         status
       }
     })
@@ -266,11 +266,11 @@ export async function updateServicePackage(req: Request, res: Response) {
     if (links !== undefined) updateData.links = JSON.stringify(links)
     if (requirements !== undefined) updateData.requirements = JSON.stringify(requirements)
     if (status !== undefined) updateData.status = status
-    // Update new media fields - temporarily commented until DB migration
-    // if (thumbnail !== undefined) updateData.thumbnail = JSON.stringify(thumbnail)
-    // if (images !== undefined) updateData.images = JSON.stringify(images)
-    // if (video !== undefined) updateData.video = JSON.stringify(video)
-    // if (documents !== undefined) updateData.documents = JSON.stringify(documents)
+    // Update media fields - store URLs directly (getFileUrl handles both relative and full URLs)
+    if (thumbnail !== undefined) updateData.thumbnail = JSON.stringify(thumbnail)
+    if (images !== undefined) updateData.images = JSON.stringify(images)
+    if (video !== undefined) updateData.video = JSON.stringify(video)
+    if (documents !== undefined) updateData.documents = JSON.stringify(documents)
 
     const servicePackage = await prisma.servicePackage.update({
       where: { id: parseInt(id) },
@@ -325,37 +325,134 @@ export async function deleteServicePackage(req: Request, res: Response) {
 }
 
 /**
- * Upload service package media - TEMPORARILY DISABLED until new media system
+ * Upload service package media
  */
-/* export async function uploadServicePackageMedia(req: Request, res: Response) {
+export async function uploadServicePackageMedia(req: Request, res: Response) {
   try {
     const userId = req.user?.id
-    const files = req.files as Express.Multer.File[]
 
     if (!userId) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    if (!files || files.length === 0) {
+    if (!req.files || !Array.isArray(req.files)) {
       return ApiResponse.error(res, "No files uploaded", 400)
     }
 
-    const uploadedFiles = files.map(file => ({
-      fileName: file.filename,
-      originalName: file.originalname,
-      filePath: getRelativePath(file.path),
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      url: getFileUrl(getRelativePath(file.path))
-    }))
+    const uploadedFiles = (req.files as Express.Multer.File[]).map((file: Express.Multer.File) => {
+      const relativePath = getRelativePath(file.path)
+      const fileUrl = getFileUrl(relativePath)
+      
+      // Determine file type based on mimetype
+      let fileType = 'document' // default
+      if (file.mimetype.startsWith('image/')) {
+        fileType = 'image'
+      } else if (file.mimetype.startsWith('video/')) {
+        fileType = 'video'
+      } else if (file.mimetype.startsWith('audio/')) {
+        fileType = 'audio'
+      }
 
-    return ApiResponse.success(res, uploadedFiles, "Media uploaded successfully")
+      return {
+        originalName: file.originalname,
+        fileName: file.filename,
+        filePath: relativePath,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        fileType: fileType,
+        url: fileUrl
+      }
+    })
 
+    return ApiResponse.success(
+      res,
+      { 
+        files: uploadedFiles,
+        count: uploadedFiles.length
+      },
+      "Media uploaded successfully"
+    )
   } catch (error: any) {
-    console.error("Upload Service Package Media Error:", error)
-    return ApiResponse.error(res, "Failed to upload media")
+    console.error("Error uploading media:", error)
+    return ApiResponse.error(res, "Failed to upload media", 500)
   }
-} */
+}
+
+/**
+ * Upload service package thumbnail
+ */
+export async function uploadServicePackageThumbnail(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id
+
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401)
+    }
+
+    if (!req.files || !Array.isArray(req.files)) {
+      return ApiResponse.error(res, "No files uploaded", 400)
+    }
+
+    const uploadedThumbnails = (req.files as Express.Multer.File[]).map((file: Express.Multer.File) => {
+      const relativePath = getRelativePath(file.path)
+      const fileUrl = getFileUrl(relativePath)
+
+      return {
+        originalName: file.originalname,
+        fileName: file.filename,
+        filePath: relativePath,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        fileType: 'image', // thumbnails are always images
+        url: fileUrl
+      }
+    })
+
+    return ApiResponse.success(
+      res,
+      { 
+        files: uploadedThumbnails,
+        count: uploadedThumbnails.length
+      },
+      "Thumbnail uploaded successfully"
+    )
+  } catch (error: any) {
+    console.error("Error uploading thumbnail:", error)
+    return ApiResponse.error(res, "Failed to upload thumbnail", 500)
+  }
+}
+
+/**
+ * Delete service package file
+ */
+export async function deleteServicePackageFile(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id
+    const { filePath } = req.body
+
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401)
+    }
+
+    if (!filePath) {
+      return ApiResponse.error(res, "File path is required", 400)
+    }
+
+    // Convert relative path to absolute path for deletion
+    const absolutePath = path.join(process.cwd(), filePath)
+    
+    // Check if file exists and delete it
+    if (fs.existsSync(absolutePath)) {
+      fs.unlinkSync(absolutePath)
+      return ApiResponse.success(res, null, "File deleted successfully")
+    } else {
+      return ApiResponse.error(res, "File not found", 404)
+    }
+  } catch (error: any) {
+    console.error("Error deleting file:", error)
+    return ApiResponse.error(res, "Failed to delete file", 500)
+  }
+}
 
 /**
  * Delete service package media file - TEMPORARILY DISABLED until new media system
