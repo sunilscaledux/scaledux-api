@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '@config/prisma'
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl } from '@utils/General'
+import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
   updatePortfolioSchema, 
@@ -151,8 +151,8 @@ export async function createPortfolio(req: Request, res: Response) {
         industry_id: portfolioData.industryId,
         role: portfolioData.role || '',
         project_skills: (portfolioData.projectSkills || []) as any,
-        thumbnail_urls: (portfolioData.thumbnail || []) as any,
-        media_urls: (portfolioData.media || []) as any,
+        thumbnail_urls: JSON.stringify((portfolioData.thumbnail || []).map(extractRelativePath)),
+        media_urls: JSON.stringify((portfolioData.media || []).map(extractRelativePath)),
         project_link: portfolioData.projectLink || null,
         completion_month: portfolioData.completionMonth || '',
         completion_year: portfolioData.completionYear || '',
@@ -222,8 +222,8 @@ export async function updatePortfolio(req: Request, res: Response) {
         industry_id: portfolioData.industryId || existingPortfolio.industry_id,
         role: portfolioData.role || existingPortfolio.role,
         project_skills: portfolioData.projectSkills ? portfolioData.projectSkills as any : existingPortfolio.project_skills,
-        thumbnail_urls: portfolioData.thumbnail !== undefined ? portfolioData.thumbnail as any : existingPortfolio.thumbnail_urls,
-        media_urls: portfolioData.media !== undefined ? portfolioData.media as any : existingPortfolio.media_urls,
+        thumbnail_urls: portfolioData.thumbnail !== undefined ? JSON.stringify((portfolioData.thumbnail || []).map(extractRelativePath)) as any : existingPortfolio.thumbnail_urls,
+        media_urls: portfolioData.media !== undefined ? JSON.stringify((portfolioData.media || []).map(extractRelativePath)) as any : existingPortfolio.media_urls,
         project_link: portfolioData.projectLink !== undefined ? portfolioData.projectLink : existingPortfolio.project_link,
         completion_month: portfolioData.completionMonth || existingPortfolio.completion_month,
         completion_year: portfolioData.completionYear || existingPortfolio.completion_year,

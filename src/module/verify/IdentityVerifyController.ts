@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '@config/prisma'
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl } from '@utils/General'
+import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
 
@@ -134,10 +134,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         id_number: idInformation.idNumber,
         id_expiry_date: idInformation.idExpiryDate ? new Date(idInformation.idExpiryDate) : null,
         issuing_country: idInformation.issuingCountry,
-        id_document_urls: idInformation.idImage,
+        id_document_urls: JSON.stringify((idInformation.idImage || []).map(extractRelativePath)),
         
         // Selfie/Keycode Verification
-        selfie_urls: keycodeVerification.picture,
+        selfie_urls: JSON.stringify((keycodeVerification.picture || []).map(extractRelativePath)),
         
         // Proof of Address
         address_line_1: proofOfAddress.address1,
@@ -149,7 +149,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         proof_of_address_consent: proofOfAddress.proofConcent || null,
         
         // Address Proof Documents (only if user selected "No" for consent)
-        address_proof_urls: proofOfAddress.uploadedAddressProofs || null,
+        address_proof_urls: proofOfAddress.uploadedAddressProofs ? JSON.stringify((proofOfAddress.uploadedAddressProofs || []).map(extractRelativePath)) as any : null,
         document_type: proofOfAddress.documentType || null,
         institution_name: proofOfAddress.institutionName || null,
         document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
@@ -174,10 +174,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           id_number: idInformation.idNumber,
           id_expiry_date: idInformation.idExpiryDate ? new Date(idInformation.idExpiryDate) : null,
           issuing_country: idInformation.issuingCountry,
-          id_document_urls: idInformation.idImage,
+          id_document_urls: JSON.stringify((idInformation.idImage || []).map(extractRelativePath)),
           
           // Selfie/Keycode Verification
-          selfie_urls: keycodeVerification.picture,
+          selfie_urls: JSON.stringify((keycodeVerification.picture || []).map(extractRelativePath)),
           
           // Proof of Address
           address_line_1: proofOfAddress.address1,
@@ -189,7 +189,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           proof_of_address_consent: proofOfAddress.proofConcent || null,
           
           // Address Proof Documents (only if user selected "No" for consent)
-          address_proof_urls: proofOfAddress.uploadedAddressProofs || null,
+          address_proof_urls: proofOfAddress.uploadedAddressProofs ? JSON.stringify((proofOfAddress.uploadedAddressProofs || []).map(extractRelativePath)) as any : null,
           document_type: proofOfAddress.documentType || null,
           institution_name: proofOfAddress.institutionName || null,
           document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
