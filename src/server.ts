@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import userRoutes from "@module/auth/AuthRoute";
 import profileRoutes from "@module/profile/ProfileRoute";
-import generalRoutes from "@module/location/GeneralRoute";
+import generalRoutes from "@module/general/GeneralRoute";
 import educationRoutes from "@module/education/EducationRoute";
 import licenseRoutes from './module/license/LicenseRoute';
 import workExperienceRoutes from './module/work-experience/WorkExperienceRoute';

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
-import { calculateProfileCompletion } from '../../events/ProfileCompletionEvent';
+import { calculateProfileCompletion } from "./ProfileCompletionService";
 
 /**
  * Get user's profile completion status

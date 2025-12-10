@@ -1,4 +1,4 @@
-import { prisma } from '../services/prismaService';
+import { prisma } from '../../services/prismaService';
 
 
 // Profile completion percentages

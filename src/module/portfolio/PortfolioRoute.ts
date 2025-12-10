@@ -5,8 +5,8 @@ import {
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
-  uploadThumbnail,
-  uploadMedia,
+  uploadPortfolioThumbnail,
+  uploadPortfolioMedia,
   deletePortfolioFile,
   duplicatePortfolio
 } from "./PortfolioController"
@@ -29,14 +29,14 @@ router.delete("/:id", deletePortfolio)
 router.post(
   "/upload-thumbnail",
   FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
-  uploadThumbnail,
+  uploadPortfolioThumbnail,
   handleMulterError
 )
 
 router.post(
   "/upload-media",
   FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10 }).array("media"),
-  uploadMedia,
+  uploadPortfolioMedia,
   handleMulterError
 )
 

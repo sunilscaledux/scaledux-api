@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseType";
-import { prisma } from "../../services/prismaService";
+import { ExpertiseService } from "./ExpertiseService";
 import { createUserExpertiseSchema, updateUserExpertiseSchema } from "./ExpertiseValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 
@@ -15,74 +15,24 @@ export async function createUserExpertise(req: Request, res: Response) {
   }
 
   const userId = req.user.id;
+  const result = await ExpertiseService.createUserExpertise(userId, value);
 
-  try {
-    // Check if expertise category exists
-    const expertiseCategory = await prisma.expertiseCategory.findFirst({
-      where: { id: value.expertise_category_id, is_active: true }
-    });
-    if (!expertiseCategory) {
-      return ApiResponse.error(res, "Invalid expertise category", 400);
-    }
-
-    // Check if specialty exists
-    const specialty = await prisma.specialty.findFirst({
-      where: { id: value.specialty_id, is_active: true }
-    });
-    if (!specialty) {
-      return ApiResponse.error(res, "Invalid specialty", 400);
-    }
-
-    const userExpertise = await prisma.userExpertise.create({
-      data: {
-        user_id: userId,
-        expertise_category_id: value.expertise_category_id,
-        specialty_id: value.specialty_id,
-        description: value.description,
-        skills: value.skills || []
-      },
-      include: {
-        expertiseCategory: {
-          select: { id: true, name: true, description: true }
-        },
-        specialty: {
-          select: { id: true, name: true, description: true }
-        }
-      }
-    });
-
-    return ApiResponse.success(res, userExpertise, "Expertise added successfully");
-  } catch (error: any) {
-    console.error("Create User Expertise Error:", error);
-    return ApiResponse.error(res, "Failed to add expertise");
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message.includes("Invalid") ? 400 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
   }
 }
 
 export async function getUserExpertises(req: Request, res: Response) {
   const userId = req.user.id;
+  const result = await ExpertiseService.getUserExpertises(userId);
 
-  try {
-    const userExpertises = await prisma.userExpertise.findMany({
-      where: {
-        user_id: userId
-      },
-      include: {
-        expertiseCategory: {
-          select: { id: true, name: true, description: true }
-        },
-        specialty: {
-          select: { id: true, name: true, description: true }
-        }
-      },
-      orderBy: {
-        created_at: 'desc'
-      }
-    });
-
-    return ApiResponse.success(res, userExpertises, "User expertises retrieved successfully");
-  } catch (error: any) {
-    console.error("Get User Expertises Error:", error);
-    return ApiResponse.error(res, "Failed to retrieve user expertises");
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    return ApiResponse.error(res, result.message);
   }
 }
 
@@ -101,59 +51,15 @@ export async function updateUserExpertise(req: Request, res: Response) {
     return ApiResponse.joiValidationError(res, error);
   }
 
-  try {
-    // Check if user expertise belongs to user
-    const existingUserExpertise = await prisma.userExpertise.findFirst({
-      where: {
-        id: expertiseId,
-        user_id: userId
-      }
-    });
+  const result = await ExpertiseService.updateUserExpertise(userId, expertiseId, value);
 
-    if (!existingUserExpertise) {
-      return ApiResponse.error(res, "User expertise not found", 404);
-    }
-
-    // Check if expertise category exists
-    const expertiseCategory = await prisma.expertiseCategory.findFirst({
-      where: { id: value.expertise_category_id, is_active: true }
-    });
-    if (!expertiseCategory) {
-      return ApiResponse.error(res, "Invalid expertise category", 400);
-    }
-
-    // Check if specialty exists
-    const specialty = await prisma.specialty.findFirst({
-      where: { id: value.specialty_id, is_active: true }
-    });
-    if (!specialty) {
-      return ApiResponse.error(res, "Invalid specialty", 400);
-    }
-
-    const userExpertise = await prisma.userExpertise.update({
-      where: {
-        id: expertiseId
-      },
-      data: {
-        expertise_category_id: value.expertise_category_id,
-        specialty_id: value.specialty_id,
-        description: value.description,
-        skills: value.skills || []
-      },
-      include: {
-        expertiseCategory: {
-          select: { id: true, name: true, description: true }
-        },
-        specialty: {
-          select: { id: true, name: true, description: true }
-        }
-      }
-    });
-
-    return ApiResponse.success(res, userExpertise, "User expertise updated successfully");
-  } catch (error: any) {
-    console.error("Update User Expertise Error:", error);
-    return ApiResponse.error(res, "Failed to update user expertise");
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    let statusCode = 500;
+    if (result.message === "User expertise not found") statusCode = 404;
+    else if (result.message.includes("Invalid")) statusCode = 400;
+    return ApiResponse.error(res, result.message, statusCode);
   }
 }
 
@@ -165,29 +71,13 @@ export async function deleteUserExpertise(req: Request, res: Response) {
     return ApiResponse.error(res, "User expertise ID is required", 400);
   }
 
-  try {
-    // Check if user expertise belongs to user
-    const existingUserExpertise = await prisma.userExpertise.findFirst({
-      where: {
-        id: expertiseId,
-        user_id: userId
-      }
-    });
+  const result = await ExpertiseService.deleteUserExpertise(userId, expertiseId);
 
-    if (!existingUserExpertise) {
-      return ApiResponse.error(res, "User expertise not found", 404);
-    }
-
-    await prisma.userExpertise.delete({
-      where: {
-        id: expertiseId
-      }
-    });
-
-    return ApiResponse.success(res, null, "User expertise deleted successfully");
-  } catch (error: any) {
-    console.error("Delete User Expertise Error:", error);
-    return ApiResponse.error(res, "Failed to delete user expertise");
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "User expertise not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
   }
 }
 
