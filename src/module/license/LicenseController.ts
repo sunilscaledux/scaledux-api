@@ -1,9 +1,7 @@
 import { Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../../services/prismaService'
 import { createLicenseSchema, updateLicenseSchema } from './LicenseValidation'
 import { CreateLicenseInput, UpdateLicenseInput } from './LicenseType'
-
-const prisma = new PrismaClient()
 
 export const getLicenses = async (req: Request, res: Response) => {
   try {

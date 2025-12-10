@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
-import { prisma } from "../../config/prisma";
+import { prisma } from "@services/prismaService";
 import { generateTokenAndSetCookie } from "@utils/jwtUtils";
 import {
   checkUserExists,

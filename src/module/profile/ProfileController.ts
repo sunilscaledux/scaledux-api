@@ -1,6 +1,6 @@
 import {Request,Response} from 'express'
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from './ProfileType'
-import { prisma } from "@config/prisma";
+import { prisma } from "../../services/prismaService";
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from "./ProfileValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getFileUrl, getRelativePath } from "@utils/General";

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
-import { prisma } from "@config/prisma";
+import { prisma } from "../../services/prismaService";
 import { createEducationSchema, updateEducationSchema } from "./EducationValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 

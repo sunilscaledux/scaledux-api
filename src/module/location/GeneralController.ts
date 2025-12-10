@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
-import { prisma } from "@config/prisma"
-import { ApiResponse } from "@utils/ApiResponse"
-import redisClient from "@config/redis"
+import { prisma } from "../../services/prismaService";
+import { ApiResponse } from "@utils/ApiResponse";
+import redisClient from "@services/redisService";
+
 import { getFileUrl } from "@utils/General"
 
 // Cache invalidation helper function

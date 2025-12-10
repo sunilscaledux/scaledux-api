@@ -1,5 +1,5 @@
 import { Request, Response } from 'express'
-import { prisma } from '@config/prisma'
+import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
 import { 

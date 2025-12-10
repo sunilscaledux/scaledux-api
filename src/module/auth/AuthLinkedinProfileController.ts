@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../services/prismaService';
 import axios from 'axios';
-
-const prisma = new PrismaClient();
 
 interface LinkedInProfileData {
   id: string;

@@ -1,9 +1,7 @@
 import { Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../../services/prismaService'
 import { createWorkExperienceSchema, updateWorkExperienceSchema } from './WorkExperienceValidation'
 import { CreateWorkExperienceInput, UpdateWorkExperienceInput } from './WorkExperienceType'
-
-const prisma = new PrismaClient()
 
 export const getWorkExperiences = async (req: Request, res: Response) => {
   try {

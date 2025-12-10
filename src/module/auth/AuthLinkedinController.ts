@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie } from '../../utils/jwtUtils';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../services/prismaService';
 import axios from 'axios';
 import { ulid } from 'ulid';
-
-const prisma = new PrismaClient();
 
 interface LinkedInCallbackRequest {
   code: string;

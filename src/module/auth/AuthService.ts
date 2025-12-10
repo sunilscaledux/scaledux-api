@@ -1,4 +1,4 @@
-import { prisma } from "@config/prisma";
+import { prisma } from "@services/prismaService";
 import bcrypt from "bcrypt";
 import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
@@ -30,7 +30,7 @@ export async function createUserAfterOtpVerification(
     if (userExists) {
       return {
         success: false,
-        message: "User already exists"
+        message: "User already exists",
       };
     }
 
@@ -65,13 +65,13 @@ export async function createUserAfterOtpVerification(
     return {
       success: true,
       message: "User created successfully",
-      data: safeUser
+      data: safeUser,
     };
   } catch (error) {
     console.error("Create user error:", error);
     return {
       success: false,
-      message: "Failed to create user. Please try again."
+      message: "Failed to create user. Please try again.",
     };
   }
 }
@@ -236,4 +236,3 @@ export function normalizeContact(email: string) {
     return { email: incoming, phone: null };
   }
 }
-

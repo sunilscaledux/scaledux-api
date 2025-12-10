@@ -1,9 +1,7 @@
 import { Request, Response } from 'express'
-import { PrismaClient } from '@prisma/client'
+import { prisma } from '../../services/prismaService'
 import { createAchievementSchema, updateAchievementSchema } from './AchievementValidation'
 import { CreateAchievementInput, UpdateAchievementInput, MediaFile } from './AchievementType'
-
-const prisma = new PrismaClient()
 
 // Helper function to get relative path (same as in ProfileController)
 const getRelativePath = (fullPath: string): string => {

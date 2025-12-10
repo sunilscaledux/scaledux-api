@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseType";
-import { prisma } from "@config/prisma";
+import { prisma } from "../../services/prismaService";
 import { createUserExpertiseSchema, updateUserExpertiseSchema } from "./ExpertiseValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 

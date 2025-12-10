@@ -1,5 +1,5 @@
 import { emailService } from "../../services/emailService";
-import { prisma } from "../../config/prisma";
+import { prisma } from "../../services/prismaService";
 import { normalizeContact } from "./AuthService";
 import { ServiceResponse } from "../../utils/ApiResponse";
 
