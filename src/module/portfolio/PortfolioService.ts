@@ -301,14 +301,16 @@ export class PortfolioService {
         };
       }
 
-      const thumbnailUrls = files.map((file: Express.Multer.File) => {
-        return getRelativePath(file.path);
-      });
+      const thumbnailPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
+      const thumbnailUrls = thumbnailPaths.map((path: string) => getFileUrl(path));
 
       return {
         success: true,
         message: "Thumbnail uploaded successfully",
-        data: { thumbnailUrls }
+        data: {
+          thumbnailPaths,  // Relative paths for storage
+          thumbnailUrls    // Full URLs for immediate display
+        }
       };
     } catch (error: any) {
       console.error("Upload Thumbnail Error:", error);
@@ -331,14 +333,16 @@ export class PortfolioService {
         };
       }
 
-      const mediaUrls = files.map((file: Express.Multer.File) => {
-        return getRelativePath(file.path);
-      });
+      const mediaPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
+      const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
 
       return {
         success: true,
         message: "Media files uploaded successfully",
-        data: { mediaUrls }
+        data: {
+          mediaPaths,  // Relative paths for storage
+          mediaUrls    // Full URLs for immediate display
+        }
       };
     } catch (error: any) {
       console.error("Upload Media Error:", error);

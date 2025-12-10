@@ -147,18 +147,22 @@ export class ProfileService {
         };
       }
 
-      const relativePath = getRelativePath(file.path);
-      const imageUrl = getFileUrl(relativePath);
+      const imagePath = getRelativePath(file.path);
+      const imageUrl = getFileUrl(imagePath);
 
       const user = await prisma.user.update({
         where: { id: userId },
-        data: { profileImage: relativePath },
+        data: { profileImage: imagePath },
       });
 
       return {
         success: true,
         message: "Profile image uploaded successfully",
-        data: { imageUrl, user }
+        data: {
+          imagePath,  // Relative path for storage
+          imageUrl,   // Full URL for immediate display
+          user
+        }
       };
     } catch (error: any) {
       console.error("Upload Profile Image Error:", error);
@@ -181,18 +185,22 @@ export class ProfileService {
         };
       }
 
-      const relativePath = getRelativePath(file.path);
-      const imageUrl = getFileUrl(relativePath);
+      const imagePath = getRelativePath(file.path);
+      const imageUrl = getFileUrl(imagePath);
 
       const user = await prisma.user.update({
         where: { id: userId },
-        data: { coverImage: relativePath },
+        data: { coverImage: imagePath },
       });
 
       return {
         success: true,
         message: "Cover image uploaded successfully",
-        data: { imageUrl, user }
+        data: {
+          imagePath,  // Relative path for storage
+          imageUrl,   // Full URL for immediate display
+          user
+        }
       };
     } catch (error: any) {
       console.error("Upload Cover Image Error:", error);

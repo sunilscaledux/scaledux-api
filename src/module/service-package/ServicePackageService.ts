@@ -274,21 +274,16 @@ export class ServicePackageService {
         };
       }
 
-      const uploadedFiles = files.map((file: Express.Multer.File) => {
-        const relativePath = getRelativePath(file.path);
-        return {
-          url: relativePath,
-          fullUrl: getFileUrl(relativePath),
-          name: file.originalname,
-          type: file.mimetype.startsWith("image/") ? "image" : file.mimetype.startsWith("video/") ? "video" : "document",
-          size: file.size,
-        };
-      });
+      const mediaPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
+      const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
 
       return {
         success: true,
         message: "Media files uploaded successfully",
-        data: uploadedFiles
+        data: {
+          mediaPaths,  // Relative paths for storage
+          mediaUrls    // Full URLs for immediate display
+        }
       };
     } catch (error: any) {
       console.error("Upload Service Package Media Error:", error);
@@ -311,21 +306,16 @@ export class ServicePackageService {
         };
       }
 
-      const uploadedFiles = files.map((file: Express.Multer.File) => {
-        const relativePath = getRelativePath(file.path);
-        return {
-          url: relativePath,
-          fullUrl: getFileUrl(relativePath),
-          name: file.originalname,
-          type: "image",
-          size: file.size,
-        };
-      });
+      const thumbnailPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
+      const thumbnailUrls = thumbnailPaths.map((path: string) => getFileUrl(path));
 
       return {
         success: true,
         message: "Thumbnail uploaded successfully",
-        data: uploadedFiles
+        data: {
+          thumbnailPaths,  // Relative paths for storage
+          thumbnailUrls    // Full URLs for immediate display
+        }
       };
     } catch (error: any) {
       console.error("Upload Service Package Thumbnail Error:", error);
