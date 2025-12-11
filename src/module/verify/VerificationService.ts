@@ -75,7 +75,7 @@ export class VerificationService {
           user_id: userId,
           agency_name: agencyName,
           cin: cin,
-          documents: documents || [],
+          document_urls: documents || [],
           status: 'PENDING'
         }
       });
@@ -141,8 +141,7 @@ export class VerificationService {
         where: { id: userId },
         select: {
           email: true,
-          emailVerified: true,
-          emailVerifiedAt: true
+          email_verified_at: true
         }
       });
 
@@ -158,8 +157,8 @@ export class VerificationService {
         message: "Email verification status retrieved successfully",
         data: {
           email: user.email,
-          isVerified: user.emailVerified || false,
-          verifiedAt: user.emailVerifiedAt
+          isVerified: !!user.email_verified_at,
+          verifiedAt: user.email_verified_at
         }
       };
     } catch (error: any) {
@@ -179,10 +178,10 @@ export class VerificationService {
       // Check if email is already verified
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { emailVerified: true }
+        select: { email_verified_at: true }
       });
 
-      if (user?.emailVerified) {
+      if (user?.email_verified_at) {
         return {
           success: false,
           message: "Email is already verified"
@@ -224,8 +223,7 @@ export class VerificationService {
         where: { id: userId },
         data: {
           email: email,
-          emailVerified: true,
-          emailVerifiedAt: new Date()
+          email_verified_at: new Date()
         }
       });
 
@@ -235,7 +233,7 @@ export class VerificationService {
         data: {
           email: user.email,
           isVerified: true,
-          verifiedAt: user.emailVerifiedAt
+          verifiedAt: user.email_verified_at
         }
       };
     } catch (error: any) {
@@ -257,10 +255,10 @@ export class VerificationService {
       // Check if phone is already verified
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { phoneVerified: true }
+        select: { phone_verified_at: true }
       });
 
-      if (user?.phoneVerified) {
+      if (user?.phone_verified_at) {
         return {
           success: false,
           message: "Phone number is already verified"
@@ -316,8 +314,7 @@ export class VerificationService {
         const updatedUser = await prisma.user.update({
           where: { id: userId },
           data: {
-            phoneVerified: true,
-            phoneVerifiedAt: new Date()
+            phone_verified_at: new Date()
           }
         });
 
@@ -327,7 +324,7 @@ export class VerificationService {
           data: {
             phone: updatedUser.phone,
             isVerified: true,
-            verifiedAt: updatedUser.phoneVerifiedAt
+            verifiedAt: updatedUser.phone_verified_at
           }
         };
       } else {
@@ -375,7 +372,7 @@ export class VerificationService {
         data: {
           isVerified: identityVerification.status === 'APPROVED',
           status: identityVerification.status,
-          verifiedAt: identityVerification.verified_at,
+          verifiedAt: identityVerification.reviewed_at,
           rejectionReason: identityVerification.rejection_reason
         }
       };
@@ -423,14 +420,18 @@ export class VerificationService {
       const identityVerification = await prisma.identityVerification.create({
         data: {
           user_id: userId,
-          document_type: data.documentType,
-          document_number: data.documentNumber,
-          full_name: data.fullName,
+          id_type: data.documentType,
+          id_number: data.documentNumber,
+          first_name: data.fullName.split(' ')[0] || data.fullName,
+          last_name: data.fullName.split(' ').slice(1).join(' ') || '',
           date_of_birth: new Date(data.dateOfBirth),
-          address: data.address,
-          id_images: data.idImages || [],
-          selfie_images: data.selfieImages || [],
-          address_proof: data.addressProof || [],
+          address_line_1: data.address,
+          city: 'Unknown', // Required field, should be passed from frontend
+          issuing_country: 'Unknown', // Required field, should be passed from frontend
+          address_country: 'Unknown', // Required field, should be passed from frontend
+          id_document_urls: data.idImages || [],
+          selfie_urls: data.selfieImages || [],
+          address_proof_urls: data.addressProof || [],
           status: 'PENDING'
         }
       });
