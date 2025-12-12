@@ -319,14 +319,14 @@ export class ProfileService {
     try {
       const user = await prisma.user.findFirst({
         where: {
-          uniqueId: uniqueId,
+          unique_id: uniqueId,
           status: 1, // Only active users
         },
         select: {
           id: true,
-          uniqueId: true,
-          FirstName: true,
-          LastName: true,
+          unique_id: true,
+          first_name: true,
+          last_name: true,
           email: true,
           phone: true,
           profileImage: true,

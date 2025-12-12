@@ -157,8 +157,8 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
-        FirstName: firstName,
-        LastName: lastName,
+        first_name: firstName,
+        last_name: lastName,
         profileImage: profileData.profilePicture?.displayImage,
         linkedinId: profileData.id,
       },
@@ -274,8 +274,8 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       {
         user: {
           id: updatedUser.id,
-          firstName: updatedUser.FirstName,
-          lastName: updatedUser.LastName,
+          firstName: updatedUser.first_name,
+          lastName: updatedUser.last_name,
           profileImage: updatedUser.profileImage,
         },
         imported: {

@@ -235,9 +235,9 @@ const linkedinCallback = async (req: Request, res: Response) => {
       // Create new user from LinkedIn OAuth
       user = await prisma.user.create({
         data: {
-          uniqueId:ulid(),
-          FirstName: firstName,
-          LastName: lastName,
+          unique_id: ulid(),
+          first_name: firstName,
+          last_name: lastName,
           email: userEmail,
           linkedinId: linkedinUser.id,
           profileImage: linkedinUser.profilePicture?.displayImage,
@@ -262,8 +262,8 @@ const linkedinCallback = async (req: Request, res: Response) => {
       {
         user: {
           id: user.id,
-          firstName: user.FirstName,
-          lastName: user.LastName,
+          firstName: user.first_name,
+          lastName: user.last_name,
           email: user.email,
           profileImage: user.profileImage,
         },
