@@ -1,9 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { OtpService } from '../auth/otpService'
-
-const otpService = new OtpService()
+import * as AuthService from '../auth/AuthService'
 
 /**
  * Get email verification status
@@ -113,7 +111,7 @@ export async function sendEmailOTP(req: Request, res: Response) {
     }
 
     // Generate and send OTP using existing OTP service
-    const otpResult = await otpService.generateAndSendOtp({
+    const otpResult = await AuthService.generateAndSendOtp({
       email: email,
       otpType: 'REGISTRATION_VERIFICATION',
       userId: userId
@@ -160,7 +158,7 @@ export async function verifyEmailOTP(req: Request, res: Response) {
     }
 
     // Verify OTP using existing OTP service
-    const verifyResult = await otpService.verifyOtpByType(
+    const verifyResult = await AuthService.verifyOtpByType(
       email,
       otp,
       'REGISTRATION_VERIFICATION'

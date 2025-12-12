@@ -7,7 +7,6 @@ import {
   userLogin,
   userOtpLogin,
   createUserAfterOtpVerification,
-  normalizeContact,
 } from "./AuthService";
 import {
   RegisterInput,
@@ -26,8 +25,8 @@ import {
   resetPasswordSchema,
 } from "./AuthValidation";
 import { ApiResponse } from "@utils/ApiResponse";
-import { otpService } from "@module/auth/otpService";
-import { getFileUrl } from '@utils/General';
+import * as AuthService from "@module/auth/AuthService";
+import { getFileUrl, normalizeContact } from '@utils/General';
 
 export async function initiateRegistration(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -50,7 +49,7 @@ export async function initiateRegistration(req: Request, res: Response) {
     }
 
     // Generate and send OTP with registration data
-    const otpResult = await otpService.generateAndSendOtp({
+    const otpResult = await AuthService.generateAndSendOtp({
       email: contactInfo.email || undefined,
       phone: contactInfo.phone || undefined,
       otpType: "REGISTRATION_VERIFICATION",
@@ -97,7 +96,7 @@ export async function register(req: Request, res: Response) {
     }
 
     // Check if OTP is verified for this identifier
-    const registrationData = await otpService.getRegistrationData(identifier);
+    const registrationData = await AuthService.getRegistrationData(identifier);
     if (!registrationData || !registrationData.verified) {
       return ApiResponse.error(
         res,
@@ -233,8 +232,8 @@ export async function resendOtp(req: Request, res: Response) {
 
     const contactInfo = normalizeContact(identifier);
 
-    // Resend OTP using otpService
-    const resendResult = await otpService.resendOtp({
+    // Resend OTP using AuthService
+    const resendResult = await AuthService.resendOtp({
       email: contactInfo.email || undefined,
       phone: contactInfo.phone || undefined,
     });
@@ -314,7 +313,7 @@ export async function requestOtp(req: Request, res: Response) {
     };
 
     // Generate and send OTP
-    const otpResult = await otpService.generateAndSendOtp({
+    const otpResult = await AuthService.generateAndSendOtp({
       email: contactInfo.email || undefined,
       phone: contactInfo.phone || undefined,
       otpType: otpTypeMap[type],
@@ -364,8 +363,8 @@ export async function verifyOtp(req: Request, res: Response) {
       "forgot-password": "FORGOT_PASSWORD_VERIFICATION" as const,
     };
 
-    // Verify OTP using otpService
-    const response = await otpService.verifyOtpByType(
+    // Verify OTP using AuthService
+    const response = await AuthService.verifyOtpByType(
       identifier,
       otp,
       otpTypeMap[type]
@@ -451,8 +450,8 @@ export async function resendOtpUnified(req: Request, res: Response) {
       "forgot-password": "FORGOT_PASSWORD_VERIFICATION" as const,
     };
 
-    // Resend OTP using otpService
-    const resendResult = await otpService.resendOtpByType(
+    // Resend OTP using AuthService
+    const resendResult = await AuthService.resendOtpByType(
       {
         email: contactInfo.email || undefined,
         phone: contactInfo.phone || undefined,

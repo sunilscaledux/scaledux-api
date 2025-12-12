@@ -44,3 +44,41 @@ export const extractRelativePath = (urlOrPath: string): string => {
     return urlOrPath
   }
 };
+
+/**
+ * Generate a random OTP code
+ */
+export const generateOtpCode = (length: number = 6): string => {
+  const digits = "0123456789";
+  let otp = "";
+
+  for (let i = 0; i < length; i++) {
+    otp += digits[Math.floor(Math.random() * digits.length)];
+  }
+
+  return otp;
+};
+
+/**
+ * Normalize contact input to determine if it's email or phone
+ */
+export const normalizeContact = (email: string) => {
+  const incoming = email;
+
+  if (!incoming) {
+    return { email: null, phone: null };
+  }
+
+  const isEmail = /@/.test(incoming);
+  const digitsOnly = incoming.replace(/\D/g, "");
+  const isPhone = /^\d{7,15}$/.test(digitsOnly);
+
+  if (isEmail) {
+    return { email: incoming, phone: null };
+  } else if (isPhone) {
+    return { email: null, phone: digitsOnly };
+  } else {
+    // Keep as-is and let Joi raise validation error
+    return { email: incoming, phone: null };
+  }
+};

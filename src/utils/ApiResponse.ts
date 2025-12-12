@@ -1,7 +1,6 @@
 import { Response } from 'express';
 import { ValidationError } from 'joi';
 
-// Generic service response type that can be reused across all services
 export interface ServiceResponse<T = any> {
   success: boolean;
   message: string;
