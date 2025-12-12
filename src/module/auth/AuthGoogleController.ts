@@ -79,11 +79,11 @@ const googleCallback = async (req: Request, res: Response) => {
 
       user = await prisma.user.create({
         data: {
-          FirstName: firstName,
-          LastName: lastName,
+          first_name: firstName,
+          last_name: lastName,
           email: googleUser.email,
           googleId: googleUser.id,
-          uniqueId: ulid(),
+          unique_id: ulid(),
           provider: "google",
           email_verified_at: new Date(),
           status: 1,
@@ -102,8 +102,8 @@ const googleCallback = async (req: Request, res: Response) => {
       {
         user: {
           id: user.id,
-          firstName: user.FirstName,
-          lastName: user.LastName,
+          firstName: user.first_name,
+          lastName: user.last_name,
           email: user.email,
           profileImage: user.profileImage,
         },

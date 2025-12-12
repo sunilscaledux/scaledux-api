@@ -7,14 +7,15 @@ import {
 } from "./AuthTypes";
 
 
-export const registerUserSchema = Joi.object<RegisterInput>({
-  FirstName: Joi.string().min(1).required().messages({
+export const registerUserSchema = Joi.object({
+  first_name: Joi.string().min(2).max(50).required().messages({
+    "string.min": "First name must be at least 2 characters long",
+    "string.max": "First name must not exceed 50 characters",
     "any.required": "First name is required",
-    "string.min": "First name is required",
   }),
-  LastName: Joi.string().min(1).required().messages({
-    "any.required": "Last name is required",
-    "string.min": "Last name is required",
+  last_name: Joi.string().min(2).max(50).optional().allow("").messages({
+    "string.min": "Last name must be at least 2 characters long",
+    "string.max": "Last name must not exceed 50 characters",
   }),
   email: Joi.string().required().messages({
     "any.required": "Email or phone number is required",

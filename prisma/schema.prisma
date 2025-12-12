@@ -9,8 +9,8 @@ datasource db {
 
 model User {
   id                Int       @id @default(autoincrement())
-  FirstName         String
-  LastName          String?
+  first_name        String
+  last_name         String?
   email             String?   @unique
   phone             String?   @unique
   email_verified_at DateTime?
@@ -31,7 +31,7 @@ model User {
   identity_verified_at         DateTime?
   identity_verification_status String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   agency_verified_at           DateTime?
-  uniqueId                     String    @unique
+  unique_id                    String    @unique
   otps                         Otp[]
   personalInfo                 PersonalInfo?
   education                    Education[]
@@ -47,10 +47,10 @@ model User {
   servicePackages              ServicePackage[]
 
   @@index([email, phone])
-  @@index([LastName, FirstName, email])
+  @@index([last_name, first_name, email])
   @@index([googleId])
   @@index([linkedinId])
-  @@map("users")
+  @@map("scd_users")
 }
 
 model PersonalInfo {
@@ -76,7 +76,7 @@ model PersonalInfo {
   country        Country?  @relation(fields: [country_id], references: [id])
   state          State?    @relation(fields: [state_id], references: [id])
 
-  @@map("personal_info")
+  @@map("scd_personal_info")
 }
 
 model Education {
@@ -96,7 +96,7 @@ model Education {
   updated_at    DateTime @updatedAt
   user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("education")
+  @@map("scd_education")
 }
 
 model License {
@@ -112,7 +112,7 @@ model License {
   updated_at       DateTime @updatedAt
   user             User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("licenses")
+  @@map("scd_licenses")
 }
 
 model ExpertiseCategory {
@@ -126,7 +126,7 @@ model ExpertiseCategory {
   specialties Specialty[]
   skills      Skill[]
 
-  @@map("expertise_categories")
+  @@map("scd_expertise_categories")
 }
 
 model Specialty {
@@ -141,7 +141,7 @@ model Specialty {
   expertises            UserExpertise[]
 
   @@unique([name, expertise_category_id])
-  @@map("specialties")
+  @@map("scd_specialties")
 }
 
 model Skill {
@@ -155,7 +155,7 @@ model Skill {
   expertiseCategory     ExpertiseCategory @relation(fields: [expertise_category_id], references: [id])
 
   @@unique([name, expertise_category_id])
-  @@map("skills")
+  @@map("scd_skills")
 }
 
 model Industry {
@@ -167,7 +167,7 @@ model Industry {
   updated_at  DateTime  @updatedAt
   portfolios  Portfolio[]
 
-  @@map("industries")
+  @@map("scd_industries")
 }
 
 model UserExpertise {
@@ -183,7 +183,7 @@ model UserExpertise {
   expertiseCategory     ExpertiseCategory @relation(fields: [expertise_category_id], references: [id])
   specialty             Specialty         @relation(fields: [specialty_id], references: [id])
 
-  @@map("user_expertises")
+  @@map("scd_user_expertises")
 }
 
 model Otp {
@@ -202,7 +202,7 @@ model Otp {
   @@index([email, otp_type, verified])
   @@index([phone, otp_type, verified])
   @@index([expires_at])
-  @@map("otps")
+  @@map("scd_otps")
 }
 
 model Country {
@@ -218,7 +218,7 @@ model Country {
   states       State[]
   personalInfo PersonalInfo[]
 
-  @@map("countries")
+  @@map("scd_countries")
 }
 
 model State {
@@ -232,7 +232,7 @@ model State {
   personalInfo PersonalInfo[]
 
   @@unique([name, country_id])
-  @@map("states")
+  @@map("scd_states")
 }
 
 model Currency {
@@ -245,7 +245,7 @@ model Currency {
   countries    Country[]
   personalInfo PersonalInfo[]
 
-  @@map("currencies")
+  @@map("scd_currencies")
 }
 
 model Language {
@@ -258,7 +258,7 @@ model Language {
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
 
-  @@map("languages")
+  @@map("scd_languages")
 }
 
 model WorkExperience {
@@ -277,7 +277,7 @@ model WorkExperience {
   updated_at        DateTime @updatedAt
   user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("work_experiences")
+  @@map("scd_work_experiences")
 }
 
 model Achievement {
@@ -294,7 +294,7 @@ model Achievement {
   updated_at        DateTime @updatedAt
   user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@map("achievements")
+  @@map("scd_achievements")
 }
 
 model IdentityVerification {
@@ -332,7 +332,7 @@ model IdentityVerification {
 
   @@index([user_id, status])
   @@index([status])
-  @@map("identity_verifications")
+  @@map("scd_identity_verifications")
 }
 
 model AgencyVerification {
@@ -352,7 +352,7 @@ model AgencyVerification {
 
   @@index([user_id, status])
   @@index([status])
-  @@map("agency_verifications")
+  @@map("scd_agency_verifications")
 }
 
 model Portfolio {
@@ -383,7 +383,7 @@ model Portfolio {
   @@index([status])
   @@index([industry_id])
   @@index([deleted_at])
-  @@map("portfolios")
+  @@map("scd_portfolios")
 }
 
 enum OtpType {
@@ -410,7 +410,7 @@ model ServiceCategory {
   
   // Indexes
   @@index([is_active])
-  @@map("service_categories")
+  @@map("scd_service_categories")
 }
 
 model ServiceSubCategory {
@@ -431,7 +431,7 @@ model ServiceSubCategory {
   @@index([category_id])
   @@index([is_active])
   @@unique([category_id, name], name: "category_id_name")
-  @@map("service_sub_categories")
+  @@map("scd_service_sub_categories")
 }
 
 model ServiceKeyword {
@@ -455,7 +455,7 @@ model ServiceKeyword {
   @@index([popularity_score])
   @@index([name])
   @@unique([category_id, name], name: "category_id_name")
-  @@map("service_keywords")
+  @@map("scd_service_keywords")
 }
 
 model ServicePackage {
@@ -504,7 +504,7 @@ model ServicePackage {
   @@index([category_id])
   @@index([sub_category_id])
   @@index([status])
-  @@map("service_packages")
+  @@map("scd_service_packages")
 }
 
 

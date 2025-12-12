@@ -121,8 +121,8 @@ export async function register(req: Request, res: Response) {
       {
         user: {
           id: userResult.data.id,
-          firstName: userResult.data.FirstName,
-          lastName: userResult.data.LastName,
+          firstName: userResult.data.first_name,
+          lastName: userResult.data.last_name,
           email: userResult.data.email,
           phone: userResult.data.phone,
         },
@@ -606,39 +606,8 @@ export async function getCurrentUser(req: Request, res: Response) {
       return ApiResponse.unauthorized(res, "Not authenticated");
     }
 
-    // Get full user details from database with relations
-    const userDetails = await prisma.user.findUnique({
-      where: { id: user.id },
-      include: {
-        personalInfo: {
-          include: {
-            currency: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                symbol: true
-              }
-            },
-            country: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                flag: true
-              }
-            },
-            state: {
-              select: {
-                id: true,
-                name: true,
-                code: true
-              }
-            }
-          }
-        }
-      }
-    });
+    // Get full user details from AuthService
+    const userDetails = await AuthService.getCurrentUserDetails(user.id);
 
     if (!userDetails) {
       return ApiResponse.error(res, "User not found");
@@ -648,9 +617,9 @@ export async function getCurrentUser(req: Request, res: Response) {
       res,
       {
         id: userDetails.id,
-        uniqueId: userDetails.uniqueId,
-        firstName: userDetails.FirstName,
-        lastName: userDetails.LastName,
+        uniqueId: userDetails.unique_id,
+        firstName: userDetails.first_name,
+        lastName: userDetails.last_name,
         email: userDetails.email,
         coverImage: getFileUrl(userDetails.coverImage),
         profileImage: getFileUrl(userDetails.profileImage),
@@ -697,12 +666,10 @@ export async function getCurrentUser(req: Request, res: Response) {
             }
           : null,
         hourly_rate: userDetails.personalInfo?.hourly_rate || null,
-        // Identity verification status
         identity_verification_status: userDetails.identity_verification_status || 'PENDING',
         identity_verified_at: userDetails.identity_verified_at,
-        // Agency verification status
         agency_verification_status: userDetails.agency_verification_status || 'PENDING',
-        // agency_verified_at: userDetails.agency_verified_at, // TODO: Uncomment after migration
+        agency_verified_at: userDetails.agency_verified_at, 
         show_as_agency: userDetails.show_as_agency || false
       },
 

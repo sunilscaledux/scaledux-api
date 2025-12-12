@@ -41,9 +41,9 @@ export async function createUserAfterOtpVerification(
     const contactInfo = normalizeContact(data.email);
 
     const userData: any = {
-      FirstName: data.FirstName,
-      uniqueId: ulid(),
-      LastName: data.LastName,
+      first_name: data.first_name,
+      unique_id: ulid(),
+      last_name: data.last_name,
       email: contactInfo.email || data.email,
       phone: contactInfo.phone,
       password: hashedPassword,
@@ -551,6 +551,51 @@ export async function getRegistrationData(identifier: string): Promise<any | nul
     };
   } catch (error) {
     console.error("Error getting registration data:", error);
+    return null;
+  }
+}
+
+/**
+ * Get current user details with all relations
+ */
+export async function getCurrentUserDetails(userId: number): Promise<any | null> {
+  try {
+    const userDetails = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        personalInfo: {
+          include: {
+            currency: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                symbol: true
+              }
+            },
+            country: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                flag: true
+              }
+            },
+            state: {
+              select: {
+                id: true,
+                name: true,
+                code: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return userDetails;
+  } catch (error) {
+    console.error("Error getting user details:", error);
     return null;
   }
 }
