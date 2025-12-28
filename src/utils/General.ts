@@ -20,7 +20,6 @@ export const getRelativePath = (path:string): string => {
  return path.replace(process.cwd() + '/', '').replace(/\\/g, '/');
 };
 
-// Utility function to extract relative path from full URL for database storage
 export const extractRelativePath = (urlOrPath: string): string => {
   if (!urlOrPath) return ''
   
@@ -28,14 +27,10 @@ export const extractRelativePath = (urlOrPath: string): string => {
   if (!urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
     return urlOrPath
   }
-  
-  // Extract relative path from full URL
-  // Example: "http://127.0.0.1:4000/uploads/1/file.jpg" -> "uploads/1/file.jpg"
   try {
     const url = new URL(urlOrPath)
     return url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname
   } catch (error) {
-    // If URL parsing fails, try to extract path manually
     const parts = urlOrPath.split('/')
     const uploadsIndex = parts.findIndex(part => part === 'uploads')
     if (uploadsIndex !== -1) {
@@ -43,6 +38,20 @@ export const extractRelativePath = (urlOrPath: string): string => {
     }
     return urlOrPath
   }
+};
+
+export const normalizeUploadedPaths = (docs: any): string[] => {
+  if (!docs || !Array.isArray(docs)) return []
+
+  return docs
+    .map((d: any) => {
+      if (!d) return ''
+      if (typeof d === 'string') return extractRelativePath(d)
+      if (typeof d?.path === 'string' && d.path) return extractRelativePath(d.path)
+      if (typeof d?.url === 'string' && d.url) return extractRelativePath(d.url)
+      return ''
+    })
+    .filter(Boolean)
 };
 
 /**

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
+import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
 
@@ -117,6 +117,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
 
     let identityVerification
 
+    const idDocumentPaths = normalizeUploadedPaths(idInformation?.idImage)
+    const selfiePaths = normalizeUploadedPaths(keycodeVerification?.picture)
+    const addressProofPaths = normalizeUploadedPaths(proofOfAddress?.uploadedAddressProofs)
+
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
       identityVerification = await prisma.identityVerification.update({
@@ -134,10 +138,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         id_number: idInformation.idNumber,
         id_expiry_date: idInformation.idExpiryDate ? new Date(idInformation.idExpiryDate) : null,
         issuing_country: idInformation.issuingCountry,
-        id_document_urls: JSON.stringify((idInformation.idImage || []).map(extractRelativePath)),
+        id_document_urls: idDocumentPaths as any,
         
         // Selfie/Keycode Verification
-        selfie_urls: JSON.stringify((keycodeVerification.picture || []).map(extractRelativePath)),
+        selfie_urls: selfiePaths as any,
         
         // Proof of Address
         address_line_1: proofOfAddress.address1,
@@ -149,7 +153,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         proof_of_address_consent: proofOfAddress.proofConcent || null,
         
         // Address Proof Documents (only if user selected "No" for consent)
-        address_proof_urls: proofOfAddress.uploadedAddressProofs ? JSON.stringify((proofOfAddress.uploadedAddressProofs || []).map(extractRelativePath)) as any : null,
+        address_proof_urls: addressProofPaths.length ? (addressProofPaths as any) : null,
         document_type: proofOfAddress.documentType || null,
         institution_name: proofOfAddress.institutionName || null,
         document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
@@ -174,10 +178,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           id_number: idInformation.idNumber,
           id_expiry_date: idInformation.idExpiryDate ? new Date(idInformation.idExpiryDate) : null,
           issuing_country: idInformation.issuingCountry,
-          id_document_urls: JSON.stringify((idInformation.idImage || []).map(extractRelativePath)),
+          id_document_urls: idDocumentPaths as any,
           
           // Selfie/Keycode Verification
-          selfie_urls: JSON.stringify((keycodeVerification.picture || []).map(extractRelativePath)),
+          selfie_urls: selfiePaths as any,
           
           // Proof of Address
           address_line_1: proofOfAddress.address1,
@@ -189,7 +193,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           proof_of_address_consent: proofOfAddress.proofConcent || null,
           
           // Address Proof Documents (only if user selected "No" for consent)
-          address_proof_urls: proofOfAddress.uploadedAddressProofs ? JSON.stringify((proofOfAddress.uploadedAddressProofs || []).map(extractRelativePath)) as any : null,
+          address_proof_urls: addressProofPaths.length ? (addressProofPaths as any) : null,
           document_type: proofOfAddress.documentType || null,
           institution_name: proofOfAddress.institutionName || null,
           document_date_issued: proofOfAddress.dateIssued ? new Date(proofOfAddress.dateIssued) : null,
@@ -240,6 +244,10 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
       return ApiResponse.error(res, "No identity verification found", 404)
     }
 
+    const idDocumentPaths = (verification.id_document_urls || []) as string[]
+    const selfiePaths = (verification.selfie_urls || []) as string[]
+    const addressProofPaths = (verification.address_proof_urls || []) as string[]
+
     return ApiResponse.success(res, {
       id: verification.id,
       status: verification.status,
@@ -257,10 +265,10 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         idNumber: verification.id_number,
         idExpiryDate: verification.id_expiry_date,
         issuingCountry: verification.issuing_country,
-        idImage: verification.id_document_urls ? (verification.id_document_urls as string[]).map((url: string) => getFileUrl(url)) : []
+        idImage: idDocumentPaths.map((p: string) => getFileUrl(p))
       },
       keycodeVerification: {
-        picture: verification.selfie_urls ? (verification.selfie_urls as string[]).map((url: string) => getFileUrl(url)) : []
+        picture: selfiePaths.map((p: string) => getFileUrl(p))
       },
       proofOfAddress: {
         address1: verification.address_line_1,
@@ -270,7 +278,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         zipCode: verification.postal_code,
         country: verification.address_country,
         proofConcent: verification.proof_of_address_consent,
-        uploadedAddressProofs: verification.address_proof_urls,
+        uploadedAddressProofs: addressProofPaths.map((p: string) => getFileUrl(p)),
         documentType: verification.document_type,
         institutionName: verification.institution_name,
         dateIssued: verification.document_date_issued
