@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
+import { extractRelativePath, getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
 
@@ -371,8 +371,8 @@ export async function deleteIdDocument(req: Request, res: Response) {
       return ApiResponse.error(res, "File path is required", 400)
     }
 
-    // Construct full file path
-    const fullPath = path.join(process.cwd(), filePath)
+    const relativePath = extractRelativePath(filePath)
+    const fullPath = path.join(process.cwd(), relativePath)
 
     // Check if file exists and delete it
     if (fs.existsSync(fullPath)) {
@@ -381,7 +381,7 @@ export async function deleteIdDocument(req: Request, res: Response) {
 
     return ApiResponse.success(
       res,
-      { deletedPath: filePath },
+      { deletedPath: relativePath },
       "ID document deleted successfully"
     )
   } catch (error: any) {
@@ -406,8 +406,8 @@ export async function deleteSelfieImage(req: Request, res: Response) {
       return ApiResponse.error(res, "File path is required", 400)
     }
 
-    // Construct full file path
-    const fullPath = path.join(process.cwd(), filePath)
+    const relativePath = extractRelativePath(filePath)
+    const fullPath = path.join(process.cwd(), relativePath)
 
     // Check if file exists and delete it
     if (fs.existsSync(fullPath)) {
@@ -416,7 +416,7 @@ export async function deleteSelfieImage(req: Request, res: Response) {
 
     return ApiResponse.success(
       res,
-      { deletedPath: filePath },
+      { deletedPath: relativePath },
       "Selfie image deleted successfully"
     )
   } catch (error: any) {
@@ -473,8 +473,8 @@ export async function deleteAddressProof(req: Request, res: Response) {
       return ApiResponse.error(res, "File path is required", 400)
     }
 
-    // Construct full file path
-    const fullPath = path.join(process.cwd(), filePath)
+    const relativePath = extractRelativePath(filePath)
+    const fullPath = path.join(process.cwd(), relativePath)
 
     // Check if file exists and delete it
     if (fs.existsSync(fullPath)) {
@@ -483,7 +483,7 @@ export async function deleteAddressProof(req: Request, res: Response) {
 
     return ApiResponse.success(
       res,
-      { deletedPath: filePath },
+      { deletedPath: relativePath },
       "Address proof deleted successfully"
     )
   } catch (error: any) {

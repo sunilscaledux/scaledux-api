@@ -1,47 +1,9 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl } from '@utils/General'
+import { extractRelativePath, getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
-
-/**
- * Get agency verification status
- */
-export async function getAgencyVerificationStatus(req: Request, res: Response) {
-  try {
-    const userId = req.user?.id
-
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    // Get the latest agency verification for the user
-    const agencyVerification = await prisma.agencyVerification.findFirst({
-      where: { user_id: userId },
-      orderBy: { created_at: 'desc' }
-    })
-
-    if (!agencyVerification) {
-      return ApiResponse.success(res, {
-        isVerified: false,
-        status: null,
-        verifiedAt: null
-      }, "No agency verification found")
-    }
-
-    return ApiResponse.success(res, {
-      isVerified: agencyVerification.status === 'APPROVED',
-      status: agencyVerification.status,
-      verifiedAt: agencyVerification.verified_at,
-      rejectionReason: agencyVerification.rejection_reason
-    }, "Agency verification status retrieved successfully")
-
-  } catch (error: any) {
-    console.error("Get Agency Verification Status Error:", error)
-    return ApiResponse.error(res, "Failed to get agency verification status")
-  }
-}
 
 /**
  * Submit agency verification
@@ -88,6 +50,8 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
     let agencyVerification
 
+    const normalizedDocumentUrls = normalizeUploadedPaths(documents)
+
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
       agencyVerification = await prisma.agencyVerification.update({
@@ -95,20 +59,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
         data: {
           agency_name: agencyName,
           cin: cin,
-          document_urls: documents.map((doc: any) => {
-            // Store only relative paths, not full URLs
-            if (doc.path) return doc.path
-            if (doc.url) {
-              // Extract relative path from full URL (remove domain part)
-              try {
-                const url = new URL(doc.url)
-                return url.pathname
-              } catch {
-                return doc.url
-              }
-            }
-            return doc
-          }),
+          document_urls: normalizedDocumentUrls,
           status: 'UNDER_REVIEW',
           submitted_at: new Date(),
           rejection_reason: null // Clear previous rejection reason
@@ -121,20 +72,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
           user_id: userId,
           agency_name: agencyName,
           cin: cin,
-          document_urls: documents.map((doc: any) => {
-            // Store only relative paths, not full URLs
-            if (doc.path) return doc.path
-            if (doc.url) {
-              // Extract relative path from full URL (remove domain part)
-              try {
-                const url = new URL(doc.url)
-                return url.pathname
-              } catch {
-                return doc.url
-              }
-            }
-            return doc
-          }),
+          document_urls: normalizedDocumentUrls,
           status: 'UNDER_REVIEW',
           submitted_at: new Date()
         }
@@ -254,9 +192,9 @@ export async function deleteAgencyDocument(req: Request, res: Response) {
       return ApiResponse.error(res, "Document path is required", 400)
     }
 
-    // Construct full file path
-    const fullPath = path.join(process.cwd(), documentPath)
-
+    const relativePath = extractRelativePath(documentPath)
+    const fullPath = path.join(process.cwd(), relativePath)
+     console.log(relativePath,fullPath);
     // Check if file exists and delete it
     if (fs.existsSync(fullPath)) {
       fs.unlinkSync(fullPath)
