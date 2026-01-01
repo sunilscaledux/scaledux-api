@@ -479,7 +479,7 @@ model ServicePackage {
   requirements        Json     @default("[]")     // Array of {requirement}
   
   // Media fields from Gallery form
-  thumbnail           Json     @default("[]")     // Array of thumbnail URLs
+  thumbnail           String?                   // Single thumbnail URL
   images              Json     @default("[]")     // Array of image URLs
   video               Json     @default("[]")     // Array of video URLs
   documents           Json     @default("[]")     // Array of document URLs

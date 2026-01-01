@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General';
+import { getRelativePath, getFileUrl, extractRelativePath, normalizeUploadedPaths } from '@utils/General';
 import { ulid } from 'ulid';
 import fs from 'fs';
 import path from 'path';
@@ -40,7 +40,10 @@ const parseServicePackageJson = (pkg: any) => {
         ? JSON.parse(pkg.requirements)
         : pkg.requirements,
     // Parse media fields and convert relative paths to full URLs
-    thumbnail: (typeof pkg.thumbnail === "string" ? JSON.parse(pkg.thumbnail) : (pkg.thumbnail || [])).map((path: string) => getFileUrl(path)),
+    thumbnail: (() => {
+      const normalized = pkg.thumbnail ? normalizeUploadedPaths([pkg.thumbnail])[0] : ''
+      return normalized ? getFileUrl(normalized) : null
+    })(),
     images: (typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || [])).map((path: string) => getFileUrl(path)),
     video: (typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || [])).map((path: string) => getFileUrl(path)),
     documents: (typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || [])).map((path: string) => getFileUrl(path)),
@@ -119,6 +122,19 @@ export class ServicePackageService {
    */
   static async createServicePackage(userId: number, packageData: any): Promise<ServiceResponse> {
     try {
+      const normalizedThumbnail = packageData.thumbnail
+        ? normalizeUploadedPaths([packageData.thumbnail])[0]
+        : null;
+      const normalizedImages = packageData.images
+        ? normalizeUploadedPaths(packageData.images)
+        : [];
+      const normalizedVideo = packageData.video
+        ? normalizeUploadedPaths(packageData.video)
+        : [];
+      const normalizedDocuments = packageData.documents
+        ? normalizeUploadedPaths(packageData.documents)
+        : [];
+
       const newPackage = await prisma.servicePackage.create({
         data: {
           unique_id: ulid(),
@@ -136,11 +152,12 @@ export class ServicePackageService {
           links: JSON.stringify(packageData.links || []),
           features: JSON.stringify(packageData.features || []),
           extra_add_ons: (packageData.extraAddOns ? JSON.stringify(packageData.extraAddOns) : null) as any,
-          thumbnail: JSON.stringify(packageData.thumbnail || []),
-          images: JSON.stringify(packageData.images || []),
-          video: JSON.stringify(packageData.video || []),
-          documents: JSON.stringify(packageData.documents || []),
+          thumbnail: normalizedThumbnail,
+          images: JSON.stringify(normalizedImages),
+          video: JSON.stringify(normalizedVideo),
+          documents: JSON.stringify(normalizedDocuments),
           status: packageData.status || "DRAFT",
+          
         },
       });
 
@@ -180,6 +197,19 @@ export class ServicePackageService {
         };
       }
 
+      const normalizedThumbnail = packageData.thumbnail
+        ? normalizeUploadedPaths([packageData.thumbnail])[0]
+        : null;
+      const normalizedImages = packageData.images
+        ? normalizeUploadedPaths(packageData.images)
+        : [];
+      const normalizedVideo = packageData.video
+        ? normalizeUploadedPaths(packageData.video)
+        : [];
+      const normalizedDocuments = packageData.documents
+        ? normalizeUploadedPaths(packageData.documents)
+        : [];
+
       const updatedPackage = await prisma.servicePackage.update({
         where: { id: existingPackage.id },
         data: {
@@ -196,10 +226,10 @@ export class ServicePackageService {
           links: JSON.stringify(packageData.links || []),
           features: JSON.stringify(packageData.features || []),
           extra_add_ons: (packageData.extraAddOns ? JSON.stringify(packageData.extraAddOns) : null) as any,
-          thumbnail: JSON.stringify(packageData.thumbnail || []),
-          images: JSON.stringify(packageData.images || []),
-          video: JSON.stringify(packageData.video || []),
-          documents: JSON.stringify(packageData.documents || []),
+          thumbnail: normalizedThumbnail,
+          images: JSON.stringify(normalizedImages),
+          video: JSON.stringify(normalizedVideo),
+          documents: JSON.stringify(normalizedDocuments),
           status: packageData.status || existingPackage.status,
         },
       });
@@ -263,70 +293,6 @@ export class ServicePackageService {
   }
 
   /**
-   * Upload service package media
-   */
-  static async uploadServicePackageMedia(userId: number, files: Express.Multer.File[]): Promise<ServiceResponse> {
-    try {
-      if (!files || !Array.isArray(files) || files.length === 0) {
-        return {
-          success: false,
-          message: "No files uploaded"
-        };
-      }
-
-      const mediaPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
-      const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
-
-      return {
-        success: true,
-        message: "Media files uploaded successfully",
-        data: {
-          mediaPaths,  // Relative paths for storage
-          mediaUrls    // Full URLs for immediate display
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Service Package Media Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload media files"
-      };
-    }
-  }
-
-  /**
-   * Upload service package thumbnail
-   */
-  static async uploadServicePackageThumbnail(userId: number, files: Express.Multer.File[]): Promise<ServiceResponse> {
-    try {
-      if (!files || !Array.isArray(files) || files.length === 0) {
-        return {
-          success: false,
-          message: "No files uploaded"
-        };
-      }
-
-      const thumbnailPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
-      const thumbnailUrls = thumbnailPaths.map((path: string) => getFileUrl(path));
-
-      return {
-        success: true,
-        message: "Thumbnail uploaded successfully",
-        data: {
-          thumbnailPaths,  // Relative paths for storage
-          thumbnailUrls    // Full URLs for immediate display
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Service Package Thumbnail Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload thumbnail"
-      };
-    }
-  }
-
-  /**
    * Delete service package file
    */
   static async deleteServicePackageFile(userId: number, filePath: string): Promise<ServiceResponse> {
@@ -344,7 +310,10 @@ export class ServicePackageService {
 
       // Extract relative path and construct full path
       const relativePath = extractRelativePath(filePath);
-      const fullPath = path.join(process.cwd(), "uploads", relativePath);
+      const cleanedRelativePath = relativePath.startsWith('uploads/')
+        ? relativePath.slice('uploads/'.length)
+        : relativePath;
+      const fullPath = path.join(process.cwd(), "uploads", cleanedRelativePath);
 
       console.log("- Relative path:", relativePath);
       console.log("- Full path:", fullPath);

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { ServicePackageService } from './ServicePackageService'
 import { ApiResponse } from '@utils/ApiResponse'
+import { getRelativePath, getFileUrl } from '@utils/General'
 
 /**
  * Get all service packages for authenticated user
@@ -130,13 +131,13 @@ export async function uploadServicePackageMedia(req: Request, res: Response) {
     return ApiResponse.error(res, "No files uploaded", 400);
   }
 
-  const result = await ServicePackageService.uploadServicePackageMedia(userId, req.files);
+  const mediaPaths = req.files.map((file: any) => getRelativePath(file.path));
+  const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
 
-  if (result.success) {
-    return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
-  }
+  return ApiResponse.success(res, {
+    mediaPaths,
+    mediaUrls,
+  }, "Media files uploaded successfully");
 }
 
 /**
@@ -153,13 +154,15 @@ export async function uploadServicePackageThumbnail(req: Request, res: Response)
     return ApiResponse.error(res, "No files uploaded", 400);
   }
 
-  const result = await ServicePackageService.uploadServicePackageThumbnail(userId, req.files);
+  // Thumbnail is single, so take only the first file (same as portfolio)
+  const file = req.files[0];
+  const thumbnailPath = getRelativePath(file.path);
+  const thumbnailUrl = getFileUrl(thumbnailPath);
 
-  if (result.success) {
-    return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
-  }
+  return ApiResponse.success(res, {
+    thumbnailPath,
+    thumbnailUrl,
+  }, "Thumbnail uploaded successfully");
 }
 
 /**

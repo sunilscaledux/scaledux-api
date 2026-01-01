@@ -25,7 +25,6 @@ router.post("/", createServicePackage)
 // Service package file delete route
 router.delete("/delete-file", deleteServicePackageFile)
 
-// Service package media upload routes
 router.post(
   "/upload-media",
   FileUpload({ 
@@ -41,12 +40,7 @@ router.post(
 // Service package thumbnail upload route
 router.post(
   "/upload-thumbnail",
-  FileUpload({ 
-    uploadPath: "service-packages/thumbnails", 
-    fileFilter: "image", 
-    maxSize: 10, 
-    maxFiles: 5 
-  }).array("thumbnail"),
+  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
   uploadServicePackageThumbnail,
   handleMulterError
 )
