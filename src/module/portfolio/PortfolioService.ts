@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General';
+import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { ulid } from 'ulid';
 import fs from 'fs';
 import path from 'path';
@@ -37,9 +37,10 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolios = portfolios.map(portfolio => ({
         ...portfolio,
-        thumbnail_urls: portfolio.thumbnail_urls 
-          ? (portfolio.thumbnail_urls as string[]).map((url: string) => getFileUrl(url))
-          : [],
+        // Use type assertion to bypass TypeScript errors until Prisma types are regenerated
+        thumbnail_url: (portfolio as any).thumbnail_url 
+          ? getFileUrl((portfolio as any).thumbnail_url as string)
+          : null,
         media_urls: portfolio.media_urls
           ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
           : []
@@ -91,9 +92,9 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...portfolio,
-        thumbnail_urls: portfolio.thumbnail_urls 
-          ? (portfolio.thumbnail_urls as string[]).map((url: string) => getFileUrl(url))
-          : [],
+        thumbnail_url: (portfolio as any).thumbnail_url 
+          ? getFileUrl((portfolio as any).thumbnail_url as string)
+          : null,
         media_urls: portfolio.media_urls
           ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
           : []
@@ -118,6 +119,14 @@ export class PortfolioService {
    */
   static async createPortfolio(userId: number, portfolioData: CreatePortfolioInput): Promise<ServiceResponse> {
     try {
+      // Normalize thumbnail (single) and media (array) URLs to paths
+      const normalizedThumbnail = portfolioData.thumbnail 
+        ? normalizeUploadedPaths([portfolioData.thumbnail])[0]
+        : null;
+      const normalizedMedia = portfolioData.media 
+        ? normalizeUploadedPaths(portfolioData.media)
+        : [];
+
       const portfolio = await prisma.portfolio.create({
         data: {
           unique_id: ulid(),
@@ -129,8 +138,8 @@ export class PortfolioService {
           industry_id: portfolioData.industryId,
           role: portfolioData.role || null,
           project_skills: (portfolioData.projectSkills || []) as any,
-          thumbnail_urls: (portfolioData.thumbnail || []) as any,
-          media_urls: (portfolioData.media || []) as any,
+          thumbnail_url: normalizedThumbnail as any,
+          media_urls: normalizedMedia as any,
           project_link: portfolioData.projectLink || null,
           completion_month: portfolioData.completionMonth || '',
           completion_year: portfolioData.completionYear || '',
@@ -151,9 +160,9 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...portfolio,
-        thumbnail_urls: portfolio.thumbnail_urls 
-          ? (portfolio.thumbnail_urls as string[]).map((url: string) => getFileUrl(url))
-          : [],
+        thumbnail_url: (portfolio as any).thumbnail_url 
+          ? getFileUrl((portfolio as any).thumbnail_url as string)
+          : null,
         media_urls: portfolio.media_urls
           ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
           : []
@@ -194,6 +203,14 @@ export class PortfolioService {
         };
       }
 
+      // Normalize thumbnail (single) and media (array) URLs to paths
+      const normalizedThumbnail = portfolioData.thumbnail 
+        ? normalizeUploadedPaths([portfolioData.thumbnail])[0]
+        : null;
+      const normalizedMedia = portfolioData.media 
+        ? normalizeUploadedPaths(portfolioData.media)
+        : [];
+
       const updatedPortfolio = await prisma.portfolio.update({
         where: { id: existingPortfolio.id },
         data: {
@@ -204,8 +221,8 @@ export class PortfolioService {
           industry_id: portfolioData.industryId,
           role: portfolioData.role,
           project_skills: (portfolioData.projectSkills || []) as any,
-          thumbnail_urls: (portfolioData.thumbnail || []) as any,
-          media_urls: (portfolioData.media || []) as any,
+          thumbnail_url: normalizedThumbnail as any,
+          media_urls: normalizedMedia as any,
           project_link: portfolioData.projectLink,
           completion_month: portfolioData.completionMonth,
           completion_year: portfolioData.completionYear,
@@ -226,9 +243,9 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...updatedPortfolio,
-        thumbnail_urls: updatedPortfolio.thumbnail_urls 
-          ? (updatedPortfolio.thumbnail_urls as string[]).map((url: string) => getFileUrl(url))
-          : [],
+        thumbnail_url: updatedPortfolio.thumbnail_url 
+          ? getFileUrl(updatedPortfolio.thumbnail_url as string)
+          : null,
         media_urls: updatedPortfolio.media_urls
           ? (updatedPortfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
           : []
@@ -289,70 +306,6 @@ export class PortfolioService {
     }
   }
 
-  /**
-   * Upload portfolio thumbnail
-   */
-  static async uploadThumbnail(userId: number, files: Express.Multer.File[]): Promise<ServiceResponse> {
-    try {
-      if (!files || !Array.isArray(files) || files.length === 0) {
-        return {
-          success: false,
-          message: "No files uploaded"
-        };
-      }
-
-      const thumbnailPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
-      const thumbnailUrls = thumbnailPaths.map((path: string) => getFileUrl(path));
-
-      return {
-        success: true,
-        message: "Thumbnail uploaded successfully",
-        data: {
-          thumbnailPaths,  // Relative paths for storage
-          thumbnailUrls    // Full URLs for immediate display
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Thumbnail Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload thumbnail"
-      };
-    }
-  }
-
-  /**
-   * Upload portfolio media files
-   */
-  static async uploadMedia(userId: number, files: Express.Multer.File[]): Promise<ServiceResponse> {
-    try {
-      if (!files || !Array.isArray(files) || files.length === 0) {
-        return {
-          success: false,
-          message: "No files uploaded"
-        };
-      }
-
-      const mediaPaths = files.map((file: Express.Multer.File) => getRelativePath(file.path));
-      const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
-
-      return {
-        success: true,
-        message: "Media files uploaded successfully",
-        data: {
-          mediaPaths,  // Relative paths for storage
-          mediaUrls    // Full URLs for immediate display
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Media Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload media files"
-      };
-    }
-  }
-
   // Portfolio file deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
   /**
@@ -388,7 +341,7 @@ export class PortfolioService {
           industry_id: originalPortfolio.industry_id,
           role: originalPortfolio.role,
           project_skills: originalPortfolio.project_skills as any,
-          thumbnail_urls: originalPortfolio.thumbnail_urls as any,
+          thumbnail_url: (originalPortfolio as any).thumbnail_url as any,
           media_urls: originalPortfolio.media_urls as any,
           project_link: originalPortfolio.project_link,
           completion_month: originalPortfolio.completion_month,
@@ -410,9 +363,9 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...duplicatedPortfolio,
-        thumbnail_urls: duplicatedPortfolio.thumbnail_urls 
-          ? (duplicatedPortfolio.thumbnail_urls as string[]).map((url: string) => getFileUrl(url))
-          : [],
+        thumbnail_url: (duplicatedPortfolio as any).thumbnail_url 
+          ? getFileUrl((duplicatedPortfolio as any).thumbnail_url as string)
+          : null,
         media_urls: duplicatedPortfolio.media_urls
           ? (duplicatedPortfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
           : []

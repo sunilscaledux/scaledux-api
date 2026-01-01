@@ -12,7 +12,7 @@ class EmailService {
         this.client = new SendMailClient({ url, token });
     }
     /**
-     * Send email
+     * Send send mail
      */
     async sendEmail(options) {
         try {

@@ -158,17 +158,17 @@ export async function uploadPortfolioMedia(req: Request, res: Response) {
     return ApiResponse.error(res, "No files uploaded", 400);
   }
 
-  const result = await PortfolioService.uploadMedia(userId, req.files);
+  const mediaPaths = req.files.map((file: any) => getRelativePath(file.path));
+  const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
 
-  if (result.success) {
-    return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
-  }
+  return ApiResponse.success(res, {
+    mediaPaths,
+    mediaUrls,
+  }, "Media files uploaded successfully");
 }
 
 /**
- * Upload portfolio thumbnail
+ * Upload portfolio thumbnail (single image)
  */
 export async function uploadPortfolioThumbnail(req: Request, res: Response) {
   const userId = req.user?.id;
@@ -181,13 +181,15 @@ export async function uploadPortfolioThumbnail(req: Request, res: Response) {
     return ApiResponse.error(res, "No files uploaded", 400);
   }
 
-  const result = await PortfolioService.uploadThumbnail(userId, req.files);
+  // Thumbnail is single, so take only the first file
+  const file = req.files[0];
+  const thumbnailPath = getRelativePath(file.path);
+  const thumbnailUrl = getFileUrl(thumbnailPath);
 
-  if (result.success) {
-    return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
-  }
+  return ApiResponse.success(res, {
+    thumbnailPath,
+    thumbnailUrl,
+  }, "Thumbnail uploaded successfully");
 }
 
 

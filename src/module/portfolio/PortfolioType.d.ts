@@ -6,7 +6,7 @@ export interface CreatePortfolioInput {
   industryId: number
   role?: string
   projectSkills?: string[]
-  thumbnail?: string[]
+  thumbnail?: string
   media?: string[]
   projectLink?: string
   completionMonth?: string
@@ -23,7 +23,7 @@ export interface UpdatePortfolioInput {
   industryId?: number
   role?: string
   projectSkills?: string[]
-  thumbnail?: string[]
+  thumbnail?: string
   media?: string[]
   projectLink?: string
   completionMonth?: string
@@ -43,7 +43,7 @@ export interface Portfolio {
   role: string
   project_skills: string[]
   tools_used: string[]
-  thumbnail_urls: string[]
+  thumbnail_url: string
   media_urls: string[]
   project_link?: string
   completion_month: string

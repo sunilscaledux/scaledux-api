@@ -366,7 +366,7 @@ model Portfolio {
   industry_id        Int
   role               String?
   project_skills     Json      // Array of skill names
-  thumbnail_urls     Json?     // Array of thumbnail image URLs
+  thumbnail_url      String?   // Single thumbnail image URL
   media_urls         Json?     // Array of media file URLs
   project_link       String?
   completion_month   String

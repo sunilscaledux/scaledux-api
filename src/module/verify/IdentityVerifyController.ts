@@ -312,8 +312,8 @@ export async function uploadIdDocuments(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       { 
-        documentUrls, // Return full URLs for frontend display
-        documentPaths // Return relative paths for storage
+        documentUrls, 
+        documentPaths 
       },
       "ID documents uploaded successfully"
     )
@@ -344,8 +344,8 @@ export async function uploadSelfieImages(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       { 
-        selfieUrls, // Return full URLs for frontend display
-        selfiePaths // Return relative paths for storage
+        selfieUrls, 
+        selfiePaths 
       },
       "Selfie images uploaded successfully"
     )
@@ -380,8 +380,8 @@ export async function uploadAddressProof(req: Request, res: Response) {
     return ApiResponse.success(
       res,
       { 
-        proofUrls, // Return full URLs for frontend display
-        proofPaths // Return relative paths for storage
+        proofUrls, 
+        proofPaths 
       },
       "Address proof documents uploaded successfully"
     )

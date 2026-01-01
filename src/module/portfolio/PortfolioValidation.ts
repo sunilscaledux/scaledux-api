@@ -34,8 +34,8 @@ export const createPortfolioSchema = Joi.object({
     'array.base': 'Project skills must be an array',
     'array.min': 'Select minimum 2 skills'
   }),
-  thumbnail: Joi.array().items(Joi.string()).optional().allow(null).messages({
-    'array.base': 'Thumbnail must be an array'
+  thumbnail: Joi.string().optional().allow(null, '').messages({
+    'string.base': 'Thumbnail must be a string (URL or path)'
   }),
   media: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Media must be an array'
@@ -117,8 +117,8 @@ export const updatePortfolioSchema = Joi.object({
     'array.base': 'Project skills must be an array',
     'array.min': 'Select minimum 2 skills'
   }),
-  thumbnail: Joi.array().items(Joi.string()).optional().allow(null).messages({
-    'array.base': 'Thumbnail must be an array'
+  thumbnail: Joi.string().optional().allow(null, '').messages({
+    'string.base': 'Thumbnail must be a string (URL or path)'
   }),
   media: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Media must be an array'
