@@ -176,39 +176,7 @@ export async function uploadAgencyDocuments(req: Request, res: Response) {
   }
 }
 
-/**
- * Delete agency document
- */
-export async function deleteAgencyDocument(req: Request, res: Response) {
-  try {
-    const userId = req.user?.id
-    const { documentPath } = req.body
-
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    if (!documentPath) {
-      return ApiResponse.error(res, "Document path is required", 400)
-    }
-
-    const relativePath = extractRelativePath(documentPath)
-    const fullPath = path.join(process.cwd(), relativePath)
-     console.log(relativePath,fullPath);
-    // Check if file exists and delete it
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-    }
-
-    return ApiResponse.success(res, {
-      message: "Document deleted successfully"
-    }, "Document deleted successfully")
-
-  } catch (error: any) {
-    console.error("Delete Agency Document Error:", error)
-    return ApiResponse.error(res, "Failed to delete document")
-  }
-}
+// Agency document deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
 /**
  * Admin function to approve or reject agency verification

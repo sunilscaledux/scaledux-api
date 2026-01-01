@@ -17,16 +17,12 @@ import {
   getIdentityVerificationDetails,
   uploadIdDocuments,
   uploadSelfieImages,
-  uploadAddressProof,
-  deleteIdDocument,
-  deleteSelfieImage,
-  deleteAddressProof
+  uploadAddressProof
 } from "./IdentityVerifyController"
 import {
   submitAgencyVerification,
   getAgencyVerificationDetails,
   uploadAgencyDocuments,
-  deleteAgencyDocument,
   updateAgencyVerificationStatus
 } from "./AgencyVerifyController"
 import { authenticateToken } from "@middleware/auth"
@@ -79,10 +75,7 @@ router.post(
   handleMulterError
 )
 
-// Identity verification file delete routes
-router.delete("/identity/delete-id-document", authenticateToken, deleteIdDocument)
-router.delete("/identity/delete-selfie", authenticateToken, deleteSelfieImage)
-router.delete("/identity/delete-address-proof", authenticateToken, deleteAddressProof)
+// Identity verification file delete routes - now handled by unified delete controller at /api/v1/files/delete-file
 
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
@@ -96,8 +89,7 @@ router.post(
   handleMulterError
 )
 
-// Agency verification file delete routes
-router.delete("/agency/delete-document", authenticateToken, deleteAgencyDocument)
+// Agency verification file delete routes - now handled by unified delete controller at /api/v1/files/delete-file
 
 // Admin route to approve/reject agency verification
 router.put("/agency/update-status", authenticateToken, updateAgencyVerificationStatus)

@@ -190,29 +190,6 @@ export async function uploadPortfolioThumbnail(req: Request, res: Response) {
   }
 }
 
-/**
- * Delete portfolio file
- */
-export async function deletePortfolioFile(req: Request, res: Response) {
-  const userId = req.user?.id;
-  const { filePath } = req.body;
-
-  if (!userId) {
-    return ApiResponse.error(res, "User not authenticated", 401);
-  }
-
-  if (!filePath) {
-    return ApiResponse.error(res, "File path is required", 400);
-  }
-
-  const result = await PortfolioService.deletePortfolioFile(userId, filePath);
-
-  if (result.success) {
-    return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
-  }
-}
 
 /**
  * Duplicate portfolio

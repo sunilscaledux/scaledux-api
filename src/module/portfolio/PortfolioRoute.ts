@@ -7,7 +7,6 @@ import {
   deletePortfolio,
   uploadPortfolioThumbnail,
   uploadPortfolioMedia,
-  deletePortfolioFile,
   duplicatePortfolio
 } from "./PortfolioController"
 import { authenticateToken } from "@middleware/auth"
@@ -40,8 +39,7 @@ router.post(
   handleMulterError
 )
 
-// Portfolio file delete route
-router.delete("/delete-file", deletePortfolioFile)
+// Portfolio file delete route - now handled by unified delete controller at /api/v1/files/delete-file
 
 // Duplicate portfolio
 router.post("/:id/duplicate", duplicatePortfolio)

@@ -355,75 +355,9 @@ export async function uploadSelfieImages(req: Request, res: Response) {
   }
 }
 
-/**
- * Delete ID document image
- */
-export async function deleteIdDocument(req: Request, res: Response) {
-  try {
-    const { filePath } = req.body
-    const userId = req.user?.id
+// ID document deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    if (!filePath) {
-      return ApiResponse.error(res, "File path is required", 400)
-    }
-
-    const relativePath = extractRelativePath(filePath)
-    const fullPath = path.join(process.cwd(), relativePath)
-
-    // Check if file exists and delete it
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-    }
-
-    return ApiResponse.success(
-      res,
-      { deletedPath: relativePath },
-      "ID document deleted successfully"
-    )
-  } catch (error: any) {
-    console.error("Error deleting ID document:", error)
-    return ApiResponse.error(res, "Failed to delete ID document", 500)
-  }
-}
-
-/**
- * Delete selfie image
- */
-export async function deleteSelfieImage(req: Request, res: Response) {
-  try {
-    const { filePath } = req.body
-    const userId = req.user?.id
-
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    if (!filePath) {
-      return ApiResponse.error(res, "File path is required", 400)
-    }
-
-    const relativePath = extractRelativePath(filePath)
-    const fullPath = path.join(process.cwd(), relativePath)
-
-    // Check if file exists and delete it
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-    }
-
-    return ApiResponse.success(
-      res,
-      { deletedPath: relativePath },
-      "Selfie image deleted successfully"
-    )
-  } catch (error: any) {
-    console.error("Error deleting selfie image:", error)
-    return ApiResponse.error(res, "Failed to delete selfie image", 500)
-  }
-}
+// Selfie image deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
 /**
  * Upload address proof documents
@@ -457,37 +391,4 @@ export async function uploadAddressProof(req: Request, res: Response) {
   }
 }
 
-/**
- * Delete address proof document
- */
-export async function deleteAddressProof(req: Request, res: Response) {
-  try {
-    const { filePath } = req.body
-    const userId = req.user?.id
-
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    if (!filePath) {
-      return ApiResponse.error(res, "File path is required", 400)
-    }
-
-    const relativePath = extractRelativePath(filePath)
-    const fullPath = path.join(process.cwd(), relativePath)
-
-    // Check if file exists and delete it
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-    }
-
-    return ApiResponse.success(
-      res,
-      { deletedPath: relativePath },
-      "Address proof deleted successfully"
-    )
-  } catch (error: any) {
-    console.error("Error deleting address proof:", error)
-    return ApiResponse.error(res, "Failed to delete address proof", 500)
-  }
-}
+// Address proof deletion is now handled by unified delete controller at /api/v1/files/delete-file

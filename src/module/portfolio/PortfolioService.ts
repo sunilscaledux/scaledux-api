@@ -353,40 +353,7 @@ export class PortfolioService {
     }
   }
 
-  /**
-   * Delete portfolio file (thumbnail or media)
-   */
-  static async deletePortfolioFile(userId: number, filePath: string): Promise<ServiceResponse> {
-    try {
-      if (!filePath) {
-        return {
-          success: false,
-          message: "File path is required"
-        };
-      }
-
-      // Extract relative path and construct full path
-      const relativePath = extractRelativePath(filePath);
-      const fullPath = path.join(process.cwd(), 'uploads', relativePath);
-
-      // Check if file exists and delete it
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-      }
-
-      return {
-        success: true,
-        message: "File deleted successfully",
-        data: null
-      };
-    } catch (error: any) {
-      console.error("Delete Portfolio File Error:", error);
-      return {
-        success: false,
-        message: "Failed to delete file"
-      };
-    }
-  }
+  // Portfolio file deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
   /**
    * Duplicate a portfolio
