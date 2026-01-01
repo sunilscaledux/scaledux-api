@@ -52,27 +52,8 @@ export const createAchievementSchema = Joi.object({
     'string.uri': 'Achievement link must be a valid URL'
   }),
   media_files: Joi.array().items(
-    Joi.object({
-      url: Joi.string().uri().required().messages({
-        'string.base': 'Media file URL must be a string',
-        'string.uri': 'Media file URL must be a valid URL',
-        'any.required': 'Media file URL is required'
-      }),
-      name: Joi.string().required().messages({
-        'string.base': 'Media file name must be a string',
-        'any.required': 'Media file name is required'
-      }),
-      type: Joi.string().valid('image', 'document').required().messages({
-        'string.base': 'Media file type must be a string',
-        'any.only': 'Media file type must be either "image" or "document"',
-        'any.required': 'Media file type is required'
-      }),
-      size: Joi.number().optional().messages({
-        'number.base': 'Media file size must be a number'
-      }),
-      mimeType: Joi.string().optional().messages({
-        'string.base': 'Media file MIME type must be a string'
-      })
+    Joi.string().messages({
+      'string.base': 'Media file must be a string (URL or path)'
     })
   ).optional().max(5).messages({
     'array.base': 'Media files must be an array',
@@ -138,27 +119,8 @@ export const updateAchievementSchema = Joi.object({
     'string.uri': 'Achievement link must be a valid URL'
   }),
   media_files: Joi.array().items(
-    Joi.object({
-      url: Joi.string().uri().required().messages({
-        'string.base': 'Media file URL must be a string',
-        'string.uri': 'Media file URL must be a valid URL',
-        'any.required': 'Media file URL is required'
-      }),
-      name: Joi.string().required().messages({
-        'string.base': 'Media file name must be a string',
-        'any.required': 'Media file name is required'
-      }),
-      type: Joi.string().valid('image', 'document').required().messages({
-        'string.base': 'Media file type must be a string',
-        'any.only': 'Media file type must be either "image" or "document"',
-        'any.required': 'Media file type is required'
-      }),
-      size: Joi.number().optional().messages({
-        'number.base': 'Media file size must be a number'
-      }),
-      mimeType: Joi.string().optional().messages({
-        'string.base': 'Media file MIME type must be a string'
-      })
+    Joi.string().messages({
+      'string.base': 'Media file must be a string (URL or path)'
     })
   ).optional().max(5).messages({
     'array.base': 'Media files must be an array',

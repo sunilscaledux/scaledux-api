@@ -13,7 +13,7 @@ export interface CreateAchievementInput {
   completed_month: string
   completed_year: string
   achievement_link?: string
-  media_files?: MediaFile[]
+  media_files?: string[]
 }
 
 export interface UpdateAchievementInput {
@@ -24,7 +24,7 @@ export interface UpdateAchievementInput {
   completed_month: string
   completed_year: string
   achievement_link?: string
-  media_files?: MediaFile[]
+  media_files?: string[]
 }
 
 export interface Achievement {
@@ -36,7 +36,7 @@ export interface Achievement {
   completed_month: string
   completed_year: string
   achievement_link?: string
-  media_files?: MediaFile[]
+  media_files?: string[]
   created_at: string
   updated_at: string
 }

@@ -156,7 +156,6 @@ export async function uploadAgencyDocuments(req: Request, res: Response) {
       return ApiResponse.error(res, "No files uploaded", 400)
     }
 
-    // Process uploaded files and get their relative paths and full URLs
     const documentPaths = req.files.map((file: any) => getRelativePath(file.path))
     const documentUrls = documentPaths.map((path: string) => getFileUrl(path))
 
