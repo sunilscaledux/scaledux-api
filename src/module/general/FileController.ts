@@ -1,13 +1,53 @@
 import { Request, Response } from 'express'
 import { ApiResponse } from '@utils/ApiResponse'
-import { extractRelativePath } from '@utils/General'
+import { extractRelativePath, getRelativePath, getFileUrl } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
 
 /**
- * Unified file deletion controller for all modules
- * Provides secure file deletion with user ownership verification
+ * Unified file upload and deletion controller for all modules
+ * Provides secure file upload/deletion with user ownership verification
  */
+
+export async function uploadFile(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id
+    const userUniqueId = req.user?.unique_id
+
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401)
+    }
+
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return ApiResponse.error(res, "No files uploaded", 400)
+    }
+
+    // Process uploaded files
+    const uploadedFiles = req.files.map((file: any) => {
+      const relativePath = getRelativePath(file.path)
+      const url = getFileUrl(relativePath)
+      return {
+        path: relativePath,
+        url: url,
+        name: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype
+      }
+    })
+
+    // Always return arrays for consistency
+    return ApiResponse.success(res, {
+      paths: uploadedFiles.map(f => f.path),
+      urls: uploadedFiles.map(f => f.url),
+      files: uploadedFiles
+    }, "Files uploaded successfully")
+
+  } catch (error: any) {
+    console.error("Upload File Error:", error)
+    return ApiResponse.error(res, "Failed to upload files", 500)
+  }
+}
+
 export async function deleteFile(req: Request, res: Response) {
   try {
     const userId = req.user?.id
@@ -29,7 +69,6 @@ export async function deleteFile(req: Request, res: Response) {
     // Extract relative path from the full URL/path
     const relativePath = extractRelativePath(filePath)
     
-    // Security check: Verify the file belongs to the authenticated user
     // File paths should contain the user's unique_id (e.g., uploads/USER_UNIQUE_ID/...)
     if (!relativePath.includes(userUniqueId)) {
       console.log("Security violation: File path doesn't contain user unique_id", {

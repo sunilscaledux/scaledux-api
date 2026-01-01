@@ -508,3 +508,15 @@ model ServicePackage {
 }
 
 
+model uploadFile {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(255)
+  path       String   @db.VarChar(500)
+  mime_type  String   @db.VarChar(100)
+  status       enum<'ATTACH','UNATTACH'> @default('ATTACH')
+  created_at DateTime @default(now())
+  @@map("scd_upload_files")
+  @@index([created_at])
+  @@index([mime_type])
+  @@index([mime_type,path])
+}

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { extractRelativePath, getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
+import { extractRelativePath, normalizeUploadedPaths, getRelativePath, getFileUrl } from '@utils/General'
+import { uploadFile } from '@module/general/FileController'
 import fs from 'fs'
 import path from 'path'
 
@@ -295,64 +296,14 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
  * Upload ID document images
  */
 export async function uploadIdDocuments(req: Request, res: Response) {
-  try {
-    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-      return ApiResponse.error(res, "No files uploaded", 400)
-    }
-
-    const userId = req.user?.id
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    // Process uploaded files and get their relative paths and full URLs
-    const documentPaths = req.files.map((file: any) => getRelativePath(file.path))
-    const documentUrls = documentPaths.map((path: string) => getFileUrl(path))
-
-    return ApiResponse.success(
-      res,
-      { 
-        documentUrls, 
-        documentPaths 
-      },
-      "ID documents uploaded successfully"
-    )
-  } catch (error: any) {
-    console.error("Error uploading ID documents:", error)
-    return ApiResponse.error(res, "Failed to upload ID documents", 500)
-  }
+  return uploadFile(req, res);
 }
 
 /**
  * Upload selfie images for keycode verification
  */
 export async function uploadSelfieImages(req: Request, res: Response) {
-  try {
-    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-      return ApiResponse.error(res, "No files uploaded", 400)
-    }
-
-    const userId = req.user?.id
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    // Process uploaded files and get their relative paths and full URLs
-    const selfiePaths = req.files.map((file: any) => getRelativePath(file.path))
-    const selfieUrls = selfiePaths.map((path: string) => getFileUrl(path))
-
-    return ApiResponse.success(
-      res,
-      { 
-        selfieUrls, 
-        selfiePaths 
-      },
-      "Selfie images uploaded successfully"
-    )
-  } catch (error: any) {
-    console.error("Error uploading selfie images:", error)
-    return ApiResponse.error(res, "Failed to upload selfie images", 500)
-  }
+  return uploadFile(req, res);
 }
 
 // ID document deletion is now handled by unified delete controller at /api/v1/files/delete-file
@@ -363,32 +314,7 @@ export async function uploadSelfieImages(req: Request, res: Response) {
  * Upload address proof documents
  */
 export async function uploadAddressProof(req: Request, res: Response) {
-  try {
-    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-      return ApiResponse.error(res, "No files uploaded", 400)
-    }
-
-    const userId = req.user?.id
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    // Process uploaded files and get their relative paths and full URLs
-    const proofPaths = req.files.map((file: any) => getRelativePath(file.path))
-    const proofUrls = proofPaths.map((path: string) => getFileUrl(path))
-
-    return ApiResponse.success(
-      res,
-      { 
-        proofUrls, 
-        proofPaths 
-      },
-      "Address proof documents uploaded successfully"
-    )
-  } catch (error: any) {
-    console.error("Error uploading address proof:", error)
-    return ApiResponse.error(res, "Failed to upload address proof", 500)
-  }
+  return uploadFile(req, res);
 }
 
 // Address proof deletion is now handled by unified delete controller at /api/v1/files/delete-file

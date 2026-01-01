@@ -1,9 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, extractRelativePath, normalizeUploadedPaths } from '@utils/General';
+import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { ulid } from 'ulid';
-import fs from 'fs';
-import path from 'path';
 
 /**
  * Helper function to parse JSON fields in service package
@@ -287,55 +285,7 @@ export class ServicePackageService {
       console.error("Delete Service Package Error:", error);
       return {
         success: false,
-        message: "Failed to delete service package"
-      };
-    }
-  }
-
-  /**
-   * Delete service package file
-   */
-  static async deleteServicePackageFile(userId: number, filePath: string): Promise<ServiceResponse> {
-    try {
-      console.log("📁 DELETE FILE REQUEST");
-      console.log("- User ID:", userId);
-      console.log("- File path:", filePath);
-
-      if (!filePath) {
-        return {
-          success: false,
-          message: "File path is required"
-        };
-      }
-
-      // Extract relative path and construct full path
-      const relativePath = extractRelativePath(filePath);
-      const cleanedRelativePath = relativePath.startsWith('uploads/')
-        ? relativePath.slice('uploads/'.length)
-        : relativePath;
-      const fullPath = path.join(process.cwd(), "uploads", cleanedRelativePath);
-
-      console.log("- Relative path:", relativePath);
-      console.log("- Full path:", fullPath);
-
-      // Check if file exists and delete it
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
-        console.log("✅ File deleted successfully");
-      } else {
-        console.log("⚠️ File not found, but continuing...");
-      }
-
-      return {
-        success: true,
-        message: "File deleted successfully",
-        data: null
-      };
-    } catch (error: any) {
-      console.error("Delete Service Package File Error:", error);
-      return {
-        success: false,
-        message: "Failed to delete file"
+        message: "An error occurred while deleting the service package"
       };
     }
   }

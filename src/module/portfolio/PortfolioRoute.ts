@@ -5,10 +5,9 @@ import {
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
-  uploadPortfolioThumbnail,
-  uploadPortfolioMedia,
   duplicatePortfolio
 } from "./PortfolioController"
+import { uploadFile } from "@module/general/FileController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
@@ -28,14 +27,14 @@ router.delete("/:id", deletePortfolio)
 router.post(
   "/upload-thumbnail",
   FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
-  uploadPortfolioThumbnail,
+  uploadFile,
   handleMulterError
 )
 
 router.post(
   "/upload-media",
   FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10 }).array("media"),
-  uploadPortfolioMedia,
+  uploadFile,
   handleMulterError
 )
 

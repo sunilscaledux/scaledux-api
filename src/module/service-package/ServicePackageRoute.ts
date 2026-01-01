@@ -4,11 +4,9 @@ import {
   getServicePackageById,
   createServicePackage,
   updateServicePackage,
-  deleteServicePackage,
-  uploadServicePackageMedia,
-  uploadServicePackageThumbnail,
-  deleteServicePackageFile
+  deleteServicePackage
 } from "./ServicePackageController"
+import { uploadFile } from "@module/general/FileController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
@@ -22,9 +20,6 @@ router.get("/", getUserServicePackages)
 router.post("/", createServicePackage)
 
 // Specific routes MUST come before generic /:id routes
-// Service package file delete route
-router.delete("/delete-file", deleteServicePackageFile)
-
 router.post(
   "/upload-media",
   FileUpload({ 
@@ -33,7 +28,7 @@ router.post(
     maxSize: 50, 
     maxFiles: 10 
   }).array("media"),
-  uploadServicePackageMedia,
+  uploadFile,
   handleMulterError
 )
 
@@ -41,7 +36,7 @@ router.post(
 router.post(
   "/upload-thumbnail",
   FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
-  uploadServicePackageThumbnail,
+  uploadFile,
   handleMulterError
 )
 

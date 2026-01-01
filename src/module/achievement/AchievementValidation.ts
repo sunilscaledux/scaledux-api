@@ -29,28 +29,7 @@ export const createAchievementSchema = Joi.object({
     'string.empty': 'Completion year is required',
     'any.required': 'Completion year is required'
   }),
-  achievement_link: Joi.string().optional().allow('').custom((value, helpers) => {
-    if (!value || value.trim() === '') {
-      return value;
-    }
-    
-    // Add https:// if no protocol is provided
-    let url = value.trim();
-    if (!url.match(/^https?:\/\//i)) {
-      url = `https://${url}`;
-    }
-    
-    // Validate the URL
-    try {
-      new URL(url);
-      return url;
-    } catch (error) {
-      return helpers.error('string.uri');
-    }
-  }).messages({
-    'string.base': 'Achievement link must be a string',
-    'string.uri': 'Achievement link must be a valid URL'
-  }),
+  achievement_link: Joi.string().optional().allow(''),
   media_files: Joi.array().items(
     Joi.string().messages({
       'string.base': 'Media file must be a string (URL or path)'
@@ -101,22 +80,24 @@ export const updateAchievementSchema = Joi.object({
       return value;
     }
     
-    // Add https:// if no protocol is provided
     let url = value.trim();
-    if (!url.match(/^https?:\/\//i)) {
-      url = `https://${url}`;
+    
+    // Reject if user sends URL with protocol (frontend should strip it)
+    if (url.match(/^https?:\/\//i)) {
+      return helpers.error('string.protocol');
     }
     
-    // Validate the URL
+    // Validate the URL by adding protocol temporarily
     try {
-      new URL(url);
-      return url;
+      new URL(`https://${url}`);
+      return url; // Store without protocol
     } catch (error) {
       return helpers.error('string.uri');
     }
   }).messages({
     'string.base': 'Achievement link must be a string',
-    'string.uri': 'Achievement link must be a valid URL'
+    'string.uri': 'Achievement link must be a valid URL',
+    'string.protocol': 'Achievement link should not include http:// or https://'
   }),
   media_files: Joi.array().items(
     Joi.string().messages({

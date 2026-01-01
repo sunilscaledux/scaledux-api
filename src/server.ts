@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import userRoutes from "@module/auth/AuthRoute";
 import profileRoutes from "@module/profile/ProfileRoute";
 import generalRoutes from "@module/general/GeneralRoute";
-import deleteFileRoutes from "@module/general/DeleteFileRoute";
+import deleteFileRoutes from "@module/general/FileRoute";
 import educationRoutes from "@module/education/EducationRoute";
 import licenseRoutes from './module/license/LicenseRoute';
 import workExperienceRoutes from './module/work-experience/WorkExperienceRoute';

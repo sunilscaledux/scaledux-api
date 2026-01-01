@@ -5,9 +5,9 @@ import {
   getAchievements,
   createAchievement,
   updateAchievement,
-  deleteAchievement,
-  uploadAchievementMedia
+  deleteAchievement
 } from './AchievementController'
+import { uploadFile } from '@module/general/FileController'
 
 const router = express.Router()
 
@@ -29,7 +29,7 @@ router.post(
     maxSize: 10, 
     maxFiles: 5 
   }).array('media', 5),
-  uploadAchievementMedia,
+  uploadFile,
   handleMulterError
 )
 

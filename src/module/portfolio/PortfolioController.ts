@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { PortfolioService } from './PortfolioService'
 import { ApiResponse } from '@utils/ApiResponse'
-import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General'
+import { extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
   updatePortfolioSchema, 
@@ -143,55 +143,6 @@ export async function deletePortfolio(req: Request, res: Response) {
     return ApiResponse.error(res, result.message, statusCode);
   }
 }
-
-/**
- * Upload portfolio media (images, videos, documents)
- */
-export async function uploadPortfolioMedia(req: Request, res: Response) {
-  const userId = req.user?.id;
-
-  if (!userId) {
-    return ApiResponse.error(res, "User not authenticated", 401);
-  }
-
-  if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-    return ApiResponse.error(res, "No files uploaded", 400);
-  }
-
-  const mediaPaths = req.files.map((file: any) => getRelativePath(file.path));
-  const mediaUrls = mediaPaths.map((path: string) => getFileUrl(path));
-
-  return ApiResponse.success(res, {
-    mediaPaths,
-    mediaUrls,
-  }, "Media files uploaded successfully");
-}
-
-/**
- * Upload portfolio thumbnail (single image)
- */
-export async function uploadPortfolioThumbnail(req: Request, res: Response) {
-  const userId = req.user?.id;
-
-  if (!userId) {
-    return ApiResponse.error(res, "User not authenticated", 401);
-  }
-
-  if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-    return ApiResponse.error(res, "No files uploaded", 400);
-  }
-
-  // Thumbnail is single, so take only the first file
-  const file = req.files[0];
-  const thumbnailPath = getRelativePath(file.path);
-  const thumbnailUrl = getFileUrl(thumbnailPath);
-
-  return ApiResponse.success(res, {
-    thumbnailPath,
-    thumbnailUrl,
-  }, "Thumbnail uploaded successfully");
-}
-
 
 /**
  * Duplicate portfolio

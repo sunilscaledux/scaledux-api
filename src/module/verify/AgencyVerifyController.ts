@@ -1,7 +1,9 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { extractRelativePath, getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General'
+import { normalizeUploadedPaths } from '@utils/General'
+import { uploadFile } from '@module/general/FileController'
+import { extractRelativePath, getRelativePath, getFileUrl } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
 
@@ -145,34 +147,7 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
  * Upload agency documents
  */
 export async function uploadAgencyDocuments(req: Request, res: Response) {
-  try {
-    const userId = req.user?.id
-
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-      return ApiResponse.error(res, "No files uploaded", 400)
-    }
-
-    const documentPaths = req.files.map((file: any) => getRelativePath(file.path))
-    const documentUrls = documentPaths.map((path: string) => getFileUrl(path))
-
-    return ApiResponse.success(
-      res,
-      {
-        documentPaths,
-        documentUrls,
-        message: "Documents uploaded successfully"
-      },
-      "Documents uploaded successfully"
-    )
-
-  } catch (error: any) {
-    console.error("Upload Agency Documents Error:", error)
-    return ApiResponse.error(res, "Failed to upload documents")
-  }
+  return uploadFile(req, res);
 }
 
 // Agency document deletion is now handled by unified delete controller at /api/v1/files/delete-file

@@ -14,19 +14,16 @@ import {
 import {
   getIdentityVerificationStatus,
   submitIdentityVerification,
-  getIdentityVerificationDetails,
-  uploadIdDocuments,
-  uploadSelfieImages,
-  uploadAddressProof
+  getIdentityVerificationDetails
 } from "./IdentityVerifyController"
 import {
   submitAgencyVerification,
   getAgencyVerificationDetails,
-  uploadAgencyDocuments,
   updateAgencyVerificationStatus
 } from "./AgencyVerifyController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
+import { uploadFile } from "@module/general/FileController"
 
 const router = Router()
 
@@ -55,7 +52,7 @@ router.post(
   "/identity/upload-id-documents",
   authenticateToken,
   FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("idDocuments"),
-  uploadIdDocuments,
+  uploadFile,
   handleMulterError
 )
 
@@ -63,7 +60,7 @@ router.post(
   "/identity/upload-selfie",
   authenticateToken,
   FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("selfieImages"),
-  uploadSelfieImages,
+  uploadFile,
   handleMulterError
 )
 
@@ -71,7 +68,7 @@ router.post(
   "/identity/upload-address-proof",
   authenticateToken,
   FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("addressProof"),
-  uploadAddressProof,
+  uploadFile,
   handleMulterError
 )
 
@@ -85,7 +82,7 @@ router.post(
   "/agency/upload-documents",
   authenticateToken,
   FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5 }).array("documents"),
-  uploadAgencyDocuments,
+  uploadFile,
   handleMulterError
 )
 

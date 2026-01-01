@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { deleteFile } from "./DeleteFileController"
+import { deleteFile } from "./FileController"
 import { authenticateToken } from "@middleware/auth"
 
 const router = Router()
