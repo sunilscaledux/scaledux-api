@@ -45,6 +45,9 @@ model User {
   show_as_agency               Boolean   @default(false)
   portfolios                   Portfolio[]
   servicePackages              ServicePackage[]
+  paymentMethods               PaymentMethod[]
+  taxInformation               TaxInformation?
+  billingTransactions          BillingTransaction[]
 
   @@index([email, phone])
   @@index([last_name, first_name, email])
@@ -513,10 +516,84 @@ model uploadFile {
   name       String   @db.VarChar(255)
   path       String   @db.VarChar(500)
   mime_type  String   @db.VarChar(100)
-  status       enum<'ATTACH','UNATTACH'> @default('ATTACH')
+  status     String   @default("UNATTACH") @db.VarChar(20)
   created_at DateTime @default(now())
   @@map("scd_upload_files")
   @@index([created_at])
   @@index([mime_type])
   @@index([mime_type,path])
+}
+
+model PaymentMethod {
+  id                     Int      @id @default(autoincrement())
+  user_id                Int
+  payment_type           String   @db.VarChar(20) // 'card' or 'paypal'
+  
+  // Razorpay integration fields
+  razorpay_customer_id   String?  @db.VarChar(255) // Razorpay customer ID
+  razorpay_payment_id    String?  @db.VarChar(255) // Razorpay payment method/token ID
+  card_token             String?  @db.VarChar(255) // Card token for future charges
+  
+  // Card display fields (for UI, not sensitive data)
+  card_brand             String?  @db.VarChar(50)  // visa, mastercard, amex, etc.
+  last_four_digits       String?  @db.VarChar(4)
+  card_holder_name       String?  @db.VarChar(100)
+  expiry_month           String?  @db.VarChar(2)
+  expiry_year            String?  @db.VarChar(4)
+  
+  // PayPal fields
+  paypal_email           String?  @db.VarChar(255)
+  paypal_payer_id        String?  @db.VarChar(255)
+  
+  // Verification status
+  is_verified            Boolean  @default(false)
+  verification_amount    Decimal? @db.Decimal(10, 2)
+  verified_at            DateTime?
+  
+  is_default             Boolean  @default(false)
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([payment_type])
+  @@index([is_default])
+  @@index([razorpay_customer_id])
+  @@map("scd_payment_methods")
+}
+
+model TaxInformation {
+  id             Int      @id @default(autoincrement())
+  user_id        Int      @unique
+  tax_residence  Json
+  has_gstin      Boolean  @default(false)
+  gstin          String?  @db.VarChar(15)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("scd_tax_information")
+}
+
+model BillingTransaction {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @default("INR") @db.VarChar(3)
+  type        String   @db.VarChar(20)
+  status      String   @db.VarChar(20)
+  description String   @db.Text
+  invoice_url String?  @db.VarChar(500)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("scd_billing_transactions")
 }

@@ -17,6 +17,7 @@ import verifyRoutes from './module/verify/VerifyRoute';
 import portfolioRoutes from './module/portfolio/PortfolioRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
 import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
+import billingRoutes from './module/billing/BillingRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -43,6 +44,7 @@ app.use("/api/v1/verify", verifyRoutes);
 app.use("/api/v1/portfolios", portfolioRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/service-categories", serviceCategoryRoutes);
+app.use("/api/v1/billing", billingRoutes);
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
