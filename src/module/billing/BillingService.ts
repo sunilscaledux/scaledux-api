@@ -16,6 +16,7 @@ if (razorpayConfig.key_id && razorpayConfig.key_secret) {
 export class BillingService {
   // Create Razorpay order for card verification (charge small amount)
   static async createVerificationOrder(userId: string, amount: number = 1) {
+    console.log(razorpayConfig);
     if (!razorpay) {
       return {
         success: false,
@@ -54,7 +55,7 @@ export class BillingService {
   // Verify Razorpay payment signature
   static verifyPaymentSignature(data: RazorpayVerificationInput): boolean {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = data;
-    const secret = process.env.RAZORPAY_KEY_SECRET || '';
+    const secret = razorpayConfig.key_secret || '';
     
     const generatedSignature = crypto
       .createHmac('sha256', secret)

@@ -7,6 +7,7 @@ export class BillingController {
   static async createVerificationOrder(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
+      console.log('👤 User ID:', userId);
       if (!userId) {
         return ApiResponse.error(res, "User not authenticated", 401);
       }

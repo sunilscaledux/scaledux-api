@@ -5,62 +5,56 @@ import { savePaymentMethodSchema, saveTaxInformationSchema } from "./BillingVali
 
 const router = Router();
 
-// Razorpay Verification Routes
+router.use(authenticateToken)
+
+// Razorpay Order Creation (for testing)
 router.post(
-  "/create-verification-order",
-  authenticateToken,
+  "/initiate-verification-order",
   BillingController.createVerificationOrder
 );
 
+
 router.post(
   "/verify-payment",
-  authenticateToken,
   BillingController.verifyAndSavePaymentMethod
 );
 
 // Payment Method Routes
 router.get(
   "/payment-methods",
-  authenticateToken,
   BillingController.getPaymentMethods
 );
 
 router.put(
   "/payment-method/:paymentMethodId/set-default",
-  authenticateToken,
   BillingController.setDefaultPaymentMethod
 );
 
 router.delete(
   "/payment-method/:paymentMethodId",
-  authenticateToken,
   BillingController.deletePaymentMethod
 );
 
 // Tax Information Routes
 router.post(
   "/tax-information",
-  authenticateToken,
   BillingController.saveTaxInformation
 );
 
 router.get(
   "/tax-information",
-  authenticateToken,
   BillingController.getTaxInformation
 );
 
 // Billing History Routes
 router.get(
   "/billing-history",
-  authenticateToken,
   BillingController.getBillingHistory
 );
 
 // Balance Route
 router.get(
   "/balance",
-  authenticateToken,
   BillingController.getUserBalance
 );
 
