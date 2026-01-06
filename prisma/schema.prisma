@@ -239,14 +239,15 @@ model State {
 }
 
 model Currency {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  code         String         @unique
-  symbol       String
-  created_at   DateTime       @default(now())
-  updated_at   DateTime       @updatedAt
-  countries    Country[]
-  personalInfo PersonalInfo[]
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  code          String         @unique
+  symbol        String
+  exchange_rate Decimal        @default(1.0) @db.Decimal(10, 6) // Exchange rate to USD (1 USD = X currency)
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+  countries     Country[]
+  personalInfo  PersonalInfo[]
 
   @@map("scd_currencies")
 }

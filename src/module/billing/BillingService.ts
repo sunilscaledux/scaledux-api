@@ -3,6 +3,7 @@ import { PaymentMethodInput, TaxInformationInput, RazorpayVerificationInput } fr
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
+import { convertToUserCurrency } from "@utils/currencyConverter";
 
 // Initialize Razorpay (only if keys are provided)
 let razorpay: any = null;
@@ -466,6 +467,8 @@ export class BillingService {
   // Get user's balance
   static async getUserBalance(userId: string) {
     const userIdNum = parseInt(userId);
+
+    // Get balance in USD (stored currency)
     const result = await prisma.billingTransaction.aggregate({
       where: {
         user_id: userIdNum,
@@ -476,13 +479,16 @@ export class BillingService {
       }
     });
 
-    const balance = result._sum?.amount || 0;
+    const balanceInUSD = Number(result._sum?.amount || 0);
+    
+    // Convert to user's currency using utility function
+    const { amount: convertedBalance, currency } = await convertToUserCurrency(userIdNum, balanceInUSD);
 
     return {
       success: true,
       data: {
-        balance,
-        currency: 'INR'
+        balance: convertedBalance,
+        currency
       }
     };
   }
