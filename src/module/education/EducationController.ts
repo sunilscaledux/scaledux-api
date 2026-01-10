@@ -3,6 +3,7 @@ import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
 import { EducationService } from "./EducationService";
 import { createEducationSchema, updateEducationSchema } from "./EducationValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { getIntParam } from '@utils/requestHelpers';
 
 export async function createEducation(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -38,7 +39,7 @@ export async function getEducations(req: Request, res: Response) {
 export async function updateEducation(req: Request, res: Response) {
   const rawBody = req.body || {};
   const userId = req.user.id;
-  const educationId = parseInt(req.params.id);
+  const educationId = getIntParam(req.params.id);
 
   // Add ID to validation data
   const validationData = { ...rawBody, id: educationId };
@@ -62,7 +63,7 @@ export async function updateEducation(req: Request, res: Response) {
 
 export async function deleteEducation(req: Request, res: Response) {
   const userId = req.user.id;
-  const educationId = parseInt(req.params.id);
+  const educationId = getIntParam(req.params.id);
 
   if (!educationId) {
     return ApiResponse.error(res, "Education ID is required", 400);

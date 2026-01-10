@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { PortfolioService } from './PortfolioService'
 import { ApiResponse } from '@utils/ApiResponse'
+import { getStringParam } from '@utils/requestHelpers'
 import { extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
@@ -37,7 +38,7 @@ export async function getUserPortfolios(req: Request, res: Response) {
  */
 export async function getPortfolioById(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -89,8 +90,9 @@ export async function createPortfolio(req: Request, res: Response) {
  * Update portfolio
  */
 export async function updatePortfolio(req: Request, res: Response) {
+  const rawBody = req.body || {};
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id); // This is unique_id
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -101,7 +103,7 @@ export async function updatePortfolio(req: Request, res: Response) {
   }
 
   // Validate request body
-  const { value, error } = updatePortfolioSchema.validate(req.body, {
+  const { value, error } = updatePortfolioSchema.validate(rawBody, {
     abortEarly: false,
   });
 
@@ -124,7 +126,7 @@ export async function updatePortfolio(req: Request, res: Response) {
  */
 export async function deletePortfolio(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -149,7 +151,7 @@ export async function deletePortfolio(req: Request, res: Response) {
  */
 export async function duplicatePortfolio(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);

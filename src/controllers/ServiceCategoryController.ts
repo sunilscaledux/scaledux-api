@@ -1,5 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../services/prismaService'
+import { ApiResponse } from '@utils/ApiResponse'
+import { getIntParam } from '@utils/requestHelpers'
 
 export class ServiceCategoryController {
   // Get all active categories
@@ -43,7 +45,7 @@ export class ServiceCategoryController {
 
       const subCategories = await prisma.serviceSubCategory.findMany({
         where: {
-          category_id: parseInt(categoryId),
+          category_id: getIntParam(categoryId),
           is_active: true
         },
         select: {
@@ -81,7 +83,7 @@ export class ServiceCategoryController {
 
       const keywords = await prisma.serviceKeyword.findMany({
         where: {
-          category_id: parseInt(categoryId),
+          category_id: getIntParam(categoryId),
           is_active: true
         },
         select: {
@@ -122,7 +124,7 @@ export class ServiceCategoryController {
 
       const category = await prisma.serviceCategory.findUnique({
         where: {
-          id: parseInt(categoryId),
+          id: getIntParam(categoryId),
           is_active: true
         },
         include: {
@@ -187,7 +189,7 @@ export class ServiceCategoryController {
 
       const keywords = await prisma.serviceKeyword.findMany({
         where: {
-          category_id: parseInt(categoryId),
+          category_id: getIntParam(categoryId),
           is_active: true,
           name: {
             contains: searchTerm,

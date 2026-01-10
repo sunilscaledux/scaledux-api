@@ -3,6 +3,7 @@ import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from './Profi
 import { ProfileService } from './ProfileService'
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from "./ProfileValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { getStringParam } from '@utils/requestHelpers';
 
 export async function updateProfileSummary(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -159,7 +160,7 @@ export async function updateAgencySettings(req: Request, res: Response) {
 }
 
 export async function getPublicProfile(req: Request, res: Response) {
-  const { uniqueId } = req.params;
+  const uniqueId = getStringParam(req.params.uniqueId);
 
   if (!uniqueId) {
     return ApiResponse.error(res, "Unique ID is required", 400);

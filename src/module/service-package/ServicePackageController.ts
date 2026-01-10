@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { ServicePackageService } from './ServicePackageService'
 import { ApiResponse } from '@utils/ApiResponse'
+import { getStringParam } from '@utils/requestHelpers'
 import { uploadFile } from '@module/general/FileController'
 
 /**
@@ -28,7 +29,7 @@ export async function getUserServicePackages(req: Request, res: Response) {
  */
 export async function getServicePackageById(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -72,7 +73,7 @@ export async function createServicePackage(req: Request, res: Response) {
  */
 export async function updateServicePackage(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -97,7 +98,7 @@ export async function updateServicePackage(req: Request, res: Response) {
  */
 export async function deleteServicePackage(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { id } = req.params; // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);

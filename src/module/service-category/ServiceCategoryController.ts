@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { ServiceCategoryService } from './ServiceCategoryService'
 import { ApiResponse } from '@utils/ApiResponse'
+import { getIntParam } from '@utils/requestHelpers'
 
 /**
  * Get all service categories
@@ -19,13 +20,13 @@ export async function getServiceCategories(req: Request, res: Response) {
  * Get subcategories by category ID
  */
 export async function getSubCategoriesByCategory(req: Request, res: Response) {
-  const { categoryId } = req.params
+  const categoryId = getIntParam(req.params.categoryId);
 
   if (!categoryId) {
     return ApiResponse.error(res, "Category ID is required", 400)
   }
 
-  const result = await ServiceCategoryService.getSubCategoriesByCategory(parseInt(categoryId))
+  const result = await ServiceCategoryService.getSubCategoriesByCategory(categoryId)
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message)
@@ -38,7 +39,7 @@ export async function getSubCategoriesByCategory(req: Request, res: Response) {
  * Get keywords by category ID with pagination and search
  */
 export async function getKeywordsByCategory(req: Request, res: Response) {
-  const { categoryId } = req.params
+  const categoryId = getIntParam(req.params.categoryId);
   const { 
     page = '1', 
     limit = '50', 
@@ -56,7 +57,7 @@ export async function getKeywordsByCategory(req: Request, res: Response) {
   const subCatId = subCategoryId ? parseInt(subCategoryId as string) : undefined
 
   const result = await ServiceCategoryService.getKeywordsByCategory(
-    parseInt(categoryId),
+    categoryId,
     pageNum,
     limitNum,
     searchStr || undefined,
@@ -83,7 +84,7 @@ export async function searchKeywords(req: Request, res: Response) {
 
   const searchStr = search as string
   const limitNum = parseInt(limit as string)
-  const catId = categoryId ? parseInt(categoryId as string) : undefined
+  const catId = categoryId ? getIntParam(categoryId as string | string[]) : undefined
   const subCatId = subCategoryId ? parseInt(subCategoryId as string) : undefined
 
   const result = await ServiceCategoryService.searchKeywords(
@@ -104,15 +105,12 @@ export async function searchKeywords(req: Request, res: Response) {
  * Get popular keywords by category (for suggestions)
  */
 export async function getPopularKeywords(req: Request, res: Response) {
-  const { categoryId } = req.params
-  const { limit = '10' } = req.query
+  const categoryId = getIntParam(req.params.categoryId);
+  const { limit = '50' } = req.query;
 
-  if (!categoryId) {
-    return ApiResponse.error(res, "Category ID is required", 400)
-  }
+  const limitNum = Math.min(parseInt(limit as string) || 50, 100);
 
-  const limitNum = parseInt(limit as string)
-  const result = await ServiceCategoryService.getPopularKeywords(parseInt(categoryId), limitNum)
+  const result = await ServiceCategoryService.getPopularKeywords(categoryId, limitNum)
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message)

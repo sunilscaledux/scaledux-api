@@ -3,6 +3,7 @@ import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseT
 import { ExpertiseService } from "./ExpertiseService";
 import { createUserExpertiseSchema, updateUserExpertiseSchema } from "./ExpertiseValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { getIntParam } from '@utils/requestHelpers';
 
 export async function createUserExpertise(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -39,7 +40,7 @@ export async function getUserExpertises(req: Request, res: Response) {
 export async function updateUserExpertise(req: Request, res: Response) {
   const rawBody = req.body || {};
   const userId = req.user.id;
-  const expertiseId = parseInt(req.params.id);
+  const expertiseId = getIntParam(req.params.id);
 
   // Add ID to validation data
   const validationData = { ...rawBody, id: expertiseId };
@@ -65,7 +66,7 @@ export async function updateUserExpertise(req: Request, res: Response) {
 
 export async function deleteUserExpertise(req: Request, res: Response) {
   const userId = req.user.id;
-  const expertiseId = parseInt(req.params.id);
+  const expertiseId = getIntParam(req.params.id);
 
   if (!expertiseId) {
     return ApiResponse.error(res, "User expertise ID is required", 400);

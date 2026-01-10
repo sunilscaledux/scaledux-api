@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { AchievementService } from './AchievementService'
+import { getIntParam } from '@utils/requestHelpers'
 import { createAchievementSchema, updateAchievementSchema } from './AchievementValidation'
 import { CreateAchievementInput, UpdateAchievementInput, MediaFile } from './AchievementType'
 import { ApiResponse } from '@utils/ApiResponse'
@@ -88,7 +89,7 @@ export const updateAchievement = async (req: Request, res: Response) => {
 // Delete an achievement
 export const deleteAchievement = async (req: Request, res: Response) => {
   const userId = req.user?.id
-  const achievementId = parseInt(req.params.id)
+  const achievementId = getIntParam(req.params.id)
 
   if (!userId) {
     return res.status(401).json({

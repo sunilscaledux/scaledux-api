@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { WorkExperienceService } from './WorkExperienceService'
 import { createWorkExperienceSchema, updateWorkExperienceSchema } from './WorkExperienceValidation'
 import { CreateWorkExperienceInput, UpdateWorkExperienceInput } from './WorkExperienceType'
+import { getIntParam } from '@utils/requestHelpers'
 
 export const getWorkExperiences = async (req: Request, res: Response) => {
   const userId = req.user?.id
@@ -83,7 +84,7 @@ export const updateWorkExperience = async (req: Request, res: Response) => {
 
 export const deleteWorkExperience = async (req: Request, res: Response) => {
   const userId = req.user?.id
-  const workExperienceId = parseInt(req.params.id)
+  const workExperienceId = getIntParam(req.params.id)
 
   if (!userId) {
     return res.status(401).json({

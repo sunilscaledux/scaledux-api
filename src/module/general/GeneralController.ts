@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from "@utils/ApiResponse";
 import redisClient from "@services/redisService";
+import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getFileUrl } from "@utils/General"
 
@@ -87,7 +88,7 @@ export async function getCountries(req: Request, res: Response) {
 
 export async function getStatesByCountry(req: Request, res: Response) {
   try {
-    const { countryId } = req.params
+    const countryId = getIntParam(req.params.countryId)
 
     if (!countryId) {
       return ApiResponse.error(res, "Country ID is required", 400)
@@ -104,7 +105,7 @@ export async function getStatesByCountry(req: Request, res: Response) {
     // If not in cache, fetch from database
     const states = await prisma.state.findMany({
       where: {
-        country_id: parseInt(countryId)
+        country_id: countryId
       },
       select: {
         id: true,
@@ -199,7 +200,7 @@ export async function getLanguages(req: Request, res: Response) {
 
 export async function getLanguagesByCountry(req: Request, res: Response) {
   try {
-    const { countryCode } = req.params
+    const countryCode = getStringParam(req.params.countryCode)
 
     if (!countryCode) {
       return ApiResponse.error(res, "Country code is required", 400)
@@ -398,7 +399,7 @@ export async function getExpertiseCategories(req: Request, res: Response) {
 
 export async function getSpecialtiesByCategory(req: Request, res: Response) {
   try {
-    const categoryId = parseInt(req.params.categoryId)
+    const categoryId = getIntParam(req.params.categoryId)
     
     if (!categoryId) {
       return ApiResponse.error(res, "Category ID is required", 400)
@@ -433,7 +434,7 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
 
 export async function getSkillsByCategory(req: Request, res: Response) {
   try {
-    const categoryId = parseInt(req.params.categoryId)
+    const categoryId = getIntParam(req.params.categoryId)
     
     if (!categoryId) {
       return ApiResponse.error(res, "Category ID is required", 400)
@@ -639,7 +640,7 @@ export async function getServiceCategories(req: Request, res: Response) {
 
 export async function getServiceSubCategories(req: Request, res: Response) {
   try {
-    const categoryId = parseInt(req.params.categoryId)
+    const categoryId = getIntParam(req.params.categoryId)
     
     if (!categoryId) {
       return ApiResponse.error(res, "Category ID is required", 400)
@@ -679,7 +680,7 @@ export async function getServiceSubCategories(req: Request, res: Response) {
 
 export async function getServiceKeywords(req: Request, res: Response) {
   try {
-    const categoryId = parseInt(req.params.categoryId)
+    const categoryId = getIntParam(req.params.categoryId)
     const { limit = 50 } = req.query
     
     if (!categoryId) {

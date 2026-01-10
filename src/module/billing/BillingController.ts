@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { BillingService } from "./BillingService";
-import { ApiResponse } from "../../utils/ApiResponse";
+import { ApiResponse } from "@utils/ApiResponse";
+import { getStringParam } from "@utils/requestHelpers";
 
 export class BillingController {
   // Create Razorpay order for card verification
@@ -109,7 +110,7 @@ export class BillingController {
   static async setDefaultPaymentMethod(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
-      const { paymentMethodId } = req.params;
+      const paymentMethodId = getStringParam(req.params.paymentMethodId);
 
       if (!userId) {
         return ApiResponse.error(res, "User not authenticated", 401);
@@ -132,7 +133,7 @@ export class BillingController {
   static async deletePaymentMethod(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
-      const { paymentMethodId } = req.params;
+      const paymentMethodId = getStringParam(req.params.paymentMethodId);
 
       if (!userId) {
         return ApiResponse.error(res, "User not authenticated", 401);

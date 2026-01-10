@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { LicenseService } from './LicenseService'
+import { getIntParam } from '@utils/requestHelpers'
 import { createLicenseSchema, updateLicenseSchema } from './LicenseValidation'
 import { CreateLicenseInput, UpdateLicenseInput } from './LicenseType'
 
@@ -85,7 +86,7 @@ export const deleteLicense = async (req: Request, res: Response) => {
     })
   }
 
-  const licenseId = parseInt(req.params.id)
+  const licenseId = getIntParam(req.params.id)
   if (isNaN(licenseId)) {
     return res.status(400).json({
       success: false,
