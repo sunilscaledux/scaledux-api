@@ -12,19 +12,34 @@ export interface EmailOptions {
 
 class EmailService {
   private client: any;
+  private isConfigured: boolean;
 
   constructor() {
     const url = mailConfig.ZEPTO_URL;
     const token = mailConfig.ZEPTO_TOKEN;
 
     if (!token) {
-      throw new Error("ZEPTO_TOKEN is required in environment variables");
+      console.warn("⚠️  ZEPTO_TOKEN not configured - Email service will be disabled");
+      this.isConfigured = false;
+      return;
     }
 
-    this.client = new SendMailClient({ url, token });
+    try {
+      this.client = new SendMailClient({ url, token });
+      this.isConfigured = true;
+      console.log("✅ Email service initialized successfully");
+    } catch (error) {
+      console.error("❌ Failed to initialize email service:", error);
+      this.isConfigured = false;
+    }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
+    if (!this.isConfigured) {
+      console.warn("⚠️  Email service not configured - Skipping email to:", options.to);
+      return false;
+    }
+
     try {
       const mailData = {
         from: {
@@ -45,10 +60,10 @@ class EmailService {
       };
 
       const response = await this.client.sendMail(mailData);
-      console.log("Email sent successfully via ZeptoMail:", response);
+      console.log("✅ Email sent successfully via ZeptoMail:", response);
       return true;
     } catch (error) {
-      console.error("Failed to send email via ZeptoMail:", error);
+      console.error("❌ Failed to send email via ZeptoMail:", error);
       return false;
     }
   }

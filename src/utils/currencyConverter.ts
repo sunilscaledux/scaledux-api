@@ -95,7 +95,7 @@ export async function getUserCurrency(userId: number): Promise<string> {
         }
       }
     });
-
+ 
     return user?.personalInfo?.currency?.code || 'USD';
   } catch (error) {
     console.error('Error getting user currency:', error);
