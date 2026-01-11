@@ -446,6 +446,7 @@ export class BillingService {
       data: {
         transactions: transactions.map((t: any) => ({
           id: t.id,
+          uniqueId: t.unique_id,
           amount: t.amount,
           currency: t.currency,
           type: t.type,
