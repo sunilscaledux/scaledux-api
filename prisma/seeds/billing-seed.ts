@@ -103,7 +103,18 @@ export async function seedBillingData(prisma: PrismaClient) {
     await prisma.billingTransaction.create({
       data: {
         unique_id: ulid(),
-        user_id: 1,
+        // WHO triggered the action
+        actor_type: 'User',
+        actor_id: transaction.userId,
+        // MONEY FROM (user pays)
+        from_type: 'User',
+        from_id: transaction.userId,
+        // MONEY TO (platform receives)
+        to_type: 'Platform',
+        to_id: 1,
+        // WHAT the transaction is about
+        subject_type: 'ServicePackage',
+        subject_id: 1,
         amount: transaction.amount,
         currency_id: currencyId,
         type: transaction.type,

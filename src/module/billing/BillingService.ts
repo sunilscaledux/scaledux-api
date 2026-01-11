@@ -431,13 +431,19 @@ export class BillingService {
 
     const [transactions, total] = await Promise.all([
       prisma.billingTransaction.findMany({
-        where: { user_id: userIdNum },
+        where: { 
+          actor_type: 'User',
+          actor_id: userIdNum 
+        },
         orderBy: { created_at: 'desc' },
         skip,
         take: limit
       }),
       prisma.billingTransaction.count({
-        where: { user_id: userIdNum }
+        where: { 
+          actor_type: 'User',
+          actor_id: userIdNum 
+        }
       })
     ]);
 
@@ -472,7 +478,8 @@ export class BillingService {
     // Get balance in USD (stored currency)
     const result = await prisma.billingTransaction.aggregate({
       where: {
-        user_id: userIdNum,
+        actor_type: 'User',
+        actor_id: userIdNum,
         status: 'completed'
       },
       _sum: {
