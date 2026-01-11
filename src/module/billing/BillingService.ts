@@ -425,25 +425,51 @@ export class BillingService {
   }
 
   // Get billing history/transactions
-  static async getBillingHistory(userId: string, page: number = 1, limit: number = 10) {
+  static async getBillingHistory(
+    userId: string, 
+    page: number = 1, 
+    limit: number = 10,
+    fromDate?: string,
+    toDate?: string,
+    search?: string
+  ) {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
+    // Build where clause with date range and search filters
+    const whereClause: any = {
+      actor_type: 'User',
+      from_id: userIdNum
+    };
+
+    if (fromDate || toDate) {
+      whereClause.created_at = {};
+      if (fromDate) {
+        whereClause.created_at.gte = new Date(fromDate);
+      }
+      if (toDate) {
+        const endDate = new Date(toDate);
+        endDate.setHours(23, 59, 59, 999);
+        whereClause.created_at.lte = endDate;
+      }
+    }
+
+    if (search) {
+      whereClause.OR = [
+        { unique_id: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
     const [transactions, total] = await Promise.all([
       prisma.billingTransaction.findMany({
-        where: { 
-          actor_type: 'User',
-          actor_id: userIdNum 
-        },
+        where: whereClause,
         orderBy: { created_at: 'desc' },
         skip,
         take: limit
       }),
       prisma.billingTransaction.count({
-        where: { 
-          actor_type: 'User',
-          actor_id: userIdNum 
-        }
+        where: whereClause
       })
     ]);
 

@@ -630,8 +630,7 @@ model BillingTransactionMeta {
   key             String   @db.VarChar(100)
   value           String   @db.Text
 
-  transaction BillingTransaction 
-    @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  transaction BillingTransaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
 
   @@index([transaction_id])
   @@index([key])

@@ -194,8 +194,18 @@ export class BillingController {
 
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
+      const fromDate = req.query.fromDate as string | undefined;
+      const toDate = req.query.toDate as string | undefined;
+      const search = req.query.search as string | undefined;
 
-      const result = await BillingService.getBillingHistory(userId.toString(), page, limit);
+      const result = await BillingService.getBillingHistory(
+        userId.toString(), 
+        page, 
+        limit,
+        fromDate,
+        toDate,
+        search
+      );
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
       console.error("Error fetching billing history:", error);
