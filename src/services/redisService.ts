@@ -14,6 +14,7 @@ redisClient.on('error', (error) => {
 
 redisClient.on('ready', () => {
   console.log('🚀 Redis is ready to accept commands');
+  console.log('⚠️  Note: Set Redis maxmemory-policy to "noeviction" for BullMQ job safety');
 });
 
 redisClient.on('close', () => {

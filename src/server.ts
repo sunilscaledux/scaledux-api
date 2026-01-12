@@ -22,6 +22,12 @@ import billingRoutes from './module/billing/BillingRoute';
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
 
+// Start main worker for background job processing (Laravel style)
+import './workers/Worker';
+
+// Bull Board for queue monitoring
+import { serverAdapter } from './config/bullBoard';
+
 dotenv.config();
 const app = express();
 
@@ -45,6 +51,12 @@ app.use("/api/v1/portfolios", portfolioRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/service-categories", serviceCategoryRoutes);
 app.use("/api/v1/billing", billingRoutes);
+
+// Bull Board UI for queue monitoring (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/admin/queues', serverAdapter.getRouter());
+  console.log('📊 Bull Board available at: http://localhost:4001/admin/queues');
+}
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {

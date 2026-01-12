@@ -58,4 +58,10 @@ router.get(
   BillingController.getUserBalance
 );
 
+// Invoice Download Route
+router.get(
+  "/invoice/:uniqueId",
+  BillingController.downloadInvoice
+);
+
 export default router;

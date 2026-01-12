@@ -228,4 +228,32 @@ export class BillingController {
       return ApiResponse.error(res, error.message || "Failed to fetch user balance");
     }
   }
+
+  // Download invoice PDF
+  static async downloadInvoice(req: Request, res: Response) {
+    try {
+      const { uniqueId } = req.params;
+
+      if (!uniqueId) {
+        return ApiResponse.error(res, "Transaction ID is required", 400);
+      }
+
+      const result = await BillingService.getInvoicePath(uniqueId);
+
+      if (!result.success) {
+        return ApiResponse.error(res, result.message, 404);
+      }
+
+      // Send PDF file
+      res.download(result.path!, `invoice-${uniqueId}.pdf`, (err) => {
+        if (err) {
+          console.error("Error downloading invoice:", err);
+          return ApiResponse.error(res, "Failed to download invoice");
+        }
+      });
+    } catch (error: any) {
+      console.error("Error downloading invoice:", error);
+      return ApiResponse.error(res, error.message || "Failed to download invoice");
+    }
+  }
 }

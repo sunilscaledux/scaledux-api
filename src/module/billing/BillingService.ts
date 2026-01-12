@@ -4,6 +4,9 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
 import { convertToUserCurrency } from "@utils/currencyConverter";
+import { dispatch } from "../../queues/Queue";
+import { InvoiceGenerator } from "../../services/InvoiceGenerator";
+import { GenerateInvoiceJob } from "../../jobs/GenerateInvoiceJob";
 
 // Initialize Razorpay (only if keys are provided)
 let razorpay: any = null;
@@ -549,16 +552,87 @@ export class BillingService {
     }
   }
 
-  // Helper: Encrypt card number (simplified - use proper encryption in production)
-  private static encryptCardNumber(cardNumber: string): string {
-    const algorithm = 'aes-256-cbc';
-    const key = process.env.ENCRYPTION_KEY || crypto.randomBytes(32);
-    const iv = crypto.randomBytes(16);
-    
-    const cipher = crypto.createCipheriv(algorithm, Buffer.from(key), iv);
-    let encrypted = cipher.update(cardNumber, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    return iv.toString('hex') + ':' + encrypted;
+  // Trigger invoice generation for a transaction
+  static async triggerInvoiceGeneration(transactionId: number) {
+    try {
+      const transaction = await prisma.billingTransaction.findUnique({
+        where: { id: transactionId },
+        include: { currency: true }
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Add job to queue (Laravel style - pass the class)
+      await dispatch(GenerateInvoiceJob, {
+        transactionId: transaction.id,
+        uniqueId: transaction.unique_id,
+        amount: parseFloat(transaction.amount.toString()),
+        currency: transaction.currency.code,
+        type: transaction.type,
+        status: transaction.status,
+        description: transaction.description,
+        createdAt: transaction.created_at,
+        actorType: transaction.actor_type,
+        actorId: transaction.actor_id,
+        fromType: transaction.from_type,
+        fromId: transaction.from_id,
+        toType: transaction.to_type,
+        toId: transaction.to_id,
+        subjectType: transaction.subject_type,
+        subjectId: transaction.subject_id
+      }, {
+        jobId: `invoice-${transaction.unique_id}`,
+        priority: 1
+      });
+
+      return {
+        success: true,
+        message: 'Invoice generation job queued successfully'
+      };
+    } catch (error: any) {
+      console.error('Error triggering invoice generation:', error);
+      throw error;
+    }
   }
+
+  // Download invoice by transaction unique ID
+  static async getInvoicePath(uniqueId: string) {
+    try {
+      const transaction = await prisma.billingTransaction.findUnique({
+        where: { unique_id: uniqueId }
+      });
+
+      if (!transaction) {
+        return {
+          success: false,
+          message: 'Transaction not found'
+        };
+      }
+
+      // Check if invoice URL exists in database
+      if (!transaction.invoice_url) {
+        // If invoice doesn't exist, trigger generation
+        await this.triggerInvoiceGeneration(transaction.id);
+        
+        return {
+          success: false,
+          message: 'Invoice is being generated. Please try again in a few moments.'
+        };
+      }
+
+      // Convert URL to file system path
+      const invoicePath = path.join(__dirname, '../../..', transaction.invoice_url);
+      
+      return {
+        success: true,
+        path: invoicePath
+      };
+    } catch (error: any) {
+      console.error('Error getting invoice:', error);
+      throw error;
+    }
+  }
+
 }
