@@ -17,6 +17,7 @@ model User {
   phone_verified_at DateTime?
   password          String?
   status            Int       @default(1)
+  role              Int       @default(1) // 1=Freelancer, 2=Founder, 3=Mentor, 4=Investor
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
   notification      Boolean   @default(false)
@@ -47,6 +48,7 @@ model User {
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
   taxInformation               TaxInformation?
+  companyDetail                CompanyDetail?
 
   @@index([email, phone])
   @@index([last_name, first_name, email])
@@ -79,6 +81,45 @@ model PersonalInfo {
   state          State?    @relation(fields: [state_id], references: [id])
 
   @@map("scd_personal_info")
+}
+
+model CompanyDetail {
+  id                    Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  company_name          String
+  company_tagline       String?
+  company_logo          String?
+  company_cover_image   String?
+  year_founded          Int?
+  company_size          String?   // e.g., "1-10", "11-50", "51-200", "201-500", "501+"
+  headquarters          String?
+  company_location      String?
+  company_website       String?
+  industry              String?
+  company_type          String?   // e.g., "Startup", "SME", "Enterprise"
+  description           String?
+  problem_statement     String?
+  solution              String?
+  target_market         String?
+  unique_value_prop     String?
+  business_model        String?
+  revenue_model         String?
+  funding_stage         String?   // e.g., "Pre-seed", "Seed", "Series A", etc.
+  total_funding         Float?
+  seeking_funding       Boolean   @default(false)
+  funding_amount        Float?
+  currency_id           Int?
+  country_id            Int?
+  state_id              Int?
+  social_links          Json?     // LinkedIn, Twitter, Facebook, etc.
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  currency              Currency? @relation(fields: [currency_id], references: [id])
+  country               Country?  @relation(fields: [country_id], references: [id])
+  state                 State?    @relation(fields: [state_id], references: [id])
+
+  @@map("scd_company_details")
 }
 
 model Education {
@@ -216,9 +257,10 @@ model Country {
   currency_id  Int?
   created_at   DateTime       @default(now())
   updated_at   DateTime       @updatedAt
-  currency     Currency?      @relation(fields: [currency_id], references: [id])
-  states       State[]
-  personalInfo PersonalInfo[]
+  currency       Currency?       @relation(fields: [currency_id], references: [id])
+  states         State[]
+  personalInfo   PersonalInfo[]
+  companyDetails CompanyDetail[]
 
   @@map("scd_countries")
 }
@@ -230,8 +272,9 @@ model State {
   country_id   Int
   created_at   DateTime       @default(now())
   updated_at   DateTime       @updatedAt
-  country      Country        @relation(fields: [country_id], references: [id], onDelete: Cascade)
-  personalInfo PersonalInfo[]
+  country        Country        @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  personalInfo   PersonalInfo[]
+  companyDetails CompanyDetail[]
 
   @@unique([name, country_id])
   @@map("scd_states")
@@ -248,6 +291,7 @@ model Currency {
   countries           Country[]
   personalInfo        PersonalInfo[]
   billingTransactions BillingTransaction[]
+  companyDetails      CompanyDetail[]
 
   @@map("scd_currencies")
 }

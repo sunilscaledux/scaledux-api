@@ -18,6 +18,7 @@ import portfolioRoutes from './module/portfolio/PortfolioRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
 import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
 import billingRoutes from './module/billing/BillingRoute';
+import companyRoutes from './module/company/CompanyRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -51,6 +52,7 @@ app.use("/api/v1/portfolios", portfolioRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/service-categories", serviceCategoryRoutes);
 app.use("/api/v1/billing", billingRoutes);
+app.use("/api/v1/company", companyRoutes);
 
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {
@@ -61,6 +63,7 @@ if (process.env.NODE_ENV !== 'production') {
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
+  console.log(`🏢 Company API: http://localhost:${PORT}/api/v1/company`);
 });
 
 export default app;
