@@ -22,8 +22,13 @@ const PortfolioRoute_1 = __importDefault(require("./module/portfolio/PortfolioRo
 const ServicePackageRoute_1 = __importDefault(require("./module/service-package/ServicePackageRoute"));
 const ServiceCategoryRoute_1 = __importDefault(require("./module/service-category/ServiceCategoryRoute"));
 const BillingRoute_1 = __importDefault(require("./module/billing/BillingRoute"));
+const CompanyRoute_1 = __importDefault(require("./module/company/CompanyRoute"));
 const path_1 = __importDefault(require("path"));
 const cors_1 = require("@middleware/cors");
+// Start main worker for background job processing (Laravel style)
+require("./workers/Worker");
+// Bull Board for queue monitoring
+const bullBoard_1 = require("./config/bullBoard");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 // Setup CORS middleware
@@ -45,8 +50,15 @@ app.use("/api/v1/portfolios", PortfolioRoute_1.default);
 app.use("/api/v1/service-packages", ServicePackageRoute_1.default);
 app.use("/api/v1/service-categories", ServiceCategoryRoute_1.default);
 app.use("/api/v1/billing", BillingRoute_1.default);
+app.use("/api/v1/company", CompanyRoute_1.default);
+// Bull Board UI for queue monitoring (only in development)
+if (process.env.NODE_ENV !== 'production') {
+    app.use('/admin/queues', bullBoard_1.serverAdapter.getRouter());
+    console.log('📊 Bull Board available at: http://localhost:4001/admin/queues');
+}
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
     console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
+    console.log(`🏢 Company API: http://localhost:${PORT}/api/v1/company`);
 });
 exports.default = app;

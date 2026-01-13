@@ -93,7 +93,17 @@ export class CompanyController {
    */
   async getCompanyDetailByUserId(req: Request, res: Response): Promise<void> {
     try {
-      const userId = parseInt(req.params.userId);
+      const userIdParam = req.params.userId;
+      
+      if (Array.isArray(userIdParam)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid user ID'
+        });
+        return;
+      }
+
+      const userId = parseInt(userIdParam);
 
       if (isNaN(userId)) {
         res.status(400).json({

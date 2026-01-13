@@ -234,11 +234,11 @@ export class BillingController {
     try {
       const { uniqueId } = req.params;
 
-      if (!uniqueId) {
+      if (!uniqueId || Array.isArray(uniqueId)) {
         return ApiResponse.error(res, "Transaction ID is required", 400);
       }
 
-      const result = await BillingService.getInvoicePath(uniqueId);
+      const result = await BillingService.getInvoicePath(uniqueId as string);
 
       if (!result.success) {
         return ApiResponse.error(res, result.message, 404);
