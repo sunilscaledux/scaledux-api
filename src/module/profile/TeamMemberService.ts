@@ -1,6 +1,7 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
+import { ulid } from 'ulid';
 
 /**
  * TeamMemberService
@@ -56,9 +57,9 @@ export class TeamMemberService {
   }
 
   /**
-   * Get a single team member by ID
+   * Get a single team member by unique_id
    */
-  static async getTeamMemberById(userId: number, memberId: number): Promise<ServiceResponse> {
+  static async getTeamMemberById(userId: number, uniqueId: string): Promise<ServiceResponse> {
     try {
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { user_id: userId }
@@ -73,7 +74,7 @@ export class TeamMemberService {
 
       const teamMember = await prisma.teamMember.findFirst({
         where: { 
-          id: memberId,
+          unique_id: uniqueId,
           company_profile_id: companyProfile.id
         },
         include: {
@@ -131,6 +132,7 @@ export class TeamMemberService {
 
       const teamMember = await prisma.teamMember.create({
         data: {
+          unique_id: ulid(),
           company_profile_id: companyProfile.id,
           ...data
         },
@@ -156,7 +158,7 @@ export class TeamMemberService {
   /**
    * Update a team member
    */
-  static async updateTeamMember(userId: number, memberId: number, data: {
+  static async updateTeamMember(userId: number, uniqueId: string, data: {
     name?: string;
     email?: string;
     role_id?: number;
@@ -178,7 +180,7 @@ export class TeamMemberService {
       // Verify team member belongs to this company
       const existingMember = await prisma.teamMember.findFirst({
         where: { 
-          id: memberId,
+          unique_id: uniqueId,
           company_profile_id: companyProfile.id
         }
       });
@@ -191,7 +193,7 @@ export class TeamMemberService {
       }
 
       const teamMember = await prisma.teamMember.update({
-        where: { id: memberId },
+        where: { id: existingMember.id },
         data,
         include: {
           role: true
@@ -215,7 +217,7 @@ export class TeamMemberService {
   /**
    * Upload team member profile image
    */
-  static async uploadProfileImage(userId: number, memberId: number, file: any): Promise<ServiceResponse> {
+  static async uploadProfileImage(userId: number, uniqueId: string, file: any): Promise<ServiceResponse> {
     try {
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { user_id: userId }
@@ -231,7 +233,7 @@ export class TeamMemberService {
       // Verify team member belongs to this company
       const existingMember = await prisma.teamMember.findFirst({
         where: { 
-          id: memberId,
+          unique_id: uniqueId,
           company_profile_id: companyProfile.id
         }
       });
@@ -246,7 +248,7 @@ export class TeamMemberService {
       const relativePath = getRelativePath(file.path);
 
       const teamMember = await prisma.teamMember.update({
-        where: { id: memberId },
+        where: { id: existingMember.id },
         data: { profile_image: relativePath }
       });
 
@@ -269,7 +271,7 @@ export class TeamMemberService {
   /**
    * Delete a team member (soft delete)
    */
-  static async deleteTeamMember(userId: number, memberId: number): Promise<ServiceResponse> {
+  static async deleteTeamMember(userId: number, uniqueId: string): Promise<ServiceResponse> {
     try {
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { user_id: userId }
@@ -285,7 +287,7 @@ export class TeamMemberService {
       // Verify team member belongs to this company
       const existingMember = await prisma.teamMember.findFirst({
         where: { 
-          id: memberId,
+          unique_id: uniqueId,
           company_profile_id: companyProfile.id
         }
       });
@@ -298,7 +300,7 @@ export class TeamMemberService {
       }
 
       await prisma.teamMember.update({
-        where: { id: memberId },
+        where: { id: existingMember.id },
         data: { is_active: false }
       });
 

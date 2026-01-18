@@ -133,9 +133,13 @@ export const createTeamMemberSchema = Joi.object({
   bio: Joi.string().optional().allow('', null).max(1000).messages({
     'string.max': 'Bio must not exceed 1000 characters'
   }),
-  linkedin_url: Joi.string().uri().optional().allow('', null).messages({
-    'string.uri': 'Please provide a valid LinkedIn URL'
-  })
+  linkedin_url: Joi.string()
+    .optional()
+    .allow('', null)
+    .pattern(/^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/)
+    .messages({
+      'string.pattern.base': 'Please provide a valid URL'
+    })
 });
 
 /**
@@ -154,7 +158,11 @@ export const updateTeamMemberSchema = Joi.object({
   bio: Joi.string().optional().allow('', null).max(1000).messages({
     'string.max': 'Bio must not exceed 1000 characters'
   }),
-  linkedin_url: Joi.string().uri().optional().allow('', null).messages({
-    'string.uri': 'Please provide a valid LinkedIn URL'
-  })
+  linkedin_url: Joi.string()
+    .optional()
+    .allow('', null)
+    .pattern(/^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/)
+    .messages({
+      'string.pattern.base': 'Please provide a valid URL'
+    })
 });

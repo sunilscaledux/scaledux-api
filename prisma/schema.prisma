@@ -281,6 +281,7 @@ model TeamRole {
 
 model TeamMember {
   id                Int       @id @default(autoincrement())
+  unique_id         String    @unique
   company_profile_id Int
   name              String
   email             String?
@@ -295,6 +296,7 @@ model TeamMember {
   role              TeamRole  @relation(fields: [role_id], references: [id])
 
   @@index([company_profile_id])
+  @@index([unique_id])
   @@map("scd_team_members")
 }
 
