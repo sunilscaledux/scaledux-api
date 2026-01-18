@@ -170,18 +170,12 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       about: profileData.summary || '',
     };
 
-    await prisma.userProfile.upsert({
-      where: { 
-        user_id_profile_type: {
-          user_id: userId,
-          profile_type: 'freelancer'
-        }
-      },
+    await prisma.freelancerProfile.upsert({
+      where: { user_id: userId },
       update: personalInfoData,
       create: {
         user_id: userId,
         unique_id: ulid(),
-        profile_type: 'freelancer',
         ...personalInfoData,
       },
     });

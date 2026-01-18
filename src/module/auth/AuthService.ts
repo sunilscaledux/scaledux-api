@@ -571,7 +571,26 @@ export async function getCurrentUserDetails(userId: number): Promise<any | null>
             symbol: true
           }
         },
-        userProfiles: {
+        freelancerProfile: {
+          include: {
+            country: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                flag: true
+              }
+            },
+            state: {
+              select: {
+                id: true,
+                name: true,
+                code: true
+              }
+            }
+          }
+        },
+        companyProfile: {
           include: {
             country: {
               select: {

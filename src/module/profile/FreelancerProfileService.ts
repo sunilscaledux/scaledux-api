@@ -14,13 +14,8 @@ export class FreelancerProfileService {
    */
   static async getProfileByUserId(userId: number, profileType: string = 'freelancer'): Promise<ServiceResponse> {
     try {
-      let profile = await prisma.userProfile.findUnique({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: profileType
-          }
-        },
+      let profile = await prisma.freelancerProfile.findUnique({
+        where: { user_id: userId },
         include: {
           user: {
             include: {
@@ -34,11 +29,10 @@ export class FreelancerProfileService {
 
       // Auto-create profile if it doesn't exist
       if (!profile) {
-        profile = await prisma.userProfile.create({
+        profile = await prisma.freelancerProfile.create({
           data: {
             user_id: userId,
             unique_id: ulid(),
-            profile_type: profileType,
           },
           include: {
             user: {
@@ -54,10 +48,10 @@ export class FreelancerProfileService {
 
       // Combine user account data with profile data (UserDetail = UserProfile + User)
       const userDetail = {
-        // Profile data (from UserProfile table) - explicitly select fields
+        // Profile data (from FreelancerProfile table) - explicitly select fields
         id: profile.id,
         unique_id: profile.unique_id,
-        profile_type: profile.profile_type,
+        profile_type: 'freelancer', // Hardcoded since this is FreelancerProfile
         profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
         coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
         hideEmail: profile.hideEmail,
@@ -113,13 +107,8 @@ export class FreelancerProfileService {
    */
   static async updateProfileSummary(userId: number, data: ProfileSummaryInput): Promise<ServiceResponse> {
     try {
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
+      const profile = await prisma.freelancerProfile.upsert({
+        where: { user_id: userId },
         update: {
           title: data.title,
           about: data.about,
@@ -127,7 +116,6 @@ export class FreelancerProfileService {
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
           title: data.title,
           about: data.about,
         },
@@ -156,13 +144,8 @@ export class FreelancerProfileService {
    */
   static async updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ServiceResponse> {
     try {
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
+      const profile = await prisma.freelancerProfile.upsert({
+        where: { user_id: userId },
         update: {
           address: data.address,
           address_line_2: data.address_line_2,
@@ -176,7 +159,6 @@ export class FreelancerProfileService {
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
           address: data.address,
           address_line_2: data.address_line_2,
           zipCode: data.zipCode,
@@ -212,20 +194,14 @@ export class FreelancerProfileService {
   static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
     try {
       // Update hourly rate in UserProfile
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
+      const profile = await prisma.freelancerProfile.upsert({
+        where: { user_id: userId },
         update: {
           hourly_rate: data.hourly_rate,
         },
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
           hourly_rate: data.hourly_rate,
         },
       });
@@ -257,20 +233,14 @@ export class FreelancerProfileService {
    */
   static async updateLanguages(userId: number, languages: any[]): Promise<ServiceResponse> {
     try {
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
+      const profile = await prisma.freelancerProfile.upsert({
+        where: { user_id: userId },
         update: {
           languages: languages,
         },
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
           languages: languages,
         },
       });
@@ -296,23 +266,34 @@ export class FreelancerProfileService {
     try {
       const relativePath = getRelativePath(file.path);
 
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
+      // Route to correct profile table based on profileType
+      let profile;
+      if (profileType === 'freelancer') {
+        profile = await prisma.freelancerProfile.upsert({
+          where: { user_id: userId },
+          update: { profileImage: relativePath },
+          create: {
             user_id: userId,
-            profile_type: profileType
-          }
-        },
-        update: {
-          profileImage: relativePath,
-        },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: profileType,
-          profileImage: relativePath,
-        },
-      });
+            unique_id: ulid(),
+            profileImage: relativePath,
+          },
+        });
+      } else if (profileType === 'founder') {
+        profile = await prisma.companyProfile.upsert({
+          where: { user_id: userId },
+          update: { profileImage: relativePath },
+          create: {
+            user_id: userId,
+            unique_id: ulid(),
+            profileImage: relativePath,
+          },
+        });
+      } else {
+        return {
+          success: false,
+          message: 'Invalid profile type',
+        };
+      }
 
       return {
         success: true,
@@ -337,23 +318,34 @@ export class FreelancerProfileService {
     try {
       const relativePath = getRelativePath(file.path);
 
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
+      // Route to correct profile table based on profileType
+      let profile;
+      if (profileType === 'freelancer') {
+        profile = await prisma.freelancerProfile.upsert({
+          where: { user_id: userId },
+          update: { coverImage: relativePath },
+          create: {
             user_id: userId,
-            profile_type: profileType
-          }
-        },
-        update: {
-          coverImage: relativePath,
-        },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: profileType,
-          coverImage: relativePath,
-        },
-      });
+            unique_id: ulid(),
+            coverImage: relativePath,
+          },
+        });
+      } else if (profileType === 'founder') {
+        profile = await prisma.companyProfile.upsert({
+          where: { user_id: userId },
+          update: { coverImage: relativePath },
+          create: {
+            user_id: userId,
+            unique_id: ulid(),
+            coverImage: relativePath,
+          },
+        });
+      } else {
+        return {
+          success: false,
+          message: 'Invalid profile type',
+        };
+      }
 
       return {
         success: true,
@@ -384,18 +376,12 @@ export class FreelancerProfileService {
       if (hideEmail !== undefined) updateData.hideEmail = hideEmail;
       if (hidePhone !== undefined) updateData.hidePhone = hidePhone;
 
-      const profile = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
+      const profile = await prisma.freelancerProfile.upsert({
+        where: { user_id: userId },
         update: updateData,
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
           ...updateData,
         },
       });

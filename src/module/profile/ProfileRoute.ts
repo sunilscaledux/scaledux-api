@@ -3,6 +3,7 @@ import { getPublicProfile } from "./ProfileController";
 import { getProfileCompletion } from "./ProfileCompletionController";
 import { UnifiedProfileController } from "./UnifiedProfileController";
 import { FreelancerProfileController } from "./FreelancerProfileController";
+import { CompanyProfileController } from "./CompanyProfileController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 
@@ -37,6 +38,16 @@ router.post(
 );
 router.patch('/freelancer/privacy', authenticateToken, FreelancerProfileController.updatePrivacySettings);
 router.patch('/freelancer/agency-settings', authenticateToken, FreelancerProfileController.updateAgencySettings);
+
+/**
+ * Company/Founder Profile Routes
+ */
+router.patch('/company/overview', authenticateToken, CompanyProfileController.updateOverview);
+router.patch('/company/details', authenticateToken, CompanyProfileController.updateDetails);
+router.patch('/company/funding', authenticateToken, CompanyProfileController.updateFunding);
+router.patch('/company/problem-solution', authenticateToken, CompanyProfileController.updateProblemSolution);
+router.patch('/company/target-market', authenticateToken, CompanyProfileController.updateTargetMarket);
+router.patch('/company/revenue-model', authenticateToken, CompanyProfileController.updateRevenueModel);
 
 /**
  * Public & Completion Routes

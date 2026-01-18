@@ -1,375 +1,35 @@
 import { prisma } from "@services/prismaService";
-import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from "./ProfileType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl, getRelativePath } from "@utils/General";
-import { ulid } from 'ulid';
+import { getFileUrl } from "@utils/General";
 
+/**
+ * ProfileService - Legacy service for public profile access
+ * For profile management, use FreelancerProfileService or CompanyProfileService
+ */
 export class ProfileService {
-  /**
-   * Update profile summary (title and about)
-   */
-  static async updateProfileSummary(userId: number, data: ProfileSummaryInput): Promise<ServiceResponse> {
-    try {
-      // Upsert personal info with title and about
-      const personalInfo = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
-        update: {
-          title: data.title,
-          about: data.about,
-        },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: 'freelancer',
-          title: data.title,
-          about: data.about,
-        },
-      });
-
-      // Get user with personal info for response
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          userProfiles: true,
-        },
-      });
-
-      return {
-        success: true,
-        message: "Profile summary updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Profile Summary Error:", error);
-      return {
-        success: false,
-        message: "Failed to update profile summary"
-      };
-    }
-  }
-
-  /**
-   * Update personal information
-   */
-  static async updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ServiceResponse> {
-    try {
-      // Upsert personal info
-      const personalInfo = await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
-        update: {
-          address: data.address,
-          address_line_2: data.address_line_2,
-          zipCode: data.zipCode,
-          country_id: data.countryId,
-          state_id: data.stateId,
-          city: data.city,
-          website: data.website,
-          links: data.links || [],
-        },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: 'freelancer',
-          address: data.address,
-          address_line_2: data.address_line_2,
-          zipCode: data.zipCode,
-          country_id: data.countryId,
-          state_id: data.stateId,
-          city: data.city,
-          website: data.website,
-          links: data.links || [],
-        },
-      });
-
-      // Get user with personal info and relations for response
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          userProfiles: {
-            include: {
-              country: true,
-              state: true,
-            },
-          },
-        },
-      });
-
-      return {
-        success: true,
-        message: "Personal information updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Personal Info Error:", error);
-      return {
-        success: false,
-        message: "Failed to update personal information"
-      };
-    }
-  }
-
-  /**
-   * Update privacy settings
-   */
-  static async updatePrivacySettings(userId: number, hideEmail?: boolean, hidePhone?: boolean): Promise<ServiceResponse> {
-    try {
-      const updateData: any = {};
-      if (hideEmail !== undefined) updateData.hideEmail = hideEmail;
-      if (hidePhone !== undefined) updateData.hidePhone = hidePhone;
-
-      const user = await prisma.user.update({
-        where: { id: userId },
-        data: updateData,
-      });
-
-      return {
-        success: true,
-        message: "Privacy settings updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Privacy Settings Error:", error);
-      return {
-        success: false,
-        message: "Failed to update privacy settings"
-      };
-    }
-  }
-
-  /**
-   * Upload profile image
-   */
-  static async uploadProfileImage(userId: number, file: Express.Multer.File): Promise<ServiceResponse> {
-    try {
-      if (!file) {
-        return {
-          success: false,
-          message: "No file uploaded"
-        };
-      }
-
-      const imagePath = getRelativePath(file.path);
-      const imageUrl = getFileUrl(imagePath);
-
-      await prisma.userProfile.upsert({
-        where: { 
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
-        update: { profileImage: imagePath },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: 'freelancer',
-          profileImage: imagePath,
-        },
-      });
-
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: { userProfiles: true },
-      });
-
-      return {
-        success: true,
-        message: "Profile image uploaded successfully",
-        data: {
-          imagePath,  // Relative path for storage
-          imageUrl,   // Full URL for immediate display
-          user
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Profile Image Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload profile image"
-      };
-    }
-  }
-
-  /**
-   * Upload cover image
-   */
-  static async uploadCoverImage(userId: number, file: Express.Multer.File): Promise<ServiceResponse> {
-    try {
-      if (!file) {
-        return {
-          success: false,
-          message: "No file uploaded"
-        };
-      }
-
-      const imagePath = getRelativePath(file.path);
-      const imageUrl = getFileUrl(imagePath);
-
-      await prisma.userProfile.upsert({
-        where: { 
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
-        update: { coverImage: imagePath },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: 'freelancer',
-          coverImage: imagePath,
-        },
-      });
-
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: { userProfiles: true },
-      });
-
-      return {
-        success: true,
-        message: "Cover image uploaded successfully",
-        data: {
-          imagePath,  // Relative path for storage
-          imageUrl,   // Full URL for immediate display
-          user
-        }
-      };
-    } catch (error: any) {
-      console.error("Upload Cover Image Error:", error);
-      return {
-        success: false,
-        message: "Failed to upload cover image"
-      };
-    }
-  }
-
-  /**
-   * Update hourly rate
-   */
-  static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
-    try {
-      // Update hourly rate in UserProfile
-      await prisma.userProfile.upsert({
-        where: {
-          user_id_profile_type: {
-            user_id: userId,
-            profile_type: 'freelancer'
-          }
-        },
-        update: {
-          hourly_rate: data.hourly_rate,
-        },
-        create: {
-          user_id: userId,
-          unique_id: ulid(),
-          profile_type: 'freelancer',
-          hourly_rate: data.hourly_rate,
-        },
-      });
-
-      // Update currency on User table
-      await prisma.user.update({
-        where: { id: userId },
-        data: {
-          currency_id: data.currency_id,
-        },
-      });
-
-      // Get user with personal info and currency for response
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: {
-          currency: true,
-          userProfiles: true,
-        },
-      });
-
-      return {
-        success: true,
-        message: "Hourly rate updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Hourly Rate Error:", error);
-      return {
-        success: false,
-        message: "Failed to update hourly rate"
-      };
-    }
-  }
-
-  /**
-   * Update languages
-   */
-  static async updateLanguages(userId: number, languages: string[]): Promise<ServiceResponse> {
-    try {
-    
-      // For now, return success without updating
-      const user = await prisma.user.findUnique({
-        where: { id: userId }
-      });
-
-      return {
-        success: true,
-        message: "Languages updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Languages Error:", error);
-      return {
-        success: false,
-        message: "Failed to update languages"
-      };
-    }
-  }
-
-  /**
-   * Update agency settings
-   */
-  static async updateAgencySettings(userId: number, showAsAgency: boolean): Promise<ServiceResponse> {
-    try {
-      const user = await prisma.user.update({
-        where: { id: userId },
-        data: { show_as_agency: showAsAgency },
-      });
-
-      return {
-        success: true,
-        message: "Agency settings updated successfully",
-        data: user
-      };
-    } catch (error: any) {
-      console.error("Update Agency Settings Error:", error);
-      return {
-        success: false,
-        message: "Failed to update agency settings"
-      };
-    }
-  }
-
+  
   /**
    * Get public profile by unique ID
    */
   static async getPublicProfile(uniqueId: string): Promise<ServiceResponse> {
     try {
+      // Try to find user by freelancer or company profile unique_id
       const user = await prisma.user.findFirst({
         where: {
-          userProfiles: { some: { unique_id: uniqueId } },
+          OR: [
+            { freelancerProfile: { unique_id: uniqueId } },
+            { companyProfile: { unique_id: uniqueId } }
+          ],
           status: 1, // Only active users
         },
         include: {
-          userProfiles: {
+          freelancerProfile: {
+            include: {
+              country: true,
+              state: true,
+            }
+          },
+          companyProfile: {
             include: {
               country: true,
               state: true,
@@ -385,7 +45,7 @@ export class ProfileService {
         };
       }
 
-      const userProfile = user.userProfiles?.[0];
+      const userProfile = user.freelancerProfile || user.companyProfile;
 
       // Transform image URLs
       const transformedUser = {
@@ -399,14 +59,14 @@ export class ProfileService {
 
       return {
         success: true,
-        message: "Public profile retrieved successfully",
+        message: "User profile retrieved successfully",
         data: transformedUser
       };
     } catch (error: any) {
       console.error("Get Public Profile Error:", error);
       return {
         success: false,
-        message: "Failed to get public profile"
+        message: "Failed to retrieve user profile"
       };
     }
   }

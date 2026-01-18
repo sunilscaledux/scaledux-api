@@ -243,12 +243,11 @@ const linkedinCallback = async (req: Request, res: Response) => {
         },
       });
 
-      // Create UserProfile with unique_id
-      await prisma.userProfile.create({
+      // Create FreelancerProfile with unique_id
+      await prisma.freelancerProfile.create({
         data: {
           user_id: user.id,
           unique_id: ulid(),
-          profile_type: 'freelancer',
         },
       });
 

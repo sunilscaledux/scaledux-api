@@ -28,7 +28,8 @@ model User {
   identity_verification_status String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   agency_verified_at           DateTime?
   otps                         Otp[]
-  userProfiles                 UserProfile[]
+  freelancerProfile            FreelancerProfile?
+  companyProfile               CompanyProfile?
   education                    Education[]
   licenses                     License[]
   workExperiences              WorkExperience[]
@@ -51,13 +52,12 @@ model User {
   @@map("scd_users")
 }
 
-model UserProfile {
+// Freelancer/Service Provider Profile
+model FreelancerProfile {
   id                    Int       @id @default(autoincrement())
-  user_id               Int
+  user_id               Int       @unique
   unique_id             String    @unique
-  profile_type          String    @default("freelancer") // freelancer, founder, mentor, investor
-  
-  // Common fields (all profile types)
+  // Profile fields
   profileImage          String?
   coverImage            String?
   hideEmail             Boolean   @default(false)
@@ -72,7 +72,7 @@ model UserProfile {
   hourly_rate           Float?
   links                 Json?     // Social media links
   languages             Json?
-  
+  show_as_agency        Boolean   @default(false)
   
   // Relations
   country_id            Int?
@@ -83,11 +83,64 @@ model UserProfile {
   country               Country?  @relation(fields: [country_id], references: [id])
   state                 State?    @relation(fields: [state_id], references: [id])
 
-  @@unique([user_id, profile_type])
-  @@index([profile_type])
   @@index([unique_id])
   @@index([user_id])
-  @@map("scd_user_profiles")
+  @@map("scd_freelancer_profiles")
+}
+
+// Company/Founder Profile
+model CompanyProfile {
+  id                    Int       @id @default(autoincrement())
+  user_id               Int       @unique
+  unique_id             String    @unique
+  
+  // Profile fields
+  profileImage          String?
+  coverImage            String?
+  hideEmail             Boolean   @default(false)
+  hidePhone             Boolean   @default(false)
+  
+  // Company information
+  company_name          String?
+  company_description   String?
+  company_website       String?
+  company_size          String?
+  founded_year          Int?
+  industry              String?
+  company_stage         String?
+  team_size             Int?
+  
+  // Business model
+  revenue_model         String?
+  target_market         String?
+  problem_statement     String?
+  solution_statement    String?
+  
+  // Funding
+  funding_status        String?
+  total_funding         Decimal?  @db.Decimal(15, 2)
+  
+  // Location
+  address               String?
+  address_line_2        String?
+  city                  String?
+  zipCode               String?
+  
+  // Social links
+  links                 Json?
+  
+  // Relations
+  country_id            Int?
+  state_id              Int?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  country               Country?  @relation(fields: [country_id], references: [id])
+  state                 State?    @relation(fields: [state_id], references: [id])
+
+  @@index([unique_id])
+  @@index([user_id])
+  @@map("scd_company_profiles")
 }
 
 model Education {
@@ -217,30 +270,32 @@ model Otp {
 }
 
 model Country {
-  id           Int            @id @default(autoincrement())
-  name         String         @unique
-  code         String         @unique
-  phone_code   String?        // Phone country code like +91, +1, +44
-  flag         String?
-  currency_id  Int?
-  created_at   DateTime       @default(now())
-  updated_at   DateTime       @updatedAt
-  currency       Currency?       @relation(fields: [currency_id], references: [id])
-  states         State[]
-  userProfiles   UserProfile[]
+  id                 Int                 @id @default(autoincrement())
+  name               String              @unique
+  code               String              @unique
+  phone_code         String?             // Phone country code like +91, +1, +44
+  flag               String?
+  currency_id        Int?
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+  currency           Currency?           @relation(fields: [currency_id], references: [id])
+  states             State[]
+  freelancerProfiles FreelancerProfile[]
+  companyProfiles    CompanyProfile[]
 
   @@map("scd_countries")
 }
 
 model State {
-  id           Int            @id @default(autoincrement())
-  name         String
-  code         String?
-  country_id   Int
-  created_at   DateTime       @default(now())
-  updated_at   DateTime       @updatedAt
-  country        Country        @relation(fields: [country_id], references: [id], onDelete: Cascade)
-  userProfiles   UserProfile[]
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  code               String?
+  country_id         Int
+  created_at         DateTime            @default(now())
+  updated_at         DateTime            @updatedAt
+  country            Country             @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  freelancerProfiles FreelancerProfile[]
+  companyProfiles    CompanyProfile[]
 
   @@unique([name, country_id])
   @@map("scd_states")
