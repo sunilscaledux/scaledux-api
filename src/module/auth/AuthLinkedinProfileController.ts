@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { prisma } from '../../services/prismaService';
 import axios from 'axios';
+import { ulid } from 'ulid';
 
 interface LinkedInProfileData {
   id: string;
@@ -159,7 +160,6 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       data: {
         first_name: firstName,
         last_name: lastName,
-        profileImage: profileData.profilePicture?.displayImage,
         linkedinId: profileData.id,
       },
     });
@@ -170,11 +170,18 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       about: profileData.summary || '',
     };
 
-    await prisma.personalInfo.upsert({
-      where: { user_id: userId },
+    await prisma.userProfile.upsert({
+      where: { 
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'freelancer'
+        }
+      },
       update: personalInfoData,
       create: {
         user_id: userId,
+        unique_id: ulid(),
+        profile_type: 'freelancer',
         ...personalInfoData,
       },
     });
@@ -276,7 +283,6 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           id: updatedUser.id,
           firstName: updatedUser.first_name,
           lastName: updatedUser.last_name,
-          profileImage: updatedUser.profileImage,
         },
         imported: {
           basicInfo: firstName || lastName ? true : false,

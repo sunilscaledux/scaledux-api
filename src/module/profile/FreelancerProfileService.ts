@@ -1,0 +1,355 @@
+import { prisma } from '@services/prismaService';
+import { ServiceResponse } from '@utils/ApiResponse';
+import { getFileUrl, getRelativePath } from '@utils/General';
+import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from './ProfileType';
+import { ulid } from 'ulid';
+
+/**
+ * FreelancerProfileService
+ * Handles all freelancer-specific profile operations
+ */
+export class FreelancerProfileService {
+  /**
+   * Get freelancer profile by user ID
+   */
+  static async getProfileByUserId(userId: number): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.userProfile.findUnique({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        include: {
+          country: true,
+          state: true,
+          currency: true,
+        },
+      });
+
+      if (!profile) {
+        return {
+          success: false,
+          message: 'Freelancer profile not found',
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Freelancer profile retrieved successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Get Freelancer Profile Error:', error);
+      return {
+        success: false,
+        message: 'Failed to retrieve freelancer profile',
+      };
+    }
+  }
+
+  /**
+   * Update profile summary (title and about)
+   */
+  static async updateProfileSummary(userId: number, data: ProfileSummaryInput): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          title: data.title,
+          about: data.about,
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          title: data.title,
+          about: data.about,
+        },
+        include: {
+          country: true,
+          state: true,
+          currency: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Profile summary updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Profile Summary Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update profile summary',
+      };
+    }
+  }
+
+  /**
+   * Update personal information
+   */
+  static async updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          address: data.address,
+          address_line_2: data.address_line_2,
+          zipCode: data.zipCode,
+          country_id: data.countryId,
+          state_id: data.stateId,
+          city: data.city,
+          website: data.website,
+          links: data.links || [],
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          address: data.address,
+          address_line_2: data.address_line_2,
+          zipCode: data.zipCode,
+          country_id: data.countryId,
+          state_id: data.stateId,
+          city: data.city,
+          website: data.website,
+          links: data.links || [],
+        },
+        include: {
+          country: true,
+          state: true,
+          currency: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Personal information updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Personal Info Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update personal information',
+      };
+    }
+  }
+
+  /**
+   * Update hourly rate
+   */
+  static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          hourly_rate: data.hourly_rate,
+          currency_id: data.currency_id,
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          hourly_rate: data.hourly_rate,
+          currency_id: data.currency_id,
+        },
+        include: {
+          currency: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Hourly rate updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Hourly Rate Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update hourly rate',
+      };
+    }
+  }
+
+  /**
+   * Update languages
+   */
+  static async updateLanguages(userId: number, languages: any[]): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          languages: languages,
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          languages: languages,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Languages updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Languages Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update languages',
+      };
+    }
+  }
+
+  /**
+   * Upload profile image
+   */
+  static async uploadProfileImage(userId: number, file: any): Promise<ServiceResponse> {
+    try {
+      const relativePath = getRelativePath(file.path);
+
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          profileImage: relativePath,
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          profileImage: relativePath,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Profile image uploaded successfully',
+        data: {
+          profileImage: getFileUrl(relativePath),
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload Profile Image Error:', error);
+      return {
+        success: false,
+        message: 'Failed to upload profile image',
+      };
+    }
+  }
+
+  /**
+   * Upload cover image
+   */
+  static async uploadCoverImage(userId: number, file: any): Promise<ServiceResponse> {
+    try {
+      const relativePath = getRelativePath(file.path);
+
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: {
+          coverImage: relativePath,
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          coverImage: relativePath,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Cover image uploaded successfully',
+        data: {
+          coverImage: getFileUrl(relativePath),
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload Cover Image Error:', error);
+      return {
+        success: false,
+        message: 'Failed to upload cover image',
+      };
+    }
+  }
+
+  /**
+   * Update privacy settings
+   */
+  static async updatePrivacySettings(
+    userId: number,
+    hideEmail?: boolean,
+    hidePhone?: boolean
+  ): Promise<ServiceResponse> {
+    try {
+      const updateData: any = {};
+      if (hideEmail !== undefined) updateData.hideEmail = hideEmail;
+      if (hidePhone !== undefined) updateData.hidePhone = hidePhone;
+
+      const profile = await prisma.userProfile.upsert({
+        where: {
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: updateData,
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          ...updateData,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Privacy settings updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Privacy Settings Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update privacy settings',
+      };
+    }
+  }
+}

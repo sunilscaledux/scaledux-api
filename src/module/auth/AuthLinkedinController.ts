@@ -225,8 +225,6 @@ const linkedinCallback = async (req: Request, res: Response) => {
           where: { id: user.id },
           data: {
             linkedinId: linkedinUser.id,
-            profileImage:
-              linkedinUser.profilePicture?.displayImage || user.profileImage,
             provider: "linkedin",
           },
         });
@@ -235,15 +233,22 @@ const linkedinCallback = async (req: Request, res: Response) => {
       // Create new user from LinkedIn OAuth
       user = await prisma.user.create({
         data: {
-          unique_id: ulid(),
           first_name: firstName,
           last_name: lastName,
           email: userEmail,
           linkedinId: linkedinUser.id,
-          profileImage: linkedinUser.profilePicture?.displayImage,
           provider: "linkedin",
           email_verified_at: new Date(),
           status: 1,
+        },
+      });
+
+      // Create UserProfile with unique_id
+      await prisma.userProfile.create({
+        data: {
+          user_id: user.id,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
         },
       });
 
@@ -265,7 +270,6 @@ const linkedinCallback = async (req: Request, res: Response) => {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
-          profileImage: user.profileImage,
         },
         token,
         authenticated: true,

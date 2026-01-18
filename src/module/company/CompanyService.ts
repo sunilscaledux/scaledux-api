@@ -1,5 +1,6 @@
 import { prisma } from '@services/prismaService';
 import { CreateCompanyDetailDto, UpdateCompanyDetailDto, CompanyDetailResponse } from './CompanyType';
+import { ulid } from 'ulid';
 
 export class CompanyService {
   /**
@@ -7,17 +8,24 @@ export class CompanyService {
    */
   async createCompanyDetail(userId: number, data: CreateCompanyDetailDto): Promise<CompanyDetailResponse> {
     // Check if company detail already exists
-    const existingCompany = await prisma.companyDetail.findUnique({
-      where: { user_id: userId }
+    const existingCompany = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
 
     if (existingCompany) {
       throw new Error('Company detail already exists for this user');
     }
 
-    const companyDetail = await prisma.companyDetail.create({
+    const companyDetail = await prisma.userProfile.create({
       data: {
         user_id: userId,
+        unique_id: ulid(),
+        profile_type: 'founder',
         ...data
       },
       include: {
@@ -54,8 +62,13 @@ export class CompanyService {
    * Get company detail by user ID
    */
   async getCompanyDetailByUserId(userId: number): Promise<CompanyDetailResponse | null> {
-    const companyDetail = await prisma.companyDetail.findUnique({
-      where: { user_id: userId },
+    const companyDetail = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      },
       include: {
         currency: {
           select: {
@@ -90,7 +103,7 @@ export class CompanyService {
    * Get company detail by ID
    */
   async getCompanyDetailById(id: number): Promise<CompanyDetailResponse | null> {
-    const companyDetail = await prisma.companyDetail.findUnique({
+    const companyDetail = await prisma.userProfile.findUnique({
       where: { id },
       include: {
         currency: {
@@ -127,16 +140,26 @@ export class CompanyService {
    */
   async updateCompanyDetail(userId: number, data: UpdateCompanyDetailDto): Promise<CompanyDetailResponse> {
     // Check if company detail exists
-    const existingCompany = await prisma.companyDetail.findUnique({
-      where: { user_id: userId }
+    const existingCompany = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
 
     if (!existingCompany) {
       throw new Error('Company detail not found');
     }
 
-    const updatedCompany = await prisma.companyDetail.update({
-      where: { user_id: userId },
+    const updatedCompany = await prisma.userProfile.update({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      },
       data,
       include: {
         currency: {
@@ -172,16 +195,26 @@ export class CompanyService {
    * Delete company detail
    */
   async deleteCompanyDetail(userId: number): Promise<void> {
-    const existingCompany = await prisma.companyDetail.findUnique({
-      where: { user_id: userId }
+    const existingCompany = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
 
     if (!existingCompany) {
       throw new Error('Company detail not found');
     }
 
-    await prisma.companyDetail.delete({
-      where: { user_id: userId }
+    await prisma.userProfile.delete({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
   }
 
@@ -189,16 +222,26 @@ export class CompanyService {
    * Upload company logo
    */
   async uploadCompanyLogo(userId: number, logoUrl: string): Promise<CompanyDetailResponse> {
-    const companyDetail = await prisma.companyDetail.findUnique({
-      where: { user_id: userId }
+    const companyDetail = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
 
     if (!companyDetail) {
       throw new Error('Company detail not found. Please create company profile first.');
     }
 
-    const updated = await prisma.companyDetail.update({
-      where: { user_id: userId },
+    const updated = await prisma.userProfile.update({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      },
       data: { company_logo: logoUrl },
       include: {
         currency: {
@@ -234,16 +277,26 @@ export class CompanyService {
    * Upload company cover image
    */
   async uploadCompanyCoverImage(userId: number, coverImageUrl: string): Promise<CompanyDetailResponse> {
-    const companyDetail = await prisma.companyDetail.findUnique({
-      where: { user_id: userId }
+    const companyDetail = await prisma.userProfile.findUnique({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      }
     });
 
     if (!companyDetail) {
       throw new Error('Company detail not found. Please create company profile first.');
     }
 
-    const updated = await prisma.companyDetail.update({
-      where: { user_id: userId },
+    const updated = await prisma.userProfile.update({
+      where: {
+        user_id_profile_type: {
+          user_id: userId,
+          profile_type: 'founder'
+        }
+      },
       data: { company_cover_image: coverImageUrl },
       include: {
         currency: {
@@ -287,7 +340,7 @@ export class CompanyService {
     const skip = (page - 1) * limit;
 
     const [companies, total] = await Promise.all([
-      prisma.companyDetail.findMany({
+      prisma.userProfile.findMany({
         skip,
         take: limit,
         include: {
@@ -319,7 +372,7 @@ export class CompanyService {
           created_at: 'desc'
         }
       }),
-      prisma.companyDetail.count()
+      prisma.userProfile.count({ where: { profile_type: 'founder' } })
     ]);
 
     return {

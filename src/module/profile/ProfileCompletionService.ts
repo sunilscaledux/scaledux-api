@@ -35,7 +35,7 @@ export const calculateProfileCompletion = async (
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        personalInfo: true,
+        userProfiles: true,
         education: true,
         licenses: true,
         workExperiences: true,
@@ -49,25 +49,28 @@ export const calculateProfileCompletion = async (
       throw new Error("User not found");
     }
 
+    // Get first profile (default to freelancer profile)
+    const userProfile = user.userProfiles?.[0];
+
     const completedFields: Record<string, boolean> = {};
     const fieldPercentages = PROFILE_COMPLETION_WEIGHTS;
 
     // Profile Picture (3%)
-    completedFields.profilePicture = !!user.profileImage;
+    completedFields.profilePicture = !!userProfile?.profileImage;
 
     // Profile Cover (3%)
-    completedFields.profileCover = !!user.coverImage;
+    completedFields.profileCover = !!userProfile?.coverImage;
 
     // Profile Summary (12%) - Title + About
-    const hasTitle = !!user.personalInfo?.title;
-    const hasAbout = !!user.personalInfo?.about;
+    const hasTitle = !!userProfile?.title;
+    const hasAbout = !!userProfile?.about;
     completedFields.profileSummary = hasTitle && hasAbout;
 
     // Personal Info (6%) - Address, city, country, website
-    const hasAddress = !!user.personalInfo?.address;
-    const hasCity = !!user.personalInfo?.city;
-    const hasCountry = !!user.personalInfo?.country_id;
-    const hasWebsite = !!user.personalInfo?.website;
+    const hasAddress = !!userProfile?.address;
+    const hasCity = !!userProfile?.city;
+    const hasCountry = !!userProfile?.country_id;
+    const hasWebsite = !!userProfile?.website;
     completedFields.personalInfo = hasAddress && hasCity && hasCountry;
 
     // Skills/Expertise (16%)
@@ -80,7 +83,7 @@ export const calculateProfileCompletion = async (
     completedFields.portfolio = (user.portfolios?.length || 0) > 0;
 
     // Hourly Rate (6%)
-    completedFields.hourlyRate = !!user.personalInfo?.hourly_rate;
+    completedFields.hourlyRate = !!userProfile?.hourly_rate;
 
     // Education (4%)
     completedFields.education = (user.education?.length || 0) > 0;
@@ -90,9 +93,9 @@ export const calculateProfileCompletion = async (
 
     // Languages (2%)
     const hasLanguages = !!(
-      user.personalInfo?.languages &&
-      Array.isArray(user.personalInfo.languages) &&
-      (user.personalInfo.languages as any[]).length > 0
+      userProfile?.languages &&
+      Array.isArray(userProfile.languages) &&
+      (userProfile.languages as any[]).length > 0
     );
     completedFields.languages = hasLanguages;
 

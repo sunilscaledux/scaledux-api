@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from "./ProfileType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, getRelativePath } from "@utils/General";
+import { ulid } from 'ulid';
 
 export class ProfileService {
   /**
@@ -10,9 +11,12 @@ export class ProfileService {
   static async updateProfileSummary(userId: number, data: ProfileSummaryInput): Promise<ServiceResponse> {
     try {
       // Upsert personal info with title and about
-      const personalInfo = await prisma.personalInfo.upsert({
+      const personalInfo = await prisma.userProfile.upsert({
         where: {
-          user_id: userId,
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
         },
         update: {
           title: data.title,
@@ -20,6 +24,8 @@ export class ProfileService {
         },
         create: {
           user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
           title: data.title,
           about: data.about,
         },
@@ -29,7 +35,7 @@ export class ProfileService {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-          personalInfo: true,
+          userProfiles: true,
         },
       });
 
@@ -53,9 +59,12 @@ export class ProfileService {
   static async updatePersonalInfo(userId: number, data: PersonalInfoInput): Promise<ServiceResponse> {
     try {
       // Upsert personal info
-      const personalInfo = await prisma.personalInfo.upsert({
+      const personalInfo = await prisma.userProfile.upsert({
         where: {
-          user_id: userId,
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
         },
         update: {
           address: data.address,
@@ -69,6 +78,8 @@ export class ProfileService {
         },
         create: {
           user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
           address: data.address,
           address_line_2: data.address_line_2,
           zipCode: data.zipCode,
@@ -84,7 +95,7 @@ export class ProfileService {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-          personalInfo: {
+          userProfiles: {
             include: {
               country: true,
               state: true,
@@ -150,9 +161,25 @@ export class ProfileService {
       const imagePath = getRelativePath(file.path);
       const imageUrl = getFileUrl(imagePath);
 
-      const user = await prisma.user.update({
+      await prisma.userProfile.upsert({
+        where: { 
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: { profileImage: imagePath },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          profileImage: imagePath,
+        },
+      });
+
+      const user = await prisma.user.findUnique({
         where: { id: userId },
-        data: { profileImage: imagePath },
+        include: { userProfiles: true },
       });
 
       return {
@@ -188,9 +215,25 @@ export class ProfileService {
       const imagePath = getRelativePath(file.path);
       const imageUrl = getFileUrl(imagePath);
 
-      const user = await prisma.user.update({
+      await prisma.userProfile.upsert({
+        where: { 
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
+        },
+        update: { coverImage: imagePath },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
+          coverImage: imagePath,
+        },
+      });
+
+      const user = await prisma.user.findUnique({
         where: { id: userId },
-        data: { coverImage: imagePath },
+        include: { userProfiles: true },
       });
 
       return {
@@ -217,9 +260,12 @@ export class ProfileService {
   static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
     try {
       // Upsert personal info with hourly rate and currency
-      const personalInfo = await prisma.personalInfo.upsert({
+      const personalInfo = await prisma.userProfile.upsert({
         where: {
-          user_id: userId,
+          user_id_profile_type: {
+            user_id: userId,
+            profile_type: 'freelancer'
+          }
         },
         update: {
           hourly_rate: data.hourly_rate,
@@ -227,6 +273,8 @@ export class ProfileService {
         },
         create: {
           user_id: userId,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
           hourly_rate: data.hourly_rate,
           currency_id: data.currency_id,
         },
@@ -236,7 +284,7 @@ export class ProfileService {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-          personalInfo: {
+          userProfiles: {
             include: {
               currency: true,
             },
@@ -319,29 +367,28 @@ export class ProfileService {
     try {
       const user = await prisma.user.findFirst({
         where: {
-          unique_id: uniqueId,
+          userProfiles: { some: { unique_id: uniqueId } },
           status: 1, // Only active users
         },
         select: {
           id: true,
-          unique_id: true,
           first_name: true,
           last_name: true,
           email: true,
           phone: true,
-          profileImage: true,
-          coverImage: true,
-          hideEmail: true,
-          hidePhone: true,
-          // languages: true, // Field might not exist in schema
           show_as_agency: true,
           created_at: true,
-          personalInfo: {
-            include: {
+          userProfiles: {
+            select: {
+              unique_id: true,
+              profileImage: true,
+              coverImage: true,
+              hideEmail: true,
+              hidePhone: true,
               country: true,
               state: true,
               currency: true,
-            },
+            }
           },
         },
       });
@@ -353,14 +400,16 @@ export class ProfileService {
         };
       }
 
+      const userProfile = user.userProfiles?.[0];
+
       // Transform image URLs
       const transformedUser = {
         ...user,
-        profileImage: user.profileImage ? getFileUrl(user.profileImage) : null,
-        coverImage: user.coverImage ? getFileUrl(user.coverImage) : null,
+        profileImage: userProfile?.profileImage ? getFileUrl(userProfile.profileImage) : null,
+        coverImage: userProfile?.coverImage ? getFileUrl(userProfile.coverImage) : null,
         // Hide sensitive info based on privacy settings
-        email: user.hideEmail ? null : user.email,
-        phone: user.hidePhone ? null : user.phone,
+        email: userProfile?.hideEmail ? null : user.email,
+        phone: userProfile?.hidePhone ? null : user.phone,
       };
 
       return {

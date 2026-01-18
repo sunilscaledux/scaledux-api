@@ -39,7 +39,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/v1", userRoutes);
-app.use("/api/v1", profileRoutes);
+app.use("/api/v1/profile", profileRoutes);
 app.use("/api/v1", generalRoutes);
 app.use("/api/v1/files", deleteFileRoutes);
 app.use("/api/v1", educationRoutes);
@@ -52,7 +52,6 @@ app.use("/api/v1/portfolios", portfolioRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/service-categories", serviceCategoryRoutes);
 app.use("/api/v1/billing", billingRoutes);
-app.use("/api/v1/company", companyRoutes);
 
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {

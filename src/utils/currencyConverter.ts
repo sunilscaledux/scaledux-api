@@ -15,7 +15,7 @@ export async function convertToUserCurrency(userId: number, amountInUSD: number)
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        personalInfo: {
+        userProfiles: {
           include: {
             currency: true
           }
@@ -23,7 +23,8 @@ export async function convertToUserCurrency(userId: number, amountInUSD: number)
       }
     });
 
-    const userCurrency = user?.personalInfo?.currency;
+    const userProfile = user?.userProfiles?.[0];
+    const userCurrency = userProfile?.currency;
     const currencyCode = userCurrency?.code || 'USD';
     const exchangeRate = (userCurrency as any)?.exchange_rate || 1;
 
@@ -56,7 +57,7 @@ export async function convertToUSD(userId: number, amount: number): Promise<numb
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        personalInfo: {
+        userProfiles: {
           include: {
             currency: true
           }
@@ -64,7 +65,8 @@ export async function convertToUSD(userId: number, amount: number): Promise<numb
       }
     });
 
-    const userCurrency = user?.personalInfo?.currency;
+    const userProfile = user?.userProfiles?.[0];
+    const userCurrency = userProfile?.currency;
     const exchangeRate = (userCurrency as any)?.exchange_rate || 1;
 
     // Convert to USD: user's currency / exchange_rate = USD
@@ -88,7 +90,7 @@ export async function getUserCurrency(userId: number): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        personalInfo: {
+        userProfiles: {
           include: {
             currency: true
           }
@@ -96,7 +98,8 @@ export async function getUserCurrency(userId: number): Promise<string> {
       }
     });
  
-    return user?.personalInfo?.currency?.code || 'USD';
+    const userProfile = user?.userProfiles?.[0];
+    return userProfile?.currency?.code || 'USD';
   } catch (error) {
     console.error('Error getting user currency:', error);
     return 'USD';

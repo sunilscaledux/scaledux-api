@@ -67,7 +67,6 @@ const googleCallback = async (req: Request, res: Response) => {
           where: { id: user.id },
           data: {
             googleId: googleUser.id,
-            profileImage: googleUser.picture || user.profileImage,
             provider: "google",
           },
         });
@@ -83,10 +82,18 @@ const googleCallback = async (req: Request, res: Response) => {
           last_name: lastName,
           email: googleUser.email,
           googleId: googleUser.id,
-          unique_id: ulid(),
           provider: "google",
           email_verified_at: new Date(),
           status: 1,
+        },
+      });
+
+      // Create UserProfile with unique_id
+      await prisma.userProfile.create({
+        data: {
+          user_id: user.id,
+          unique_id: ulid(),
+          profile_type: 'freelancer',
         },
       });
 
@@ -105,7 +112,6 @@ const googleCallback = async (req: Request, res: Response) => {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
-          profileImage: user.profileImage,
         },
         token,
         authenticated: true,

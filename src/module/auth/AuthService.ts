@@ -563,7 +563,7 @@ export async function getCurrentUserDetails(userId: number): Promise<any | null>
     const userDetails = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        personalInfo: {
+        userProfiles: {
           include: {
             currency: {
               select: {

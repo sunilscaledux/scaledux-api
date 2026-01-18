@@ -38,7 +38,7 @@ export interface UpdateCompanyDetailDto extends Partial<CreateCompanyDetailDto> 
 export interface CompanyDetailResponse {
   id: number;
   user_id: number;
-  company_name: string;
+  company_name?: string | null;
   company_tagline?: string | null;
   company_logo?: string | null;
   company_cover_image?: string | null;
@@ -58,14 +58,14 @@ export interface CompanyDetailResponse {
   revenue_model?: string | null;
   funding_stage?: string | null;
   total_funding?: number | null;
-  seeking_funding: boolean;
+  seeking_funding?: boolean | null;
   funding_amount?: number | null;
   currency_id?: number | null;
   country_id?: number | null;
   state_id?: number | null;
   social_links?: any;
-  created_at: Date;
-  updated_at: Date;
+  created_at?: Date;
+  updated_at?: Date;
   currency?: {
     id: number;
     name: string;
