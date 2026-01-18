@@ -6,6 +6,7 @@ import { FreelancerProfileController } from "./FreelancerProfileController";
 import { CompanyProfileController } from "./CompanyProfileController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
+import { uploadFile } from "@module/general/FileController";
 
 const router = Router();
 
@@ -61,6 +62,13 @@ router.patch('/company/overview', authenticateToken, CompanyProfileController.up
 router.patch('/company/details', authenticateToken, CompanyProfileController.updateDetails);
 router.patch('/company/funding', authenticateToken, CompanyProfileController.updateFunding);
 router.patch('/company/problem-solution', authenticateToken, CompanyProfileController.updateProblemSolution);
+router.post(
+  '/company/target-market-document',
+  authenticateToken,
+  FileUpload({ uploadPath: 'documents/target-market', fileFilter: 'document', maxSize: 5, maxFiles: 1 }).array('document'),
+  uploadFile,
+  handleMulterError
+);
 router.patch('/company/target-market', authenticateToken, CompanyProfileController.updateTargetMarket);
 router.patch('/company/revenue-model', authenticateToken, CompanyProfileController.updateRevenueModel);
 
