@@ -395,4 +395,32 @@ export class FreelancerProfileService {
       };
     }
   }
+
+  /**
+   * Update agency settings (show_as_agency in User table)
+   */
+  static async updateAgencySettings(
+    userId: number,
+    show_as_agency: boolean
+  ): Promise<ServiceResponse> {
+    try {
+      // Update the User table, not UserProfile
+      const user = await prisma.user.update({
+        where: { id: userId },
+        data: { show_as_agency },
+      });
+
+      return {
+        success: true,
+        message: 'Agency settings updated successfully',
+        data: user,
+      };
+    } catch (error: any) {
+      console.error('Update Agency Settings Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update agency settings',
+      };
+    }
+  }
 }

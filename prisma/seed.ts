@@ -12,23 +12,23 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🚀 Starting comprehensive database seeding...");
 
-//   // // 1. Seed Currencies
-//   const currencyMap = await seedCurrencies(prisma);
+  // // 1. Seed Currencies
+  const currencyMap = await seedCurrencies(prisma);
 
-//   // // 2. Seed Countries and States
-//   await seedCountriesAndStates(prisma, currencyMap);
+  // // 2. Seed Countries and States
+  await seedCountriesAndStates(prisma, currencyMap);
 
-//   // // 3. Seed Languages
-//   await seedLanguages(prisma);
+  // // 3. Seed Languages
+  await seedLanguages(prisma);
 
-//   // // 4. Seed Expertise System
-//   await seedExpertise(prisma);
+  // // 4. Seed Expertise System
+  await seedExpertise(prisma);
 
-//   // 5. Seed Service Categories
-//   await seedServiceCategories(prisma);
+  // 5. Seed Service Categories
+  await seedServiceCategories(prisma);
 
-//   // 6. Seed Industries
-//   await seedIndustries(prisma);
+  // 6. Seed Industries
+  await seedIndustries(prisma);
 
 await seedBillingData(prisma);
 

@@ -36,6 +36,7 @@ router.post(
   handleMulterError
 );
 router.patch('/freelancer/privacy', authenticateToken, FreelancerProfileController.updatePrivacySettings);
+router.patch('/freelancer/agency-settings', authenticateToken, FreelancerProfileController.updateAgencySettings);
 
 /**
  * Public & Completion Routes

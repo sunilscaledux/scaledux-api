@@ -198,4 +198,29 @@ export class FreelancerProfileController {
       return ApiResponse.error(res, error.message || 'Failed to update privacy settings');
     }
   }
+
+  /**
+   * Update agency settings
+   * PATCH /api/v1/profile/freelancer/agency-settings
+   */
+  static async updateAgencySettings(req: Request, res: Response) {
+    try {
+      const { show_as_agency } = req.body;
+
+      if (show_as_agency !== undefined && typeof show_as_agency !== 'boolean') {
+        return ApiResponse.error(res, 'show_as_agency must be a boolean', 400);
+      }
+
+      const userId = req.user.id;
+      const result = await FreelancerProfileService.updateAgencySettings(userId, show_as_agency);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to update agency settings');
+    }
+  }
 }
