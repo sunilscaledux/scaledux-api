@@ -147,7 +147,8 @@ export class FreelancerProfileController {
       }
 
       const userId = req.user.id;
-      const result = await FreelancerProfileService.uploadCoverImage(userId, req.file);
+      const profileType = req.body.profile_type || 'freelancer';
+      const result = await FreelancerProfileService.uploadCoverImage(userId, req.file, profileType);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);

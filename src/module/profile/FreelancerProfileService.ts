@@ -333,7 +333,7 @@ export class FreelancerProfileService {
   /**
    * Upload cover image
    */
-  static async uploadCoverImage(userId: number, file: any): Promise<ServiceResponse> {
+  static async uploadCoverImage(userId: number, file: any, profileType: string = 'freelancer'): Promise<ServiceResponse> {
     try {
       const relativePath = getRelativePath(file.path);
 
@@ -341,7 +341,7 @@ export class FreelancerProfileService {
         where: {
           user_id_profile_type: {
             user_id: userId,
-            profile_type: 'freelancer'
+            profile_type: profileType
           }
         },
         update: {
@@ -350,7 +350,7 @@ export class FreelancerProfileService {
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profile_type: 'freelancer',
+          profile_type: profileType,
           coverImage: relativePath,
         },
       });
