@@ -259,8 +259,8 @@ export class ProfileService {
    */
   static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
     try {
-      // Upsert personal info with hourly rate and currency
-      const personalInfo = await prisma.userProfile.upsert({
+      // Update hourly rate in UserProfile
+      await prisma.userProfile.upsert({
         where: {
           user_id_profile_type: {
             user_id: userId,
@@ -269,13 +269,19 @@ export class ProfileService {
         },
         update: {
           hourly_rate: data.hourly_rate,
-          currency_id: data.currency_id,
         },
         create: {
           user_id: userId,
           unique_id: ulid(),
           profile_type: 'freelancer',
           hourly_rate: data.hourly_rate,
+        },
+      });
+
+      // Update currency on User table
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
           currency_id: data.currency_id,
         },
       });
@@ -284,11 +290,8 @@ export class ProfileService {
       const user = await prisma.user.findUnique({
         where: { id: userId },
         include: {
-          userProfiles: {
-            include: {
-              currency: true,
-            },
-          },
+          currency: true,
+          userProfiles: true,
         },
       });
 
@@ -365,24 +368,11 @@ export class ProfileService {
           userProfiles: { some: { unique_id: uniqueId } },
           status: 1, // Only active users
         },
-        select: {
-          id: true,
-          first_name: true,
-          last_name: true,
-          email: true,
-          phone: true,
-          show_as_agency: true,
-          created_at: true,
+        include: {
           userProfiles: {
-            select: {
-              unique_id: true,
-              profileImage: true,
-              coverImage: true,
-              hideEmail: true,
-              hidePhone: true,
+            include: {
               country: true,
               state: true,
-              currency: true,
             }
           },
         },

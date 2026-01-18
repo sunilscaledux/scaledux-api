@@ -467,6 +467,9 @@ export class BillingService {
     const [transactions, total] = await Promise.all([
       prisma.billingTransaction.findMany({
         where: whereClause,
+        include: {
+          currency: true
+        },
         orderBy: { created_at: 'desc' },
         skip,
         take: limit
@@ -483,7 +486,8 @@ export class BillingService {
           id: t.id,
           uniqueId: t.unique_id,
           amount: t.amount,
-          currency: t.currency,
+          currency: t.currency?.code || 'INR',
+          currencySymbol: t.currency?.symbol || '₹',
           type: t.type,
           status: t.status,
           description: t.description,
@@ -519,13 +523,14 @@ export class BillingService {
     const balanceInUSD = Number(result._sum?.amount || 0);
     
     // Convert to user's currency using utility function
-    const { amount: convertedBalance, currency } = await convertToUserCurrency(userIdNum, balanceInUSD);
+    const { amount: convertedBalance, currency, currencySymbol } = await convertToUserCurrency(userIdNum, balanceInUSD);
 
     return {
       success: true,
       data: {
         balance: convertedBalance,
-        currency
+        currency,
+        currencySymbol
       }
     };
   }

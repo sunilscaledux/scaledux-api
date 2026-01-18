@@ -14,7 +14,7 @@ export class FreelancerProfileService {
    */
   static async getProfileByUserId(userId: number): Promise<ServiceResponse> {
     try {
-      const profile = await prisma.userProfile.findUnique({
+      let profile = await prisma.userProfile.findUnique({
         where: {
           user_id_profile_type: {
             user_id: userId,
@@ -22,18 +22,34 @@ export class FreelancerProfileService {
           }
         },
         include: {
-          user: true,
+          user: {
+            include: {
+              currency: true,
+            },
+          },
           country: true,
           state: true,
-          currency: true,
         },
       });
 
+      // Auto-create profile if it doesn't exist
       if (!profile) {
-        return {
-          success: false,
-          message: 'Freelancer profile not found',
-        };
+        profile = await prisma.userProfile.create({
+          data: {
+            user_id: userId,
+            unique_id: ulid(),
+            profile_type: 'freelancer',
+          },
+          include: {
+            user: {
+              include: {
+                currency: true,
+              },
+            },
+            country: true,
+            state: true,
+          },
+        });
       }
 
       // Combine user account data with profile data (UserDetail = UserProfile + User)
@@ -59,7 +75,7 @@ export class FreelancerProfileService {
         // Relations
         country: profile.country,
         state: profile.state,
-        currency: profile.currency,
+        currency: profile.user.currency,
         // User account data (from User table)
         firstName: profile.user.first_name,
         lastName: profile.user.last_name,
@@ -118,7 +134,6 @@ export class FreelancerProfileService {
         include: {
           country: true,
           state: true,
-          currency: true,
         },
       });
 
@@ -174,7 +189,6 @@ export class FreelancerProfileService {
         include: {
           country: true,
           state: true,
-          currency: true,
         },
       });
 
@@ -197,6 +211,7 @@ export class FreelancerProfileService {
    */
   static async updateHourlyRate(userId: number, data: HourlyRateInput): Promise<ServiceResponse> {
     try {
+      // Update hourly rate in UserProfile
       const profile = await prisma.userProfile.upsert({
         where: {
           user_id_profile_type: {
@@ -206,17 +221,20 @@ export class FreelancerProfileService {
         },
         update: {
           hourly_rate: data.hourly_rate,
-          currency_id: data.currency_id,
         },
         create: {
           user_id: userId,
           unique_id: ulid(),
           profile_type: 'freelancer',
           hourly_rate: data.hourly_rate,
-          currency_id: data.currency_id,
         },
-        include: {
-          currency: true,
+      });
+
+      // Update currency on User table
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          currency_id: data.currency_id,
         },
       });
 

@@ -3,15 +3,8 @@ import { FreelancerProfileService } from './FreelancerProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from './ProfileValidation';
 
-/**
- * FreelancerProfileController
- * Handles freelancer-specific profile operations
- */
 export class FreelancerProfileController {
-  /**
-   * Get freelancer profile
-   * GET /api/v1/profile/freelancer/me
-   */
+  
   static async getMyProfile(req: Request, res: Response) {
     try {
       const userId = req.user.id;
@@ -27,10 +20,6 @@ export class FreelancerProfileController {
     }
   }
 
-  /**
-   * Update freelancer profile summary
-   * PATCH /api/v1/profile/freelancer/summary
-   */
   static async updateSummary(req: Request, res: Response) {
     try {
       const { value, error } = updateSummarySchema.validate(req.body, { abortEarly: false });

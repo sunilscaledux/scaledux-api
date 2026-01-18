@@ -255,7 +255,7 @@ model Currency {
   created_at          DateTime              @default(now())
   updated_at          DateTime              @updatedAt
   countries           Country[]
-  userProfiles        UserProfile[]
+  users               User[]
   billingTransactions BillingTransaction[]
 
   @@map("scd_currencies")

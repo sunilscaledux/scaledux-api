@@ -9,38 +9,37 @@ import { prisma } from '../services/prismaService';
 export async function convertToUserCurrency(userId: number, amountInUSD: number): Promise<{
   amount: number;
   currency: string;
+  currencySymbol: string;
 }> {
   try {
-    // Get user's currency from personal info
+    // Get user's currency from User table
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        userProfiles: {
-          include: {
-            currency: true
-          }
-        }
+        currency: true
       }
     });
 
-    const userProfile = user?.userProfiles?.[0];
-    const userCurrency = userProfile?.currency;
-    const currencyCode = userCurrency?.code || 'USD';
-    const exchangeRate = (userCurrency as any)?.exchange_rate || 1;
-
-    // Convert amount: USD * exchange_rate = user's currency
-    const convertedAmount = amountInUSD * Number(exchangeRate);
+    const currencyCode = user?.currency?.code || 'INR';
+    const currencySymbol = user?.currency?.symbol || '₹';
+    
+    // For now, no conversion - just return amount with user's currency
+    // TODO: Implement exchange rate conversion when needed
+    // const exchangeRate = user?.currency?.exchange_rate || 1;
+    // const convertedAmount = amountInUSD * Number(exchangeRate);
 
     return {
-      amount: convertedAmount,
-      currency: currencyCode
+      amount: amountInUSD,
+      currency: currencyCode,
+      currencySymbol: currencySymbol
     };
   } catch (error) {
     console.error('Error converting currency:', error);
-    // Return original amount in USD if conversion fails
+    // Return original amount in INR if conversion fails
     return {
       amount: amountInUSD,
-      currency: 'USD'
+      currency: 'INR',
+      currencySymbol: '₹'
     };
   }
 }
@@ -52,32 +51,36 @@ export async function convertToUserCurrency(userId: number, amountInUSD: number)
  * @returns Amount in USD
  */
 export async function convertToUSD(userId: number, amount: number): Promise<number> {
-  try {
-    // Get user's currency from personal info
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        userProfiles: {
-          include: {
-            currency: true
-          }
-        }
-      }
-    });
+  // For now, only INR is supported - return amount as-is
+  return amount;
 
-    const userProfile = user?.userProfiles?.[0];
-    const userCurrency = userProfile?.currency;
-    const exchangeRate = (userCurrency as any)?.exchange_rate || 1;
+  // TODO: Implement multi-currency support when needed
+  // try {
+  //   // Get user's currency from personal info
+  //   const user = await prisma.user.findUnique({
+  //     where: { id: userId },
+  //     include: {
+  //       userProfiles: {
+  //         include: {
+  //           currency: true
+  //         }
+  //       }
+  //     }
+  //   });
 
-    // Convert to USD: user's currency / exchange_rate = USD
-    const amountInUSD = amount / Number(exchangeRate);
+  //   const userProfile = user?.userProfiles?.[0];
+  //   const userCurrency = userProfile?.currency;
+  //   const exchangeRate = (userCurrency as any)?.exchange_rate || 1;
 
-    return amountInUSD;
-  } catch (error) {
-    console.error('Error converting to USD:', error);
-    // Return original amount if conversion fails
-    return amount;
-  }
+  //   // Convert to USD: user's currency / exchange_rate = USD
+  //   const amountInUSD = amount / Number(exchangeRate);
+
+  //   return amountInUSD;
+  // } catch (error) {
+  //   console.error('Error converting to USD:', error);
+  //   // Return original amount if conversion fails
+  //   return amount;
+  // }
 }
 
 /**
@@ -90,18 +93,13 @@ export async function getUserCurrency(userId: number): Promise<string> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        userProfiles: {
-          include: {
-            currency: true
-          }
-        }
+        currency: true
       }
     });
  
-    const userProfile = user?.userProfiles?.[0];
-    return userProfile?.currency?.code || 'USD';
+    return user?.currency?.code || 'INR';
   } catch (error) {
     console.error('Error getting user currency:', error);
-    return 'USD';
+    return 'INR';
   }
 }
