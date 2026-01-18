@@ -4,6 +4,7 @@ import { getProfileCompletion } from "./ProfileCompletionController";
 import { UnifiedProfileController } from "./UnifiedProfileController";
 import { FreelancerProfileController } from "./FreelancerProfileController";
 import { CompanyProfileController } from "./CompanyProfileController";
+import { TeamMemberController } from "./TeamMemberController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -71,6 +72,22 @@ router.post(
 );
 router.patch('/company/target-market', authenticateToken, CompanyProfileController.updateTargetMarket);
 router.patch('/company/revenue-model', authenticateToken, CompanyProfileController.updateRevenueModel);
+
+/**
+ * Team Member Routes
+ */
+router.get('/company/team-members', authenticateToken, TeamMemberController.getTeamMembers);
+router.get('/company/team-members/:id', authenticateToken, TeamMemberController.getTeamMemberById);
+router.post('/company/team-members', authenticateToken, TeamMemberController.createTeamMember);
+router.patch('/company/team-members/:id', authenticateToken, TeamMemberController.updateTeamMember);
+router.delete('/company/team-members/:id', authenticateToken, TeamMemberController.deleteTeamMember);
+router.post(
+  '/company/team-members/:id/profile-image',
+  authenticateToken,
+  FileUpload({ uploadPath: 'team/members', fileFilter: 'image', maxSize: 2 }).single('image'),
+  TeamMemberController.uploadProfileImage,
+  handleMulterError
+);
 
 /**
  * Public & Completion Routes

@@ -138,6 +138,7 @@ model CompanyProfile {
   state                 State?    @relation(fields: [state_id], references: [id])
   industry              Industry? @relation(fields: [industry_id], references: [id])
   subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
+  teamMembers           TeamMember[]
 
   @@index([unique_id])
   @@index([user_id])
@@ -263,6 +264,38 @@ model BusinessModel {
   updated_at  DateTime @updatedAt
 
   @@map("scd_business_models")
+}
+
+model TeamRole {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  code        String       @unique
+  description String?
+  is_active   Boolean      @default(true)
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  teamMembers TeamMember[]
+
+  @@map("scd_team_roles")
+}
+
+model TeamMember {
+  id                Int       @id @default(autoincrement())
+  company_profile_id Int
+  name              String
+  email             String?
+  role_id           Int
+  bio               String?
+  profile_image     String?
+  linkedin_url      String?
+  is_active         Boolean   @default(true)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  companyProfile    CompanyProfile @relation(fields: [company_profile_id], references: [id], onDelete: Cascade)
+  role              TeamRole  @relation(fields: [role_id], references: [id])
+
+  @@index([company_profile_id])
+  @@map("scd_team_members")
 }
 
 model UserExpertise {

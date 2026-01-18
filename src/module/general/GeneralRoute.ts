@@ -16,6 +16,7 @@ import {
   getIndustries,
   getSubIndustriesByIndustry,
   getBusinessModels,
+  getTeamRoles,
   searchSkills,
   getAllSkills,
   getServiceCategories,
@@ -47,6 +48,7 @@ router.get("/expertise-categories/:categoryId/skills", getSkillsByCategory)
 router.get("/industries", getIndustries)
 router.get("/industries/:industryId/sub-industries", getSubIndustriesByIndustry)
 router.get("/business-models", getBusinessModels)
+router.get("/team-roles", getTeamRoles)
 
 // Skills endpoints (for large datasets)
 router.get("/skills/search", searchSkills) // GET /skills/search?q=javascript&limit=20

@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import { CompanyProfileService } from './CompanyProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
+import {
+  updateOverviewSchema,
+  updateDetailsSchema,
+  updateFundingSchema,
+  updateProblemSolutionSchema,
+  updateTargetMarketSchema,
+  updateRevenueModelSchema
+} from './CompanyProfileValidation';
 
 /**
  * CompanyProfileController
@@ -78,8 +86,14 @@ export class CompanyProfileController {
    */
   static async updateOverview(req: Request, res: Response) {
     try {
+      const { error, value } = updateOverviewSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateOverview(userId, req.body);
+      const result = await CompanyProfileService.updateOverview(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -97,8 +111,14 @@ export class CompanyProfileController {
    */
   static async updateDetails(req: Request, res: Response) {
     try {
+      const { error, value } = updateDetailsSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateDetails(userId, req.body);
+      const result = await CompanyProfileService.updateDetails(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -116,8 +136,14 @@ export class CompanyProfileController {
    */
   static async updateFunding(req: Request, res: Response) {
     try {
+      const { error, value } = updateFundingSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateFunding(userId, req.body);
+      const result = await CompanyProfileService.updateFunding(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -135,8 +161,14 @@ export class CompanyProfileController {
    */
   static async updateProblemSolution(req: Request, res: Response) {
     try {
+      const { error, value } = updateProblemSolutionSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateProblemSolution(userId, req.body);
+      const result = await CompanyProfileService.updateProblemSolution(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -154,8 +186,14 @@ export class CompanyProfileController {
    */
   static async updateTargetMarket(req: Request, res: Response) {
     try {
+      const { error, value } = updateTargetMarketSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateTargetMarket(userId, req.body);
+      const result = await CompanyProfileService.updateTargetMarket(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -173,8 +211,14 @@ export class CompanyProfileController {
    */
   static async updateRevenueModel(req: Request, res: Response) {
     try {
+      const { error, value } = updateRevenueModelSchema.validate(req.body, { abortEarly: false });
+      
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
       const userId = req.user.id;
-      const result = await CompanyProfileService.updateRevenueModel(userId, req.body);
+      const result = await CompanyProfileService.updateRevenueModel(userId, value);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
