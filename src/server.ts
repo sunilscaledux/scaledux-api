@@ -18,7 +18,6 @@ import portfolioRoutes from './module/portfolio/PortfolioRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
 import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
 import billingRoutes from './module/billing/BillingRoute';
-import companyRoutes from './module/company/CompanyRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";

@@ -104,7 +104,6 @@ model CompanyProfile {
   company_website       String?
   company_size          String?
   founded_year          Int?
-  industry              String?
   company_stage         String?
   team_size             Int?
   
@@ -130,11 +129,15 @@ model CompanyProfile {
   // Relations
   country_id            Int?
   state_id              Int?
+  industry_id           Int?
+  sub_industry_id       Int?
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
   user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
   country               Country?  @relation(fields: [country_id], references: [id])
   state                 State?    @relation(fields: [state_id], references: [id])
+  industry              Industry? @relation(fields: [industry_id], references: [id])
+  subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
 
   @@index([unique_id])
   @@index([user_id])
@@ -221,15 +224,45 @@ model Skill {
 }
 
 model Industry {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  description String?
-  is_active   Boolean   @default(true)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  portfolios  Portfolio[]
+  id              Int              @id @default(autoincrement())
+  name            String           @unique
+  description     String?
+  is_active       Boolean          @default(true)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  portfolios      Portfolio[]
+  subIndustries   SubIndustry[]
+  companyProfiles CompanyProfile[]
 
   @@map("scd_industries")
+}
+
+model SubIndustry {
+  id              Int              @id @default(autoincrement())
+  industry_id     Int
+  name            String
+  description     String?
+  is_active       Boolean          @default(true)
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  industry        Industry         @relation(fields: [industry_id], references: [id], onDelete: Cascade)
+  companyProfiles CompanyProfile[]
+
+  @@unique([industry_id, name])
+  @@index([industry_id])
+  @@map("scd_sub_industries")
+}
+
+model BusinessModel {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@map("scd_business_models")
 }
 
 model UserExpertise {

@@ -5,6 +5,7 @@ import { seedLanguages } from "./seeds/languages-seed";
 import { seedExpertise } from "./seeds/expertise-seed";
 import { seedServiceCategories } from "./seeds/service-categories-seed";
 import { seedIndustries } from "./seeds/industries-seed";
+import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
 import { seedBillingData } from "./seeds/billing-seed";
 
 const prisma = new PrismaClient();
@@ -30,7 +31,10 @@ async function main() {
   // 6. Seed Industries
   await seedIndustries(prisma);
 
-await seedBillingData(prisma);
+  // 7. Seed Sub-Industries and Business Models
+  await seedSubIndustriesAndBusinessModels(prisma);
+
+  await seedBillingData(prisma);
 
   console.log("✅ All seeding completed successfully!");
 }

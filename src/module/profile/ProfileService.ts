@@ -52,9 +52,9 @@ export class ProfileService {
         ...user,
         profileImage: userProfile?.profileImage ? getFileUrl(userProfile.profileImage) : null,
         coverImage: userProfile?.coverImage ? getFileUrl(userProfile.coverImage) : null,
-        // Hide sensitive info based on privacy settings
-        email: userProfile?.hideEmail ? null : user.email,
-        phone: userProfile?.hidePhone ? null : user.phone,
+        // Email and phone are always visible for now
+        email: user.email,
+        phone: user.phone,
       };
 
       return {

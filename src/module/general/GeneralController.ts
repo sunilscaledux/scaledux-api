@@ -499,6 +499,78 @@ export async function getIndustries(req: Request, res: Response) {
   }
 }
 
+export async function getSubIndustriesByIndustry(req: Request, res: Response) {
+  try {
+    const industryId = getIntParam(req.params.industryId)
+    
+    if (!industryId) {
+      return ApiResponse.error(res, "Industry ID is required", 400)
+    }
+
+    const cacheKey = `sub-industries:industry:${industryId}`
+    
+    // Try to get from Redis cache first
+    const cachedSubIndustries = await redisClient.get(cacheKey)
+    if (cachedSubIndustries) {
+      return ApiResponse.success(res, JSON.parse(cachedSubIndustries), "Sub-industries retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const subIndustries = await prisma.subIndustry.findMany({
+      where: { 
+        industry_id: industryId,
+        is_active: true 
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache for 24 hours
+    await redisClient.setex(cacheKey, 864000, JSON.stringify(subIndustries))
+
+    return ApiResponse.success(res, subIndustries, "Sub-industries retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Sub-Industries Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve sub-industries")
+  }
+}
+
+export async function getBusinessModels(req: Request, res: Response) {
+  try {
+    const cacheKey = "business-models";
+    
+    // Try to get from Redis cache first
+    const cachedModels = await redisClient.get(cacheKey)
+    if (cachedModels) {
+      return ApiResponse.success(res, JSON.parse(cachedModels), "Business models retrieved successfully")
+    }
+
+    // If not in cache, fetch from database
+    const businessModels = await prisma.businessModel.findMany({
+      where: { is_active: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    })
+
+    // Cache for 24 hours
+    await redisClient.setex(cacheKey, 864000, JSON.stringify(businessModels))
+
+    return ApiResponse.success(res, businessModels, "Business models retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Business Models Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve business models")
+  }
+}
+
 // Skills search function for large datasets
 export async function searchSkills(req: Request, res: Response) {
   try {

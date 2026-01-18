@@ -23,6 +23,8 @@ export class CompanyProfileService {
           },
           country: true,
           state: true,
+          industry: true,
+          subIndustry: true,
         },
       });
 
@@ -41,6 +43,8 @@ export class CompanyProfileService {
             },
             country: true,
             state: true,
+            industry: true,
+            subIndustry: true,
           },
         });
       }
@@ -52,8 +56,6 @@ export class CompanyProfileService {
         profile_type: 'founder',
         profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
         coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
-        hideEmail: profile.hideEmail,
-        hidePhone: profile.hidePhone,
         
         // Company info
         company_name: profile.company_name,
@@ -61,7 +63,10 @@ export class CompanyProfileService {
         company_website: profile.company_website,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
+        industry_id: profile.industry_id,
+        sub_industry_id: profile.sub_industry_id,
         industry: profile.industry,
+        subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
         team_size: profile.team_size,
         
@@ -184,7 +189,6 @@ export class CompanyProfileService {
   static async updateOverview(userId: number, data: {
     company_name?: string;
     company_description?: string;
-    industry?: string;
     company_website?: string;
     founded_year?: number;
     company_size?: string;
@@ -241,6 +245,8 @@ export class CompanyProfileService {
     zipCode?: string;
     country_id?: number;
     state_id?: number;
+    industry_id?: number;
+    sub_industry_id?: number;
   }): Promise<ServiceResponse> {
     try {
       const profile = await prisma.companyProfile.upsert({
