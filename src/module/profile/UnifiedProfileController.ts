@@ -10,15 +10,22 @@ export class UnifiedProfileController {
   static async getMyProfile(req: Request, res: Response) {
     try {
       const userId = req.user.id;
+      const profileType = (req.query.profile_type as string) || 'freelancer';
       
-      // Get freelancer profile (only profile type supported for now)
-      const result = await FreelancerProfileService.getProfileByUserId(userId);
+      // Validate profile type
+      const validProfileTypes = ['freelancer', 'founder', 'mentor', 'investor'];
+      if (!validProfileTypes.includes(profileType)) {
+        return ApiResponse.error(res, 'Invalid profile type', 400);
+      }
+      
+      // Get profile for the specified type
+      const result = await FreelancerProfileService.getProfileByUserId(userId, profileType);
 
       if (result.success) {
         return ApiResponse.success(res, {
           ...result.data,
-          availableProfileTypes: ['freelancer'],
-          activeProfileType: 'freelancer'
+          availableProfileTypes: ['freelancer', 'founder'],
+          activeProfileType: profileType
         }, result.message);
       } else {
         return ApiResponse.error(res, result.message, 404);

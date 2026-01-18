@@ -10,15 +10,15 @@ import { ulid } from 'ulid';
  */
 export class FreelancerProfileService {
   /**
-   * Get freelancer profile by user ID
+   * Get profile by user ID and profile type
    */
-  static async getProfileByUserId(userId: number): Promise<ServiceResponse> {
+  static async getProfileByUserId(userId: number, profileType: string = 'freelancer'): Promise<ServiceResponse> {
     try {
       let profile = await prisma.userProfile.findUnique({
         where: {
           user_id_profile_type: {
             user_id: userId,
-            profile_type: 'freelancer'
+            profile_type: profileType
           }
         },
         include: {
@@ -38,7 +38,7 @@ export class FreelancerProfileService {
           data: {
             user_id: userId,
             unique_id: ulid(),
-            profile_type: 'freelancer',
+            profile_type: profileType,
           },
           include: {
             user: {
