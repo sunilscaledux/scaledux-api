@@ -22,6 +22,7 @@ export class FreelancerProfileService {
           }
         },
         include: {
+          user: true,
           country: true,
           state: true,
           currency: true,
@@ -35,16 +36,58 @@ export class FreelancerProfileService {
         };
       }
 
+      // Combine user account data with profile data (UserDetail = UserProfile + User)
+      const userDetail = {
+        // Profile data (from UserProfile table) - explicitly select fields
+        id: profile.id,
+        unique_id: profile.unique_id,
+        profile_type: profile.profile_type,
+        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
+        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        hideEmail: profile.hideEmail,
+        hidePhone: profile.hidePhone,
+        title: profile.title,
+        about: profile.about,
+        address: profile.address,
+        address_line_2: profile.address_line_2,
+        city: profile.city,
+        website: profile.website,
+        zipCode: profile.zipCode,
+        hourly_rate: profile.hourly_rate,
+        links: profile.links,
+        languages: profile.languages,
+        // Relations
+        country: profile.country,
+        state: profile.state,
+        currency: profile.currency,
+        // User account data (from User table)
+        firstName: profile.user.first_name,
+        lastName: profile.user.last_name,
+        email: profile.user.email,
+        phone: profile.user.phone,
+        emailVerified: !!profile.user.email_verified_at,
+        phoneVerified: !!profile.user.phone_verified_at,
+        status: profile.user.status?.toString(),
+        identity_verification_status: profile.user.identity_verification_status,
+        identity_verified_at: profile.user.identity_verified_at?.toISOString(),
+        agency_verification_status: profile.user.agency_verification_status,
+        agency_verified_at: profile.user.agency_verified_at?.toISOString(),
+        show_as_agency: profile.user.show_as_agency,
+        // Response metadata
+        availableProfileTypes: ['freelancer'],
+        activeProfileType: 'freelancer',
+      };
+
       return {
         success: true,
-        message: 'Freelancer profile retrieved successfully',
-        data: profile,
+        message: 'User profile retrieved successfully',
+        data: userDetail,
       };
     } catch (error: any) {
       console.error('Get Freelancer Profile Error:', error);
       return {
         success: false,
-        message: 'Failed to retrieve freelancer profile',
+        message: 'Failed to retrieve user profile',
       };
     }
   }

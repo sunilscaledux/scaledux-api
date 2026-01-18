@@ -73,43 +73,6 @@ model UserProfile {
   links                 Json?     // Social media links
   languages             Json?
   
-  // Founder-specific fields (when profile_type = "founder")
-  company_name          String?
-  company_tagline       String?
-  company_logo          String?
-  company_cover_image   String?
-  year_founded          Int?
-  company_size          String?   // e.g., "1-10", "11-50", "51-200", "201-500", "501+"
-  headquarters          String?
-  company_location      String?
-  company_website       String?
-  industry              String?
-  company_type          String?   // e.g., "Startup", "SME", "Enterprise"
-  description           String?
-  problem_statement     String?
-  solution              String?
-  target_market         String?
-  unique_value_prop     String?
-  business_model        String?
-  revenue_model         String?
-  funding_stage         String?   // e.g., "Pre-seed", "Seed", "Series A", etc.
-  total_funding         Float?
-  seeking_funding       Boolean   @default(false)
-  funding_amount        Float?
-  social_links          Json?     // LinkedIn, Twitter, Facebook, etc.
-  
-  // Mentor-specific fields (when profile_type = "mentor")
-  expertise_areas       Json?     // Array of expertise areas
-  mentoring_experience  Int?      // Years of experience
-  availability          String?   // e.g., "Full-time", "Part-time", "Weekends"
-  session_rate          Float?    // Hourly rate for mentoring sessions
-  
-  // Investor-specific fields (when profile_type = "investor")
-  investment_focus      Json?     // Array of industries/sectors
-  investment_stage      String?   // e.g., "Pre-seed", "Seed", "Series A"
-  ticket_size_min       Float?    // Minimum investment amount
-  ticket_size_max       Float?    // Maximum investment amount
-  portfolio_companies   Json?     // Array of portfolio companies
   
   // Relations
   country_id            Int?
