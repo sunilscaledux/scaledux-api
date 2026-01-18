@@ -1,12 +1,183 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { ulid } from 'ulid';
+import { getFileUrl, getRelativePath } from '@utils/General';
 
 /**
  * CompanyProfileService
  * Handles all company/founder-specific profile operations
  */
 export class CompanyProfileService {
+  /**
+   * Get company profile by user ID
+   */
+  static async getMyProfile(userId: number): Promise<ServiceResponse> {
+    try {
+      let profile = await prisma.companyProfile.findUnique({
+        where: { user_id: userId },
+        include: {
+          user: {
+            include: {
+              currency: true,
+            },
+          },
+          country: true,
+          state: true,
+        },
+      });
+
+      // Auto-create profile if it doesn't exist
+      if (!profile) {
+        profile = await prisma.companyProfile.create({
+          data: {
+            user_id: userId,
+            unique_id: ulid(),
+          },
+          include: {
+            user: {
+              include: {
+                currency: true,
+              },
+            },
+            country: true,
+            state: true,
+          },
+        });
+      }
+
+      // Transform data for response
+      const companyDetail = {
+        id: profile.id,
+        unique_id: profile.unique_id,
+        profile_type: 'founder',
+        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
+        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        hideEmail: profile.hideEmail,
+        hidePhone: profile.hidePhone,
+        
+        // Company info
+        company_name: profile.company_name,
+        company_description: profile.company_description,
+        company_website: profile.company_website,
+        company_size: profile.company_size,
+        founded_year: profile.founded_year,
+        industry: profile.industry,
+        company_stage: profile.company_stage,
+        team_size: profile.team_size,
+        
+        // Business model
+        revenue_model: profile.revenue_model,
+        target_market: profile.target_market,
+        problem_statement: profile.problem_statement,
+        solution_statement: profile.solution_statement,
+        
+        // Funding
+        funding_status: profile.funding_status,
+        total_funding: profile.total_funding,
+        
+        // Location
+        address: profile.address,
+        address_line_2: profile.address_line_2,
+        city: profile.city,
+        zipCode: profile.zipCode,
+        
+        // Social links
+        links: profile.links,
+        
+        // Relations
+        country: profile.country,
+        state: profile.state,
+        currency: profile.user.currency,
+        
+        // User data
+        firstName: profile.user.first_name,
+        lastName: profile.user.last_name,
+        email: profile.user.email,
+        phone: profile.user.phone,
+        emailVerified: !!profile.user.email_verified_at,
+        phoneVerified: !!profile.user.phone_verified_at,
+      };
+
+      return {
+        success: true,
+        message: 'Company profile retrieved successfully',
+        data: companyDetail,
+      };
+    } catch (error: any) {
+      console.error('Get Company Profile Error:', error);
+      return {
+        success: false,
+        message: 'Failed to retrieve company profile',
+      };
+    }
+  }
+
+  /**
+   * Upload profile image
+   */
+  static async uploadProfileImage(userId: number, file: any): Promise<ServiceResponse> {
+    try {
+      const relativePath = getRelativePath(file.path);
+
+      const profile = await prisma.companyProfile.upsert({
+        where: { user_id: userId },
+        update: { profileImage: relativePath },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          profileImage: relativePath,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Profile image uploaded successfully',
+        data: {
+          profileImage: getFileUrl(relativePath),
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload Profile Image Error:', error);
+      return {
+        success: false,
+        message: 'Failed to upload profile image',
+      };
+    }
+  }
+
+  /**
+   * Upload cover image
+   */
+  static async uploadCoverImage(userId: number, file: any): Promise<ServiceResponse> {
+    try {
+      const relativePath = getRelativePath(file.path);
+
+      const profile = await prisma.companyProfile.upsert({
+        where: { user_id: userId },
+        update: { coverImage: relativePath },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          coverImage: relativePath,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Cover image uploaded successfully',
+        data: {
+          coverImage: getFileUrl(relativePath),
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload Cover Image Error:', error);
+      return {
+        success: false,
+        message: 'Failed to upload cover image',
+      };
+    }
+  }
+
   /**
    * Update company overview (company name, description, etc.)
    */

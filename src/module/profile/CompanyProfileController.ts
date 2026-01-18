@@ -8,6 +8,71 @@ import { ApiResponse } from '@utils/ApiResponse';
  */
 export class CompanyProfileController {
   /**
+   * Get my company profile
+   * GET /api/v1/profile/company/me
+   */
+  static async getMyProfile(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const result = await CompanyProfileService.getMyProfile(userId);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to retrieve company profile');
+    }
+  }
+
+  /**
+   * Upload profile image
+   * POST /api/v1/profile/company/profile-image
+   */
+  static async uploadProfileImage(req: Request, res: Response) {
+    try {
+      if (!req.file) {
+        return ApiResponse.error(res, 'No file uploaded', 400);
+      }
+
+      const userId = req.user.id;
+      const result = await CompanyProfileService.uploadProfileImage(userId, req.file);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to upload profile image');
+    }
+  }
+
+  /**
+   * Upload cover image
+   * POST /api/v1/profile/company/cover-image
+   */
+  static async uploadCoverImage(req: Request, res: Response) {
+    try {
+      if (!req.file) {
+        return ApiResponse.error(res, 'No file uploaded', 400);
+      }
+
+      const userId = req.user.id;
+      const result = await CompanyProfileService.uploadCoverImage(userId, req.file);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to upload cover image');
+    }
+  }
+
+  /**
    * Update company overview
    * PATCH /api/v1/profile/company/overview
    */

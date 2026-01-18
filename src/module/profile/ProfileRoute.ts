@@ -42,6 +42,21 @@ router.patch('/freelancer/agency-settings', authenticateToken, FreelancerProfile
 /**
  * Company/Founder Profile Routes
  */
+router.get('/company/me', authenticateToken, CompanyProfileController.getMyProfile);
+router.post(
+  '/company/profile-image',
+  authenticateToken,
+  FileUpload({ uploadPath: 'profile/company' }).single('image'),
+  CompanyProfileController.uploadProfileImage,
+  handleMulterError
+);
+router.post(
+  '/company/cover-image',
+  authenticateToken,
+  FileUpload({ uploadPath: 'cover/company' }).single('image'),
+  CompanyProfileController.uploadCoverImage,
+  handleMulterError
+);
 router.patch('/company/overview', authenticateToken, CompanyProfileController.updateOverview);
 router.patch('/company/details', authenticateToken, CompanyProfileController.updateDetails);
 router.patch('/company/funding', authenticateToken, CompanyProfileController.updateFunding);
