@@ -311,12 +311,7 @@ export class ProfileService {
    */
   static async updateLanguages(userId: number, languages: string[]): Promise<ServiceResponse> {
     try {
-      // Note: languages field might not exist in User schema
-      // const user = await prisma.user.update({
-      //   where: { id: userId },
-      //   data: { languages: languages || [] },
-      // });
-      
+    
       // For now, return success without updating
       const user = await prisma.user.findUnique({
         where: { id: userId }
