@@ -179,7 +179,7 @@ export class CompanyProfileService {
   }
 
   /**
-   * Update company overview (company name, description, etc.)
+   * Update company overview (includes company info and location)
    */
   static async updateOverview(userId: number, data: {
     company_name?: string;
@@ -187,6 +187,13 @@ export class CompanyProfileService {
     industry?: string;
     company_website?: string;
     founded_year?: number;
+    company_size?: string;
+    address?: string;
+    address_line_2?: string;
+    city?: string;
+    zipCode?: string;
+    country_id?: number;
+    state_id?: number;
   }): Promise<ServiceResponse> {
     try {
       const profile = await prisma.companyProfile.upsert({

@@ -97,8 +97,6 @@ model CompanyProfile {
   // Profile fields
   profileImage          String?
   coverImage            String?
-  hideEmail             Boolean   @default(false)
-  hidePhone             Boolean   @default(false)
   
   // Company information
   company_name          String?
