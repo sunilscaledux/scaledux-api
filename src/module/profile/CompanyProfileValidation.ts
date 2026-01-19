@@ -130,6 +130,24 @@ export const updateFundingRoundSchema = Joi.object({
 });
 
 /**
+ * Validation schema for raising fund
+ */
+export const raisingFundSchema = Joi.object({
+  is_raising: Joi.boolean().required().messages({
+    'any.required': 'Raising status is required'
+  }),
+  round_type: Joi.string().optional().max(100).allow(null, '').messages({
+    'string.max': 'Round type must not exceed 100 characters'
+  }),
+  target_amount: Joi.number().optional().min(0).allow(null).messages({
+    'number.min': 'Target amount cannot be negative'
+  }),
+  uses_of_fund: Joi.object().optional().allow(null).messages({
+    'object.base': 'Uses of fund must be a valid object'
+  })
+});
+
+/**
  * Validation schema for updating problem and solution
  */
 export const updateProblemSolutionSchema = Joi.object({

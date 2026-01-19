@@ -145,6 +145,7 @@ model CompanyProfile {
   subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
   teamMembers           TeamMember[]
   fundingRounds         FundingRound[]
+  raisingFund           RaisingFund?
 
   @@index([unique_id])
   @@index([user_id])
@@ -166,6 +167,20 @@ model FundingRound {
 
   @@index([company_profile_id])
   @@map("scd_funding_rounds")
+}
+
+model RaisingFund {
+  id                    Int       @id @default(autoincrement())
+  company_profile_id    Int       @unique
+  is_raising            Boolean   @default(false)
+  round_type            String?
+  target_amount         Decimal?  @db.Decimal(15, 2)
+  uses_of_fund          Json?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  companyProfile        CompanyProfile @relation(fields: [company_profile_id], references: [id], onDelete: Cascade)
+
+  @@map("scd_raising_funds")
 }
 
 model Education {

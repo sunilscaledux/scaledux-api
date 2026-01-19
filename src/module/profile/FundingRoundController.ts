@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiResponse } from "@utils/ApiResponse";
 import { FundingRoundService } from "./FundingRoundService";
 import * as CompanyProfileValidation from "./CompanyProfileValidation";
+import { getIntParam } from "@utils/requestHelpers";
 
 export class FundingRoundController {
   /**
@@ -61,9 +62,9 @@ export class FundingRoundController {
       }
 
       const userId = req.user.id;
-      const fundingRoundId = parseInt(req.params.id);
+      const fundingRoundId = getIntParam(req.params.id);
 
-      if (isNaN(fundingRoundId)) {
+      if (!fundingRoundId) {
         return ApiResponse.error(res, 'Invalid funding round ID');
       }
 
@@ -86,9 +87,9 @@ export class FundingRoundController {
   static async deleteFundingRound(req: Request, res: Response) {
     try {
       const userId = req.user.id;
-      const fundingRoundId = parseInt(req.params.id);
+      const fundingRoundId = getIntParam(req.params.id);
 
-      if (isNaN(fundingRoundId)) {
+      if (!fundingRoundId) {
         return ApiResponse.error(res, 'Invalid funding round ID');
       }
 
