@@ -71,7 +71,12 @@ export class CompanyProfileService {
         team_size: profile.team_size,
         
         // Business model
-        revenue_model: profile.revenue_model,
+        revenue_description: profile.revenue_description,
+        revenueModels: profile.revenue_model_ids.length > 0 
+          ? await prisma.revenueModel.findMany({
+              where: { id: { in: profile.revenue_model_ids } },
+            })
+          : null,
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
@@ -408,16 +413,29 @@ export class CompanyProfileService {
    * Update revenue model
    */
   static async updateRevenueModel(userId: number, data: {
-    revenue_model?: string;
+    revenue_model_ids?: number[] | null;
+    revenue_description?: string | null;
   }): Promise<ServiceResponse> {
     try {
-      const profile = await prisma.companyProfile.upsert({
+      // Prepare update data
+      const updateData: any = {};
+      
+      if (data.revenue_description !== undefined) {
+        updateData.revenue_description = data.revenue_description;
+      }
+      
+      if (data.revenue_model_ids !== undefined) {
+        updateData.revenue_model_ids = data.revenue_model_ids || [];
+      }
+
+      // Update or create profile
+      const updatedProfile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
-        update: data,
+        update: updateData,
         create: {
           user_id: userId,
           unique_id: ulid(),
-          ...data,
+          ...updateData,
         },
         include: {
           user: {
@@ -427,13 +445,25 @@ export class CompanyProfileService {
           },
           country: true,
           state: true,
+          industry: true,
+          subIndustry: true,
         },
       });
+
+      // Fetch revenue models if any
+      const revenueModels = updatedProfile.revenue_model_ids.length > 0
+        ? await prisma.revenueModel.findMany({
+            where: { id: { in: updatedProfile.revenue_model_ids } },
+          })
+        : [];
 
       return {
         success: true,
         message: 'Revenue model updated successfully',
-        data: profile,
+        data: {
+          ...updatedProfile,
+          revenueModels: revenueModels.length > 0 ? revenueModels : null,
+        },
       };
     } catch (error: any) {
       console.error('Update Revenue Model Error:', error);

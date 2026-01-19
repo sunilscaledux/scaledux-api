@@ -107,8 +107,12 @@ export const updateTargetMarketSchema = Joi.object({
  * Validation schema for updating revenue model
  */
 export const updateRevenueModelSchema = Joi.object({
-  revenue_model: Joi.string().optional().allow('', null).max(2000).messages({
-    'string.max': 'Revenue model must not exceed 2000 characters'
+  revenue_model_ids: Joi.array().items(Joi.number().integer()).optional().allow(null).messages({
+    'array.base': 'Revenue models must be an array',
+    'number.base': 'Each revenue model ID must be a valid number'
+  }),
+  revenue_description: Joi.string().optional().allow('', null).max(5000).messages({
+    'string.max': 'Revenue description must not exceed 5000 characters'
   })
 });
 

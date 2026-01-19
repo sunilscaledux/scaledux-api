@@ -7,6 +7,7 @@ import { seedServiceCategories } from "./seeds/service-categories-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
 import { seedTeamRoles } from "./seeds/team-roles-seed";
+import { seedRevenueModels } from "./seeds/revenue-models-seed";
 import { seedBillingData } from "./seeds/billing-seed";
 
 const prisma = new PrismaClient();
@@ -37,6 +38,9 @@ async function main() {
 
   // 8. Seed Team Roles
   await seedTeamRoles(prisma);
+
+  // 9. Seed Revenue Models
+  await seedRevenueModels(prisma);
 
   await seedBillingData(prisma);
 
