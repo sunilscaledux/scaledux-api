@@ -5,6 +5,7 @@ import redisClient from "@services/redisService";
 import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getFileUrl } from "@utils/General"
+import { FUNDING_STAGES } from "../../constants/fundingStages"
 
 // Cache invalidation helper function
 export async function invalidateLocationCache(countryId?: string) {
@@ -636,6 +637,20 @@ export async function getTeamRoles(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Get Team Roles Error:", error)
     return ApiResponse.error(res, "Failed to retrieve team roles")
+  }
+}
+
+/**
+ * Get all funding stages
+ * GET /api/v1/funding-stages
+ */
+export async function getFundingStages(req: Request, res: Response) {
+  try {
+    // Return funding stages from constants (no database needed)
+    return ApiResponse.success(res, FUNDING_STAGES, "Funding stages retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Funding Stages Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve funding stages")
   }
 }
 

@@ -144,10 +144,28 @@ model CompanyProfile {
   industry              Industry? @relation(fields: [industry_id], references: [id])
   subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
   teamMembers           TeamMember[]
+  fundingRounds         FundingRound[]
 
   @@index([unique_id])
   @@index([user_id])
   @@map("scd_company_profiles")
+}
+
+model FundingRound {
+  id                    Int       @id @default(autoincrement())
+  company_profile_id    Int
+  investor_name         String
+  funding_stage         String
+  funding_amount        Decimal   @db.Decimal(15, 2)
+  funding_date          DateTime
+  funding_valuation     Decimal?  @db.Decimal(15, 2)
+  deleted_at            DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  companyProfile        CompanyProfile @relation(fields: [company_profile_id], references: [id], onDelete: Cascade)
+
+  @@index([company_profile_id])
+  @@map("scd_funding_rounds")
 }
 
 model Education {

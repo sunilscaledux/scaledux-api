@@ -83,6 +83,53 @@ export const updateFundingSchema = Joi.object({
 });
 
 /**
+ * Validation schema for creating a funding round
+ */
+export const createFundingRoundSchema = Joi.object({
+  investor_name: Joi.string().required().max(255).messages({
+    'string.empty': 'Investor name is required',
+    'string.max': 'Investor name must not exceed 255 characters'
+  }),
+  funding_stage: Joi.string().required().max(100).messages({
+    'string.empty': 'Funding stage is required',
+    'string.max': 'Funding stage must not exceed 100 characters'
+  }),
+  funding_amount: Joi.number().required().min(0).messages({
+    'number.base': 'Funding amount must be a number',
+    'any.required': 'Funding amount is required',
+    'number.min': 'Funding amount cannot be negative'
+  }),
+  funding_date: Joi.date().required().messages({
+    'date.base': 'Funding date must be a valid date',
+    'any.required': 'Funding date is required'
+  }),
+  funding_valuation: Joi.number().optional().min(0).allow(null).messages({
+    'number.min': 'Funding valuation cannot be negative'
+  })
+});
+
+/**
+ * Validation schema for updating a funding round
+ */
+export const updateFundingRoundSchema = Joi.object({
+  investor_name: Joi.string().optional().max(255).messages({
+    'string.max': 'Investor name must not exceed 255 characters'
+  }),
+  funding_stage: Joi.string().optional().max(100).messages({
+    'string.max': 'Funding stage must not exceed 100 characters'
+  }),
+  funding_amount: Joi.number().optional().min(0).messages({
+    'number.min': 'Funding amount cannot be negative'
+  }),
+  funding_date: Joi.date().optional().messages({
+    'date.base': 'Funding date must be a valid date'
+  }),
+  funding_valuation: Joi.number().optional().min(0).allow(null).messages({
+    'number.min': 'Funding valuation cannot be negative'
+  })
+});
+
+/**
  * Validation schema for updating problem and solution
  */
 export const updateProblemSolutionSchema = Joi.object({

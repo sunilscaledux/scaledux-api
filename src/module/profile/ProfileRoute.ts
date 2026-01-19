@@ -5,6 +5,7 @@ import { UnifiedProfileController } from "./UnifiedProfileController";
 import { FreelancerProfileController } from "./FreelancerProfileController";
 import { CompanyProfileController } from "./CompanyProfileController";
 import { TeamMemberController } from "./TeamMemberController";
+import { FundingRoundController } from "./FundingRoundController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -79,6 +80,14 @@ router.patch(
   CompanyProfileController.uploadTractionDocument,
   handleMulterError
 );
+
+/**
+ * Funding Round Routes
+ */
+router.get('/company/funding-rounds', authenticateToken, FundingRoundController.getFundingRounds);
+router.post('/company/funding-rounds', authenticateToken, FundingRoundController.createFundingRound);
+router.patch('/company/funding-rounds/:id', authenticateToken, FundingRoundController.updateFundingRound);
+router.delete('/company/funding-rounds/:id', authenticateToken, FundingRoundController.deleteFundingRound);
 
 /**
  * Team Member Routes
