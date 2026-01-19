@@ -81,6 +81,10 @@ export class CompanyProfileService {
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
         
+        // Traction
+        traction_title: profile.traction_title,
+        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        
         // Funding
         funding_status: profile.funding_status,
         total_funding: profile.total_funding,
@@ -470,6 +474,104 @@ export class CompanyProfileService {
       return {
         success: false,
         message: 'Failed to update revenue model',
+      };
+    }
+  }
+
+  /**
+   * Update traction
+   */
+  static async updateTraction(userId: number, data: {
+    traction_title?: string | null;
+    traction_document?: string | null;
+  }): Promise<ServiceResponse> {
+    try {
+      // Prepare update data
+      const updateData: any = {};
+      
+      if (data.traction_title !== undefined) {
+        updateData.traction_title = data.traction_title;
+      }
+      
+      if (data.traction_document !== undefined) {
+        updateData.traction_document = data.traction_document;
+      }
+
+      // Update or create profile
+      const updatedProfile = await prisma.companyProfile.upsert({
+        where: { user_id: userId },
+        update: updateData,
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          ...updateData,
+        },
+        include: {
+          user: {
+            include: {
+              currency: true,
+            },
+          },
+          country: true,
+          state: true,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Traction updated successfully',
+        data: updatedProfile,
+      };
+    } catch (error: any) {
+      console.error('Update Traction Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update traction',
+      };
+    }
+  }
+
+  /**
+   * Upload traction document with title
+   */
+  static async uploadTractionDocument(userId: number, file: any, traction_title?: string): Promise<ServiceResponse> {
+    try {
+      const updateData: any = {};
+      
+      // Handle file upload if provided
+      if (file) {
+        const relativePath = getRelativePath(file.path);
+        updateData.traction_document = relativePath;
+      }
+      
+      // Handle title if provided
+      if (traction_title !== undefined) {
+        updateData.traction_title = traction_title;
+      }
+
+      const profile = await prisma.companyProfile.upsert({
+        where: { user_id: userId },
+        update: updateData,
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          ...updateData,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Traction updated successfully',
+        data: {
+          traction_title: profile.traction_title,
+          traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        },
+      };
+    } catch (error: any) {
+      console.error('Upload Traction Document Error:', error);
+      return {
+        success: false,
+        message: 'Failed to upload traction document',
       };
     }
   }

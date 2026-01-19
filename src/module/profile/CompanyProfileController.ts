@@ -1,14 +1,7 @@
 import { Request, Response } from 'express';
 import { CompanyProfileService } from './CompanyProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
-import {
-  updateOverviewSchema,
-  updateDetailsSchema,
-  updateFundingSchema,
-  updateProblemSolutionSchema,
-  updateTargetMarketSchema,
-  updateRevenueModelSchema
-} from './CompanyProfileValidation';
+import * as CompanyProfileValidation from './CompanyProfileValidation';
 
 /**
  * CompanyProfileController
@@ -86,7 +79,7 @@ export class CompanyProfileController {
    */
   static async updateOverview(req: Request, res: Response) {
     try {
-      const { error, value } = updateOverviewSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateOverviewSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -111,7 +104,7 @@ export class CompanyProfileController {
    */
   static async updateDetails(req: Request, res: Response) {
     try {
-      const { error, value } = updateDetailsSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateDetailsSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -136,7 +129,7 @@ export class CompanyProfileController {
    */
   static async updateFunding(req: Request, res: Response) {
     try {
-      const { error, value } = updateFundingSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateFundingSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -161,7 +154,7 @@ export class CompanyProfileController {
    */
   static async updateProblemSolution(req: Request, res: Response) {
     try {
-      const { error, value } = updateProblemSolutionSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateProblemSolutionSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -186,7 +179,7 @@ export class CompanyProfileController {
    */
   static async updateTargetMarket(req: Request, res: Response) {
     try {
-      const { error, value } = updateTargetMarketSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateTargetMarketSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -211,7 +204,7 @@ export class CompanyProfileController {
    */
   static async updateRevenueModel(req: Request, res: Response) {
     try {
-      const { error, value } = updateRevenueModelSchema.validate(req.body, { abortEarly: false });
+      const { error, value } = CompanyProfileValidation.updateRevenueModelSchema.validate(req.body, { abortEarly: false });
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
@@ -227,6 +220,55 @@ export class CompanyProfileController {
       }
     } catch (error: any) {
       return ApiResponse.error(res, error.message || 'Failed to update revenue model');
+    }
+  }
+
+  /**
+   * Update traction
+   */
+  static async updateTraction(req: Request, res: Response) {
+    try {
+      const { error, value } = CompanyProfileValidation.updateTractionSchema.validate(req.body);
+      if (error) {
+        return ApiResponse.error(res, error.details[0].message);
+      }
+
+      const userId = req.user.id;
+      const result = await CompanyProfileService.updateTraction(userId, value);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to update traction');
+    }
+  }
+
+  /**
+   * Upload traction document with title
+   */
+  static async uploadTractionDocument(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const { traction_title } = req.body;
+      const file = req.file;
+
+      // Validate that we have at least a file or title
+      if (!file && !traction_title) {
+        return ApiResponse.error(res, 'Either file or title is required', 400);
+      }
+
+      const result = await CompanyProfileService.uploadTractionDocument(userId, file, traction_title);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to upload traction document');
     }
   }
 }

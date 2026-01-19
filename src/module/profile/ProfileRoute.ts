@@ -72,6 +72,13 @@ router.post(
 );
 router.patch('/company/target-market', authenticateToken, CompanyProfileController.updateTargetMarket);
 router.patch('/company/revenue-model', authenticateToken, CompanyProfileController.updateRevenueModel);
+router.patch(
+  '/company/traction',
+  authenticateToken,
+  FileUpload({ uploadPath: 'documents/traction', fileFilter: 'any', maxSize: 50, maxFiles: 1 }).single('document'),
+  CompanyProfileController.uploadTractionDocument,
+  handleMulterError
+);
 
 /**
  * Team Member Routes

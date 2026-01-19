@@ -114,6 +114,10 @@ model CompanyProfile {
   problem_statement     String?
   solution_statement    String?
   
+  // Traction
+  traction_title        String?
+  traction_document     String?
+  
   // Funding
   funding_status        String?
   total_funding         Decimal?  @db.Decimal(15, 2)

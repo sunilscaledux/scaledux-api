@@ -116,6 +116,18 @@ export const updateRevenueModelSchema = Joi.object({
   })
 });
 
+/**
+ * Validation schema for updating traction
+ */
+export const updateTractionSchema = Joi.object({
+  traction_title: Joi.string().optional().allow('', null).max(255).messages({
+    'string.max': 'Traction title must not exceed 255 characters'
+  }),
+  traction_document: Joi.string().optional().allow('', null).messages({
+    'string.base': 'Traction document must be a string'
+  })
+});
+
 // ==================== TEAM MEMBER VALIDATIONS ====================
 
 /**
