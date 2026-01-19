@@ -123,7 +123,7 @@ export const createTeamMemberSchema = Joi.object({
     'string.max': 'Name must not exceed 255 characters',
     'any.required': 'Name is required'
   }),
-  email: Joi.string().email().optional().allow('', null).messages({
+  email: Joi.string().email({ tlds: { allow: false } }).optional().allow('', null).messages({
     'string.email': 'Please provide a valid email address'
   }),
   role_id: Joi.number().integer().required().messages({
@@ -149,7 +149,7 @@ export const updateTeamMemberSchema = Joi.object({
   name: Joi.string().optional().max(255).messages({
     'string.max': 'Name must not exceed 255 characters'
   }),
-  email: Joi.string().email().optional().allow('', null).messages({
+  email: Joi.string().email({ tlds: { allow: false } }).optional().allow('', null).messages({
     'string.email': 'Please provide a valid email address'
   }),
   role_id: Joi.number().integer().optional().messages({
