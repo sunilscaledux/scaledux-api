@@ -9,7 +9,7 @@ import { createFounderProjectSchema, updateFounderProjectSchema, saveDraftProjec
  */
 export async function getCompanyProjects(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { status, search, categoryId, sortBy } = req.query;
+  const { status, search, categoryId, sortBy, contractStatus, milestoneStatus, contractStartFrom, contractEndTo } = req.query;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -20,7 +20,11 @@ export async function getCompanyProjects(req: Request, res: Response) {
     status as string,
     search as string,
     categoryId ? parseInt(categoryId as string) : undefined,
-    sortBy as 'newest' | 'oldest' | 'budget'
+    sortBy as 'newest' | 'oldest' | 'budget' | 'updated' | 'proposals' | 'invited',
+    contractStatus ? (contractStatus as string).split(',') : undefined,
+    milestoneStatus ? (milestoneStatus as string).split(',') : undefined,
+    contractStartFrom as string,
+    contractEndTo as string
   );
 
   if (result.success) {

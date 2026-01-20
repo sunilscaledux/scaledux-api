@@ -13,7 +13,11 @@ export class FounderProjectService {
     status?: string,
     search?: string,
     categoryId?: number,
-    sortBy: 'newest' | 'oldest' | 'budget' = 'newest'
+    sortBy: 'newest' | 'oldest' | 'budget' | 'updated' | 'proposals' | 'invited' = 'newest',
+    contractStatus?: string[],
+    milestoneStatus?: string[],
+    contractStartFrom?: string,
+    contractEndTo?: string
   ): Promise<ServiceResponse> {
     try {
       const whereClause: any = { 
@@ -37,12 +41,28 @@ export class FounderProjectService {
         ];
       }
 
+      // Note: contractStatus, milestoneStatus, and date filters are passed but not used
+      // because FounderProject schema doesn't have these fields
+      // These filters are for contracts/milestones which are separate entities
+      console.log('Filter params received (not applied to FounderProject):', {
+        contractStatus,
+        milestoneStatus,
+        contractStartFrom,
+        contractEndTo
+      })
+
       // Determine sort order
       let orderBy: any = { created_at: 'desc' };
       if (sortBy === 'oldest') {
         orderBy = { created_at: 'asc' };
       } else if (sortBy === 'budget') {
         orderBy = { budget_amount: 'desc' };
+      } else if (sortBy === 'updated') {
+        orderBy = { updated_at: 'desc' };
+      } else if (sortBy === 'proposals') {
+        orderBy = { proposals_count: 'desc' };
+      } else if (sortBy === 'invited') {
+        orderBy = { invited_count: 'desc' };
       }
 
       const projects = await prisma.founderProject.findMany({
