@@ -6,8 +6,6 @@ import { extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
   updatePortfolioSchema, 
-  createDraftPortfolioSchema, 
-  updateDraftPortfolioSchema 
 } from './PortfolioValidation'
 import { CreatePortfolioInput, UpdatePortfolioInput } from './PortfolioType'
 import fs from 'fs'

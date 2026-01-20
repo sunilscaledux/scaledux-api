@@ -37,6 +37,7 @@ model User {
   expertises                   UserExpertise[]
   identityVerifications        IdentityVerification[]
   agencyVerifications          AgencyVerification[]
+  founderProjects              FounderProject[]
   agency_verification_status   String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   show_as_agency               Boolean   @default(false)
   portfolios                   Portfolio[]
@@ -570,6 +571,44 @@ model Portfolio {
   @@map("scd_portfolios")
 }
 
+model FounderProject {
+  id                    Int       @id @default(autoincrement())
+  unique_id             String    @unique @default(uuid())
+  user_id               Int
+  project_title         String    @db.VarChar(50)
+  project_description   String    @db.Text
+  category_id           Int
+  sub_category_id       Int?
+  project_files         Json      @default("[]")
+  scope_of_work         String    @db.Text
+  skills_required       Json
+  experience_needed     String    @db.VarChar(50)
+  budget_currency       String    @db.VarChar(10)
+  budget_amount         String    @db.VarChar(20)
+  is_nda_required       Boolean   @default(false)
+  screening_questions   Json      @default("[]")
+  advanced_preferences  Json
+  status                String    @default("DRAFT")
+  invited_count         Int       @default(0)
+  proposals_count       Int       @default(0)
+  hired_count           Int       @default(0)
+  deleted_at            DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  
+  user                  User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  category              ServiceCategory @relation(fields: [category_id], references: [id])
+  subCategory           ServiceSubCategory? @relation(fields: [sub_category_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([status])
+  @@index([category_id])
+  @@index([sub_category_id])
+  @@index([deleted_at])
+  @@index([created_at])
+  @@map("scd_founder_projects")
+}
+
 enum OtpType {
   REGISTRATION_VERIFICATION
   LOGIN_VERIFICATION
@@ -591,6 +630,7 @@ model ServiceCategory {
   subCategories   ServiceSubCategory[]
   keywords        ServiceKeyword[]
   servicePackages ServicePackage[]
+  founderProjects FounderProject[]
   
   // Indexes
   @@index([is_active])
@@ -610,6 +650,7 @@ model ServiceSubCategory {
   category        ServiceCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
   keywords        ServiceKeyword[]
   servicePackages ServicePackage[]
+  founderProjects FounderProject[]
   
   // Indexes
   @@index([category_id])
