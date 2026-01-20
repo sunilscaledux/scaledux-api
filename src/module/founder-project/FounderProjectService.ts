@@ -8,18 +8,45 @@ export class FounderProjectService {
   /**
    * Get all founder projects for a user
    */
-  static async getUserProjects(userId: number, status?: string): Promise<ServiceResponse> {
+  static async getUserProjects(
+    userId: number, 
+    status?: string,
+    search?: string,
+    categoryId?: number,
+    sortBy: 'newest' | 'oldest' | 'budget' = 'newest'
+  ): Promise<ServiceResponse> {
     try {
-      const whereClause: any = { user_id: userId };
+      const whereClause: any = { 
+        user_id: userId,
+        deleted_at: null
+      };
+      
       if (status) {
         whereClause.status = status;
       }
 
+      if (categoryId) {
+        whereClause.category_id = categoryId;
+      }
+
+      // Search across title and description
+      if (search) {
+        whereClause.OR = [
+          { project_title: { contains: search, mode: 'insensitive' } },
+          { project_description: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      // Determine sort order
+      let orderBy: any = { created_at: 'desc' };
+      if (sortBy === 'oldest') {
+        orderBy = { created_at: 'asc' };
+      } else if (sortBy === 'budget') {
+        orderBy = { budget_amount: 'desc' };
+      }
+
       const projects = await prisma.founderProject.findMany({
-        where: {
-          ...whereClause,
-          deleted_at: null
-        },
+        where: whereClause,
         include: {
           category: {
             select: {
@@ -36,7 +63,7 @@ export class FounderProjectService {
             }
           }
         },
-        orderBy: { created_at: 'desc' }
+        orderBy
       });
 
       // Transform file URLs to full URLs
@@ -49,14 +76,14 @@ export class FounderProjectService {
 
       return {
         success: true,
-        message: "Projects retrieved successfully",
-        data: transformedProjects
+        data: transformedProjects,
+        message: "Projects retrieved successfully"
       };
     } catch (error: any) {
-      console.error("Get User Projects Error:", error);
+      console.error("Error in getUserProjects:", error);
       return {
         success: false,
-        message: "Failed to get projects"
+        message: error.message || "Failed to retrieve projects"
       };
     }
   }

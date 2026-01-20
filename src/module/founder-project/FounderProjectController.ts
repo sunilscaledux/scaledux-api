@@ -9,19 +9,25 @@ import { createFounderProjectSchema, updateFounderProjectSchema, saveDraftProjec
  */
 export async function getCompanyProjects(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { status } = req.query; // 'DRAFT' or 'PUBLISHED'
+  const { status, search, categoryId, sortBy } = req.query;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
   }
 
-  const result = await FounderProjectService.getUserProjects(userId, status as string);
+  const result = await FounderProjectService.getUserProjects(
+    userId, 
+    status as string,
+    search as string,
+    categoryId ? parseInt(categoryId as string) : undefined,
+    sortBy as 'newest' | 'oldest' | 'budget'
+  );
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);
-  } else {
-    return ApiResponse.error(res, result.message);
   }
+
+  return ApiResponse.error(res, result.message);
 }
 
 /**
