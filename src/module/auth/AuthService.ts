@@ -47,10 +47,14 @@ export async function createUserAfterOtpVerification(
       email: contactInfo.email || data.email,
       phone: contactInfo.phone,
       password: hashedPassword,
-      terms: data.terms,
       notification: data.notification || false,
       status: 1,
     };
+
+    // Only include terms if provided (otherwise use database default)
+    if (data.terms !== undefined) {
+      userData.terms = data.terms;
+    }
 
     // Set verification timestamp for the method that was used
     if (contactInfo.email || data.email) {
@@ -70,11 +74,16 @@ export async function createUserAfterOtpVerification(
       message: "User created successfully",
       data: safeUser,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create user error:", error);
+    console.error("Error details:", {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta
+    });
     return {
       success: false,
-      message: "Failed to create user. Please try again.",
+      message: error?.message || "Failed to create user. Please try again.",
     };
   }
 }

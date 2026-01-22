@@ -175,7 +175,6 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       update: personalInfoData,
       create: {
         user_id: userId,
-        unique_id: ulid(),
         ...personalInfoData,
       },
     });

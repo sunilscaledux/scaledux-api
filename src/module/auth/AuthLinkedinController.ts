@@ -243,11 +243,10 @@ const linkedinCallback = async (req: Request, res: Response) => {
         },
       });
 
-      // Create PersonalInfo with unique_id
+      // Create PersonalInfo
       await prisma.personalInfo.create({
         data: {
           user_id: user.id,
-          unique_id: ulid(),
         },
       });
 
@@ -269,6 +268,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
           firstName: user.first_name,
           lastName: user.last_name,
           email: user.email,
+          role: user.role,
         },
         token,
         authenticated: true,

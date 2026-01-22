@@ -125,6 +125,7 @@ export async function register(req: Request, res: Response) {
           lastName: userResult.data.last_name,
           email: userResult.data.email,
           phone: userResult.data.phone,
+          role: userResult.data.role,
         },
         token,
         authenticated: true,
@@ -678,5 +679,42 @@ export async function getCurrentUser(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Get Current User Error:", error);
     return ApiResponse.error(res, "Failed to get user details");
+  }
+}
+
+export async function updateUserRole(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const { role } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!role) {
+    return ApiResponse.error(res, "Role is required", 400);
+  }
+
+  // Validate role is one of the allowed values
+  const allowedRoles = ['freelancer', 'founder', 'mentor', 'investor'];
+  if (!allowedRoles.includes(role)) {
+    return ApiResponse.error(res, "Invalid role. Must be one of: freelancer, founder, mentor, investor", 400);
+  }
+
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role }
+    });
+
+    return ApiResponse.success(
+      res,
+      {
+        role: updatedUser.role
+      },
+      "User role updated successfully"
+    );
+  } catch (error: any) {
+    console.error("Update User Role Error:", error);
+    return ApiResponse.error(res, "Failed to update user role");
   }
 }

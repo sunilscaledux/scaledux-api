@@ -1,8 +1,6 @@
 import { Router } from "express";
-import { getPublicProfile } from "./ProfileController";
 import { getProfileCompletion } from "./ProfileCompletionController";
-import { UnifiedProfileController } from "./UnifiedProfileController";
-import { FreelancerProfileController } from "./FreelancerProfileController";
+import { ProfileController } from "./ProfileController";
 import { CompanyProfileController } from "./CompanyProfileController";
 import { TeamMemberController } from "./TeamMemberController";
 import { FundingRoundController } from "./FundingRoundController";
@@ -16,31 +14,31 @@ const router = Router();
 /**
  * Unified Profile Routes
  */
-router.get("/me", authenticateToken, UnifiedProfileController.getMyProfile);
+router.get("/me", authenticateToken, ProfileController.getMyProfile);
 
 /**
  * Personal Info Routes (common for all users)
  */
-router.patch('/summary', authenticateToken, FreelancerProfileController.updateSummary);
-router.patch('/personal-info', authenticateToken, FreelancerProfileController.updatePersonalInfo);
-router.patch('/hourly-rate', authenticateToken, FreelancerProfileController.updateHourlyRate);
-router.patch('/languages', authenticateToken, FreelancerProfileController.updateLanguages);
+router.patch('/summary', authenticateToken, ProfileController.updateSummary);
+router.patch('/personal-info', authenticateToken, ProfileController.updatePersonalInfo);
+router.patch('/hourly-rate', authenticateToken, ProfileController.updateHourlyRate);
+router.patch('/languages', authenticateToken, ProfileController.updateLanguages);
 router.post(
   '/profile-image',
   authenticateToken,
   FileUpload({ uploadPath: 'profile' }).single('image'),
-  FreelancerProfileController.uploadProfileImage,
+  ProfileController.uploadProfileImage,
   handleMulterError
 );
 router.post(
   '/cover-image',
   authenticateToken,
   FileUpload({ uploadPath: 'cover' }).single('image'),
-  FreelancerProfileController.uploadCoverImage,
+  ProfileController.uploadCoverImage,
   handleMulterError
 );
-router.patch('/privacy', authenticateToken, FreelancerProfileController.updatePrivacySettings);
-router.patch('/agency-settings', authenticateToken, FreelancerProfileController.updateAgencySettings);
+router.patch('/privacy', authenticateToken, ProfileController.updatePrivacySettings);
+router.patch('/agency-settings', authenticateToken, ProfileController.updateAgencySettings);
 
 /**
  * Company/Founder Profile Routes
@@ -115,6 +113,6 @@ router.post(
  * Public & Completion Routes
  */
 router.get("/completion/status", authenticateToken, getProfileCompletion);
-router.get("/:uniqueId", getPublicProfile);
+router.get("/:uniqueId", ProfileController.getPublicProfile);
 
 export default router;

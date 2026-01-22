@@ -24,10 +24,7 @@ export const registerUserSchema = Joi.object({
     "any.required": "Password is required",
     "string.min": "Password must be at least 8 characters long",
   }),
-  terms: Joi.boolean().valid(true).required().messages({
-    "any.required": "You must accept the terms",
-    "any.only": "You must accept the terms",
-  }),
+  terms: Joi.boolean().optional(),
   notification: Joi.boolean().optional(),
 });
 

@@ -10,6 +10,7 @@ import {
   requestOtp,
   verifyOtp,
   resendOtpUnified,
+  updateUserRole,
 } from "@module/auth/AuthController";
 import { googleCallback } from "@module/auth/AuthGoogleController";
 import { linkedinCallback } from "@module/auth/AuthLinkedinController";
@@ -35,6 +36,7 @@ router.post("/reset-password", generalRateLimiter, resetPassword);
 
 router.post("/logout", authenticateToken, logout);
 router.get("/auth/me", authenticateToken, getCurrentUser);
+router.patch("/auth/role", authenticateToken, updateUserRole);
 router.post("/auth/google-callback", generalRateLimiter, googleCallback);
 router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);
 router.post("/auth/linkedin-import-profile", authenticateToken, importLinkedInProfile);
