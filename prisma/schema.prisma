@@ -24,11 +24,12 @@ model User {
   googleId          String?   @unique
   linkedinId        String?   @unique
   provider          String?
+  role              String?   @default("freelancer") // freelancer, founder, mentor, investor
   identity_verified_at         DateTime?
   identity_verification_status String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   agency_verified_at           DateTime?
   otps                         Otp[]
-  freelancerProfile            FreelancerProfile?
+  personalInfo                 PersonalInfo?
   companyProfile               CompanyProfile?
   education                    Education[]
   licenses                     License[]
@@ -53,8 +54,8 @@ model User {
   @@map("scd_users")
 }
 
-// Freelancer/Service Provider Profile
-model FreelancerProfile {
+// Personal Info - Common for all user types
+model PersonalInfo {
   id                    Int       @id @default(autoincrement())
   user_id               Int       @unique
   unique_id             String    @unique
@@ -86,7 +87,7 @@ model FreelancerProfile {
 
   @@index([unique_id])
   @@index([user_id])
-  @@map("scd_freelancer_profiles")
+  @@map("scd_personal_info")
 }
 
 // Company/Founder Profile
@@ -397,7 +398,7 @@ model Country {
   updated_at         DateTime            @updatedAt
   currency           Currency?           @relation(fields: [currency_id], references: [id])
   states             State[]
-  freelancerProfiles FreelancerProfile[]
+  personalInfos      PersonalInfo[]
   companyProfiles    CompanyProfile[]
 
   @@map("scd_countries")
@@ -411,7 +412,7 @@ model State {
   created_at         DateTime            @default(now())
   updated_at         DateTime            @updatedAt
   country            Country             @relation(fields: [country_id], references: [id], onDelete: Cascade)
-  freelancerProfiles FreelancerProfile[]
+  personalInfos      PersonalInfo[]
   companyProfiles    CompanyProfile[]
 
   @@unique([name, country_id])

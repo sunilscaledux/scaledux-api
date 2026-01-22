@@ -13,17 +13,17 @@ export class ProfileService {
    */
   static async getPublicProfile(uniqueId: string): Promise<ServiceResponse> {
     try {
-      // Try to find user by freelancer or company profile unique_id
+      // Try to find user by personal or company profile unique_id
       const user = await prisma.user.findFirst({
         where: {
           OR: [
-            { freelancerProfile: { unique_id: uniqueId } },
+            { personalInfo: { unique_id: uniqueId } },
             { companyProfile: { unique_id: uniqueId } }
           ],
           status: 1, // Only active users
         },
         include: {
-          freelancerProfile: {
+          personalInfo: {
             include: {
               country: true,
               state: true,
@@ -45,7 +45,7 @@ export class ProfileService {
         };
       }
 
-      const userProfile = user.freelancerProfile || user.companyProfile;
+      const userProfile = user.personalInfo || user.companyProfile;
 
       // Transform image URLs
       const transformedUser = {

@@ -35,7 +35,7 @@ export const calculateProfileCompletion = async (
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        freelancerProfile: true,
+        personalInfo: true,
         companyProfile: true,
         education: true,
         licenses: true,
@@ -50,8 +50,8 @@ export const calculateProfileCompletion = async (
       throw new Error("User not found");
     }
 
-    // Get freelancer profile (default profile type for completion)
-    const userProfile = user.freelancerProfile;
+    // Get personal info (default profile type for completion)
+    const userProfile = user.personalInfo;
 
     const completedFields: Record<string, boolean> = {};
     const fieldPercentages = PROFILE_COMPLETION_WEIGHTS;

@@ -4,6 +4,12 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { ulid } from 'ulid';
 
+// Force server restart to pick up database changes
+
+/**
+ * FounderProjectService
+ * Handles all founder project operations
+ */
 export class FounderProjectService {
   /**
    * Get all founder projects for a user
@@ -149,7 +155,8 @@ export class FounderProjectService {
               first_name: true,
               last_name: true,
               email: true,
-              freelancerProfile: {
+              role: true,
+              personalInfo: {
                 select: {
                   profileImage: true,
                   city: true,

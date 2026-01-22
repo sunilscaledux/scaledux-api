@@ -571,7 +571,7 @@ export async function getCurrentUserDetails(userId: number): Promise<any | null>
             symbol: true
           }
         },
-        freelancerProfile: {
+        personalInfo: {
           include: {
             country: {
               select: {
