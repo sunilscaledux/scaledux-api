@@ -65,7 +65,7 @@ export const createFounderProjectSchema = Joi.object({
     'any.only': 'NDA requirement must be either yes or no',
     'any.required': 'NDA requirement is required'
   }),
-  screeningQuestions: Joi.array().items(
+  screeningQuestions: Joi.array().optional().allow(null).items(
     Joi.object({
       question: Joi.string().required()
     })
@@ -74,23 +74,23 @@ export const createFounderProjectSchema = Joi.object({
     'array.max': 'Maximum 10 screening questions allowed'
   }),
   advancedPreferences: Joi.object({
-    englishLevel: Joi.string().required().messages({
+    englishLevel: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'English level is required',
       'any.required': 'English level is required'
     }),
-    hireWithin: Joi.string().required().messages({
+    hireWithin: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'Hire within is required',
       'any.required': 'Hire within is required'
     }),
-    timeRequirement: Joi.string().required().messages({
+    timeRequirement: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'Time requirement is required',
       'any.required': 'Time requirement is required'
     }),
-    earnedAmount: Joi.string().required().messages({
+    earnedAmount: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'Earned amount is required',
       'any.required': 'Earned amount is required'
     }),
-    loccation: Joi.string().required().messages({
+    loccation: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'Location is required',
       'any.required': 'Location is required'
     })
@@ -154,7 +154,10 @@ export const saveDraftProjectSchema = Joi.object({
     timeRequirement: Joi.string().optional().allow(''),
     earnedAmount: Joi.string().optional().allow(''),
     loccation: Joi.string().optional().allow('')
-  }).optional()
+  }).optional(),
+  status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED').messages({
+    'any.only': 'Status must be either DRAFT or PUBLISHED'
+  })
 })
 
 export const updateFounderProjectSchema = Joi.object({

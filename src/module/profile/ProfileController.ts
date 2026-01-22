@@ -227,16 +227,11 @@ export class ProfileController {
         return ApiResponse.error(res, 'Unique ID is required', 400);
       }
 
-      // First, try to find in PersonalInfo (freelancer, mentor, investor)
       const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
       
       if (personalInfo.success) {
         return ApiResponse.success(res, personalInfo.data, personalInfo.message);
       }
-
-      // If not found in PersonalInfo, try CompanyProfile (founder)
-      // This will be implemented when CompanyProfileService is ready
-      
       return ApiResponse.error(res, 'Profile not found', 404);
     } catch (error: any) {
       return ApiResponse.error(res, error.message || 'Failed to fetch public profile');

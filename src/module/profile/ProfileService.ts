@@ -115,7 +115,7 @@ export class PersonalInfoService {
       // Combine user account data with profile data (UserDetail = UserProfile + User)
       const userDetail = {
         // Profile data (from PersonalInfo table) - explicitly select fields
-        id: profile.id,
+        id: profile.user.id,
         unique_id: profile.user.unique_id,
         profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
         coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,

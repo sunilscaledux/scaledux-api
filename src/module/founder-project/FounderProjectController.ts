@@ -42,11 +42,16 @@ export async function getProjectById(req: Request, res: Response) {
   const userId = req.user?.id || null;
   const id = getStringParam(req.params.id);
 
+  console.log('🔍 getProjectById - userId:', userId, 'id:', id);
+
   if (!id) {
+    console.log('❌ No project ID provided');
     return ApiResponse.error(res, "Project ID is required", 400);
   }
 
   const result = await FounderProjectService.getProjectById(userId, id);
+
+  console.log('📦 getProjectById result:', result.success, result.message);
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);

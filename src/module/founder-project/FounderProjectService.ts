@@ -125,12 +125,11 @@ export class FounderProjectService {
         deleted_at: null
       };
 
-      // If userId provided, check ownership; otherwise only show published projects
-      if (userId) {
-        whereClause.user_id = userId;
-      } else {
+      // If no userId (public access), only show published projects
+      if (!userId) {
         whereClause.status = 'PUBLISHED';
       }
+      // If userId provided, show all their projects (including drafts)
 
       const project = await prisma.founderProject.findFirst({
         where: whereClause,
@@ -173,6 +172,14 @@ export class FounderProjectService {
       });
 
       if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      // If userId provided, verify ownership
+      if (userId && project.user_id !== userId) {
         return {
           success: false,
           message: "Project not found"
