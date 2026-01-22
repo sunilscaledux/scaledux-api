@@ -50,12 +50,6 @@ export class FounderProjectService {
       // Note: contractStatus, milestoneStatus, and date filters are passed but not used
       // because FounderProject schema doesn't have these fields
       // These filters are for contracts/milestones which are separate entities
-      console.log('Filter params received (not applied to FounderProject):', {
-        contractStatus,
-        milestoneStatus,
-        contractStartFrom,
-        contractEndTo
-      })
 
       // Determine sort order
       let orderBy: any = { created_at: 'desc' };
