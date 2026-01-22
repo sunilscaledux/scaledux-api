@@ -36,14 +36,11 @@ export async function getCompanyProjects(req: Request, res: Response) {
 
 /**
  * Get project by unique ID
+ * Works with or without authentication
  */
 export async function getProjectById(req: Request, res: Response) {
-  const userId = req.user?.id;
+  const userId = req.user?.id || null;
   const id = getStringParam(req.params.id);
-
-  if (!userId) {
-    return ApiResponse.error(res, "User not authenticated", 401);
-  }
 
   if (!id) {
     return ApiResponse.error(res, "Project ID is required", 400);

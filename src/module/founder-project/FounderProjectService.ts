@@ -110,14 +110,58 @@ export class FounderProjectService {
 
   /**
    * Get a single project by unique ID
+   * If userId is provided, it checks ownership; otherwise returns any published project
    */
-  static async getProjectById(userId: number, uniqueId: string): Promise<ServiceResponse> {
+  static async getProjectById(userId: number | null, uniqueId: string): Promise<ServiceResponse> {
     try {
+      const whereClause: any = {
+        unique_id: uniqueId,
+        deleted_at: null
+      };
+
+      // If userId provided, check ownership; otherwise only show published projects
+      if (userId) {
+        whereClause.user_id = userId;
+      } else {
+        whereClause.status = 'PUBLISHED';
+      }
+
       const project = await prisma.founderProject.findFirst({
-        where: { 
-          unique_id: uniqueId,
-          user_id: userId,
-          deleted_at: null
+        where: whereClause,
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              description: true
+            }
+          },
+          subCategory: {
+            select: {
+              id: true,
+              name: true,
+              description: true
+            }
+          },
+          user: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              freelancerProfile: {
+                select: {
+                  profileImage: true,
+                  city: true,
+                  country: {
+                    select: {
+                      name: true
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       });
 

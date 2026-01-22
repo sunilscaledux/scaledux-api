@@ -14,12 +14,14 @@ import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
-// All routes require authentication
+// Public route - works with or without authentication
+router.get("/:id", getProjectById)
+
+// All routes below require authentication
 router.use(authenticateToken)
 
 // Founder Project CRUD routes
 router.get("/", getCompanyProjects)
-router.get("/:id", getProjectById)
 router.post("/draft", saveDraft) // Draft route with minimal validation
 router.post("/", createProject)
 router.put("/:id", updateProject)
