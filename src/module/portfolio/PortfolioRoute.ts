@@ -5,7 +5,9 @@ import {
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
-  duplicatePortfolio
+  duplicatePortfolio,
+  saveDraft,
+  updateDraft
 } from "./PortfolioController"
 import { uploadFile } from "@module/general/FileController"
 import { authenticateToken } from "@middleware/auth"
@@ -20,7 +22,9 @@ router.use(authenticateToken)
 router.get("/", getUserPortfolios)
 router.get("/:id", getPortfolioById)
 router.post("/", createPortfolio)
+router.post("/draft", saveDraft) // Save as draft (relaxed validation)
 router.put("/:id", updatePortfolio)
+router.put("/:id/draft", updateDraft) // Update as draft (relaxed validation)
 router.delete("/:id", deletePortfolio)
 
 // Portfolio file upload routes

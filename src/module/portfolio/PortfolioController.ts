@@ -5,7 +5,9 @@ import { getStringParam } from '@utils/requestHelpers'
 import { extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
-  updatePortfolioSchema, 
+  updatePortfolioSchema,
+  createDraftPortfolioSchema,
+  updateDraftPortfolioSchema
 } from './PortfolioValidation'
 import { CreatePortfolioInput, UpdatePortfolioInput } from './PortfolioType'
 import fs from 'fs'
@@ -81,6 +83,75 @@ export async function createPortfolio(req: Request, res: Response) {
     return ApiResponse.success(res, result.data, result.message, 201);
   } else {
     return ApiResponse.error(res, result.message);
+  }
+}
+
+/**
+ * Save portfolio as draft (relaxed validation)
+ */
+export async function saveDraft(req: Request, res: Response) {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  // Validate with draft schema (relaxed validation)
+  const { value, error } = createDraftPortfolioSchema.validate(req.body, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  // Force status to DRAFT
+  const draftData = { ...value, status: 'DRAFT' };
+
+  const result = await PortfolioService.createPortfolio(userId, draftData);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, "Draft saved successfully", 201);
+  } else {
+    return ApiResponse.error(res, result.message);
+  }
+}
+
+/**
+ * Update portfolio as draft (relaxed validation)
+ */
+export async function updateDraft(req: Request, res: Response) {
+  const rawBody = req.body || {};
+  const userId = req.user?.id;
+  const id = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!id) {
+    return ApiResponse.error(res, "Portfolio ID is required", 400);
+  }
+
+  // Validate with draft schema (relaxed validation)
+  const { value, error } = updateDraftPortfolioSchema.validate(rawBody, {
+    abortEarly: false,
+  });
+
+  if (error) {
+    return ApiResponse.joiValidationError(res, error);
+  }
+
+  // Force status to DRAFT
+  const draftData = { ...value, status: 'DRAFT' };
+
+  const result = await PortfolioService.updatePortfolio(userId, id, draftData);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, "Draft updated successfully");
+  } else {
+    const statusCode = result.message === "Portfolio not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
   }
 }
 
