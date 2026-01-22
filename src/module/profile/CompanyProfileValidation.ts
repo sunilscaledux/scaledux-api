@@ -10,9 +10,17 @@ export const updateOverviewSchema = Joi.object({
   company_description: Joi.string().optional().allow('', null).max(2000).messages({
     'string.max': 'Company description must not exceed 2000 characters'
   }),
-  company_website: Joi.string().uri().optional().allow('', null).messages({
-    'string.uri': 'Please provide a valid website URL'
+  cin: Joi.string().optional().allow('', null).max(50).messages({
+    'string.max': 'CIN must not exceed 50 characters'
   }),
+  company_website: Joi.string()
+    .optional()
+    .allow('', null)
+    .trim()
+    .pattern(/^(www\.)?[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/)
+    .messages({
+      'string.pattern.base': 'Please provide a valid website URL (e.g., example.com or www.example.com)'
+    }),
   founded_year: Joi.number().integer().min(1800).max(new Date().getFullYear()).optional().messages({
     'number.min': 'Founded year must be after 1800',
     'number.max': 'Founded year cannot be in the future'

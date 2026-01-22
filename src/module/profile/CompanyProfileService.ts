@@ -198,6 +198,7 @@ export class CompanyProfileService {
   static async updateOverview(userId: number, data: {
     company_name?: string;
     company_description?: string;
+    cin?: string;
     company_website?: string;
     founded_year?: number;
     company_size?: string;
@@ -209,13 +210,31 @@ export class CompanyProfileService {
     state_id?: number;
   }): Promise<ServiceResponse> {
     try {
+      // Remove CIN from data as it's handled separately in agency verification flow
+      const { cin, ...profileData } = data;
+      
+      // Normalize company_website: if it doesn't have protocol, prepend https://
+      if (profileData.company_website && profileData.company_website !== '') {
+        const website = profileData.company_website.trim();
+        if (!/^https?:\/\//i.test(website)) {
+          profileData.company_website = `https://${website}`;
+        }
+      }
+      
+      // Filter out undefined values to prevent overwriting existing data with undefined
+      // This is important for unregistered companies that don't send certain fields
+      const filteredProfileData = Object.fromEntries(
+        Object.entries(profileData).filter(([_, value]) => value !== undefined)
+      ) as typeof profileData;
+      
+      // Update company profile
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
-        update: data,
+        update: filteredProfileData,
         create: {
           user_id: userId,
           unique_id: ulid(),
-          ...data,
+          ...filteredProfileData,
         },
         include: {
           user: {
@@ -225,13 +244,82 @@ export class CompanyProfileService {
           },
           country: true,
           state: true,
+          industry: true,
+          subIndustry: true,
         },
       });
+
+
+      // Fetch revenue models if they exist
+      const revenueModels = profile.revenue_model_ids.length > 0 
+        ? await prisma.revenueModel.findMany({
+            where: { id: { in: profile.revenue_model_ids } },
+          })
+        : null;
+
+      // Transform data for response (same structure as getMyProfile)
+      const companyDetail = {
+        id: profile.id,
+        unique_id: profile.unique_id,
+        profile_type: 'founder',
+        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
+        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        
+        // Company info
+        company_name: profile.company_name,
+        company_description: profile.company_description,
+        company_website: profile.company_website,
+        company_size: profile.company_size,
+        founded_year: profile.founded_year,
+        industry_id: profile.industry_id,
+        sub_industry_id: profile.sub_industry_id,
+        industry: profile.industry,
+        subIndustry: profile.subIndustry,
+        company_stage: profile.company_stage,
+        team_size: profile.team_size,
+        
+        // Business model
+        revenue_description: profile.revenue_description,
+        revenueModels: revenueModels,
+        target_market: profile.target_market,
+        problem_statement: profile.problem_statement,
+        solution_statement: profile.solution_statement,
+        
+        // Traction
+        traction_title: profile.traction_title,
+        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        
+        // Funding
+        funding_status: profile.funding_status,
+        total_funding: profile.total_funding,
+        
+        // Location
+        address: profile.address,
+        address_line_2: profile.address_line_2,
+        city: profile.city,
+        zipCode: profile.zipCode,
+        
+        // Social links
+        links: profile.links,
+        
+        // Relations
+        country: profile.country,
+        state: profile.state,
+        currency: profile.user.currency,
+        
+        // User data
+        firstName: profile.user.first_name,
+        lastName: profile.user.last_name,
+        email: profile.user.email,
+        phone: profile.user.phone,
+        emailVerified: !!profile.user.email_verified_at,
+        phoneVerified: !!profile.user.phone_verified_at,
+      };
 
       return {
         success: true,
         message: 'Company overview updated successfully',
-        data: profile,
+        data: companyDetail,
       };
     } catch (error: any) {
       console.error('Update Company Overview Error:', error);
