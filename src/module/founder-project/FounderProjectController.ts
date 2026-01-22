@@ -214,3 +214,105 @@ export async function duplicateProject(req: Request, res: Response) {
     return ApiResponse.error(res, result.message, statusCode);
   }
 }
+
+/**
+ * Get matching service providers for a project
+ */
+export async function getMatchingServiceProviders(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+  const { page, limit, sortBy, filter } = req.query;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await FounderProjectService.getMatchingServiceProviders(
+    userId,
+    projectId,
+    page ? parseInt(page as string) : 1,
+    limit ? parseInt(limit as string) : 10,
+    sortBy as 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed',
+    filter as 'all' | 'invited' | 'saved'
+  );
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "Project not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Invite a service provider to a project
+ */
+export async function inviteProvider(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+  const { providerId, message } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  if (!providerId) {
+    return ApiResponse.error(res, "Provider ID is required", 400);
+  }
+
+  const result = await FounderProjectService.inviteProvider(
+    userId,
+    projectId,
+    parseInt(providerId),
+    message
+  );
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "Project not found" || result.message === "Provider match not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Toggle save provider for later
+ */
+export async function toggleSaveProvider(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+  const { providerId } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  if (!providerId) {
+    return ApiResponse.error(res, "Provider ID is required", 400);
+  }
+
+  const result = await FounderProjectService.toggleSaveProvider(
+    userId,
+    projectId,
+    parseInt(providerId)
+  );
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "Project not found" || result.message === "Provider match not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}

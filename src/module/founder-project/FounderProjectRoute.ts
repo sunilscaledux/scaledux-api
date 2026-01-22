@@ -6,7 +6,10 @@ import {
   saveDraft,
   updateProject,
   deleteProject,
-  duplicateProject
+  duplicateProject,
+  getMatchingServiceProviders,
+  inviteProvider,
+  toggleSaveProvider
 } from "./FounderProjectController"
 import { uploadFile } from "@module/general/FileController"
 import { authenticateToken } from "@middleware/auth"
@@ -35,5 +38,10 @@ router.post(
 
 // Duplicate project
 router.post("/:id/duplicate", duplicateProject)
+
+// Service provider matching and invitation routes
+router.get("/:id/matching-providers", getMatchingServiceProviders)
+router.post("/:id/invite-provider", inviteProvider)
+router.post("/:id/toggle-save-provider", toggleSaveProvider)
 
 export default router

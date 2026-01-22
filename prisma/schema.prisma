@@ -48,6 +48,7 @@ model User {
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
+  providerMatches              ProjectProviderMatch[] @relation("ProviderMatches")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -599,6 +600,7 @@ model FounderProject {
   user                  User @relation(fields: [user_id], references: [id], onDelete: Cascade)
   category              ServiceCategory @relation(fields: [category_id], references: [id])
   subCategory           ServiceSubCategory? @relation(fields: [sub_category_id], references: [id])
+  providerMatches       ProjectProviderMatch[]
 
   @@index([user_id, status])
   @@index([status])
@@ -607,6 +609,31 @@ model FounderProject {
   @@index([deleted_at])
   @@index([created_at])
   @@map("scd_founder_projects")
+}
+
+// Stores matched service providers for a project
+model ProjectProviderMatch {
+  id                    Int       @id @default(autoincrement())
+  project_id            Int
+  provider_id           Int       // Freelancer user id
+  matched_skills        Json      // Array of matched skill names
+  match_score           Float     // Percentage match (0-100)
+  is_invited            Boolean   @default(false)
+  invited_at            DateTime?
+  invitation_message    String?   @db.Text
+  is_saved              Boolean   @default(false) // Saved for later
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  
+  project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  provider              User @relation("ProviderMatches", fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, provider_id])
+  @@index([project_id])
+  @@index([provider_id])
+  @@index([is_invited])
+  @@index([match_score])
+  @@map("scd_project_provider_matches")
 }
 
 enum OtpType {

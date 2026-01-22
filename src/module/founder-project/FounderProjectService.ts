@@ -237,6 +237,13 @@ export class FounderProjectService {
         }
       });
 
+      // Compute and store provider matches in background
+      if (data.skillsRequired && data.skillsRequired.length > 0) {
+        this.computeAndStoreMatches(project.id, userId, data.skillsRequired).catch(err => {
+          console.error("Error computing provider matches:", err);
+        });
+      }
+
       // Transform file URLs for response
       const transformedProject = {
         ...project,
@@ -254,6 +261,73 @@ export class FounderProjectService {
         success: false,
         message: "Failed to create project"
       };
+    }
+  }
+
+  /**
+   * Compute and store provider matches for a project
+   */
+  static async computeAndStoreMatches(projectId: number, ownerId: number, skillsRequired: string[]): Promise<void> {
+    try {
+      // Get all freelancers with their expertise
+      const freelancers = await prisma.user.findMany({
+        where: {
+          role: 'freelancer',
+          id: { not: ownerId },
+          status: 1
+        },
+        include: {
+          expertises: true
+        }
+      });
+
+      const matchesToCreate: Array<{
+        project_id: number;
+        provider_id: number;
+        matched_skills: string[];
+        match_score: number;
+      }> = [];
+
+      for (const freelancer of freelancers) {
+        // Collect all skills from user's expertises
+        const userSkills: string[] = [];
+        freelancer.expertises.forEach(exp => {
+          if (exp.skills && Array.isArray(exp.skills)) {
+            userSkills.push(...(exp.skills as string[]));
+          }
+        });
+
+        // Find matched skills (case-insensitive)
+        const matchedSkills = skillsRequired.filter(reqSkill =>
+          userSkills.some(userSkill =>
+            userSkill.toLowerCase() === reqSkill.toLowerCase()
+          )
+        );
+
+        // Only store if there's at least one match
+        if (matchedSkills.length > 0) {
+          const matchScore = (matchedSkills.length / skillsRequired.length) * 100;
+          matchesToCreate.push({
+            project_id: projectId,
+            provider_id: freelancer.id,
+            matched_skills: matchedSkills,
+            match_score: matchScore
+          });
+        }
+      }
+
+      // Bulk insert matches
+      if (matchesToCreate.length > 0) {
+        await prisma.projectProviderMatch.createMany({
+          data: matchesToCreate,
+          skipDuplicates: true
+        });
+      }
+
+      console.log(`Stored ${matchesToCreate.length} provider matches for project ${projectId}`);
+    } catch (error) {
+      console.error("Error in computeAndStoreMatches:", error);
+      throw error;
     }
   }
 
@@ -319,6 +393,13 @@ export class FounderProjectService {
         where: { id: existingProject.id },
         data: updateData
       });
+
+      // Refresh provider matches if skills were updated
+      if (data.skillsRequired !== undefined && data.skillsRequired.length > 0) {
+        this.refreshProjectMatches(existingProject.id, userId, data.skillsRequired).catch(err => {
+          console.error("Error refreshing provider matches:", err);
+        });
+      }
 
       // Transform file URLs
       const transformedProject = {
@@ -437,6 +518,326 @@ export class FounderProjectService {
         success: false,
         message: "Failed to duplicate project"
       };
+    }
+  }
+
+  /**
+   * Get matching service providers (freelancers) for a project from stored matches
+   */
+  static async getMatchingServiceProviders(
+    userId: number,
+    projectId: string,
+    page: number = 1,
+    limit: number = 10,
+    sortBy: 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed' = 'relevance',
+    filter: 'all' | 'invited' | 'saved' = 'all'
+  ): Promise<ServiceResponse> {
+    try {
+      // Get the project
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          user_id: userId,
+          deleted_at: null
+        }
+      });
+
+      if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      const requiredSkills = (project.skills_required as string[]) || [];
+
+      // Build where clause for matches based on filter
+      const matchWhere: any = { project_id: project.id };
+      if (filter === 'invited') {
+        matchWhere.is_invited = true;
+      } else if (filter === 'saved') {
+        matchWhere.is_saved = true;
+      }
+
+      // Determine sort order
+      let orderBy: any = { match_score: 'desc' };
+      if (sortBy === 'hourly_rate') {
+        orderBy = { provider: { personalInfo: { hourly_rate: 'asc' } } };
+      }
+
+      // Get stored matches with provider details
+      const matches = await prisma.projectProviderMatch.findMany({
+        where: matchWhere,
+        include: {
+          provider: {
+            include: {
+              personalInfo: {
+                include: {
+                  country: {
+                    select: { id: true, name: true, code: true }
+                  },
+                  state: {
+                    select: { id: true, name: true }
+                  }
+                }
+              },
+              expertises: {
+                include: {
+                  expertiseCategory: {
+                    select: { id: true, name: true }
+                  },
+                  specialty: {
+                    select: { id: true, name: true }
+                  }
+                }
+              },
+              servicePackages: {
+                where: { status: 'PUBLISHED' },
+                select: { id: true }
+              }
+            }
+          }
+        },
+        orderBy: sortBy === 'relevance' ? { match_score: 'desc' } : undefined
+      });
+
+      // Transform data
+      let providers = matches.map(match => {
+        const freelancer = match.provider;
+        const userSkills: string[] = [];
+        freelancer.expertises.forEach(exp => {
+          if (exp.skills && Array.isArray(exp.skills)) {
+            userSkills.push(...(exp.skills as string[]));
+          }
+        });
+
+        return {
+          id: freelancer.id,
+          unique_id: freelancer.unique_id,
+          first_name: freelancer.first_name,
+          last_name: freelancer.last_name,
+          email: freelancer.email,
+          profile_image: freelancer.personalInfo?.profileImage 
+            ? getFileUrl(freelancer.personalInfo.profileImage) 
+            : null,
+          title: freelancer.personalInfo?.title || null,
+          about: freelancer.personalInfo?.about || null,
+          hourly_rate: freelancer.personalInfo?.hourly_rate || null,
+          country: freelancer.personalInfo?.country || null,
+          state: freelancer.personalInfo?.state || null,
+          city: freelancer.personalInfo?.city || null,
+          expertises: freelancer.expertises.map(exp => ({
+            id: exp.id,
+            category: exp.expertiseCategory,
+            specialty: exp.specialty,
+            skills: exp.skills || []
+          })),
+          all_skills: userSkills,
+          matched_skills: match.matched_skills as string[],
+          match_score: match.match_score,
+          service_packages_count: freelancer.servicePackages.length,
+          total_earned: 0,
+          projects_completed: freelancer.servicePackages.length,
+          rating: 0,
+          reviews_count: 0,
+          is_invited: match.is_invited,
+          invited_at: match.invited_at,
+          is_saved: match.is_saved
+        };
+      });
+
+      // Sort in memory for non-relevance sorts
+      if (sortBy === 'rating') {
+        providers.sort((a, b) => b.rating - a.rating);
+      } else if (sortBy === 'hourly_rate') {
+        providers.sort((a, b) => (a.hourly_rate || 0) - (b.hourly_rate || 0));
+      } else if (sortBy === 'projects_completed') {
+        providers.sort((a, b) => b.projects_completed - a.projects_completed);
+      }
+
+      // Pagination
+      const total = providers.length;
+      const totalPages = Math.ceil(total / limit);
+      const offset = (page - 1) * limit;
+      const paginatedProviders = providers.slice(offset, offset + limit);
+
+      return {
+        success: true,
+        message: "Service providers retrieved successfully",
+        data: {
+          providers: paginatedProviders,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages
+          },
+          project_skills: requiredSkills
+        }
+      };
+    } catch (error: any) {
+      console.error("Get Matching Service Providers Error:", error);
+      return {
+        success: false,
+        message: "Failed to get matching service providers"
+      };
+    }
+  }
+
+  /**
+   * Invite a service provider to a project
+   */
+  static async inviteProvider(
+    userId: number,
+    projectId: string,
+    providerId: number,
+    message?: string
+  ): Promise<ServiceResponse> {
+    try {
+      // Get the project
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          user_id: userId,
+          deleted_at: null
+        }
+      });
+
+      if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      // Update the match record
+      const match = await prisma.projectProviderMatch.updateMany({
+        where: {
+          project_id: project.id,
+          provider_id: providerId
+        },
+        data: {
+          is_invited: true,
+          invited_at: new Date(),
+          invitation_message: message || null
+        }
+      });
+
+      if (match.count === 0) {
+        return {
+          success: false,
+          message: "Provider match not found"
+        };
+      }
+
+      // Update project invited count
+      await prisma.founderProject.update({
+        where: { id: project.id },
+        data: { invited_count: { increment: 1 } }
+      });
+
+      return {
+        success: true,
+        message: "Invitation sent successfully",
+        data: null
+      };
+    } catch (error: any) {
+      console.error("Invite Provider Error:", error);
+      return {
+        success: false,
+        message: "Failed to invite provider"
+      };
+    }
+  }
+
+  /**
+   * Save/unsave a provider for later
+   */
+  static async toggleSaveProvider(
+    userId: number,
+    projectId: string,
+    providerId: number
+  ): Promise<ServiceResponse> {
+    try {
+      // Get the project
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          user_id: userId,
+          deleted_at: null
+        }
+      });
+
+      if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      // Get current match record
+      const existingMatch = await prisma.projectProviderMatch.findUnique({
+        where: {
+          project_id_provider_id: {
+            project_id: project.id,
+            provider_id: providerId
+          }
+        }
+      });
+
+      if (!existingMatch) {
+        return {
+          success: false,
+          message: "Provider match not found"
+        };
+      }
+
+      // Toggle is_saved
+      const updatedMatch = await prisma.projectProviderMatch.update({
+        where: {
+          project_id_provider_id: {
+            project_id: project.id,
+            provider_id: providerId
+          }
+        },
+        data: {
+          is_saved: !existingMatch.is_saved
+        }
+      });
+
+      return {
+        success: true,
+        message: updatedMatch.is_saved ? "Provider saved" : "Provider unsaved",
+        data: { is_saved: updatedMatch.is_saved }
+      };
+    } catch (error: any) {
+      console.error("Toggle Save Provider Error:", error);
+      return {
+        success: false,
+        message: "Failed to save provider"
+      };
+    }
+  }
+
+  /**
+   * Refresh matches for a project (useful when skills are updated)
+   */
+  static async refreshProjectMatches(projectId: number, ownerId: number, skillsRequired: string[]): Promise<void> {
+    try {
+      // Delete existing matches that haven't been invited or saved
+      await prisma.projectProviderMatch.deleteMany({
+        where: {
+          project_id: projectId,
+          is_invited: false,
+          is_saved: false
+        }
+      });
+
+      // Recompute matches
+      await this.computeAndStoreMatches(projectId, ownerId, skillsRequired);
+    } catch (error) {
+      console.error("Error refreshing project matches:", error);
+      throw error;
     }
   }
 }
