@@ -127,34 +127,39 @@ export class PortfolioService {
         ? normalizeUploadedPaths(portfolioData.media)
         : [];
 
-      const portfolio = await prisma.portfolio.create({
-        data: {
-          unique_id: ulid(),
-          user_id: userId,
-          title: portfolioData.title,
-          description: portfolioData.description,
-          company_name: portfolioData.companyName,
-          hide_company_name: portfolioData.hideCompanyName || false,
-          industry_id: portfolioData.industryId,
-          role: portfolioData.role || null,
-          project_skills: (portfolioData.projectSkills || []) as any,
-          thumbnail_url: normalizedThumbnail as any,
-          media_urls: normalizedMedia as any,
-          project_link: portfolioData.projectLink || null,
-          completion_month: portfolioData.completionMonth || '',
-          completion_year: portfolioData.completionYear || '',
-          references: (portfolioData.references || []) as any,
-          status: portfolioData.status || 'DRAFT'
-        },
-        include: {
-          industry: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
-          }
+      // Build data object conditionally
+      const createData: any = {
+        unique_id: ulid(),
+        user_id: userId,
+        hide_company_name: portfolioData.hideCompanyName || false,
+        project_skills: (portfolioData.projectSkills || []) as any,
+        thumbnail_url: normalizedThumbnail as any,
+        media_urls: normalizedMedia as any,
+        references: (portfolioData.references || []) as any,
+        status: portfolioData.status || 'DRAFT'
+      };
+      
+      // Only add optional fields if they have values
+      if (portfolioData.title) createData.title = portfolioData.title;
+      if (portfolioData.description) createData.description = portfolioData.description;
+      if (portfolioData.companyName) createData.company_name = portfolioData.companyName;
+      if (portfolioData.role) createData.role = portfolioData.role;
+      if (portfolioData.projectLink) createData.project_link = portfolioData.projectLink;
+      if (portfolioData.completionMonth) createData.completion_month = portfolioData.completionMonth;
+      if (portfolioData.completionYear) createData.completion_year = portfolioData.completionYear;
+      
+      // Validate industry exists before adding it
+      if (portfolioData.industryId) {
+        const industryExists = await prisma.industry.findUnique({
+          where: { id: portfolioData.industryId }
+        });
+        if (industryExists) {
+          createData.industry_id = portfolioData.industryId;
         }
+      }
+      
+      const portfolio = await prisma.portfolio.create({
+        data: createData
       });
 
       // Transform URLs to full URLs
@@ -177,7 +182,7 @@ export class PortfolioService {
       console.error("Create Portfolio Error:", error);
       return {
         success: false,
-        message: "Failed to create portfolio"
+        message: error?.message || "Failed to create portfolio"
       };
     }
   }
