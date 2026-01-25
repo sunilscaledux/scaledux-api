@@ -115,48 +115,64 @@ export class FounderProjectService {
    */
   static async getProjectById(userId: number | null, uniqueId: string): Promise<ServiceResponse> {
     try {
-      // Fetch the project without ownership restriction first
-      const project = await prisma.founderProject.findFirst({
-        where: {
-          unique_id: uniqueId,
-          deleted_at: null
+      // Build include object - only add invites/savedByUsers when user is logged in
+      const baseInclude = {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
         },
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
-          },
-          subCategory: {
-            select: {
-              id: true,
-              name: true,
-              description: true
-            }
-          },
-          user: {
-            select: {
-              id: true,
-              first_name: true,
-              last_name: true,
-              email: true,
-              role: true,
-              personalInfo: {
-                select: {
-                  profileImage: true,
-                  city: true,
-                  country: {
-                    select: {
-                      name: true
-                    }
+        subCategory: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            role: true,
+            personalInfo: {
+              select: {
+                profileImage: true,
+                city: true,
+                country: {
+                  select: {
+                    name: true
                   }
                 }
               }
             }
           }
         }
+      };
+
+      // Only include invites and savedByUsers for logged-in users
+      const include = userId ? {
+        ...baseInclude,
+        invites: {
+          where: { provider_id: userId },
+          select: { id: true }
+        },
+        savedByUsers: {
+          where: { user_id: userId },
+          select: { id: true }
+        }
+      } : baseInclude;
+
+      // Fetch the project without ownership restriction first
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: uniqueId,
+          deleted_at: null
+        },
+        include: include as any
       });
 
       if (!project) {
@@ -177,27 +193,19 @@ export class FounderProjectService {
         };
       }
 
-      // Check if project is saved by the current user (for non-owners)
-      let isSavedByUser = false;
-      if (userId && !isOwner) {
-        const savedProject = await (prisma as any).savedProject.findUnique({
-          where: {
-            project_id_user_id: {
-              project_id: project.id,
-              user_id: userId
-            }
-          }
-        });
-        isSavedByUser = !!savedProject;
-      }
+      // Check user status using relations (already filtered by userId in query)
+      const isSavedByUser = !isOwner && (project as any).savedByUsers?.length > 0;
+      const isInvitedUser = !isOwner && (project as any).invites?.length > 0;
 
-      // Transform file URLs
+      // Transform file URLs and remove relation data from response
+      const { invites, savedByUsers, ...projectData } = project as any;
       const transformedProject = {
-        ...project,
+        ...projectData,
         project_files: project.project_files
           ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
           : [],
         is_saved: isSavedByUser,
+        is_invited: isInvitedUser,
         is_owner: isOwner
       };
 
