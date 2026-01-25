@@ -237,13 +237,6 @@ export class FounderProjectService {
         }
       });
 
-      // Compute and store provider matches in background
-      if (data.skillsRequired && data.skillsRequired.length > 0) {
-        this.computeAndStoreMatches(project.id, userId, data.skillsRequired).catch(err => {
-          console.error("Error computing provider matches:", err);
-        });
-      }
-
       // Transform file URLs for response
       const transformedProject = {
         ...project,
@@ -264,72 +257,6 @@ export class FounderProjectService {
     }
   }
 
-  /**
-   * Compute and store provider matches for a project
-   */
-  static async computeAndStoreMatches(projectId: number, ownerId: number, skillsRequired: string[]): Promise<void> {
-    try {
-      // Get all freelancers with their expertise
-      const freelancers = await prisma.user.findMany({
-        where: {
-          role: 'freelancer',
-          id: { not: ownerId },
-          status: 1
-        },
-        include: {
-          expertises: true
-        }
-      });
-
-      const matchesToCreate: Array<{
-        project_id: number;
-        provider_id: number;
-        matched_skills: string[];
-        match_score: number;
-      }> = [];
-
-      for (const freelancer of freelancers) {
-        // Collect all skills from user's expertises
-        const userSkills: string[] = [];
-        freelancer.expertises.forEach(exp => {
-          if (exp.skills && Array.isArray(exp.skills)) {
-            userSkills.push(...(exp.skills as string[]));
-          }
-        });
-
-        // Find matched skills (case-insensitive)
-        const matchedSkills = skillsRequired.filter(reqSkill =>
-          userSkills.some(userSkill =>
-            userSkill.toLowerCase() === reqSkill.toLowerCase()
-          )
-        );
-
-        // Only store if there's at least one match
-        if (matchedSkills.length > 0) {
-          const matchScore = (matchedSkills.length / skillsRequired.length) * 100;
-          matchesToCreate.push({
-            project_id: projectId,
-            provider_id: freelancer.id,
-            matched_skills: matchedSkills,
-            match_score: matchScore
-          });
-        }
-      }
-
-      // Bulk insert matches
-      if (matchesToCreate.length > 0) {
-        await prisma.projectProviderMatch.createMany({
-          data: matchesToCreate,
-          skipDuplicates: true
-        });
-      }
-
-      console.log(`Stored ${matchesToCreate.length} provider matches for project ${projectId}`);
-    } catch (error) {
-      console.error("Error in computeAndStoreMatches:", error);
-      throw error;
-    }
-  }
 
   /**
    * Update founder project
@@ -393,13 +320,6 @@ export class FounderProjectService {
         where: { id: existingProject.id },
         data: updateData
       });
-
-      // Refresh provider matches if skills were updated
-      if (data.skillsRequired !== undefined && data.skillsRequired.length > 0) {
-        this.refreshProjectMatches(existingProject.id, userId, data.skillsRequired).catch(err => {
-          console.error("Error refreshing provider matches:", err);
-        });
-      }
 
       // Transform file URLs
       const transformedProject = {
@@ -522,7 +442,8 @@ export class FounderProjectService {
   }
 
   /**
-   * Get matching service providers (freelancers) for a project from stored matches
+   * Get all service providers (freelancers) - simplified version
+   * TODO: Add matching logic later
    */
   static async getMatchingServiceProviders(
     userId: number,
@@ -533,7 +454,7 @@ export class FounderProjectService {
     filter: 'all' | 'invited' | 'saved' = 'all'
   ): Promise<ServiceResponse> {
     try {
-      // Get the project
+      // Verify project exists
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,
@@ -549,63 +470,37 @@ export class FounderProjectService {
         };
       }
 
-      const requiredSkills = (project.skills_required as string[]) || [];
-
-      // Build where clause for matches based on filter
-      const matchWhere: any = { project_id: project.id };
-      if (filter === 'invited') {
-        matchWhere.is_invited = true;
-      } else if (filter === 'saved') {
-        matchWhere.is_saved = true;
-      }
-
-      // Determine sort order
-      let orderBy: any = { match_score: 'desc' };
-      if (sortBy === 'hourly_rate') {
-        orderBy = { provider: { personalInfo: { hourly_rate: 'asc' } } };
-      }
-
-      // Get stored matches with provider details
-      const matches = await prisma.projectProviderMatch.findMany({
-        where: matchWhere,
-        include: {
-          provider: {
-            include: {
-              personalInfo: {
-                include: {
-                  country: {
-                    select: { id: true, name: true, code: true }
-                  },
-                  state: {
-                    select: { id: true, name: true }
-                  }
-                }
-              },
-              expertises: {
-                include: {
-                  expertiseCategory: {
-                    select: { id: true, name: true }
-                  },
-                  specialty: {
-                    select: { id: true, name: true }
-                  }
-                }
-              },
-              servicePackages: {
-                where: { status: 'PUBLISHED' },
-                select: { id: true }
-              }
-            }
-          }
+      // Fetch all active freelancers (excluding project owner)
+      const freelancers = await prisma.user.findMany({
+        where: {
+          role: 'freelancer',
+          id: { not: userId },
+          status: 1
         },
-        orderBy: sortBy === 'relevance' ? { match_score: 'desc' } : undefined
+        include: {
+          personalInfo: {
+            include: {
+              country: { select: { id: true, name: true, code: true } },
+              state: { select: { id: true, name: true } }
+            }
+          },
+          expertises: {
+            include: {
+              expertiseCategory: { select: { id: true, name: true } },
+              specialty: { select: { id: true, name: true } }
+            }
+          },
+          servicePackages: {
+            where: { status: 'PUBLISHED' },
+            select: { id: true }
+          }
+        }
       });
 
-      // Transform data
-      let providers = matches.map(match => {
-        const freelancer = match.provider;
+      // Transform freelancers to provider format
+      const providers = freelancers.map(freelancer => {
         const userSkills: string[] = [];
-        freelancer.expertises.forEach(exp => {
+        freelancer.expertises.forEach((exp: any) => {
           if (exp.skills && Array.isArray(exp.skills)) {
             userSkills.push(...(exp.skills as string[]));
           }
@@ -626,34 +521,25 @@ export class FounderProjectService {
           country: freelancer.personalInfo?.country || null,
           state: freelancer.personalInfo?.state || null,
           city: freelancer.personalInfo?.city || null,
-          expertises: freelancer.expertises.map(exp => ({
+          expertises: freelancer.expertises.map((exp: any) => ({
             id: exp.id,
             category: exp.expertiseCategory,
             specialty: exp.specialty,
             skills: exp.skills || []
           })),
           all_skills: userSkills,
-          matched_skills: match.matched_skills as string[],
-          match_score: match.match_score,
+          matched_skills: [],
+          match_score: 0,
           service_packages_count: freelancer.servicePackages.length,
           total_earned: 0,
           projects_completed: freelancer.servicePackages.length,
           rating: 0,
           reviews_count: 0,
-          is_invited: match.is_invited,
-          invited_at: match.invited_at,
-          is_saved: match.is_saved
+          is_invited: false,
+          invited_at: null,
+          is_saved: false
         };
       });
-
-      // Sort in memory for non-relevance sorts
-      if (sortBy === 'rating') {
-        providers.sort((a, b) => b.rating - a.rating);
-      } else if (sortBy === 'hourly_rate') {
-        providers.sort((a, b) => (a.hourly_rate || 0) - (b.hourly_rate || 0));
-      } else if (sortBy === 'projects_completed') {
-        providers.sort((a, b) => b.projects_completed - a.projects_completed);
-      }
 
       // Pagination
       const total = providers.length;
@@ -666,23 +552,42 @@ export class FounderProjectService {
         message: "Service providers retrieved successfully",
         data: {
           providers: paginatedProviders,
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages
-          },
-          project_skills: requiredSkills
+          pagination: { page, limit, total, totalPages },
+          project_skills: (project.skills_required as string[]) || []
         }
       };
     } catch (error: any) {
-      console.error("Get Matching Service Providers Error:", error);
+      console.error("Get Service Providers Error:", error);
       return {
         success: false,
-        message: "Failed to get matching service providers"
+        message: "Failed to get service providers"
       };
     }
   }
+
+  /*
+   * TODO: Re-enable matching logic later
+   * 
+   * Helper to sort providers by different criteria
+   *
+  private static sortProviders(
+    providers: any[],
+    sortBy: 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed'
+  ): any[] {
+    switch (sortBy) {
+      case 'relevance':
+        return providers.sort((a, b) => b.match_score - a.match_score);
+      case 'rating':
+        return providers.sort((a, b) => b.rating - a.rating);
+      case 'hourly_rate':
+        return providers.sort((a, b) => (a.hourly_rate || 0) - (b.hourly_rate || 0));
+      case 'projects_completed':
+        return providers.sort((a, b) => b.projects_completed - a.projects_completed);
+      default:
+        return providers.sort((a, b) => b.match_score - a.match_score);
+    }
+  }
+  */
 
   /**
    * Invite a service provider to a project
@@ -710,25 +615,47 @@ export class FounderProjectService {
         };
       }
 
-      // Update the match record
-      const match = await prisma.projectProviderMatch.updateMany({
+      // Verify the provider exists and is a freelancer
+      const provider = await prisma.user.findFirst({
         where: {
-          project_id: project.id,
-          provider_id: providerId
-        },
-        data: {
-          is_invited: true,
-          invited_at: new Date(),
-          invitation_message: message || null
+          id: providerId,
+          role: 'freelancer',
+          status: 1
         }
       });
 
-      if (match.count === 0) {
+      if (!provider) {
         return {
           success: false,
-          message: "Provider match not found"
+          message: "Provider not found"
         };
       }
+
+      // Check if already invited
+      const existingInvite = await (prisma as any).projectInvite.findUnique({
+        where: {
+          project_id_provider_id: {
+            project_id: project.id,
+            provider_id: providerId
+          }
+        }
+      });
+
+      if (existingInvite) {
+        return {
+          success: false,
+          message: "Provider already invited"
+        };
+      }
+
+      // Create the invite record
+      await (prisma as any).projectInvite.create({
+        data: {
+          project_id: project.id,
+          provider_id: providerId,
+          message: message || null
+        }
+      });
 
       // Update project invited count
       await prisma.founderProject.update({
@@ -775,40 +702,45 @@ export class FounderProjectService {
         };
       }
 
-      // Get current match record
-      const existingMatch = await prisma.projectProviderMatch.findUnique({
+      // Verify the provider exists and is a freelancer
+      const provider = await prisma.user.findFirst({
         where: {
-          project_id_provider_id: {
-            project_id: project.id,
-            provider_id: providerId
-          }
+          id: providerId,
+          role: 'freelancer',
+          status: 1
         }
       });
 
-      if (!existingMatch) {
+      if (!provider) {
         return {
           success: false,
-          message: "Provider match not found"
+          message: "Provider not found"
         };
       }
 
-      // Toggle is_saved
-      const updatedMatch = await prisma.projectProviderMatch.update({
-        where: {
-          project_id_provider_id: {
-            project_id: project.id,
-            provider_id: providerId
-          }
-        },
-        data: {
-          is_saved: !existingMatch.is_saved
-        }
+      // Get current saved providers array
+      const savedProviders = ((project as any).saved_providers as number[]) || [];
+      const isSaved = savedProviders.includes(providerId);
+
+      let newSavedProviders: number[];
+      if (isSaved) {
+        // Remove from saved
+        newSavedProviders = savedProviders.filter(id => id !== providerId);
+      } else {
+        // Add to saved
+        newSavedProviders = [...savedProviders, providerId];
+      }
+
+      // Update the project with saved providers as JSON
+      await (prisma.founderProject.update as any)({
+        where: { id: project.id },
+        data: { saved_providers: newSavedProviders }
       });
 
       return {
         success: true,
-        message: updatedMatch.is_saved ? "Provider saved" : "Provider unsaved",
-        data: { is_saved: updatedMatch.is_saved }
+        message: isSaved ? "Provider unsaved" : "Provider saved",
+        data: { is_saved: !isSaved }
       };
     } catch (error: any) {
       console.error("Toggle Save Provider Error:", error);
@@ -819,25 +751,4 @@ export class FounderProjectService {
     }
   }
 
-  /**
-   * Refresh matches for a project (useful when skills are updated)
-   */
-  static async refreshProjectMatches(projectId: number, ownerId: number, skillsRequired: string[]): Promise<void> {
-    try {
-      // Delete existing matches that haven't been invited or saved
-      await prisma.projectProviderMatch.deleteMany({
-        where: {
-          project_id: projectId,
-          is_invited: false,
-          is_saved: false
-        }
-      });
-
-      // Recompute matches
-      await this.computeAndStoreMatches(projectId, ownerId, skillsRequired);
-    } catch (error) {
-      console.error("Error refreshing project matches:", error);
-      throw error;
-    }
-  }
 }

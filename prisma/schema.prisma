@@ -48,7 +48,7 @@ model User {
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
-  providerMatches              ProjectProviderMatch[] @relation("ProviderMatches")
+  projectInvites               ProjectInvite[] @relation("ProjectInvites")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -593,6 +593,7 @@ model FounderProject {
   invited_count         Int       @default(0)
   proposals_count       Int       @default(0)
   hired_count           Int       @default(0)
+  saved_providers       Json      @default("[]") // Array of provider user IDs saved for later
   deleted_at            DateTime?
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
@@ -600,7 +601,7 @@ model FounderProject {
   user                  User @relation(fields: [user_id], references: [id], onDelete: Cascade)
   category              ServiceCategory @relation(fields: [category_id], references: [id])
   subCategory           ServiceSubCategory? @relation(fields: [sub_category_id], references: [id])
-  providerMatches       ProjectProviderMatch[]
+  invites               ProjectInvite[]
 
   @@index([user_id, status])
   @@index([status])
@@ -612,28 +613,20 @@ model FounderProject {
 }
 
 // Stores matched service providers for a project
-model ProjectProviderMatch {
+model ProjectInvite {
   id                    Int       @id @default(autoincrement())
   project_id            Int
   provider_id           Int       // Freelancer user id
-  matched_skills        Json      // Array of matched skill names
-  match_score           Float     // Percentage match (0-100)
-  is_invited            Boolean   @default(false)
-  invited_at            DateTime?
-  invitation_message    String?   @db.Text
-  is_saved              Boolean   @default(false) // Saved for later
+  message               String?   @db.Text
   created_at            DateTime  @default(now())
-  updated_at            DateTime  @updatedAt
   
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  provider              User @relation("ProviderMatches", fields: [provider_id], references: [id], onDelete: Cascade)
+  provider              User @relation("ProjectInvites", fields: [provider_id], references: [id], onDelete: Cascade)
 
   @@unique([project_id, provider_id])
   @@index([project_id])
   @@index([provider_id])
-  @@index([is_invited])
-  @@index([match_score])
-  @@map("scd_project_provider_matches")
+  @@map("scd_project_invites")
 }
 
 enum OtpType {
