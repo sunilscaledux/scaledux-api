@@ -109,6 +109,203 @@ export class FounderProjectService {
   }
 
   /**
+   * Browse published projects for service providers
+   * Only returns published projects, with save/invite status for logged-in users
+   */
+  static async browseProjects(
+    userId: number | null,
+    params: {
+      search?: string;
+      categoryIds?: number[];
+      skills?: string[];
+      budgetMin?: number;
+      budgetMax?: number;
+      experienceLevel?: string;
+      sortBy?: 'newest' | 'oldest' | 'budget_high' | 'budget_low';
+      page?: number;
+      limit?: number;
+      filter?: 'all' | 'saved';
+    }
+  ): Promise<ServiceResponse> {
+    try {
+      const {
+        search,
+        categoryIds,
+        skills,
+        budgetMin,
+        budgetMax,
+        experienceLevel,
+        sortBy = 'newest',
+        page = 1,
+        limit = 20,
+        filter = 'all'
+      } = params;
+
+      // Base where clause - only published, not deleted
+      const whereClause: any = {
+        status: 'PUBLISHED',
+        deleted_at: null
+      };
+
+      // Category filter (supports multiple categories)
+      if (categoryIds && categoryIds.length > 0) {
+        whereClause.category_id = { in: categoryIds };
+      }
+
+      // Search across title and description
+      if (search) {
+        whereClause.OR = [
+          { project_title: { contains: search, mode: 'insensitive' } },
+          { project_description: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      // Skills filter (check if any skill matches)
+      if (skills && skills.length > 0) {
+        whereClause.skills_required = {
+          hasSome: skills
+        };
+      }
+
+      // Note: Budget filtering is done in JavaScript after fetch
+      // because budget_amount is stored as string and string comparison
+      // doesn't work correctly for numeric values (e.g., "7000" > "17000" in string comparison)
+
+      // Experience level filter
+      if (experienceLevel) {
+        whereClause.experience_needed = experienceLevel;
+      }
+
+      // Filter by saved projects only
+      if (filter === 'saved' && userId) {
+        whereClause.savedByUsers = {
+          some: { user_id: userId }
+        };
+      }
+
+      // Determine sort order
+      let orderBy: any = { created_at: 'desc' };
+      if (sortBy === 'oldest') {
+        orderBy = { created_at: 'asc' };
+      } else if (sortBy === 'budget_high') {
+        orderBy = { budget_amount: 'desc' };
+      } else if (sortBy === 'budget_low') {
+        orderBy = { budget_amount: 'asc' };
+      }
+
+      // Build include - add user status relations if logged in
+      const baseInclude = {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        },
+        subCategory: {
+          select: {
+            id: true,
+            name: true,
+            description: true
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            currency: {
+              select: {
+                id: true,
+                code: true,
+                symbol: true
+              }
+            },
+            personalInfo: {
+              select: {
+                profileImage: true,
+                country: { select: { name: true } }
+              }
+            }
+          }
+        }
+      };
+
+      const include = userId ? {
+        ...baseInclude,
+        invites: {
+          where: { provider_id: userId },
+          select: { id: true }
+        },
+        savedByUsers: {
+          where: { user_id: userId },
+          select: { id: true }
+        }
+      } : baseInclude;
+
+      // Check if budget filtering is needed
+      const hasBudgetFilter = budgetMin !== undefined || budgetMax !== undefined;
+
+      // Get all projects (we'll filter by budget in JS if needed)
+      let allProjects = await prisma.founderProject.findMany({
+        where: whereClause,
+        include: include as any,
+        orderBy
+      });
+
+      // Apply budget filter in JavaScript (because budget_amount is stored as string)
+      if (hasBudgetFilter) {
+        allProjects = allProjects.filter((project: any) => {
+          const budgetValue = parseFloat(project.budget_amount) || 0;
+          if (budgetMin !== undefined && budgetValue < budgetMin) return false;
+          if (budgetMax !== undefined && budgetValue > budgetMax) return false;
+          return true;
+        });
+      }
+
+      // Calculate pagination after budget filtering
+      const totalCount = allProjects.length;
+      const paginatedProjects = allProjects.slice((page - 1) * limit, page * limit);
+
+      // Transform projects
+      const transformedProjects = paginatedProjects.map((project: any) => {
+        const { invites, savedByUsers, ...projectData } = project;
+        // Use user's currency symbol if available, otherwise fallback to budget_currency or default
+        const currencySymbol = project.user?.currency?.symbol || '₹';
+        return {
+          ...projectData,
+          budget_currency: currencySymbol,
+          project_files: project.project_files
+            ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
+            : [],
+          is_saved: userId ? (savedByUsers?.length > 0) : false,
+          is_invited: userId ? (invites?.length > 0) : false
+        };
+      });
+
+      return {
+        success: true,
+        data: {
+          projects: transformedProjects,
+          pagination: {
+            page,
+            limit,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit)
+          }
+        },
+        message: "Projects retrieved successfully"
+      };
+    } catch (error: any) {
+      console.error("Error in browseProjects:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to retrieve projects"
+      };
+    }
+  }
+
+  /**
    * Get a single project by unique ID
    * - Project owners can see their drafts and published projects
    * - Non-owners (including service providers) can only see published projects
@@ -138,6 +335,13 @@ export class FounderProjectService {
             last_name: true,
             email: true,
             role: true,
+            currency: {
+              select: {
+                id: true,
+                code: true,
+                symbol: true
+              }
+            },
             personalInfo: {
               select: {
                 profileImage: true,
@@ -199,8 +403,11 @@ export class FounderProjectService {
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, ...projectData } = project as any;
+      // Use user's currency symbol if available
+      const currencySymbol = (project as any).user?.currency?.symbol || '₹';
       const transformedProject = {
         ...projectData,
+        budget_currency: currencySymbol,
         project_files: project.project_files
           ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
           : [],

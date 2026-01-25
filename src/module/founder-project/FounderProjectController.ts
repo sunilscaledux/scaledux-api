@@ -35,6 +35,45 @@ export async function getCompanyProjects(req: Request, res: Response) {
 }
 
 /**
+ * Browse published projects (for service providers)
+ * Works with or without authentication
+ */
+export async function browseProjects(req: Request, res: Response) {
+  const userId = req.user?.id || null;
+  const { 
+    search, 
+    categoryIds, 
+    skills, 
+    budgetMin, 
+    budgetMax, 
+    experienceLevel, 
+    sortBy, 
+    page, 
+    limit, 
+    filter 
+  } = req.query;
+
+  const result = await FounderProjectService.browseProjects(userId, {
+    search: search as string,
+    categoryIds: categoryIds ? (categoryIds as string).split(',').map(id => parseInt(id)) : undefined,
+    skills: skills ? (skills as string).split(',') : undefined,
+    budgetMin: budgetMin ? parseFloat(budgetMin as string) : undefined,
+    budgetMax: budgetMax ? parseFloat(budgetMax as string) : undefined,
+    experienceLevel: experienceLevel as string,
+    sortBy: sortBy as 'newest' | 'oldest' | 'budget_high' | 'budget_low',
+    page: page ? parseInt(page as string) : 1,
+    limit: limit ? parseInt(limit as string) : 20,
+    filter: filter as 'all' | 'saved'
+  });
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  }
+
+  return ApiResponse.error(res, result.message);
+}
+
+/**
  * Get project by unique ID
  * Works with or without authentication
  */

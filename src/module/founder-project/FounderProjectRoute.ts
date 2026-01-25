@@ -10,13 +10,17 @@ import {
   getMatchingServiceProviders,
   inviteProvider,
   toggleSaveProvider,
-  toggleSaveProject
+  toggleSaveProject,
+  browseProjects
 } from "./FounderProjectController"
 import { uploadFile } from "@module/general/FileController"
-import { authenticateToken } from "@middleware/auth"
+import { authenticateToken, optionalAuth } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
+
+// Public/optional auth routes (before authenticateToken middleware)
+router.get("/browse", optionalAuth, browseProjects)
 
 // All routes below require authentication
 router.use(authenticateToken)
