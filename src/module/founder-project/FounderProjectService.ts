@@ -65,6 +65,21 @@ export class FounderProjectService {
         orderBy = { invited_count: 'desc' };
       }
 
+      // Get user's currency for budget display
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          currency: {
+            select: {
+              id: true,
+              code: true,
+              symbol: true
+            }
+          }
+        }
+      });
+      const currencySymbol = user?.currency?.symbol || '₹';
+
       const projects = await prisma.founderProject.findMany({
         where: whereClause,
         include: {
@@ -86,9 +101,10 @@ export class FounderProjectService {
         orderBy
       });
 
-      // Transform file URLs to full URLs
+      // Transform file URLs to full URLs and add currency symbol
       const transformedProjects = projects.map(project => ({
         ...project,
+        budget_currency: currencySymbol,
         project_files: project.project_files
           ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
           : []
