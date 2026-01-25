@@ -442,8 +442,7 @@ export class FounderProjectService {
   }
 
   /**
-   * Get all service providers (freelancers) - simplified version
-   * TODO: Add matching logic later
+   * Get service providers (freelancers) - with filter support
    */
   static async getMatchingServiceProviders(
     userId: number,
@@ -454,7 +453,7 @@ export class FounderProjectService {
     filter: 'all' | 'invited' | 'saved' = 'all'
   ): Promise<ServiceResponse> {
     try {
-      // Verify project exists
+      // Verify project exists and get saved providers
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,
@@ -470,13 +469,59 @@ export class FounderProjectService {
         };
       }
 
-      // Fetch all active freelancers (excluding project owner)
+      const projectSkills = (project.skills_required as string[]) || [];
+      const savedProviderIds = ((project as any).saved_providers as number[]) || [];
+
+      // Get invited provider IDs and their invite data
+      const invites = await (prisma as any).projectInvite.findMany({
+        where: { project_id: project.id },
+        select: {
+          provider_id: true,
+          created_at: true,
+          message: true
+        }
+      });
+      const invitedProviderIds = invites.map((i: any) => i.provider_id);
+      const inviteMap = new Map(invites.map((i: any) => [i.provider_id, i]));
+
+      // Build where clause based on filter
+      let whereClause: any = {
+        role: 'freelancer',
+        id: { not: userId },
+        status: 1
+      };
+
+      if (filter === 'invited') {
+        if (invitedProviderIds.length === 0) {
+          return {
+            success: true,
+            message: "Service providers retrieved successfully",
+            data: {
+              providers: [],
+              pagination: { page, limit, total: 0, totalPages: 0 },
+              project_skills: projectSkills
+            }
+          };
+        }
+        whereClause.id = { in: invitedProviderIds };
+      } else if (filter === 'saved') {
+        if (savedProviderIds.length === 0) {
+          return {
+            success: true,
+            message: "Service providers retrieved successfully",
+            data: {
+              providers: [],
+              pagination: { page, limit, total: 0, totalPages: 0 },
+              project_skills: projectSkills
+            }
+          };
+        }
+        whereClause.id = { in: savedProviderIds };
+      }
+
+      // Fetch freelancers
       const freelancers = await prisma.user.findMany({
-        where: {
-          role: 'freelancer',
-          id: { not: userId },
-          status: 1
-        },
+        where: whereClause,
         include: {
           personalInfo: {
             include: {
@@ -505,6 +550,10 @@ export class FounderProjectService {
             userSkills.push(...(exp.skills as string[]));
           }
         });
+
+        const invite = inviteMap.get(freelancer.id);
+        const isInvited = invitedProviderIds.includes(freelancer.id);
+        const isSaved = savedProviderIds.includes(freelancer.id);
 
         return {
           id: freelancer.id,
@@ -535,9 +584,9 @@ export class FounderProjectService {
           projects_completed: freelancer.servicePackages.length,
           rating: 0,
           reviews_count: 0,
-          is_invited: false,
-          invited_at: null,
-          is_saved: false
+          is_invited: isInvited,
+          invited_at: (invite as any)?.created_at || null,
+          is_saved: isSaved
         };
       });
 
@@ -553,7 +602,7 @@ export class FounderProjectService {
         data: {
           providers: paginatedProviders,
           pagination: { page, limit, total, totalPages },
-          project_skills: (project.skills_required as string[]) || []
+          project_skills: projectSkills
         }
       };
     } catch (error: any) {
@@ -638,7 +687,7 @@ export class FounderProjectService {
             project_id: project.id,
             provider_id: providerId
           }
-        }
+        } 
       });
 
       if (existingInvite) {
