@@ -243,7 +243,12 @@ export async function getMatchingServiceProviders(req: Request, res: Response) {
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);
   } else {
-    const statusCode = result.message === "Project not found" ? 404 : 500;
+    let statusCode = 500;
+    if (result.message === "Project not found") {
+      statusCode = 404;
+    } else if (result.message?.includes("permission")) {
+      statusCode = 403;
+    }
     return ApiResponse.error(res, result.message, statusCode);
   }
 }
@@ -313,6 +318,36 @@ export async function toggleSaveProvider(req: Request, res: Response) {
     return ApiResponse.success(res, result.data, result.message);
   } else {
     const statusCode = result.message === "Project not found" || result.message === "Provider match not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Toggle save project for service providers
+ */
+export async function toggleSaveProject(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await FounderProjectService.toggleSaveProject(userId, projectId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    let statusCode = 500;
+    if (result.message === "Project not found") {
+      statusCode = 404;
+    } else if (result.message?.includes("cannot save your own")) {
+      statusCode = 400;
+    }
     return ApiResponse.error(res, result.message, statusCode);
   }
 }

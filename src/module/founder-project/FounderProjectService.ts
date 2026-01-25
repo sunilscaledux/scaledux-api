@@ -110,23 +110,17 @@ export class FounderProjectService {
 
   /**
    * Get a single project by unique ID
-   * If userId is provided, it checks ownership; otherwise returns any published project
+   * - Project owners can see their drafts and published projects
+   * - Non-owners (including service providers) can only see published projects
    */
   static async getProjectById(userId: number | null, uniqueId: string): Promise<ServiceResponse> {
     try {
-      const whereClause: any = {
-        unique_id: uniqueId,
-        deleted_at: null
-      };
-
-      // If no userId (public access), only show published projects
-      if (!userId) {
-        whereClause.status = 'PUBLISHED';
-      }
-      // If userId provided, show all their projects (including drafts)
-
+      // Fetch the project without ownership restriction first
       const project = await prisma.founderProject.findFirst({
-        where: whereClause,
+        where: {
+          unique_id: uniqueId,
+          deleted_at: null
+        },
         include: {
           category: {
             select: {
@@ -172,12 +166,29 @@ export class FounderProjectService {
         };
       }
 
-      // If userId provided, verify ownership
-      if (userId && project.user_id !== userId) {
+      const isOwner = userId && project.user_id === userId;
+      const isPublished = project.status === 'PUBLISHED';
+
+      // Non-owners can only view published projects
+      if (!isOwner && !isPublished) {
         return {
           success: false,
           message: "Project not found"
         };
+      }
+
+      // Check if project is saved by the current user (for non-owners)
+      let isSavedByUser = false;
+      if (userId && !isOwner) {
+        const savedProject = await (prisma as any).savedProject.findUnique({
+          where: {
+            project_id_user_id: {
+              project_id: project.id,
+              user_id: userId
+            }
+          }
+        });
+        isSavedByUser = !!savedProject;
       }
 
       // Transform file URLs
@@ -185,7 +196,9 @@ export class FounderProjectService {
         ...project,
         project_files: project.project_files
           ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
-          : []
+          : [],
+        is_saved: isSavedByUser,
+        is_owner: isOwner
       };
 
       return {
@@ -453,11 +466,10 @@ export class FounderProjectService {
     filter: 'all' | 'invited' | 'saved' = 'all'
   ): Promise<ServiceResponse> {
     try {
-      // Verify project exists and get saved providers
+      // First check if project exists
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,
-          user_id: userId,
           deleted_at: null
         }
       });
@@ -466,6 +478,14 @@ export class FounderProjectService {
         return {
           success: false,
           message: "Project not found"
+        };
+      }
+
+      // Check if user is the project owner
+      if (project.user_id !== userId) {
+        return {
+          success: false,
+          message: "You don't have permission to view service providers for this project"
         };
       }
 
@@ -797,6 +817,117 @@ export class FounderProjectService {
         success: false,
         message: "Failed to save provider"
       };
+    }
+  }
+
+  /**
+   * Toggle save project for service providers (save for later)
+   */
+  static async toggleSaveProject(
+    userId: number,
+    projectId: string
+  ): Promise<ServiceResponse> {
+    try {
+      // Get the project
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          deleted_at: null,
+          status: 'PUBLISHED' // Only allow saving published projects
+        }
+      });
+
+      if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      // Check if user is the project owner (owners shouldn't save their own projects)
+      if (project.user_id === userId) {
+        return {
+          success: false,
+          message: "You cannot save your own project"
+        };
+      }
+
+      // Check if already saved
+      const existingSave = await (prisma as any).savedProject.findUnique({
+        where: {
+          project_id_user_id: {
+            project_id: project.id,
+            user_id: userId
+          }
+        }
+      });
+
+      if (existingSave) {
+        // Unsave the project
+        await (prisma as any).savedProject.delete({
+          where: {
+            project_id_user_id: {
+              project_id: project.id,
+              user_id: userId
+            }
+          }
+        });
+
+        return {
+          success: true,
+          message: "Project unsaved",
+          data: { is_saved: false }
+        };
+      }
+
+      // Save the project
+      await (prisma as any).savedProject.create({
+        data: {
+          project_id: project.id,
+          user_id: userId
+        }
+      });
+
+      return {
+        success: true,
+        message: "Project saved",
+        data: { is_saved: true }
+      };
+    } catch (error: any) {
+      console.error("Toggle Save Project Error:", error);
+      return {
+        success: false,
+        message: "Failed to save project"
+      };
+    }
+  }
+
+  /**
+   * Check if a project is saved by the user
+   */
+  static async isProjectSaved(
+    userId: number,
+    projectId: string
+  ): Promise<boolean> {
+    try {
+      const project = await prisma.founderProject.findFirst({
+        where: { unique_id: projectId, deleted_at: null }
+      });
+
+      if (!project) return false;
+
+      const existingSave = await (prisma as any).savedProject.findUnique({
+        where: {
+          project_id_user_id: {
+            project_id: project.id,
+            user_id: userId
+          }
+        }
+      });
+
+      return !!existingSave;
+    } catch (error) {
+      return false;
     }
   }
 

@@ -49,6 +49,7 @@ model User {
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
+  savedProjects                SavedProject[] @relation("SavedProjects")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -602,6 +603,7 @@ model FounderProject {
   category              ServiceCategory @relation(fields: [category_id], references: [id])
   subCategory           ServiceSubCategory? @relation(fields: [sub_category_id], references: [id])
   invites               ProjectInvite[]
+  savedByUsers          SavedProject[]
 
   @@index([user_id, status])
   @@index([status])
@@ -627,6 +629,22 @@ model ProjectInvite {
   @@index([project_id])
   @@index([provider_id])
   @@map("scd_project_invites")
+}
+
+// Service providers save projects they're interested in
+model SavedProject {
+  id                    Int       @id @default(autoincrement())
+  project_id            Int
+  user_id               Int       // Service provider user id
+  created_at            DateTime  @default(now())
+  
+  project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  user                  User @relation("SavedProjects", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@index([project_id])
+  @@index([user_id])
+  @@map("scd_saved_projects")
 }
 
 enum OtpType {
