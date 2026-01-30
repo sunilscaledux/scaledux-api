@@ -620,7 +620,9 @@ model ProjectInvite {
   project_id            Int
   provider_id           Int       // Freelancer user id
   message               String?   @db.Text
+  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED
   created_at            DateTime  @default(now())
+  updated_at            DateTime  @default(now()) @updatedAt
   
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   provider              User @relation("ProjectInvites", fields: [provider_id], references: [id], onDelete: Cascade)
@@ -628,6 +630,7 @@ model ProjectInvite {
   @@unique([project_id, provider_id])
   @@index([project_id])
   @@index([provider_id])
+  @@index([status])
   @@map("scd_project_invites")
 }
 

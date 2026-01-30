@@ -9,6 +9,7 @@ import {
   duplicateProject,
   getMatchingServiceProviders,
   inviteProvider,
+  rejectInvitation,
   toggleSaveProvider,
   toggleSaveProject,
   browseProjects
@@ -21,13 +22,13 @@ const router = Router()
 
 // Public/optional auth routes (before authenticateToken middleware)
 router.get("/browse", optionalAuth, browseProjects)
+router.get("/:id", optionalAuth, getProjectById) // Accessible by both logged-in and non-logged-in users
 
 // All routes below require authentication
 router.use(authenticateToken)
 
 // Founder Project CRUD routes
 router.get("/", getCompanyProjects)
-router.get("/:id", getProjectById) // Moved after auth to allow viewing drafts
 router.post("/draft", saveDraft) // Draft route with minimal validation
 router.post("/", createProject)
 router.put("/:id", updateProject)
@@ -49,7 +50,8 @@ router.get("/:id/matching-providers", getMatchingServiceProviders)
 router.post("/:id/invite-provider", inviteProvider)
 router.post("/:id/toggle-save-provider", toggleSaveProvider)
 
-// Service provider save project for later
+// Service provider actions
 router.post("/:id/save", toggleSaveProject)
+router.post("/:id/reject-invitation", rejectInvitation)
 
 export default router

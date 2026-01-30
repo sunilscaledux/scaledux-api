@@ -250,8 +250,8 @@ export class FounderProjectService {
       const include = userId ? {
         ...baseInclude,
         invites: {
-          where: { provider_id: userId },
-          select: { id: true }
+          where: { provider_id: userId, status: 'PENDING' },
+          select: { id: true, status: true }
         },
         savedByUsers: {
           where: { user_id: userId },
@@ -377,8 +377,8 @@ export class FounderProjectService {
       const include = userId ? {
         ...baseInclude,
         invites: {
-          where: { provider_id: userId },
-          select: { id: true }
+          where: { provider_id: userId, status: 'PENDING' },
+          select: { id: true, status: true, message: true, created_at: true }
         },
         savedByUsers: {
           where: { user_id: userId },
@@ -416,6 +416,7 @@ export class FounderProjectService {
       // Check user status using relations (already filtered by userId in query)
       const isSavedByUser = !isOwner && (project as any).savedByUsers?.length > 0;
       const isInvitedUser = !isOwner && (project as any).invites?.length > 0;
+      const inviteData = (project as any).invites?.[0] || null;
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, ...projectData } = project as any;
@@ -429,6 +430,8 @@ export class FounderProjectService {
           : [],
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
+        invitation_message: inviteData?.message || null,
+        invitation_date: inviteData?.created_at || null,
         is_owner: isOwner
       };
 
@@ -723,17 +726,23 @@ export class FounderProjectService {
       const projectSkills = (project.skills_required as string[]) || [];
       const savedProviderIds = ((project as any).saved_providers as number[]) || [];
 
-      // Get invited provider IDs and their invite data
+      // Get invited provider IDs and their invite data (only PENDING invites count as "invited")
       const invites = await (prisma as any).projectInvite.findMany({
         where: { project_id: project.id },
         select: {
           provider_id: true,
           created_at: true,
-          message: true
+          message: true,
+          status: true
         }
       });
-      const invitedProviderIds = invites.map((i: any) => i.provider_id);
+      // Map all invites by provider ID for easy lookup
       const inviteMap = new Map(invites.map((i: any) => [i.provider_id, i]));
+      // All provider IDs that have any invite (for the 'invited' filter)
+      const allInvitedProviderIds = invites.map((i: any) => i.provider_id);
+      // Only PENDING invites are considered "invited" for the is_invited flag
+      const pendingInvites = invites.filter((i: any) => i.status === 'PENDING');
+      const pendingInvitedProviderIds = pendingInvites.map((i: any) => i.provider_id);
 
       // Build where clause based on filter
       let whereClause: any = {
@@ -743,7 +752,8 @@ export class FounderProjectService {
       };
 
       if (filter === 'invited') {
-        if (invitedProviderIds.length === 0) {
+        // Show all providers with any invite status (PENDING, ACCEPTED, REJECTED)
+        if (allInvitedProviderIds.length === 0) {
           return {
             success: true,
             message: "Service providers retrieved successfully",
@@ -754,7 +764,7 @@ export class FounderProjectService {
             }
           };
         }
-        whereClause.id = { in: invitedProviderIds };
+        whereClause.id = { in: allInvitedProviderIds };
       } else if (filter === 'saved') {
         if (savedProviderIds.length === 0) {
           return {
@@ -803,7 +813,8 @@ export class FounderProjectService {
         });
 
         const invite = inviteMap.get(freelancer.id);
-        const isInvited = invitedProviderIds.includes(freelancer.id);
+        // is_invited is true only for PENDING invitations
+        const isInvited = pendingInvitedProviderIds.includes(freelancer.id);
         const isSaved = savedProviderIds.includes(freelancer.id);
 
         return {
@@ -836,6 +847,7 @@ export class FounderProjectService {
           rating: 0,
           reviews_count: 0,
           is_invited: isInvited,
+          invite_status: (invite as any)?.status || null,
           invited_at: (invite as any)?.created_at || null,
           is_saved: isSaved
         };
@@ -973,6 +985,71 @@ export class FounderProjectService {
       return {
         success: false,
         message: "Failed to invite provider"
+      };
+    }
+  }
+
+  /**
+   * Reject an invitation (service provider rejects founder's invitation)
+   */
+  static async rejectInvitation(
+    userId: number,
+    projectId: string
+  ): Promise<ServiceResponse> {
+    try {
+      // Get the project
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          deleted_at: null
+        }
+      });
+
+      if (!project) {
+        return {
+          success: false,
+          message: "Project not found"
+        };
+      }
+
+      // Check if user was invited to this project with PENDING status
+      const invite = await (prisma as any).projectInvite.findFirst({
+        where: {
+          project_id: project.id,
+          provider_id: userId,
+          status: 'PENDING'
+        }
+      });
+
+      if (!invite) {
+        return {
+          success: false,
+          message: "You don't have a pending invitation for this project"
+        };
+      }
+
+      // Update the invite status to REJECTED
+      await (prisma as any).projectInvite.update({
+        where: {
+          project_id_provider_id: {
+            project_id: project.id,
+            provider_id: userId
+          }
+        },
+        data: {
+          status: 'REJECTED'
+        }
+      });
+
+      return {
+        success: true,
+        message: "Invitation rejected successfully"
+      };
+    } catch (error: any) {
+      console.error("Reject Invitation Error:", error);
+      return {
+        success: false,
+        message: "Failed to reject invitation"
       };
     }
   }

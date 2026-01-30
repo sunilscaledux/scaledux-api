@@ -328,6 +328,36 @@ export async function inviteProvider(req: Request, res: Response) {
 }
 
 /**
+ * Reject an invitation (service provider rejects founder's invitation)
+ */
+export async function rejectInvitation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await FounderProjectService.rejectInvitation(userId, projectId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    let statusCode = 500;
+    if (result.message === "Project not found") {
+      statusCode = 404;
+    } else if (result.message === "You were not invited to this project") {
+      statusCode = 400;
+    }
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Toggle save provider for later
  */
 export async function toggleSaveProvider(req: Request, res: Response) {
