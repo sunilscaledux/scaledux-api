@@ -50,6 +50,7 @@ model User {
   currency                     Currency? @relation(fields: [currency_id], references: [id])
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
+  proposals                    Proposal[] @relation("UserProposals")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -604,6 +605,7 @@ model FounderProject {
   subCategory           ServiceSubCategory? @relation(fields: [sub_category_id], references: [id])
   invites               ProjectInvite[]
   savedByUsers          SavedProject[]
+  proposals             Proposal[]
 
   @@index([user_id, status])
   @@index([status])
@@ -648,6 +650,37 @@ model SavedProject {
   @@index([project_id])
   @@index([user_id])
   @@map("scd_saved_projects")
+}
+
+// Proposals submitted by service providers for founder projects
+model Proposal {
+  id                    Int       @id @default(autoincrement())
+  unique_id             String    @unique @default(cuid())
+  project_id            Int
+  provider_id           Int       // Service provider user id
+  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  
+  // Proposal content
+  cover_letter          String    @db.Text
+  proposed_amount       Decimal   @db.Decimal(15, 2)
+  payment_schedule      String    @db.VarChar(20) // byProject, byMilestone
+  milestones            Json      @default("[]") // Array of milestone objects
+  screening_answers     Json      @default("[]") // Answers to screening questions
+  attachments           Json      @default("[]") // File URLs
+  
+  // Timestamps
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @default(now()) @updatedAt
+  
+  // Relations
+  project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  provider              User @relation("UserProposals", fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, provider_id]) // One proposal per provider per project
+  @@index([project_id])
+  @@index([provider_id])
+  @@index([status])
+  @@map("scd_proposals")
 }
 
 enum OtpType {
