@@ -44,6 +44,7 @@ router.patch('/agency-settings', authenticateToken, ProfileController.updateAgen
  * Company/Founder Profile Routes
  */
 router.get('/company/me', authenticateToken, CompanyProfileController.getMyProfile);
+router.get('/company/public/:uniqueId', CompanyProfileController.getPublicProfile);
 router.post(
   '/company/profile-image',
   authenticateToken,

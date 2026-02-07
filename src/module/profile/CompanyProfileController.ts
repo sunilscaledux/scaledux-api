@@ -28,6 +28,26 @@ export class CompanyProfileController {
   }
 
   /**
+   * Get public company profile by founder unique_id (no auth)
+   * GET /api/v1/profile/company/public/:uniqueId
+   */
+  static async getPublicProfile(req: Request, res: Response) {
+    try {
+      const { uniqueId } = req.params;
+      if (!uniqueId) {
+        return ApiResponse.error(res, 'Unique ID is required', 400);
+      }
+      const result = await CompanyProfileService.getPublicByUniqueId(uniqueId);
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      }
+      return ApiResponse.error(res, result.message, 404);
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to retrieve company profile');
+    }
+  }
+
+  /**
    * Upload profile image
    * POST /api/v1/profile/company/profile-image
    */

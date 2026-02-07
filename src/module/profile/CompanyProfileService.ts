@@ -127,6 +127,103 @@ export class CompanyProfileService {
   }
 
   /**
+   * Get public company profile by founder unique_id (no auth)
+   */
+  static async getPublicByUniqueId(uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { unique_id: uniqueId },
+      });
+      if (!user) {
+        return { success: false, message: 'Founder not found' };
+      }
+
+      const profile = await prisma.companyProfile.findUnique({
+        where: { user_id: user.id },
+        include: {
+          user: { include: { currency: true } },
+          country: true,
+          state: true,
+          industry: true,
+          subIndustry: true,
+          fundingRounds: {
+            where: { deleted_at: null },
+            orderBy: { funding_date: 'desc' },
+          },
+        },
+      });
+
+      if (!profile) {
+        return { success: false, message: 'Company profile not found' };
+      }
+
+      const totalFundingNum = profile.total_funding != null ? Number(profile.total_funding) : null;
+      const fundingRounds = (profile.fundingRounds || []).map((r) => ({
+        id: r.id,
+        investor_name: r.investor_name,
+        funding_stage: r.funding_stage,
+        funding_amount: Number(r.funding_amount),
+        funding_date: r.funding_date.toISOString(),
+        funding_valuation: r.funding_valuation != null ? Number(r.funding_valuation) : null,
+      }));
+
+      const companyDetail = {
+        id: profile.id,
+        unique_id: profile.unique_id,
+        profile_type: 'founder',
+        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
+        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        company_name: profile.company_name,
+        company_description: profile.company_description,
+        company_website: profile.company_website,
+        company_size: profile.company_size,
+        founded_year: profile.founded_year,
+        industry_id: profile.industry_id,
+        sub_industry_id: profile.sub_industry_id,
+        industry: profile.industry,
+        subIndustry: profile.subIndustry,
+        company_stage: profile.company_stage,
+        team_size: profile.team_size,
+        revenue_description: profile.revenue_description,
+        revenueModels: profile.revenue_model_ids.length > 0
+          ? await prisma.revenueModel.findMany({ where: { id: { in: profile.revenue_model_ids } } })
+          : null,
+        target_market: profile.target_market,
+        problem_statement: profile.problem_statement,
+        solution_statement: profile.solution_statement,
+        traction_title: profile.traction_title,
+        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        funding_status: profile.funding_status,
+        total_funding: totalFundingNum,
+        fundingRounds,
+        address: profile.address,
+        address_line_2: profile.address_line_2,
+        city: profile.city,
+        zipCode: profile.zipCode,
+        links: profile.links,
+        country: profile.country,
+        state: profile.state,
+        currency: profile.user.currency,
+        firstName: profile.user.first_name,
+        lastName: profile.user.last_name,
+        email: null,
+        phone: null,
+        emailVerified: false,
+        phoneVerified: false,
+      };
+
+      return {
+        success: true,
+        message: 'Company profile retrieved successfully',
+        data: companyDetail,
+      };
+    } catch (error: any) {
+      console.error('Get Public Company Profile Error:', error);
+      return { success: false, message: 'Failed to retrieve company profile' };
+    }
+  }
+
+  /**
    * Upload profile image
    */
   static async uploadProfileImage(userId: number, file: any): Promise<ServiceResponse> {
