@@ -264,7 +264,9 @@ export class ProposalService {
                   about: true,
                   hourly_rate: true,
                   country: { select: { name: true } },
-                  city: true
+                  city: true,
+                  links: true,
+                  languages: true
                 }
               }
             }
@@ -374,7 +376,9 @@ export class ProposalService {
                   about: true,
                   hourly_rate: true,
                   country: { select: { name: true } },
-                  city: true
+                  city: true,
+                  links: true,
+                  languages: true
                 }
               }
             }

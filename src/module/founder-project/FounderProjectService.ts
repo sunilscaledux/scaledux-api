@@ -176,12 +176,7 @@ export class FounderProjectService {
         ];
       }
 
-      // Skills filter (check if any skill matches)
-      if (skills && skills.length > 0) {
-        whereClause.skills_required = {
-          hasSome: skills
-        };
-      }
+      // Skills filter is applied in JavaScript after fetch (skills_required is Json, no hasSome for Json in Prisma)
 
       // Note: Budget filtering is done in JavaScript after fetch
       // because budget_amount is stored as string and string comparison
@@ -262,12 +257,27 @@ export class FounderProjectService {
       // Check if budget filtering is needed
       const hasBudgetFilter = budgetMin !== undefined || budgetMax !== undefined;
 
-      // Get all projects (we'll filter by budget in JS if needed)
+      // Get all projects (we'll filter by budget and skills in JS - budget is string, skills_required is Json)
       let allProjects = await prisma.founderProject.findMany({
         where: whereClause,
         include: include as any,
         orderBy
       });
+
+      // Apply skills filter in JavaScript (skills_required is Json; Prisma Json type doesn't support hasSome)
+      if (skills && skills.length > 0) {
+        allProjects = allProjects.filter((project: any) => {
+          const projectSkills = Array.isArray(project.skills_required)
+            ? project.skills_required
+            : typeof project.skills_required === 'string'
+              ? (() => { try { return JSON.parse(project.skills_required); } catch { return []; } })()
+              : [];
+          const skillStrings = projectSkills.map((s: any) => (typeof s === 'string' ? s : s?.name ?? s?.skill ?? '')).filter(Boolean);
+          return skills.some((requested: string) =>
+            skillStrings.some((ps: string) => String(ps).toLowerCase() === String(requested).toLowerCase())
+          );
+        });
+      }
 
       // Apply budget filter in JavaScript (because budget_amount is stored as string)
       if (hasBudgetFilter) {
@@ -373,11 +383,11 @@ export class FounderProjectService {
         }
       };
 
-      // Only include invites and savedByUsers for logged-in users
+      // Only include invites and savedByUsers for logged-in users (any invite status so we can show REJECTED)
       const include = userId ? {
         ...baseInclude,
         invites: {
-          where: { provider_id: userId, status: 'PENDING' },
+          where: { provider_id: userId },
           select: { id: true, status: true, message: true, created_at: true }
         },
         savedByUsers: {
@@ -415,8 +425,10 @@ export class FounderProjectService {
 
       // Check user status using relations (already filtered by userId in query)
       const isSavedByUser = !isOwner && (project as any).savedByUsers?.length > 0;
-      const isInvitedUser = !isOwner && (project as any).invites?.length > 0;
       const inviteData = (project as any).invites?.[0] || null;
+      const inviteStatus = inviteData?.status || null;
+      // is_invited = had a PENDING invite (for showing Accept/Reject). We also return invite_status so UI can show "Invitation rejected"
+      const isInvitedUser = !isOwner && inviteStatus === 'PENDING';
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, ...projectData } = project as any;
@@ -430,6 +442,7 @@ export class FounderProjectService {
           : [],
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
+        invite_status: inviteStatus,
         invitation_message: inviteData?.message || null,
         invitation_date: inviteData?.created_at || null,
         is_owner: isOwner
