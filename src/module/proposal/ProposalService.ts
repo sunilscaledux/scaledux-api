@@ -344,6 +344,7 @@ export class ProposalService {
               user: {
                 select: {
                   id: true,
+                  unique_id: true,
                   first_name: true,
                   last_name: true,
                   currency: {
@@ -352,7 +353,9 @@ export class ProposalService {
                   personalInfo: {
                     select: {
                       profileImage: true,
-                      country: { select: { name: true } }
+                      about: true,
+                      country: { select: { name: true } },
+                      city: true
                     }
                   }
                 }
@@ -405,12 +408,22 @@ export class ProposalService {
       }
 
       // Transform with file URLs
+      const projectUser = proposal.project?.user;
       const transformedProposal = {
         ...proposal,
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
         project: proposal.project ? {
           ...proposal.project,
-          budget_currency: proposal.project.user?.currency?.symbol || '₹'
+          budget_currency: proposal.project.user?.currency?.symbol || '₹',
+          user: projectUser ? {
+            ...projectUser,
+            personalInfo: projectUser.personalInfo ? {
+              ...projectUser.personalInfo,
+              profileImage: projectUser.personalInfo.profileImage
+                ? getFileUrl(projectUser.personalInfo.profileImage)
+                : null
+            } : null
+          } : null
         } : null,
         provider: proposal.provider ? {
           ...proposal.provider,
