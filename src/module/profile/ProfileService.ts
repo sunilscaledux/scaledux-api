@@ -151,6 +151,17 @@ export class PersonalInfoService {
         show_as_agency: profile.user.show_as_agency,
       };
 
+      // Include agency name only when agency is verified
+      if (profile.user.agency_verification_status === 'APPROVED') {
+        const approvedAgency = await prisma.agencyVerification.findFirst({
+          where: { user_id: userId, status: 'APPROVED' },
+          orderBy: { verified_at: 'desc' },
+        });
+        if (approvedAgency) {
+          (userDetail as Record<string, unknown>).agencyName = approvedAgency.agency_name;
+        }
+      }
+
       return {
         success: true,
         message: 'User profile retrieved successfully',
