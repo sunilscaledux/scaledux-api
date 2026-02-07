@@ -3,7 +3,6 @@ import {
   register,
   login,
   logout,
-  getCurrentUser,
   testCookies,
   checkUserExistsForLogin,
   resetPassword,
@@ -35,7 +34,6 @@ router.post(
 router.post("/reset-password", generalRateLimiter, resetPassword);
 
 router.post("/logout", authenticateToken, logout);
-router.get("/auth/me", authenticateToken, getCurrentUser);
 router.patch("/auth/role", authenticateToken, updateUserRole);
 router.post("/auth/google-callback", generalRateLimiter, googleCallback);
 router.post("/auth/linkedin-callback", generalRateLimiter, linkedinCallback);

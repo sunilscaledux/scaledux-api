@@ -325,18 +325,15 @@ export class PersonalInfoService {
     try {
       const relativePath = getRelativePath(file.path);
 
-      // Route to correct profile table based on profileType
-      let profile;
-      if (profileType === 'freelancer') {
-        profile = await prisma.personalInfo.upsert({
-          where: { user_id: userId },
-          update: { profileImage: relativePath },
-          create: {
-            user_id: userId,
-            profileImage: relativePath,
-          },
-        });
-      }
+      // Personal profile image: update PersonalInfo for all roles (freelancer, founder, mentor, investor)
+      await prisma.personalInfo.upsert({
+        where: { user_id: userId },
+        update: { profileImage: relativePath },
+        create: {
+          user_id: userId,
+          profileImage: relativePath,
+        },
+      });
 
       return {
         success: true,
@@ -361,18 +358,15 @@ export class PersonalInfoService {
     try {
       const relativePath = getRelativePath(file.path);
 
-      // Route to correct profile table based on profileType
-      let profile;
-      if (profileType === 'freelancer') {
-        profile = await prisma.personalInfo.upsert({
-          where: { user_id: userId },
-          update: { coverImage: relativePath },
-          create: {
-            user_id: userId,
-            coverImage: relativePath,
-          },
-        });
-      }
+      // Personal cover image: update PersonalInfo for all roles (freelancer, founder, mentor, investor)
+      await prisma.personalInfo.upsert({
+        where: { user_id: userId },
+        update: { coverImage: relativePath },
+        create: {
+          user_id: userId,
+          coverImage: relativePath,
+        },
+      });
 
       return {
         success: true,
