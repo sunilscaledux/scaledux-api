@@ -4,6 +4,7 @@ import {
   getMyProposals,
   getProposalsByProject,
   getProposalById,
+  updateProposal,
   updateProposalStatus,
   withdrawProposal,
   checkProposalStatus
@@ -41,8 +42,11 @@ router.get("/project/:projectId", getProposalsByProject); // Get proposals for a
 // Shared routes
 router.get("/:id", getProposalById); // Get proposal details
 
-// Status updates
-router.put("/:id/status", updateProposalStatus); // Accept/reject proposal (founder)
+// Status update (founder) - must be before PUT /:id
+router.put("/:id/status", updateProposalStatus);
+// Service provider: update proposal content (PENDING only)
+router.put("/:id", updateProposal);
+
 router.delete("/:id", withdrawProposal); // Withdraw proposal (service provider)
 
 export default router;

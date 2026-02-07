@@ -138,6 +138,50 @@ export async function getProposalById(req: Request, res: Response) {
 }
 
 /**
+ * Update proposal content (service provider, PENDING only)
+ */
+export async function updateProposal(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const {
+    cover_letter,
+    proposed_amount,
+    payment_schedule,
+    milestones,
+    screening_answers,
+    attachments
+  } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  if (proposed_amount == null || proposed_amount <= 0) {
+    return ApiResponse.error(res, "Valid proposed amount is required", 400);
+  }
+
+  const result = await ProposalService.updateProposal(userId, proposalId, {
+    cover_letter,
+    proposed_amount: parseFloat(proposed_amount),
+    payment_schedule: payment_schedule || 'byProject',
+    milestones: milestones || [],
+    screening_answers: screening_answers || [],
+    attachments: attachments || []
+  });
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") || result.message?.includes("permission") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Update proposal status (founder)
  */
 export async function updateProposalStatus(req: Request, res: Response) {

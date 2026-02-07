@@ -438,6 +438,49 @@ export class ProposalService {
   }
 
   /**
+   * Update proposal content (service provider only, PENDING only)
+   */
+  static async updateProposal(
+    userId: number,
+    proposalId: string,
+    data: {
+      cover_letter?: string;
+      proposed_amount: number;
+      payment_schedule: string;
+      milestones: any[];
+      screening_answers: any[];
+      attachments: string[];
+    }
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId, provider_id: userId }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found or you don't have permission" };
+      }
+      if (proposal.status !== 'PENDING') {
+        return { success: false, message: "Only pending proposals can be edited" };
+      }
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: {
+          cover_letter: data.cover_letter ?? proposal.cover_letter,
+          proposed_amount: data.proposed_amount,
+          payment_schedule: data.payment_schedule,
+          milestones: data.milestones,
+          screening_answers: data.screening_answers,
+          attachments: data.attachments
+        }
+      });
+      return { success: true, message: "Proposal updated successfully" };
+    } catch (error: any) {
+      console.error("Update Proposal Error:", error);
+      return { success: false, message: error.message || "Failed to update proposal" };
+    }
+  }
+
+  /**
    * Update proposal status (founder only)
    */
   static async updateProposalStatus(
