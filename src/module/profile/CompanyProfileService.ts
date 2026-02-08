@@ -61,6 +61,7 @@ export class CompanyProfileService {
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
+        cin: profile.cin ?? null,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,
@@ -176,6 +177,7 @@ export class CompanyProfileService {
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
+        cin: profile.cin ?? null,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,
@@ -307,23 +309,24 @@ export class CompanyProfileService {
     state_id?: number;
   }): Promise<ServiceResponse> {
     try {
-      // Remove CIN from data as it's handled separately in agency verification flow
-      const { cin, ...profileData } = data;
-      
       // Normalize company_website: if it doesn't have protocol, prepend https://
+      const profileData = { ...data };
       if (profileData.company_website && profileData.company_website !== '') {
         const website = profileData.company_website.trim();
         if (!/^https?:\/\//i.test(website)) {
           profileData.company_website = `https://${website}`;
         }
       }
-      
-      // Filter out undefined values to prevent overwriting existing data with undefined
-      // This is important for unregistered companies that don't send certain fields
+
+      // Filter out undefined and NaN so we don't overwrite with invalid values
       const filteredProfileData = Object.fromEntries(
-        Object.entries(profileData).filter(([_, value]) => value !== undefined)
+        Object.entries(profileData).filter(([key, value]) => {
+          if (value === undefined) return false;
+          if (typeof value === 'number' && Number.isNaN(value)) return false;
+          return true;
+        })
       ) as typeof profileData;
-      
+
       // Update company profile
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
@@ -366,6 +369,7 @@ export class CompanyProfileService {
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
+        cin: profile.cin ?? null,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,

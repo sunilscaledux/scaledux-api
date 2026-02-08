@@ -106,6 +106,7 @@ model CompanyProfile {
   company_name          String?
   company_description   String?
   company_website       String?
+  cin                   String?
   company_size          String?
   founded_year          Int?
   company_stage         String?
