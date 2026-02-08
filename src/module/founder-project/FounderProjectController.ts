@@ -75,19 +75,29 @@ export async function browseProjects(req: Request, res: Response) {
 
 /**
  * Get project by unique ID
- * Works with or without authentication
+ * Works with or without authentication.
+ * When forEdit=true in query, only the project owner may fetch (returns 403 otherwise).
  */
 export async function getProjectById(req: Request, res: Response) {
   const userId = req.user?.id || null;
   const id = getStringParam(req.params.id);
+  const forEdit = req.query.forEdit === 'true' || req.query.forEdit === '1';
 
   if (!id) {
     return ApiResponse.error(res, "Project ID is required", 400);
   }
 
+  if (forEdit && !userId) {
+    return ApiResponse.error(res, "Authentication required to edit this project", 401);
+  }
+
   const result = await FounderProjectService.getProjectById(userId, id);
 
   if (result.success) {
+    const data = result.data as { is_owner?: boolean };
+    if (forEdit && data?.is_owner === false) {
+      return ApiResponse.error(res, "You do not have permission to edit this project", 403);
+    }
     return ApiResponse.success(res, result.data, result.message);
   } else {
     const statusCode = result.message === "Project not found" ? 404 : 500;
