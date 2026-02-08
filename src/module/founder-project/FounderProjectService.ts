@@ -47,9 +47,73 @@ export class FounderProjectService {
         ];
       }
 
-      // Note: contractStatus, milestoneStatus, and date filters are passed but not used
-      // because FounderProject schema doesn't have these fields
-      // These filters are for contracts/milestones which are separate entities
+      // Build optional filter on proposals (contract status and/or date range)
+      const proposalStatusMap: Record<string, string[]> = {
+        active: ['ACCEPTED'],
+        completed: ['ACCEPTED'],
+        cancelled: ['REJECTED', 'WITHDRAWN']
+      };
+      const presetToRange = (preset: string, now: Date) => {
+        switch (preset) {
+          case 'current-week': {
+            const d = new Date(now);
+            d.setDate(d.getDate() - d.getDay());
+            d.setHours(0, 0, 0, 0);
+            return { start: d, end: new Date(now) };
+          }
+          case 'last-week': {
+            const d = new Date(now);
+            d.setDate(d.getDate() - d.getDay() - 7);
+            d.setHours(0, 0, 0, 0);
+            const end = new Date(d);
+            end.setDate(end.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
+            return { start: d, end };
+          }
+          case 'last-month': {
+            const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+            return { start, end };
+          }
+          case 'last-90-days': {
+            const start = new Date(now);
+            start.setDate(start.getDate() - 90);
+            start.setHours(0, 0, 0, 0);
+            return { start, end: new Date(now) };
+          }
+          default:
+            return null;
+        }
+      };
+
+      const now = new Date();
+      let proposalFilter: any = {};
+      if (contractStatus && contractStatus.length > 0) {
+        const statuses = contractStatus.flatMap((s) => proposalStatusMap[s] || []);
+        if (statuses.length > 0) proposalFilter.status = { in: statuses };
+      }
+      if (contractStartFrom || contractEndTo) {
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+        if (contractStartFrom) {
+          const range = presetToRange(contractStartFrom, now);
+          if (range) startDate = range.start;
+        }
+        if (contractEndTo) {
+          const range = presetToRange(contractEndTo, now);
+          if (range) endDate = range.end;
+        }
+        if (startDate || endDate) {
+          proposalFilter.created_at = {};
+          if (startDate) proposalFilter.created_at.gte = startDate;
+          if (endDate) proposalFilter.created_at.lte = endDate;
+        }
+      }
+      if (Object.keys(proposalFilter).length > 0) {
+        whereClause.proposals = { some: proposalFilter };
+      }
+
+      // milestoneStatus (e.g. payment-requested, active, awaiting-funding) would require filtering on proposal.milestones JSON; not applied here yet
 
       // Determine sort order
       let orderBy: any = { created_at: 'desc' };
