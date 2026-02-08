@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl } from '@utils/General';
+import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 
 /**
  * ProposalService
@@ -475,6 +476,16 @@ export class ProposalService {
       if (proposal.status !== 'PENDING') {
         return { success: false, message: "Only pending proposals can be edited" };
       }
+      const oldSnapshot = {
+        status: proposal.status,
+        cover_letter: proposal.cover_letter,
+        proposed_amount: proposal.proposed_amount?.toString?.(),
+        payment_schedule: proposal.payment_schedule,
+        milestones: proposal.milestones,
+        screening_answers: proposal.screening_answers,
+        attachments: proposal.attachments
+      };
+      await createProposalActivity(proposal.unique_id, 'CONTENT_UPDATE', { oldSnapshot }, userId);
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
@@ -531,6 +542,11 @@ export class ProposalService {
           message: "You don't have permission to update this proposal"
         };
       }
+
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: proposal.status,
+        newStatus: status
+      }, userId);
 
       // Update the proposal status
       await (prisma as any).proposal.update({
@@ -659,6 +675,62 @@ export class ProposalService {
         success: false,
         message: error.message || "Failed to check proposal status"
       };
+    }
+  }
+
+  /**
+   * Request modify (founder only): send a message to the service provider. Creates activity only; no status change.
+   */
+  static async requestModify(
+    userId: number,
+    proposalId: string,
+    message: string
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: { project: { select: { user_id: true } } }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "You don't have permission to request changes for this proposal" };
+      }
+      const trimmed = (message || '').trim();
+      if (!trimmed) {
+        return { success: false, message: "Message is required" };
+      }
+      await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
+      return { success: true, message: "Request sent to the service provider" };
+    } catch (error: any) {
+      console.error("Request Modify Error:", error);
+      return { success: false, message: error.message || "Failed to send request" };
+    }
+  }
+
+  /**
+   * Get proposal activities (founder or proposal provider only)
+   */
+  static async getProposalActivities(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: { project: { select: { user_id: true } } }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      const isFounder = proposal.project.user_id === userId;
+      const isProvider = proposal.provider_id === userId;
+      if (!isFounder && !isProvider) {
+        return { success: false, message: "You don't have permission to view this proposal's activities" };
+      }
+      const activities = await fetchProposalActivities(proposal.unique_id);
+      return { success: true, data: activities, message: "Activities retrieved" };
+    } catch (error: any) {
+      console.error("Get Proposal Activities Error:", error);
+      return { success: false, message: error.message || "Failed to get activities" };
     }
   }
 }

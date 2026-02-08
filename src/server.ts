@@ -1,8 +1,10 @@
 // Import module alias setup first
 import './moduleAlias';
 
-import express from 'express';
 import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
 import cookieParser from 'cookie-parser';
 import userRoutes from "@module/auth/AuthRoute";
 import profileRoutes from "@module/profile/ProfileRoute";
@@ -23,6 +25,7 @@ import billingRoutes from './module/billing/BillingRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
+import { connectMongo } from '@services/mongoService';
 
 // Start main worker for background job processing (Laravel style)
 import './workers/Worker';
@@ -30,7 +33,6 @@ import './workers/Worker';
 // Bull Board for queue monitoring
 import { serverAdapter } from './config/bullBoard';
 
-dotenv.config();
 const app = express();
 
 // Setup CORS middleware
@@ -63,9 +65,19 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
-  console.log(`🏢 Company API: http://localhost:${PORT}/api/v1/company`);
-});
+
+async function start() {
+  try {
+    await connectMongo();
+  } catch (_) {
+    // Continue without MongoDB; proposal activities will be no-op
+  }
+  app.listen(PORT, () => {
+    console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
+    console.log(`🏢 Company API: http://localhost:${PORT}/api/v1/company`);
+  });
+}
+
+start();
 
 export default app;

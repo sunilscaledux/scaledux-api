@@ -263,3 +263,54 @@ export async function checkProposalStatus(req: Request, res: Response) {
     return ApiResponse.error(res, result.message, 500);
   }
 }
+
+/**
+ * Request modify (founder): send message to service provider
+ */
+export async function requestModify(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const { message } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.requestModify(userId, proposalId, message ?? '');
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("permission") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Get proposal activities (founder or proposal provider)
+ */
+export async function getProposalActivities(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.getProposalActivities(userId, proposalId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("permission") ? 403 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}

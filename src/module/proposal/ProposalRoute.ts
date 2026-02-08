@@ -7,7 +7,9 @@ import {
   updateProposal,
   updateProposalStatus,
   withdrawProposal,
-  checkProposalStatus
+  checkProposalStatus,
+  requestModify,
+  getProposalActivities
 } from "./ProposalController";
 import { authenticateToken } from "@middleware/auth";
 import { uploadFile } from "@module/general/FileController";
@@ -44,6 +46,10 @@ router.get("/:id", getProposalById); // Get proposal details
 
 // Status update (founder) - must be before PUT /:id
 router.put("/:id/status", updateProposalStatus);
+// Request modify (founder)
+router.post("/:id/request-modify", requestModify);
+// Get activities (founder or provider)
+router.get("/:id/activities", getProposalActivities);
 // Service provider: update proposal content (PENDING only)
 router.put("/:id", updateProposal);
 
