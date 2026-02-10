@@ -40,6 +40,19 @@ export async function getMessages(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, 500);
 }
 
+export async function searchMessages(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const conversationId = getStringParam(req.params.id);
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
+  const result = await ConversationService.searchMessages(conversationId, userId, q);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
+  return ApiResponse.error(res, result.message, 500);
+}
+
 export async function sendMessage(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);

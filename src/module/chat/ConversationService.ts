@@ -252,6 +252,58 @@ export class ConversationService {
   }
 
   /**
+   * Search messages in a conversation by content (case-insensitive). User must be participant.
+   */
+  static async searchMessages(
+    conversationUniqueId: string,
+    userId: number,
+    query: string
+  ): Promise<ServiceResponse<{ messages: any[] }>> {
+    try {
+      const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
+      if (!conv.success || !conv.data) return { success: false, message: conv.message };
+
+      const trimmed = (query || "").trim();
+      if (!trimmed) return { success: true, message: "OK", data: { messages: [] } };
+
+      const limit = 100;
+      const messages = await (prisma as any).message.findMany({
+        where: {
+          conversation_id: conv.data.id,
+          content: { contains: trimmed, mode: "insensitive" }
+        },
+        orderBy: { created_at: "asc" },
+        take: limit,
+        include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
+      });
+
+      const formatted = messages.map((m: any) => ({
+        id: m.id,
+        unique_id: m.unique_id,
+        conversation_id: conv.data.unique_id,
+        sender_id: m.sender_id,
+        sender: m.sender
+          ? {
+              id: m.sender.id,
+              first_name: m.sender.first_name,
+              last_name: m.sender.last_name,
+              profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+            }
+          : null,
+        type: m.type,
+        content: m.content,
+        metadata: m.metadata,
+        created_at: m.created_at
+      }));
+
+      return { success: true, message: "OK", data: { messages: formatted } };
+    } catch (error: any) {
+      console.error("searchMessages Error:", error);
+      return { success: false, message: error.message || "Failed to search messages" };
+    }
+  }
+
+  /**
    * Send a user message. Returns the created message.
    */
   static async sendMessage(
