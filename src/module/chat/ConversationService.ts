@@ -1,6 +1,13 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { getFileUrl } from "@utils/General";
 import { emitNewMessageToBothUsers } from "./chatSocket";
+
+function toProfileImageUrl(profileImage: string | null | undefined): string | null {
+  if (!profileImage) return null;
+  const url = getFileUrl(profileImage);
+  return url || null;
+}
 
 /**
  * ConversationService
@@ -111,8 +118,8 @@ export class ConversationService {
       const convos = await (prisma as any).conversation.findMany({
         where: { OR: [{ user1_id: userId }, { user2_id: userId }] },
         include: {
-          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true } },
-          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true } },
+          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
+          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
           messages: { orderBy: { created_at: "desc" }, take: 1 }
         },
         orderBy: { updated_at: "desc" }
@@ -121,10 +128,17 @@ export class ConversationService {
       const list = convos.map((c: any) => {
         const other = c.user1_id === userId ? c.user2 : c.user1;
         const lastMsg = c.messages[0];
+        const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
         return {
           id: c.id,
           unique_id: c.unique_id,
-          otherParticipant: { id: other.id, unique_id: other.unique_id, first_name: other.first_name, last_name: other.last_name },
+          otherParticipant: {
+            id: other.id,
+            unique_id: other.unique_id,
+            first_name: other.first_name,
+            last_name: other.last_name,
+            profile_image: profileImageUrl
+          },
           lastMessage: lastMsg ? { content: lastMsg.content, type: lastMsg.type, created_at: lastMsg.created_at } : null,
           updated_at: c.updated_at
         };
@@ -145,17 +159,24 @@ export class ConversationService {
       const c = await (prisma as any).conversation.findFirst({
         where: { unique_id: uniqueId },
         include: {
-          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true } },
-          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true } }
+          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
+          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } }
         }
       });
       if (!c) return { success: false, message: "Conversation not found" };
       if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
       const other = c.user1_id === userId ? c.user2 : c.user1;
+      const otherParticipant = {
+        id: other.id,
+        unique_id: other.unique_id,
+        first_name: other.first_name,
+        last_name: other.last_name,
+        profile_image: toProfileImageUrl(other.personalInfo?.profileImage)
+      };
       return {
         success: true,
         message: "OK",
-        data: { id: c.id, unique_id: c.unique_id, otherParticipant: other, updated_at: c.updated_at }
+        data: { id: c.id, unique_id: c.unique_id, otherParticipant, updated_at: c.updated_at }
       };
     } catch (error: any) {
       console.error("getConversationByUniqueId Error:", error);
@@ -186,7 +207,7 @@ export class ConversationService {
         take: limit + 1,
         skip: cursor ? 1 : 0,
         cursor: cursor ? { id: cursor.id } : undefined,
-        include: { sender: { select: { id: true, first_name: true, last_name: true } } }
+        include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
       const hasMore = messages.length > limit;
@@ -196,7 +217,14 @@ export class ConversationService {
         unique_id: m.unique_id,
         conversation_id: conv.data.unique_id,
         sender_id: m.sender_id,
-        sender: m.sender,
+        sender: m.sender
+          ? {
+              id: m.sender.id,
+              first_name: m.sender.first_name,
+              last_name: m.sender.last_name,
+              profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+            }
+          : null,
         type: m.type,
         content: m.content,
         metadata: m.metadata,
@@ -232,7 +260,7 @@ export class ConversationService {
           type: "USER",
           content: trimmed
         },
-        include: { sender: { select: { id: true, first_name: true, last_name: true } } }
+        include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
       // Update conversation updated_at
@@ -242,6 +270,14 @@ export class ConversationService {
       });
 
       const receiverId = conv.data.otherParticipant.id;
+      const senderPayload = msg.sender
+        ? {
+            id: msg.sender.id,
+            first_name: msg.sender.first_name,
+            last_name: msg.sender.last_name,
+            profile_image: toProfileImageUrl(msg.sender.personalInfo?.profileImage)
+          }
+        : null;
       return {
         success: true,
         message: "Sent",
@@ -250,7 +286,7 @@ export class ConversationService {
           unique_id: msg.unique_id,
           conversation_id: conv.data.unique_id,
           sender_id: msg.sender_id,
-          sender: msg.sender,
+          sender: senderPayload,
           type: msg.type,
           content: msg.content,
           metadata: msg.metadata,

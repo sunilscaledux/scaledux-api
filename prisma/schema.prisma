@@ -691,7 +691,7 @@ model Proposal {
 // Chat: one conversation per (user1, user2, project) pair
 model Conversation {
   id         Int       @id @default(autoincrement())
-  unique_id  String    @unique @default(uuid())
+  unique_id  String    @unique @default(cuid())
   user1_id   Int       // smaller user id for consistent lookup
   user2_id   Int       // larger user id
   project_id Int?      // optional: project-scoped conversation
