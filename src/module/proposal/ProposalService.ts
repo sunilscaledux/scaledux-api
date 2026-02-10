@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl } from '@utils/General';
+import { ulid } from 'ulid';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 
 /**
@@ -66,6 +67,7 @@ export class ProposalService {
       // Create the proposal
       const proposal = await (prisma as any).proposal.create({
         data: {
+          unique_id: ulid(),
           project_id: project.id,
           provider_id: userId,
           cover_letter: data.cover_letter || '',

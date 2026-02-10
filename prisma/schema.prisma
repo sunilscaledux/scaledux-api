@@ -656,7 +656,7 @@ model SavedProject {
 // Proposals submitted by service providers for founder projects
 model Proposal {
   id                    Int       @id @default(autoincrement())
-  unique_id             String    @unique @default(cuid())
+  unique_id             String    @unique
   project_id            Int
   provider_id           Int       // Service provider user id
   status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED, WITHDRAWN
