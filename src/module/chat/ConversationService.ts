@@ -1,12 +1,23 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl } from "@utils/General";
+import { getFileUrl, extractRelativePath } from "@utils/General";
 import { emitNewMessageToBothUsers } from "./chatSocket";
 
 function toProfileImageUrl(profileImage: string | null | undefined): string | null {
   if (!profileImage) return null;
   const url = getFileUrl(profileImage);
   return url || null;
+}
+
+/** Map message metadata.attachments (relative paths) to full URLs for API response. */
+function metadataWithAttachmentUrls(metadata: any): any {
+  if (!metadata || typeof metadata !== "object") return metadata;
+  const attachments = metadata.attachments;
+  if (!Array.isArray(attachments) || attachments.length === 0) return metadata;
+  return {
+    ...metadata,
+    attachments: attachments.map((p: string) => getFileUrl(p))
+  };
 }
 
 function formatLocation(city: string | null | undefined, countryName: string | null | undefined): string | null {
@@ -240,7 +251,7 @@ export class ConversationService {
           : null,
         type: m.type,
         content: m.content,
-        metadata: m.metadata,
+        metadata: metadataWithAttachmentUrls(m.metadata),
         created_at: m.created_at
       }));
 
@@ -292,7 +303,7 @@ export class ConversationService {
           : null,
         type: m.type,
         content: m.content,
-        metadata: m.metadata,
+        metadata: metadataWithAttachmentUrls(m.metadata),
         created_at: m.created_at
       }));
 
@@ -309,21 +320,29 @@ export class ConversationService {
   static async sendMessage(
     conversationUniqueId: string,
     userId: number,
-    content: string
+    content: string,
+    attachmentUrls?: string[]
   ): Promise<ServiceResponse<any>> {
     try {
       const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
       if (!conv.success || !conv.data) return { success: false, message: conv.message };
 
       const trimmed = (content || "").trim();
-      if (!trimmed) return { success: false, message: "Content is required" };
+      const hasAttachments = Array.isArray(attachmentUrls) && attachmentUrls.length > 0;
+      if (!trimmed && !hasAttachments) return { success: false, message: "Content or attachments are required" };
 
+      // Store relative paths only; map to full URLs when sending response
+      const attachmentPaths = hasAttachments
+        ? attachmentUrls!.map((url) => extractRelativePath(url)).filter(Boolean)
+        : undefined;
+      const metadata = attachmentPaths?.length ? { attachments: attachmentPaths } : undefined;
       const msg = await (prisma as any).message.create({
         data: {
           conversation_id: conv.data.id,
           sender_id: userId,
           type: "USER",
-          content: trimmed
+          content: trimmed || "(attachment)",
+          metadata: metadata ?? undefined
         },
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
@@ -354,7 +373,7 @@ export class ConversationService {
           sender: senderPayload,
           type: msg.type,
           content: msg.content,
-          metadata: msg.metadata,
+          metadata: metadataWithAttachmentUrls(msg.metadata),
           created_at: msg.created_at,
           receiverId
         }

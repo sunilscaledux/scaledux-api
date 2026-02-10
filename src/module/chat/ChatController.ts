@@ -56,11 +56,18 @@ export async function searchMessages(req: Request, res: Response) {
 export async function sendMessage(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);
-  const { content } = req.body || {};
+  const { content, attachmentUrls } = req.body || {};
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
   if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
-  if (!content || typeof content !== "string") return ApiResponse.error(res, "Content is required", 400);
-  const result = await ConversationService.sendMessage(conversationId, userId, content);
+  const hasContent = typeof content === "string" && content.trim().length > 0;
+  const hasAttachments = Array.isArray(attachmentUrls) && attachmentUrls.length > 0;
+  if (!hasContent && !hasAttachments) return ApiResponse.error(res, "Content or attachments are required", 400);
+  const result = await ConversationService.sendMessage(
+    conversationId,
+    userId,
+    typeof content === "string" ? content : "",
+    hasAttachments ? attachmentUrls : undefined
+  );
   if (result.success) {
     const data = result.data as any;
     if (data.receiverId != null) {

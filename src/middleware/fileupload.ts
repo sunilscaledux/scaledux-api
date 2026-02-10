@@ -27,6 +27,24 @@ const documentFileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
+// File filter for chat: PDF, JPG, JPEG, DOC, DOCX, ZIP (max 10MB, max 3 files)
+const chatFileFilter = (req: any, file: any, cb: any) => {
+  const allowedMimeTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/zip'
+  ];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PDF, JPG, JPEG, PNG, DOC, DOCX, and ZIP files are allowed.'), false);
+  }
+};
+
 // Generic storage configuration
 const createStorage = (uploadPath: string) => {
   return multer.diskStorage({
@@ -53,7 +71,7 @@ const createStorage = (uploadPath: string) => {
 // Multer configurations for different use cases
 export const FileUpload = (options: {
   uploadPath: string;
-  fileFilter?: 'image' | 'document' | 'any';
+  fileFilter?: 'image' | 'document' | 'chat' | 'any';
   maxSize?: number; // in MB
   maxFiles?: number;
 }) => {
@@ -66,6 +84,9 @@ export const FileUpload = (options: {
       break;
     case 'document':
       filter = documentFileFilter;
+      break;
+    case 'chat':
+      filter = chatFileFilter;
       break;
     default:
       filter = undefined;
