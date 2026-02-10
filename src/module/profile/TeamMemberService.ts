@@ -1,7 +1,6 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
-import { ulid } from 'ulid';
 
 /**
  * TeamMemberService
@@ -132,7 +131,6 @@ export class TeamMemberService {
 
       const teamMember = await prisma.teamMember.create({
         data: {
-          unique_id: ulid(),
           company_profile_id: companyProfile.id,
           ...data
         },

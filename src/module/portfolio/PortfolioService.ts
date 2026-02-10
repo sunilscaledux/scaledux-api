@@ -2,7 +2,6 @@ import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
-import { ulid } from 'ulid';
 import fs from 'fs';
 import path from 'path';
 
@@ -129,7 +128,6 @@ export class PortfolioService {
 
       // Build data object conditionally
       const createData: any = {
-        unique_id: ulid(),
         user_id: userId,
         hide_company_name: portfolioData.hideCompanyName || false,
         project_skills: (portfolioData.projectSkills || []) as any,
@@ -337,7 +335,6 @@ export class PortfolioService {
       // Create duplicate
       const duplicatedPortfolio = await prisma.portfolio.create({
         data: {
-          unique_id: ulid(),
           user_id: userId,
           title: `${originalPortfolio.title} (Copy)`,
           description: originalPortfolio.description,

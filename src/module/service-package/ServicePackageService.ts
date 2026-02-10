@@ -1,7 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
-import { ulid } from 'ulid';
 
 /**
  * Helper function to parse JSON fields in service package
@@ -135,7 +134,6 @@ export class ServicePackageService {
 
       const newPackage = await prisma.servicePackage.create({
         data: {
-          unique_id: ulid(),
           user_id: userId,
           title: packageData.title,
           package_description: packageData.packageDescription || "",

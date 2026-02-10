@@ -339,7 +339,7 @@ model TeamRole {
 
 model TeamMember {
   id                Int       @id @default(autoincrement())
-  unique_id         String    @unique
+  unique_id         String    @unique @default(cuid())
   company_profile_id Int
   name              String
   email             String?
@@ -549,7 +549,7 @@ model AgencyVerification {
 
 model Portfolio {
   id                 Int       @id @default(autoincrement())
-  unique_id          String    @unique @default(uuid())
+  unique_id          String    @unique @default(cuid())
   user_id            Int
   title              String?
   description        String?   @db.Text
@@ -580,7 +580,7 @@ model Portfolio {
 
 model FounderProject {
   id                    Int       @id @default(autoincrement())
-  unique_id             String    @unique @default(uuid())
+  unique_id             String    @unique @default(cuid())
   user_id               Int
   project_title         String    @db.VarChar(50)
   project_description   String    @db.Text
@@ -660,7 +660,7 @@ model SavedProject {
 // Proposals submitted by service providers for founder projects
 model Proposal {
   id                    Int       @id @default(autoincrement())
-  unique_id             String    @unique
+  unique_id             String    @unique @default(cuid())
   project_id            Int
   provider_id           Int       // Service provider user id
   status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED, WITHDRAWN
@@ -711,7 +711,7 @@ model Conversation {
 
 model Message {
   id              Int       @id @default(autoincrement())
-  unique_id       String    @unique @default(uuid())
+  unique_id       String    @unique @default(cuid())
   conversation_id Int
   sender_id       Int?      // null for system messages
   type            String    @db.VarChar(20) // USER | SYSTEM
@@ -802,7 +802,7 @@ model ServiceKeyword {
 
 model ServicePackage {
   id                  Int      @id @default(autoincrement())
-  unique_id           String   @unique
+  unique_id           String   @unique @default(cuid())
   user_id             Int
   title               String   @db.VarChar(200)
   category_id         Int
@@ -919,7 +919,7 @@ model TaxInformation {
 
 model BillingTransaction {
   id              Int      @id @default(autoincrement())
-  unique_id       String   @unique @db.VarChar(26)
+  unique_id       String   @unique @default(cuid()) @db.VarChar(26)
 
   // WHO triggered the action
   actor_type      String   @db.VarChar(50) // User, Admin, System

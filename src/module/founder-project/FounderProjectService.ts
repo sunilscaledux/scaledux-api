@@ -2,7 +2,6 @@ import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
-import { ulid } from 'ulid';
 import { ConversationService } from '@module/chat/ConversationService';
 
 // Force server restart to pick up database changes
@@ -537,7 +536,6 @@ export class FounderProjectService {
 
       const project = await prisma.founderProject.create({
         data: {
-          unique_id: ulid(),
           user_id: userId,
           project_title: data.projectTitle,
           project_description: data.projectDescription,
@@ -727,7 +725,6 @@ export class FounderProjectService {
 
       const duplicatedProject = await prisma.founderProject.create({
         data: {
-          unique_id: ulid(),
           user_id: userId,
           project_title: `${originalProject.project_title} (Copy)`,
           project_description: originalProject.project_description,
