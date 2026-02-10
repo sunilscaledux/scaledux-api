@@ -101,13 +101,14 @@ export class ProposalService {
         data: { proposals_count: { increment: 1 } }
       });
 
-      // Sync to chat: conversation founder <-> provider, system message
+      // Sync to chat: conversation founder <-> provider, system message (initiator = provider)
       await ConversationService.syncSystemMessage(
         project.user_id,
         userId,
         "New proposal submitted",
         { activityType: "proposal_submitted", proposalId: proposal.unique_id, projectId: project.unique_id, projectTitle: project.project_title },
-        project.id
+        project.id,
+        userId
       );
 
       return {
@@ -564,14 +565,15 @@ export class ProposalService {
         data: { status }
       });
 
-      // Sync to chat: notify provider
+      // Sync to chat: notify provider (initiator = founder)
       const content = status === 'ACCEPTED' ? "Proposal accepted" : "Proposal rejected";
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         content,
         { activityType: "proposal_status", proposalId: proposal.unique_id, newStatus: status },
-        proposal.project.id
+        proposal.project.id,
+        proposal.project.user_id
       );
 
       return {
@@ -642,7 +644,8 @@ export class ProposalService {
           userId,
           "Proposal withdrawn",
           { activityType: "proposal_withdrawn", proposalId: proposal.unique_id },
-          proposal.project.id
+          proposal.project.id,
+          userId
         );
       }
 
@@ -735,13 +738,14 @@ export class ProposalService {
       }
       await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
 
-      // Sync to chat: notify provider
+      // Sync to chat: notify provider (initiator = founder)
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         "Founder requested changes to your proposal",
         { activityType: "request_modify", proposalId: proposal.unique_id, message: trimmed },
-        proposal.project.id
+        proposal.project.id,
+        proposal.project.user_id
       );
 
       return { success: true, message: "Request sent to the service provider" };

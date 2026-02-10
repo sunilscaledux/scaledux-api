@@ -54,18 +54,20 @@ export class ConversationService {
   }
 
   /**
-   * Create a system message in a conversation (no sender).
+   * Create a system message in a conversation.
+   * Optional senderId = initiator (founder or provider) so the message displays as sent by that user.
    */
   static async createSystemMessage(
     conversationId: number,
     content: string,
-    metadata?: Record<string, unknown>
-  ): Promise<ServiceResponse<{ id: number; unique_id: string; type: string; content: string; metadata: any; created_at: Date }>> {
+    metadata?: Record<string, unknown>,
+    senderId?: number
+  ): Promise<ServiceResponse<{ id: number; unique_id: string; type: string; content: string; metadata: any; created_at: Date; sender_id: number | null }>> {
     try {
       const msg = await (prisma as any).message.create({
         data: {
           conversation_id: conversationId,
-          sender_id: null,
+          sender_id: senderId ?? null,
           type: "SYSTEM",
           content,
           metadata: metadata ?? undefined
@@ -80,18 +82,20 @@ export class ConversationService {
 
   /**
    * Get-or-create conversation and post a system message in one go (for invite/proposal sync).
+   * initiatorUserId = user who triggered the event (founder or provider); message displays as sent by them.
    */
   static async syncSystemMessage(
     userId1: number,
     userId2: number,
     content: string,
     metadata?: Record<string, unknown>,
-    projectId?: number
+    projectId?: number,
+    initiatorUserId?: number
   ): Promise<ServiceResponse<{ conversationUniqueId: string }>> {
     const conv = await this.getOrCreateConversation(userId1, userId2, projectId);
     if (!conv.success || !conv.data) return { success: false, message: conv.message };
 
-    const msg = await this.createSystemMessage(conv.data.id, content, metadata);
+    const msg = await this.createSystemMessage(conv.data.id, content, metadata, initiatorUserId);
     if (!msg.success) return { success: false, message: msg.message };
 
     // Realtime: emit to conversation room and both user rooms
@@ -99,7 +103,7 @@ export class ConversationService {
       id: msg.data!.id,
       unique_id: msg.data!.unique_id,
       conversationId: conv.data.unique_id,
-      senderId: null as number | null,
+      senderId: msg.data!.sender_id ?? null,
       type: msg.data!.type,
       content: msg.data!.content,
       metadata: msg.data!.metadata ?? undefined,

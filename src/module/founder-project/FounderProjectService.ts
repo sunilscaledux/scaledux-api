@@ -1050,13 +1050,14 @@ export class FounderProjectService {
         data: { invited_count: { increment: 1 } }
       });
 
-      // Sync to chat: get-or-create conversation and add system message
+      // Sync to chat: get-or-create conversation and add system message (initiator = founder)
       await ConversationService.syncSystemMessage(
         project.user_id,
         providerId,
         "New project invitation received",
         { activityType: "project_invitation", projectId: project.unique_id, projectTitle: project.project_title },
-        project.id
+        project.id,
+        project.user_id
       );
 
       return {
