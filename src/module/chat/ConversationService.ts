@@ -9,6 +9,11 @@ function toProfileImageUrl(profileImage: string | null | undefined): string | nu
   return url || null;
 }
 
+function formatLocation(city: string | null | undefined, countryName: string | null | undefined): string | null {
+  const parts = [city, countryName].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 /**
  * ConversationService
  * Handles conversation and system message creation for chat sync (invites, proposals, etc.)
@@ -122,8 +127,8 @@ export class ConversationService {
       const convos = await (prisma as any).conversation.findMany({
         where: { OR: [{ user1_id: userId }, { user2_id: userId }] },
         include: {
-          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
-          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
+          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } },
+          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } },
           messages: { orderBy: { created_at: "desc" }, take: 1 }
         },
         orderBy: { updated_at: "desc" }
@@ -133,6 +138,7 @@ export class ConversationService {
         const other = c.user1_id === userId ? c.user2 : c.user1;
         const lastMsg = c.messages[0];
         const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
+        const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
         return {
           id: c.id,
           unique_id: c.unique_id,
@@ -141,7 +147,8 @@ export class ConversationService {
             unique_id: other.unique_id,
             first_name: other.first_name,
             last_name: other.last_name,
-            profile_image: profileImageUrl
+            profile_image: profileImageUrl,
+            location: location || null
           },
           lastMessage: lastMsg ? { content: lastMsg.content, type: lastMsg.type, created_at: lastMsg.created_at } : null,
           updated_at: c.updated_at
@@ -163,19 +170,21 @@ export class ConversationService {
       const c = await (prisma as any).conversation.findFirst({
         where: { unique_id: uniqueId },
         include: {
-          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } },
-          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } }
+          user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } },
+          user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } }
         }
       });
       if (!c) return { success: false, message: "Conversation not found" };
       if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
       const other = c.user1_id === userId ? c.user2 : c.user1;
+      const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
       const otherParticipant = {
         id: other.id,
         unique_id: other.unique_id,
         first_name: other.first_name,
         last_name: other.last_name,
-        profile_image: toProfileImageUrl(other.personalInfo?.profileImage)
+        profile_image: toProfileImageUrl(other.personalInfo?.profileImage),
+        location: location || null
       };
       return {
         success: true,
