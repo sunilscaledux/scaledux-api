@@ -3,6 +3,7 @@ import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderP
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { ulid } from 'ulid';
+import { ConversationService } from '@module/chat/ConversationService';
 
 // Force server restart to pick up database changes
 
@@ -1051,6 +1052,15 @@ export class FounderProjectService {
         where: { id: project.id },
         data: { invited_count: { increment: 1 } }
       });
+
+      // Sync to chat: get-or-create conversation and add system message
+      await ConversationService.syncSystemMessage(
+        project.user_id,
+        providerId,
+        "New project invitation received",
+        { activityType: "project_invitation", projectId: project.unique_id, projectTitle: project.project_title },
+        project.id
+      );
 
       return {
         success: true,

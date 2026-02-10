@@ -3,6 +3,7 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl } from '@utils/General';
 import { ulid } from 'ulid';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
+import { ConversationService } from '@module/chat/ConversationService';
 
 /**
  * ProposalService
@@ -101,6 +102,15 @@ export class ProposalService {
         where: { id: project.id },
         data: { proposals_count: { increment: 1 } }
       });
+
+      // Sync to chat: conversation founder <-> provider, system message
+      await ConversationService.syncSystemMessage(
+        project.user_id,
+        userId,
+        "New proposal submitted",
+        { activityType: "proposal_submitted", proposalId: proposal.unique_id, projectId: project.unique_id, projectTitle: project.project_title },
+        project.id
+      );
 
       return {
         success: true,
@@ -556,6 +566,16 @@ export class ProposalService {
         data: { status }
       });
 
+      // Sync to chat: notify provider
+      const content = status === 'ACCEPTED' ? "Proposal accepted" : "Proposal rejected";
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        content,
+        { activityType: "proposal_status", proposalId: proposal.unique_id, newStatus: status },
+        proposal.project.id
+      );
+
       return {
         success: true,
         message: `Proposal ${status.toLowerCase()} successfully`
@@ -615,6 +635,18 @@ export class ProposalService {
         where: { id: proposal.project.id },
         data: { proposals_count: { decrement: 1 } }
       });
+
+      // Sync to chat: notify founder (provider withdrew)
+      const project = await prisma.founderProject.findFirst({ where: { id: proposal.project.id }, select: { user_id: true } });
+      if (project) {
+        await ConversationService.syncSystemMessage(
+          project.user_id,
+          userId,
+          "Proposal withdrawn",
+          { activityType: "proposal_withdrawn", proposalId: proposal.unique_id },
+          proposal.project.id
+        );
+      }
 
       return {
         success: true,
@@ -691,7 +723,7 @@ export class ProposalService {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
-        include: { project: { select: { user_id: true } } }
+        include: { project: { select: { user_id: true, id: true } } }
       });
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
@@ -704,6 +736,16 @@ export class ProposalService {
         return { success: false, message: "Message is required" };
       }
       await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
+
+      // Sync to chat: notify provider
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "Founder requested changes to your proposal",
+        { activityType: "request_modify", proposalId: proposal.unique_id, message: trimmed },
+        proposal.project.id
+      );
+
       return { success: true, message: "Request sent to the service provider" };
     } catch (error: any) {
       console.error("Request Modify Error:", error);

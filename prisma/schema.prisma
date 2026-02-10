@@ -51,6 +51,9 @@ model User {
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
   proposals                    Proposal[] @relation("UserProposals")
+  conversationsAsUser1        Conversation[] @relation("ConversationUser1")
+  conversationsAsUser2         Conversation[] @relation("ConversationUser2")
+  sentMessages                 Message[]
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -607,6 +610,7 @@ model FounderProject {
   invites               ProjectInvite[]
   savedByUsers          SavedProject[]
   proposals             Proposal[]
+  conversations         Conversation[]
 
   @@index([user_id, status])
   @@index([status])
@@ -682,6 +686,44 @@ model Proposal {
   @@index([provider_id])
   @@index([status])
   @@map("scd_proposals")
+}
+
+// Chat: one conversation per (user1, user2, project) pair
+model Conversation {
+  id         Int       @id @default(autoincrement())
+  unique_id  String    @unique @default(uuid())
+  user1_id   Int       // smaller user id for consistent lookup
+  user2_id   Int       // larger user id
+  project_id Int?      // optional: project-scoped conversation
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  user1    User            @relation("ConversationUser1", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2    User            @relation("ConversationUser2", fields: [user2_id], references: [id], onDelete: Cascade)
+  project  FounderProject? @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  messages Message[]
+
+  @@unique([user1_id, user2_id, project_id])
+  @@index([user1_id, user2_id])
+  @@index([project_id])
+  @@map("scd_conversations")
+}
+
+model Message {
+  id              Int       @id @default(autoincrement())
+  unique_id       String    @unique @default(uuid())
+  conversation_id Int
+  sender_id       Int?      // null for system messages
+  type            String    @db.VarChar(20) // USER | SYSTEM
+  content         String    @db.Text
+  metadata        Json?     // e.g. { activityType, projectId, proposalId }
+  created_at      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender       User?        @relation(fields: [sender_id], references: [id], onDelete: SetNull)
+
+  @@index([conversation_id, created_at])
+  @@map("scd_messages")
 }
 
 enum OtpType {
