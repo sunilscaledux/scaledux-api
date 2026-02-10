@@ -321,7 +321,8 @@ export class ConversationService {
     conversationUniqueId: string,
     userId: number,
     content: string,
-    attachmentUrls?: string[]
+    attachmentUrls?: string[],
+    replyTo?: { messageId: number; unique_id: string; content: string; senderName?: string }
   ): Promise<ServiceResponse<any>> {
     try {
       const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
@@ -335,14 +336,17 @@ export class ConversationService {
       const attachmentPaths = hasAttachments
         ? attachmentUrls!.map((url) => extractRelativePath(url)).filter(Boolean)
         : undefined;
-      const metadata = attachmentPaths?.length ? { attachments: attachmentPaths } : undefined;
+      const metadata: any = {};
+      if (attachmentPaths?.length) metadata.attachments = attachmentPaths;
+      if (replyTo?.messageId && replyTo?.unique_id) metadata.replyTo = replyTo;
+      const hasMetadata = Object.keys(metadata).length > 0;
       const msg = await (prisma as any).message.create({
         data: {
           conversation_id: conv.data.id,
           sender_id: userId,
           type: "USER",
           content: trimmed || "(attachment)",
-          metadata: metadata ?? undefined
+          metadata: hasMetadata ? metadata : undefined
         },
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
