@@ -78,10 +78,6 @@ io.on('connection', (socket) => {
     return;
   }
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[socket] client connected, userId:', socket.data.userId);
-  }
-
   socket.on('join_conversation', async (conversationId: string) => {
     if (!conversationId || typeof conversationId !== 'string') return;
     const userId = socket.data.userId;
