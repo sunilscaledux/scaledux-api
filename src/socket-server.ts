@@ -40,6 +40,9 @@ app.post('/emit', (req, res) => {
   try {
     if (type === 'new_message') {
       emitNewMessageWithIO(io, conversationId, message, receiverId);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[socket] emitted new_message', conversationId, 'to receiver', receiverId);
+      }
     } else if (type === 'new_message_both') {
       if (typeof userId1 !== 'number' || typeof userId2 !== 'number') {
         res.status(400).json({ ok: false, error: 'userId1 and userId2 required for new_message_both' });
@@ -60,6 +63,7 @@ app.post('/emit', (req, res) => {
 io.on('connection', (socket) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.cookie?.match(/auth_token=([^;]+)/)?.[1];
   if (!token) {
+    if (process.env.NODE_ENV !== 'production') console.log('[socket] connection rejected: no token');
     socket.disconnect(true);
     return;
   }
@@ -69,8 +73,13 @@ io.on('connection', (socket) => {
     socket.data.userId = userId;
     socket.join(`user:${userId}`);
   } catch {
+    if (process.env.NODE_ENV !== 'production') console.log('[socket] connection rejected: invalid token');
     socket.disconnect(true);
     return;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[socket] client connected, userId:', socket.data.userId);
   }
 
   socket.on('join_conversation', async (conversationId: string) => {
@@ -87,6 +96,7 @@ io.on('connection', (socket) => {
 
 httpServer.listen(socketConfig.port, () => {
   console.log(`🔌 Socket server: http://localhost:${socketConfig.port}/socket.io`);
+  console.log(`   Ensure frontend uses this URL (NEXT_PUBLIC_SOCKET_URL or default :4001) and both API + socket processes are running.`);
 });
 
 export default httpServer;

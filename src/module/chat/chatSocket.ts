@@ -63,8 +63,8 @@ async function notifySocketServerViaHttp(
       headers: { "x-internal-secret": socketConfig.emitSecret },
       timeout: 5000
     });
-  } catch (err) {
-    console.error("Socket server notify failed:", err);
+  } catch (err: any) {
+    console.error("Socket server notify failed (is socket server running on", socketConfig.serverUrl, "?):", err?.message || err);
   }
 }
 
