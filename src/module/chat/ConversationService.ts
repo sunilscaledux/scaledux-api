@@ -131,21 +131,34 @@ export class ConversationService {
   }
 
   /**
-   * List conversations for a user (with last message and other participant).
+   * List conversations for a user (with last message and other participant). Paginated with cursor.
    */
-  static async listConversationsForUser(userId: number): Promise<ServiceResponse<any[]>> {
+  static async listConversationsForUser(
+    userId: number,
+    opts: { limit?: number; cursor?: string } = {}
+  ): Promise<ServiceResponse<{ list: any[]; nextCursor: string | null; hasMore: boolean }>> {
     try {
+      const limit = Math.min(opts.limit ?? 20, 50);
+      const cursorDate = opts.cursor ? new Date(opts.cursor) : null;
+
       const convos = await (prisma as any).conversation.findMany({
-        where: { OR: [{ user1_id: userId }, { user2_id: userId }] },
+        where: {
+          OR: [{ user1_id: userId }, { user2_id: userId }],
+          ...(cursorDate ? { updated_at: { lt: cursorDate } } : {})
+        },
         include: {
           user1: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } },
           user2: { select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true, city: true, country: { select: { name: true } } } } } },
           messages: { orderBy: { created_at: "desc" }, take: 1 }
         },
-        orderBy: { updated_at: "desc" }
+        orderBy: { updated_at: "desc" },
+        take: limit + 1
       });
 
-      const list = convos.map((c: any) => {
+      const hasMore = convos.length > limit;
+      const slice = hasMore ? convos.slice(0, limit) : convos;
+
+      const list = slice.map((c: any) => {
         const other = c.user1_id === userId ? c.user2 : c.user1;
         const lastMsg = c.messages[0];
         const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
@@ -166,7 +179,10 @@ export class ConversationService {
         };
       });
 
-      return { success: true, message: "OK", data: list };
+      const last = slice[slice.length - 1];
+      const nextCursor = hasMore && last ? last.updated_at?.toISOString?.() ?? null : null;
+
+      return { success: true, message: "OK", data: { list, nextCursor, hasMore } };
     } catch (error: any) {
       console.error("listConversationsForUser Error:", error);
       return { success: false, message: error.message || "Failed to list conversations" };
@@ -220,7 +236,7 @@ export class ConversationService {
       const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
       if (!conv.success || !conv.data) return { success: false, message: conv.message };
 
-      const limit = Math.min(opts.limit ?? 50, 100);
+      const limit = Math.max(1, Math.min(opts.limit ?? 20, 100));
       const cursor = opts.before
         ? await (prisma as any).message.findFirst({ where: { unique_id: opts.before } })
         : null;
@@ -236,7 +252,7 @@ export class ConversationService {
 
       const hasMore = messages.length > limit;
       const list = (hasMore ? messages.slice(0, limit) : messages).reverse();
-      const formatted = list.map((m: any) => ({
+      const formatted = list.slice(0, limit).map((m: any) => ({
         id: m.id,
         unique_id: m.unique_id,
         conversation_id: conv.data.unique_id,

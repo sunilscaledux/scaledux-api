@@ -10,7 +10,9 @@ function getStringParam(param: unknown): string {
 export async function getConversations(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
-  const result = await ConversationService.listConversationsForUser(userId);
+  const limit = req.query.limit ? Math.min(parseInt(String(req.query.limit), 10), 50) : 20;
+  const cursor = typeof req.query.cursor === "string" ? req.query.cursor : undefined;
+  const result = await ConversationService.listConversationsForUser(userId, { limit, cursor });
   if (result.success) return ApiResponse.success(res, result.data, result.message);
   return ApiResponse.error(res, result.message, 500);
 }
@@ -30,7 +32,8 @@ export async function getConversation(req: Request, res: Response) {
 export async function getMessages(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);
-  const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+  const rawLimit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
+  const limit = Number.isNaN(rawLimit) ? 20 : Math.max(1, Math.min(rawLimit, 100));
   const before = getStringParam(req.query.before);
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
   if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
