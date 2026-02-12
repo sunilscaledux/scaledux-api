@@ -40,9 +40,6 @@ app.post('/emit', (req, res) => {
   try {
     if (type === 'new_message') {
       emitNewMessageWithIO(io, conversationId, message, receiverId);
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[socket] emitted new_message', conversationId, 'to receiver', receiverId);
-      }
     } else if (type === 'new_message_both') {
       if (typeof userId1 !== 'number' || typeof userId2 !== 'number') {
         res.status(400).json({ ok: false, error: 'userId1 and userId2 required for new_message_both' });
