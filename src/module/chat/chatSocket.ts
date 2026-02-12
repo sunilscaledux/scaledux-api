@@ -1,4 +1,6 @@
-import { getIO } from "@config/socket";
+import { Server as SocketServer } from "socket.io";
+import axios from "axios";
+import socketConfig from "@config/socketConfig";
 
 export type MessagePayload = {
   id: number;
@@ -12,21 +14,77 @@ export type MessagePayload = {
 };
 
 /**
- * Emit message:new to conversation room and conversation:new_message to receiver's user room.
- * Call after creating a message (user or system).
+ * Emit using the given io instance (used by socket-server process).
  */
-export function emitNewMessage(conversationUniqueId: string, message: MessagePayload, receiverUserId?: number) {
-  const io = getIO();
-  if (!io) return;
+export function emitNewMessageWithIO(
+  io: SocketServer,
+  conversationUniqueId: string,
+  message: MessagePayload,
+  receiverUserId?: number
+) {
   const payload = { message };
   io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  if (receiverUserId) {
+  if (receiverUserId != null) {
     io.to(`user:${receiverUserId}`).emit("conversation:new_message", payload);
   }
 }
 
 /**
- * Emit to both participants' user rooms (e.g. for system messages).
+ * Emit to both users using the given io instance (used by socket-server process).
+ */
+export function emitNewMessageToBothUsersWithIO(
+  io: SocketServer,
+  conversationUniqueId: string,
+  message: MessagePayload,
+  userId1: number,
+  userId2: number
+) {
+  const payload = { message };
+  io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
+  io.to(`user:${userId1}`).emit("conversation:new_message", payload);
+  io.to(`user:${userId2}`).emit("conversation:new_message", payload);
+}
+
+/**
+ * Notify socket server via HTTP when API runs in a separate process (no Socket.IO).
+ */
+async function notifySocketServerViaHttp(
+  type: "new_message" | "new_message_both",
+  body: {
+    conversationId: string;
+    message: MessagePayload;
+    receiverId?: number;
+    userId1?: number;
+    userId2?: number;
+  }
+) {
+  try {
+    await axios.post(`${socketConfig.serverUrl}/emit`, { type, ...body }, {
+      headers: { "x-internal-secret": socketConfig.emitSecret },
+      timeout: 5000
+    });
+  } catch (err) {
+    console.error("Socket server notify failed:", err);
+  }
+}
+
+/**
+ * Notify socket server to emit message:new and conversation:new_message (API has no Socket.IO; uses HTTP).
+ */
+export function emitNewMessage(
+  conversationUniqueId: string,
+  message: MessagePayload,
+  receiverUserId?: number
+) {
+  notifySocketServerViaHttp("new_message", {
+    conversationId: conversationUniqueId,
+    message,
+    receiverId: receiverUserId
+  });
+}
+
+/**
+ * Notify socket server to emit to both participants (e.g. system messages).
  */
 export function emitNewMessageToBothUsers(
   conversationUniqueId: string,
@@ -34,10 +92,10 @@ export function emitNewMessageToBothUsers(
   userId1: number,
   userId2: number
 ) {
-  const io = getIO();
-  if (!io) return;
-  const payload = { message };
-  io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  io.to(`user:${userId1}`).emit("conversation:new_message", payload);
-  io.to(`user:${userId2}`).emit("conversation:new_message", payload);
+  notifySocketServerViaHttp("new_message_both", {
+    conversationId: conversationUniqueId,
+    message,
+    userId1,
+    userId2
+  });
 }

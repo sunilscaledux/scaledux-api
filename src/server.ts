@@ -6,10 +6,6 @@ dotenv.config();
 
 import http from 'http';
 import express from 'express';
-import { Server as SocketServer } from 'socket.io';
-import jwt from 'jsonwebtoken';
-import { setIO } from '@config/socket';
-import { ConversationService } from '@module/chat/ConversationService';
 import cookieParser from 'cookie-parser';
 import userRoutes from "@module/auth/AuthRoute";
 import profileRoutes from "@module/profile/ProfileRoute";
@@ -75,41 +71,6 @@ const PORT = process.env.PORT || 4000;
 
 const httpServer = http.createServer(app);
 
-const corsOrigin = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim()).filter(Boolean) || true;
-const io = new SocketServer(httpServer, {
-  path: '/socket.io',
-  cors: { origin: corsOrigin, credentials: true }
-});
-setIO(io);
-
-io.on('connection', (socket) => {
-  const token = socket.handshake.auth?.token || socket.handshake.headers?.cookie?.match(/auth_token=([^;]+)/)?.[1];
-  if (!token) {
-    socket.disconnect(true);
-    return;
-  }
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as { id: number };
-    const userId = decoded.id;
-    socket.data.userId = userId;
-    socket.join(`user:${userId}`);
-  } catch {
-    socket.disconnect(true);
-    return;
-  }
-
-  socket.on('join_conversation', async (conversationId: string) => {
-    if (!conversationId || typeof conversationId !== 'string') return;
-    const userId = socket.data.userId;
-    const result = await ConversationService.getConversationByUniqueId(conversationId, userId);
-    if (result.success) socket.join(`conversation:${conversationId}`);
-  });
-
-  socket.on('leave_conversation', (conversationId: string) => {
-    if (conversationId) socket.leave(`conversation:${conversationId}`);
-  });
-});
-
 async function start() {
   try {
     await connectMongo();
@@ -118,8 +79,6 @@ async function start() {
   }
   httpServer.listen(PORT, () => {
     console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
-    console.log(`🏢 Company API: http://localhost:${PORT}/api/v1/company`);
-    console.log(`🔌 Socket.io: http://localhost:${PORT}/socket.io`);
   });
 }
 
