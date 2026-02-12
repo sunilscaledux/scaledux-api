@@ -88,6 +88,23 @@ io.on('connection', (socket) => {
   socket.on('leave_conversation', (conversationId: string) => {
     if (conversationId) socket.leave(`conversation:${conversationId}`);
   });
+
+  socket.on('typing_start', (payload: { conversationId: string; userName?: string }) => {
+    const conversationId = payload?.conversationId;
+    if (!conversationId || typeof conversationId !== 'string') return;
+    const userName = typeof payload.userName === 'string' ? payload.userName : 'Someone';
+    socket.to(`conversation:${conversationId}`).emit('conversation:typing', {
+      userId: socket.data.userId,
+      userName
+    });
+  });
+
+  socket.on('typing_stop', (conversationId: string) => {
+    if (!conversationId || typeof conversationId !== 'string') return;
+    socket.to(`conversation:${conversationId}`).emit('conversation:typing_stop', {
+      userId: socket.data.userId
+    });
+  });
 });
 
 httpServer.listen(socketConfig.port, () => {
