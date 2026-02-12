@@ -33,7 +33,8 @@ export class CompanyProfileController {
    */
   static async getPublicProfile(req: Request, res: Response) {
     try {
-      const { uniqueId } = req.params;
+      const rawId = req.params.uniqueId;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
       if (!uniqueId) {
         return ApiResponse.error(res, 'Unique ID is required', 400);
       }

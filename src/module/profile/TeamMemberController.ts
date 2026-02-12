@@ -31,7 +31,8 @@ export class TeamMemberController {
   static async getTeamMemberById(req: Request, res: Response) {
     try {
       const userId = req.user.id;
-      const uniqueId = req.params.id;
+      const rawId = req.params.id;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
 
       if (!uniqueId) {
         return ApiResponse.error(res, 'Team member ID is required', 400);
@@ -89,7 +90,8 @@ export class TeamMemberController {
       }
 
       const userId = req.user.id;
-      const uniqueId = req.params.id;
+      const rawId = req.params.id;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
 
       if (!uniqueId) {
         return ApiResponse.error(res, 'Team member ID is required', 400);
@@ -115,7 +117,8 @@ export class TeamMemberController {
   static async uploadProfileImage(req: Request, res: Response) {
     try {
       const userId = req.user.id;
-      const uniqueId = req.params.id;
+      const rawId = req.params.id;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
 
       if (!uniqueId) {
         return ApiResponse.error(res, 'Team member ID is required', 400);
@@ -145,7 +148,8 @@ export class TeamMemberController {
   static async deleteTeamMember(req: Request, res: Response) {
     try {
       const userId = req.user.id;
-      const uniqueId = req.params.id;
+      const rawId = req.params.id;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
 
       if (!uniqueId) {
         return ApiResponse.error(res, 'Team member ID is required', 400);

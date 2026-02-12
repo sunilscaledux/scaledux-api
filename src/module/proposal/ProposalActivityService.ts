@@ -25,5 +25,5 @@ export async function getProposalActivities(proposalUniqueId: string): Promise<I
   const list = await ProposalActivity.find({ proposalUniqueId })
     .sort({ createdAt: -1 })
     .lean();
-  return list as IProposalActivity[];
+  return list as unknown as IProposalActivity[];
 }
