@@ -70,6 +70,50 @@ export class ConversationService {
   }
 
   /**
+   * Search users by name or email for starting a chat. Excludes current user. Returns at most 15.
+   */
+  static async searchUsersForChat(
+    currentUserId: number,
+    query: string
+  ): Promise<ServiceResponse<{ users: Array<{ id: number; unique_id: string | null; first_name: string; last_name: string | null; profile_image: string | null }> }>> {
+    try {
+      const q = (query || "").trim();
+      if (q.length === 0) {
+        return { success: true, message: "OK", data: { users: [] } };
+      }
+      const users = await (prisma as any).user.findMany({
+        where: {
+          id: { not: currentUserId },
+          OR: [
+            { first_name: { contains: q, mode: "insensitive" } },
+            { last_name: { contains: q, mode: "insensitive" } },
+            ...(q.includes("@") ? [{ email: { contains: q, mode: "insensitive" } }] : [])
+          ]
+        },
+        select: {
+          id: true,
+          unique_id: true,
+          first_name: true,
+          last_name: true,
+          personalInfo: { select: { profileImage: true } }
+        },
+        take: 15
+      });
+      const list = users.map((u: any) => ({
+        id: u.id,
+        unique_id: u.unique_id ?? null,
+        first_name: u.first_name,
+        last_name: u.last_name ?? null,
+        profile_image: toProfileImageUrl(u.personalInfo?.profileImage)
+      }));
+      return { success: true, message: "OK", data: { users: list } };
+    } catch (error: any) {
+      console.error("searchUsersForChat Error:", error);
+      return { success: false, message: error.message || "Failed to search users" };
+    }
+  }
+
+  /**
    * Create a system message in a conversation.
    * Optional senderId = initiator (founder or provider) so the message displays as sent by that user.
    */

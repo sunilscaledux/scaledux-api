@@ -17,6 +17,29 @@ export async function getConversations(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, 500);
 }
 
+export async function searchUsersForChat(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  const result = await ConversationService.searchUsersForChat(userId, q);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  return ApiResponse.error(res, result.message, 500);
+}
+
+export async function startConversation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  const otherUserId = req.body?.otherUserId != null ? parseInt(String(req.body.otherUserId), 10) : NaN;
+  if (!Number.isInteger(otherUserId) || otherUserId === userId) {
+    return ApiResponse.error(res, "Valid other user ID is required", 400);
+  }
+  const result = await ConversationService.getOrCreateConversation(userId, otherUserId);
+  if (!result.success || !result.data) return ApiResponse.error(res, result.message || "Failed to start conversation", 500);
+  const conv = await ConversationService.getConversationByUniqueId(result.data.unique_id, userId);
+  if (conv.success && conv.data) return ApiResponse.success(res, conv.data, result.message, 201);
+  return ApiResponse.success(res, { unique_id: result.data.unique_id, id: result.data.id }, result.message, 201);
+}
+
 export async function getConversation(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);

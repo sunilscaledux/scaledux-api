@@ -43,6 +43,7 @@ model User {
   agency_verification_status   String?   @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   show_as_agency               Boolean   @default(false)
   portfolios                   Portfolio[]
+  investmentPortfolios         InvestorPortfolio[]
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
   taxInformation               TaxInformation?
@@ -278,6 +279,7 @@ model Industry {
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
   portfolios      Portfolio[]
+  investorPortfolios InvestorPortfolio[]
   subIndustries   SubIndustry[]
   companyProfiles CompanyProfile[]
 
@@ -294,6 +296,7 @@ model SubIndustry {
   updated_at      DateTime         @updatedAt
   industry        Industry         @relation(fields: [industry_id], references: [id], onDelete: Cascade)
   companyProfiles CompanyProfile[]
+  investorPortfolios InvestorPortfolio[]
 
   @@unique([industry_id, name])
   @@index([industry_id])
@@ -576,6 +579,48 @@ model Portfolio {
   @@index([industry_id])
   @@index([deleted_at])
   @@map("scd_portfolios")
+}
+
+// Investor's investment portfolio - companies they've invested in
+model InvestorPortfolio {
+  id                    Int       @id @default(autoincrement())
+  unique_id             String    @unique @default(cuid())
+  user_id               Int
+  
+  // Company overview
+  company_name          String
+  company_logo          String?
+  description           String?   @db.Text
+  company_website       String?
+  industry_id           Int?
+  sub_industry_id       Int?
+  
+  // Investment details
+  investment_size       Decimal?  @db.Decimal(15, 2)
+  investment_date       DateTime?
+  round_participated_in String?   // Pre Seed, Angel, Seed, Pre Series A+
+  current_status        String?   @default("Active") // Active, Exited, Acquired
+  
+  // Strategic role
+  board_advisory_role   String?
+  impact_in_company_growth String? @db.Text
+  exit_information      String?   @db.Text
+  
+  // Status and timestamps
+  status                String    @default("DRAFT") // DRAFT, PUBLISHED
+  deleted_at            DateTime?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  industry              Industry? @relation(fields: [industry_id], references: [id])
+  subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([status])
+  @@index([industry_id])
+  @@index([deleted_at])
+  @@map("scd_investor_portfolios")
 }
 
 model FounderProject {
