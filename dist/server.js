@@ -21,6 +21,7 @@ const AchievementRoute_1 = __importDefault(require("./module/achievement/Achieve
 const ExpertiseRoute_1 = __importDefault(require("./module/expertise/ExpertiseRoute"));
 const VerifyRoute_1 = __importDefault(require("./module/verify/VerifyRoute"));
 const PortfolioRoute_1 = __importDefault(require("./module/portfolio/PortfolioRoute"));
+const InvestmentPortfolioRoute_1 = __importDefault(require("./module/investment-portfolio/InvestmentPortfolioRoute"));
 const FounderProjectRoute_1 = __importDefault(require("./module/founder-project/FounderProjectRoute"));
 const ProposalRoute_1 = __importDefault(require("./module/proposal/ProposalRoute"));
 const ChatRoute_1 = __importDefault(require("./module/chat/ChatRoute"));
@@ -51,6 +52,7 @@ app.use("/api/v1/achievements", AchievementRoute_1.default);
 app.use("/api/v1/expertises", ExpertiseRoute_1.default);
 app.use("/api/v1/verify", VerifyRoute_1.default);
 app.use("/api/v1/portfolios", PortfolioRoute_1.default);
+app.use("/api/v1/investment-portfolios", InvestmentPortfolioRoute_1.default);
 app.use("/api/v1/founder-projects", FounderProjectRoute_1.default);
 app.use("/api/v1/proposals", ProposalRoute_1.default);
 app.use("/api/v1", ChatRoute_1.default);
