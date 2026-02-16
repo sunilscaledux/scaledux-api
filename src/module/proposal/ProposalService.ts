@@ -3,6 +3,7 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl } from '@utils/General';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { ConversationService } from '@module/chat/ConversationService';
+import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 
 /**
  * ProposalService
@@ -102,11 +103,19 @@ export class ProposalService {
       });
 
       // Sync to chat: conversation founder <-> provider, system message (initiator = provider)
+      const projectTitle = project.project_title || "Project";
       await ConversationService.syncSystemMessage(
         project.user_id,
         userId,
-        "New proposal submitted",
-        { activityType: "proposal_submitted", proposalId: proposal.unique_id, projectId: project.unique_id, projectTitle: project.project_title },
+        "",
+        {
+          activityType: "proposal_submitted",
+          proposalId: proposal.unique_id,
+          projectId: project.unique_id,
+          projectTitle: project.project_title,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_SUBMITTED_SENT} ${projectTitle}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_SUBMITTED_RECEIVED} ${projectTitle}`
+        },
         project.id,
         userId
       );
@@ -566,12 +575,19 @@ export class ProposalService {
       });
 
       // Sync to chat: notify provider (initiator = founder)
-      const content = status === 'ACCEPTED' ? "Proposal accepted" : "Proposal rejected";
+      const sentText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
+      const receivedText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
-        content,
-        { activityType: "proposal_status", proposalId: proposal.unique_id, newStatus: status },
+        "",
+        {
+          activityType: "proposal_status",
+          proposalId: proposal.unique_id,
+          newStatus: status,
+          messageSent: sentText,
+          messageReceived: receivedText
+        },
         proposal.project.id,
         proposal.project.user_id
       );
@@ -637,13 +653,24 @@ export class ProposalService {
       });
 
       // Sync to chat: notify founder (provider withdrew)
-      const project = await prisma.founderProject.findFirst({ where: { id: proposal.project.id }, select: { user_id: true } });
+      const project = await prisma.founderProject.findFirst({
+        where: { id: proposal.project.id },
+        select: { user_id: true, project_title: true, unique_id: true }
+      });
       if (project) {
+        const projectTitle = project.project_title || "Project";
         await ConversationService.syncSystemMessage(
           project.user_id,
           userId,
-          "Proposal withdrawn",
-          { activityType: "proposal_withdrawn", proposalId: proposal.unique_id },
+          "",
+          {
+            activityType: "proposal_withdrawn",
+            proposalId: proposal.unique_id,
+            projectId: project.unique_id,
+            projectTitle: project.project_title,
+            messageSent: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_RECEIVED
+          },
           proposal.project.id,
           userId
         );
@@ -724,7 +751,7 @@ export class ProposalService {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
-        include: { project: { select: { user_id: true, id: true } } }
+        include: { project: { select: { user_id: true, id: true, project_title: true, unique_id: true } } }
       });
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
@@ -738,12 +765,20 @@ export class ProposalService {
       }
       await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
 
-      // Sync to chat: notify provider (initiator = founder)
+      const projectTitle = proposal.project.project_title || "Project";
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
-        "Founder requested changes to your proposal",
-        { activityType: "request_modify", proposalId: proposal.unique_id, message: trimmed },
+        "",
+        {
+          activityType: "request_modify",
+          proposalId: proposal.unique_id,
+          message: trimmed,
+          projectId: proposal.project.unique_id,
+          projectTitle: proposal.project.project_title,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_SENT} ${projectTitle}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_RECEIVED} ${projectTitle}`
+        },
         proposal.project.id,
         proposal.project.user_id
       );

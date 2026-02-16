@@ -53,6 +53,27 @@ export async function getInvestmentPortfolioById(req: Request, res: Response) {
   }
 }
 
+/**
+ * Get published investment portfolio by id (public, no auth required).
+ * Only PUBLISHED portfolios are returned; drafts are not exposed.
+ */
+export async function getPublicInvestmentPortfolioById(req: Request, res: Response) {
+  const id = getStringParam(req.params.id);
+
+  if (!id) {
+    return ApiResponse.error(res, "Investment portfolio ID is required", 400);
+  }
+
+  const result = await InvestmentPortfolioService.getPublicByUniqueId(id);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "Investment portfolio not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
 export async function createInvestmentPortfolio(req: Request, res: Response) {
   const userId = req.user?.id;
 

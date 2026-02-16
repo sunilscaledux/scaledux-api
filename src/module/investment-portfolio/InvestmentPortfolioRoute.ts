@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   getUserInvestmentPortfolios,
   getInvestmentPortfolioById,
+  getPublicInvestmentPortfolioById,
   createInvestmentPortfolio,
   updateInvestmentPortfolio,
   deleteInvestmentPortfolio,
@@ -14,6 +15,10 @@ import { uploadFile } from "@module/general/FileController";
 import { authenticateToken } from "@middleware/auth";
 
 const router = Router();
+
+// Public: get published investment portfolio by id (no auth)
+router.get("/public/:id", getPublicInvestmentPortfolioById);
+
 router.use(authenticateToken);
 
 // CRUD

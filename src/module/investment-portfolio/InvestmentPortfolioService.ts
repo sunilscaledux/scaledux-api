@@ -100,6 +100,53 @@ export class InvestmentPortfolioService {
     }
   }
 
+  /**
+   * Get published investment portfolio by unique_id (public, no auth).
+   * Only returns PUBLISHED portfolios; drafts are not exposed.
+   */
+  static async getPublicByUniqueId(uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const portfolio = await prisma.investorPortfolio.findFirst({
+        where: {
+          unique_id: uniqueId,
+          deleted_at: null,
+          status: "PUBLISHED"
+        },
+        include: {
+          industry: {
+            select: { id: true, name: true, description: true }
+          },
+          subIndustry: {
+            select: { id: true, name: true, description: true }
+          }
+        }
+      });
+
+      if (!portfolio) {
+        return { success: false, message: "Investment portfolio not found" };
+      }
+
+      const transformed = {
+        ...portfolio,
+        company_logo_url: portfolio.company_logo
+          ? getFileUrl(portfolio.company_logo)
+          : null
+      };
+
+      return {
+        success: true,
+        message: "Investment portfolio retrieved successfully",
+        data: transformed
+      };
+    } catch (error: any) {
+      console.error("Get Public Investment Portfolio By ID Error:", error);
+      return {
+        success: false,
+        message: "Failed to get investment portfolio"
+      };
+    }
+  }
+
   static async createInvestmentPortfolio(
     userId: number,
     data: CreateInvestmentPortfolioInput
@@ -118,6 +165,7 @@ export class InvestmentPortfolioService {
         industry_id: data.industryId,
         sub_industry_id: data.subIndustryId,
         investment_size: data.investmentSize,
+        investment_size_currency: data.investmentSizeCurrency,
         investment_date: data.investmentDate
           ? new Date(data.investmentDate)
           : null,
@@ -195,6 +243,8 @@ export class InvestmentPortfolioService {
         updateData.sub_industry_id = data.subIndustryId;
       if (data.investmentSize !== undefined)
         updateData.investment_size = data.investmentSize;
+      if (data.investmentSizeCurrency !== undefined)
+        updateData.investment_size_currency = data.investmentSizeCurrency;
       if (data.investmentDate !== undefined)
         updateData.investment_date = data.investmentDate
           ? new Date(data.investmentDate)

@@ -3,6 +3,7 @@ import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderP
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
+import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 
 // Force server restart to pick up database changes
 
@@ -1051,11 +1052,18 @@ export class FounderProjectService {
       });
 
       // Sync to chat: get-or-create conversation and add system message (initiator = founder)
+      const projectTitle = project.project_title || "Project";
       await ConversationService.syncSystemMessage(
         project.user_id,
         providerId,
-        "New project invitation received",
-        { activityType: "project_invitation", projectId: project.unique_id, projectTitle: project.project_title },
+        "",
+        {
+          activityType: "project_invitation",
+          projectId: project.unique_id,
+          projectTitle: project.project_title,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_SENT}: ${projectTitle}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_RECEIVED}: ${projectTitle}`
+        },
         project.id,
         project.user_id
       );

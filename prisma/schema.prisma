@@ -596,9 +596,10 @@ model InvestorPortfolio {
   sub_industry_id       Int?
   
   // Investment details
-  investment_size       Decimal?  @db.Decimal(15, 2)
-  investment_date       DateTime?
-  round_participated_in String?   // Pre Seed, Angel, Seed, Pre Series A+
+  investment_size           Decimal?  @db.Decimal(15, 2)
+  investment_size_currency  String?   // USD, INR
+  investment_date           DateTime?
+  round_participated_in     String?   // Pre Seed, Angel, Seed, Pre Series A+
   current_status        String?   @default("Active") // Active, Exited, Acquired
   
   // Strategic role

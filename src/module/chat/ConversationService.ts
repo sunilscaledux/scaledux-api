@@ -25,6 +25,21 @@ function formatLocation(city: string | null | undefined, countryName: string | n
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
+/** Resolve display content for SYSTEM messages with messageSent/messageReceived in metadata. */
+function resolveSystemMessageContent(
+  type: string,
+  content: string,
+  metadata: any,
+  senderId: number | null,
+  viewerUserId: number
+): string {
+  if (type !== "SYSTEM" || !metadata || typeof metadata !== "object") return content;
+  const sent = metadata.messageSent;
+  const received = metadata.messageReceived;
+  if (sent == null || received == null) return content;
+  return senderId === viewerUserId ? String(sent) : String(received);
+}
+
 /**
  * ConversationService
  * Handles conversation and system message creation for chat sync (invites, proposals, etc.)
@@ -205,6 +220,9 @@ export class ConversationService {
       const list = slice.map((c: any) => {
         const other = c.user1_id === userId ? c.user2 : c.user1;
         const lastMsg = c.messages[0];
+        const lastContent = lastMsg
+          ? resolveSystemMessageContent(lastMsg.type, lastMsg.content, lastMsg.metadata, lastMsg.sender_id, userId)
+          : null;
         const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
         const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
         return {
@@ -218,7 +236,7 @@ export class ConversationService {
             profile_image: profileImageUrl,
             location: location || null
           },
-          lastMessage: lastMsg ? { content: lastMsg.content, type: lastMsg.type, created_at: lastMsg.created_at } : null,
+          lastMessage: lastMsg ? { content: lastContent, type: lastMsg.type, created_at: lastMsg.created_at } : null,
           updated_at: c.updated_at
         };
       });
@@ -296,24 +314,28 @@ export class ConversationService {
 
       const hasMore = messages.length > limit;
       const list = (hasMore ? messages.slice(0, limit) : messages).reverse();
-      const formatted = list.slice(0, limit).map((m: any) => ({
-        id: m.id,
-        unique_id: m.unique_id,
-        conversation_id: conv.data.unique_id,
-        sender_id: m.sender_id,
-        sender: m.sender
-          ? {
-              id: m.sender.id,
-              first_name: m.sender.first_name,
-              last_name: m.sender.last_name,
-              profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
-            }
-          : null,
-        type: m.type,
-        content: m.content,
-        metadata: metadataWithAttachmentUrls(m.metadata),
-        created_at: m.created_at
-      }));
+      const formatted = list.slice(0, limit).map((m: any) => {
+        const meta = metadataWithAttachmentUrls(m.metadata);
+        const content = resolveSystemMessageContent(m.type, m.content, meta, m.sender_id, userId);
+        return {
+          id: m.id,
+          unique_id: m.unique_id,
+          conversation_id: conv.data.unique_id,
+          sender_id: m.sender_id,
+          sender: m.sender
+            ? {
+                id: m.sender.id,
+                first_name: m.sender.first_name,
+                last_name: m.sender.last_name,
+                profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+              }
+            : null,
+          type: m.type,
+          content,
+          metadata: meta,
+          created_at: m.created_at
+        };
+      });
 
       return { success: true, message: "OK", data: { messages: formatted, hasMore } };
     } catch (error: any) {
@@ -348,24 +370,28 @@ export class ConversationService {
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
-      const formatted = messages.map((m: any) => ({
-        id: m.id,
-        unique_id: m.unique_id,
-        conversation_id: conv.data.unique_id,
-        sender_id: m.sender_id,
-        sender: m.sender
-          ? {
-              id: m.sender.id,
-              first_name: m.sender.first_name,
-              last_name: m.sender.last_name,
-              profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
-            }
-          : null,
-        type: m.type,
-        content: m.content,
-        metadata: metadataWithAttachmentUrls(m.metadata),
-        created_at: m.created_at
-      }));
+      const formatted = messages.map((m: any) => {
+        const meta = metadataWithAttachmentUrls(m.metadata);
+        const content = resolveSystemMessageContent(m.type, m.content, meta, m.sender_id, userId);
+        return {
+          id: m.id,
+          unique_id: m.unique_id,
+          conversation_id: conv.data.unique_id,
+          sender_id: m.sender_id,
+          sender: m.sender
+            ? {
+                id: m.sender.id,
+                first_name: m.sender.first_name,
+                last_name: m.sender.last_name,
+                profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+              }
+            : null,
+          type: m.type,
+          content,
+          metadata: meta,
+          created_at: m.created_at
+        };
+      });
 
       return { success: true, message: "OK", data: { messages: formatted } };
     } catch (error: any) {

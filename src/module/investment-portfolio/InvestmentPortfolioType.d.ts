@@ -6,6 +6,7 @@ export interface CreateInvestmentPortfolioInput {
   industryId?: number
   subIndustryId?: number
   investmentSize?: number
+  investmentSizeCurrency?: string
   investmentDate?: string
   roundParticipatedIn?: string
   currentStatus?: string
@@ -23,6 +24,7 @@ export interface UpdateInvestmentPortfolioInput {
   industryId?: number
   subIndustryId?: number
   investmentSize?: number
+  investmentSizeCurrency?: string
   investmentDate?: string
   roundParticipatedIn?: string
   currentStatus?: string
