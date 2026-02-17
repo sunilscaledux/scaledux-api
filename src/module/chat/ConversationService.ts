@@ -37,7 +37,12 @@ function resolveSystemMessageContent(
   const sent = metadata.messageSent;
   const received = metadata.messageReceived;
   if (sent == null || received == null) return content;
-  return senderId === viewerUserId ? String(sent) : String(received);
+  const base = senderId === viewerUserId ? String(sent) : String(received);
+  if (metadata.activityType === "request_modify" && metadata.message) {
+    const msg = String(metadata.message).trim();
+    return msg ? `${base}\n\n${msg}` : base;
+  }
+  return base;
 }
 
 /**
