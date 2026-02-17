@@ -58,20 +58,21 @@ export class ConversationService {
    * Get or create a conversation between two users, optionally scoped to a project.
    * Uses normalized user ids (user1_id <= user2_id) for consistent lookup.
    */
+  /**
+   * Get or create a single conversation between two users.
+   * Conversation is not scoped to a project — one thread per user pair for all context (chat, invites, proposals, etc.).
+   */
   static async getOrCreateConversation(
     userId1: number,
     userId2: number,
-    projectId?: number
+    _projectId?: number
   ): Promise<ServiceResponse<{ id: number; unique_id: string }>> {
     try {
       const [u1, u2] = userId1 <= userId2 ? [userId1, userId2] : [userId2, userId1];
 
       const existing = await (prisma as any).conversation.findFirst({
-        where: {
-          user1_id: u1,
-          user2_id: u2,
-          project_id: projectId ?? null
-        }
+        where: { user1_id: u1, user2_id: u2 },
+        orderBy: { updated_at: "desc" }
       });
 
       if (existing) {
@@ -82,7 +83,6 @@ export class ConversationService {
         data: {
           user1_id: u1,
           user2_id: u2,
-          project_id: projectId ?? null,
           status: "NOT_ACCEPTED"
         }
       });
@@ -97,6 +97,7 @@ export class ConversationService {
   /**
    * Set conversation status to ACCEPTED (e.g. when receiver accepts project invite). Call from
    * FounderProjectService.acceptInvitation or similar.
+   * Uses the single conversation between project owner and receiver (no project_id filter).
    */
   static async setConversationStatusAcceptedByProject(
     projectId: number,
@@ -111,7 +112,7 @@ export class ConversationService {
       ? [project.user_id, receiverUserId]
       : [receiverUserId, project.user_id];
     await (prisma as any).conversation.updateMany({
-      where: { user1_id: u1, user2_id: u2, project_id: projectId },
+      where: { user1_id: u1, user2_id: u2 },
       data: { status: "ACCEPTED" }
     });
   }

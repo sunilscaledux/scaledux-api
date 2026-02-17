@@ -656,7 +656,6 @@ model FounderProject {
   invites               ProjectInvite[]
   savedByUsers          SavedProject[]
   proposals             Proposal[]
-  conversations         Conversation[]
 
   @@index([user_id, status])
   @@index([status])
@@ -742,25 +741,22 @@ model Proposal {
   @@map("scd_proposals")
 }
 
-// Chat: one conversation per (user1, user2, project) pair
+// Chat: one conversation per user pair (user1, user2)
 model Conversation {
   id         Int       @id @default(autoincrement())
   unique_id  String    @unique @default(cuid())
   user1_id   Int       // smaller user id for consistent lookup
   user2_id   Int       // larger user id
-  project_id Int?      // optional: project-scoped conversation
   status     String?   @db.VarChar(20) // NOT_ACCEPTED | ACCEPTED | BLOCKED; null = no restriction
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
 
-  user1    User            @relation("ConversationUser1", fields: [user1_id], references: [id], onDelete: Cascade)
-  user2    User            @relation("ConversationUser2", fields: [user2_id], references: [id], onDelete: Cascade)
-  project  FounderProject? @relation(fields: [project_id], references: [id], onDelete: SetNull)
+  user1    User     @relation("ConversationUser1", fields: [user1_id], references: [id], onDelete: Cascade)
+  user2    User     @relation("ConversationUser2", fields: [user2_id], references: [id], onDelete: Cascade)
   messages Message[]
 
-  @@unique([user1_id, user2_id, project_id])
+  @@unique([user1_id, user2_id])
   @@index([user1_id, user2_id])
-  @@index([project_id])
   @@map("scd_conversations")
 }
 
