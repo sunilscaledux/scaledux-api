@@ -73,7 +73,8 @@ export class ConversationService {
         data: {
           user1_id: u1,
           user2_id: u2,
-          project_id: projectId ?? null
+          project_id: projectId ?? null,
+          status: "NOT_ACCEPTED"
         }
       });
 
@@ -82,6 +83,28 @@ export class ConversationService {
       console.error("getOrCreateConversation Error:", error);
       return { success: false, message: error.message || "Failed to get or create conversation" };
     }
+  }
+
+  /**
+   * Set conversation status to ACCEPTED (e.g. when receiver accepts project invite). Call from
+   * FounderProjectService.acceptInvitation or similar.
+   */
+  static async setConversationStatusAcceptedByProject(
+    projectId: number,
+    receiverUserId: number
+  ): Promise<void> {
+    const project = await (prisma as any).founderProject.findFirst({
+      where: { id: projectId },
+      select: { user_id: true }
+    });
+    if (!project) return;
+    const [u1, u2] = project.user_id <= receiverUserId
+      ? [project.user_id, receiverUserId]
+      : [receiverUserId, project.user_id];
+    await (prisma as any).conversation.updateMany({
+      where: { user1_id: u1, user2_id: u2, project_id: projectId },
+      data: { status: "ACCEPTED" }
+    });
   }
 
   /**
@@ -275,10 +298,28 @@ export class ConversationService {
         profile_image: toProfileImageUrl(other.personalInfo?.profileImage),
         location: location || null
       };
+      const firstUserMsg = await (prisma as any).message.findFirst({
+        where: { conversation_id: c.id, type: "USER" },
+        orderBy: { created_at: "asc" },
+        select: { sender_id: true }
+      });
+      const isInitiator = firstUserMsg?.sender_id != null && userId === firstUserMsg.sender_id;
+      const status = (c as any).status as string | null | undefined;
+      const receiverAccepted = status === "ACCEPTED";
       return {
         success: true,
         message: "OK",
-        data: { id: c.id, unique_id: c.unique_id, otherParticipant, updated_at: c.updated_at }
+        data: {
+          id: c.id,
+          unique_id: c.unique_id,
+          user1_id: c.user1_id,
+          user2_id: c.user2_id,
+          otherParticipant,
+          updated_at: c.updated_at,
+          status: status ?? null,
+          receiverAccepted,
+          isInitiator
+        }
       };
     } catch (error: any) {
       console.error("getConversationByUniqueId Error:", error);
@@ -414,6 +455,28 @@ export class ConversationService {
       const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
       if (!conv.success || !conv.data) return { success: false, message: conv.message };
 
+      const convStatus = (conv.data as any).status as string | null | undefined;
+      if (convStatus === "BLOCKED") {
+        return {
+          success: false,
+          message: "This conversation is blocked",
+          statusCode: 403
+        };
+      }
+      const firstUserMessage = await (prisma as any).message.findFirst({
+        where: { conversation_id: conv.data.id, type: "USER" },
+        orderBy: { created_at: "asc" },
+        select: { sender_id: true }
+      });
+      const initiatorId = firstUserMessage?.sender_id ?? null;
+      if (initiatorId != null && userId === initiatorId && convStatus === "NOT_ACCEPTED") {
+        return {
+          success: false,
+          message: "You cannot send another message until the receiver accepts or replies",
+          statusCode: 403
+        };
+      }
+
       const trimmed = (content || "").trim();
       const hasAttachments = Array.isArray(attachmentUrls) && attachmentUrls.length > 0;
       if (!trimmed && !hasAttachments) return { success: false, message: "Content or attachments are required" };
@@ -437,10 +500,16 @@ export class ConversationService {
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
-      // Update conversation updated_at
+      // Update conversation: NOT_ACCEPTED when first USER message; ACCEPTED when receiver replies (sender !== first message sender).
+      let statusUpdate: string | undefined;
+      if (firstUserMessage == null) statusUpdate = "NOT_ACCEPTED";
+      else if (msg.sender_id !== firstUserMessage.sender_id) statusUpdate = "ACCEPTED";
       await (prisma as any).conversation.update({
         where: { id: conv.data.id },
-        data: { updated_at: new Date() }
+        data: {
+          updated_at: new Date(),
+          ...(statusUpdate != null ? { status: statusUpdate } : {})
+        }
       });
 
       const receiverId = conv.data.otherParticipant.id;

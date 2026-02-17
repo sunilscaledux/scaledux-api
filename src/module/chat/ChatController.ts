@@ -124,7 +124,8 @@ export async function sendMessage(req: Request, res: Response) {
     const { receiverId: _, ...rest } = data;
     return ApiResponse.success(res, rest, result.message, 201);
   }
-  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, null, 404);
   if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
-  return ApiResponse.error(res, result.message, 500);
+  const statusCode = (result as { statusCode?: number }).statusCode;
+  return ApiResponse.error(res, result.message, null, statusCode === 403 ? 403 : 500);
 }
