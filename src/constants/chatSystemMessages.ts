@@ -11,18 +11,18 @@ export const CHAT_SYSTEM_MESSAGES = {
   PROJECT_INVITATION_REJECTED_SENT: "You rejected the project invitation",
   PROJECT_INVITATION_REJECTED_RECEIVED: "Rejected the project invitation",
 
-  PROPOSAL_SUBMITTED_SENT: "Proposal submitted for",
-  PROPOSAL_SUBMITTED_RECEIVED: "New proposal submitted for",
+  PROPOSAL_SUBMITTED_SENT: "You submitted a proposal for",
+  PROPOSAL_SUBMITTED_RECEIVED: "A new proposal received for",
 
-  PROPOSAL_ACCEPTED_SENT: "Proposal accepted",
-  PROPOSAL_ACCEPTED_RECEIVED: "Proposal accepted",
+  PROPOSAL_ACCEPTED_SENT: "You accepted the proposal",
+  PROPOSAL_ACCEPTED_RECEIVED: "Accepted the proposal",
 
-  PROPOSAL_REJECTED_SENT: "Proposal rejected",
-  PROPOSAL_REJECTED_RECEIVED: "Proposal rejected",
+  PROPOSAL_REJECTED_SENT: "You rejected the proposal",
+  PROPOSAL_REJECTED_RECEIVED: "Rejected the proposal",
 
-  PROPOSAL_WITHDRAWN_SENT: "Proposal withdrawn",
-  PROPOSAL_WITHDRAWN_RECEIVED: "Proposal withdrawn",
+  PROPOSAL_WITHDRAWN_SENT: "You withdrew the proposal",
+  PROPOSAL_WITHDRAWN_RECEIVED: "Withdrew the proposal", 
 
   REQUEST_MODIFY_SENT: "You requested changes for",
-  REQUEST_MODIFY_RECEIVED: "Founder requested changes to your proposal for"
+  REQUEST_MODIFY_RECEIVED: "Requested changes to your proposal for"
 } as const;
