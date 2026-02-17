@@ -42,6 +42,10 @@ function resolveSystemMessageContent(
     const msg = String(metadata.message).trim();
     return msg ? `${base}\n\n${msg}` : base;
   }
+  if (metadata.activityType === "proposal_status" && metadata.message) {
+    const msg = String(metadata.message).trim();
+    return msg ? `${base}\n\n${msg}` : base;
+  }
   return base;
 }
 

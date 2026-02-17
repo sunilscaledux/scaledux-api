@@ -187,7 +187,7 @@ export async function updateProposal(req: Request, res: Response) {
 export async function updateProposalStatus(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { status } = req.body;
+  const { status, reason } = req.body;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -201,7 +201,12 @@ export async function updateProposalStatus(req: Request, res: Response) {
     return ApiResponse.error(res, "Valid status (ACCEPTED or REJECTED) is required", 400);
   }
 
-  const result = await ProposalService.updateProposalStatus(userId, proposalId, status);
+  const rejectionReason = status === 'REJECTED' ? (typeof reason === 'string' ? reason.trim() : '') : undefined;
+  if (status === 'REJECTED' && !rejectionReason) {
+    return ApiResponse.error(res, "Reason for rejection is required", 400);
+  }
+
+  const result = await ProposalService.updateProposalStatus(userId, proposalId, status, rejectionReason);
 
   if (result.success) {
     return ApiResponse.success(res, null, result.message);

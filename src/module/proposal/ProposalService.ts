@@ -525,14 +525,19 @@ export class ProposalService {
   }
 
   /**
-   * Update proposal status (founder only)
+   * Update proposal status (founder only). When rejecting, reason is required and stored in remark + synced to chat.
    */
   static async updateProposalStatus(
     userId: number,
     proposalId: string,
-    status: 'ACCEPTED' | 'REJECTED'
+    status: 'ACCEPTED' | 'REJECTED',
+    rejectionReason?: string
   ): Promise<ServiceResponse> {
     try {
+      if (status === 'REJECTED' && (!rejectionReason || !rejectionReason.trim())) {
+        return { success: false, message: "Reason for rejection is required" };
+      }
+
       // Find the proposal
       const proposal = await (prisma as any).proposal.findFirst({
         where: {
@@ -542,7 +547,8 @@ export class ProposalService {
           project: {
             select: {
               id: true,
-              user_id: true
+              user_id: true,
+              project_title: true
             }
           }
         }
@@ -565,29 +571,39 @@ export class ProposalService {
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: proposal.status,
-        newStatus: status
+        newStatus: status,
+        ...(status === 'REJECTED' && rejectionReason ? { message: rejectionReason } : {})
       }, userId);
 
-      // Update the proposal status
-      await (prisma as any).proposal.update({
-        where: { id: proposal.id },
-        data: { status }
-      });
+      if (status === 'REJECTED' && rejectionReason?.trim()) {
+        await prisma.$executeRaw`
+          UPDATE scd_proposals SET status = 'REJECTED', remark = ${rejectionReason.trim()}, updated_at = NOW() WHERE id = ${proposal.id}
+        `;
+      } else {
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status }
+        });
+      }
 
       // Sync to chat: notify provider (initiator = founder)
       const sentText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
       const receivedText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
+      const metadata: Record<string, unknown> = {
+        activityType: "proposal_status",
+        proposalId: proposal.unique_id,
+        newStatus: status,
+        messageSent: sentText,
+        messageReceived: receivedText
+      };
+      if (status === 'REJECTED' && rejectionReason?.trim()) {
+        metadata.message = rejectionReason.trim();
+      }
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         "",
-        {
-          activityType: "proposal_status",
-          proposalId: proposal.unique_id,
-          newStatus: status,
-          messageSent: sentText,
-          messageReceived: receivedText
-        },
+        metadata,
         proposal.project.id,
         proposal.project.user_id
       );
