@@ -718,7 +718,8 @@ model Proposal {
   milestones            Json      @default("[]") // Array of milestone objects
   screening_answers     Json      @default("[]") // Answers to screening questions
   attachments           Json      @default("[]") // File URLs
-  
+  remark                String?   @db.Text       // Last "request changes" message from client (freelancer sees this at top)
+
   // Timestamps
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now()) @updatedAt

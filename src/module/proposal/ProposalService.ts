@@ -765,6 +765,11 @@ export class ProposalService {
       }
       await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
 
+      await (prisma as any).proposal.update({
+        where: { unique_id: proposalId },
+        data: { remark: trimmed }
+      });
+
       const projectTitle = proposal.project.project_title || "Project";
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
