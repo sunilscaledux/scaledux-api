@@ -9,6 +9,7 @@ import {
   duplicateProject,
   getMatchingServiceProviders,
   inviteProvider,
+  acceptInvitation,
   rejectInvitation,
   toggleSaveProvider,
   toggleSaveProject,
@@ -52,6 +53,7 @@ router.post("/:id/toggle-save-provider", toggleSaveProvider)
 
 // Service provider actions
 router.post("/:id/save", toggleSaveProject)
+router.post("/:id/accept-invitation", acceptInvitation)
 router.post("/:id/reject-invitation", rejectInvitation)
 
 export default router

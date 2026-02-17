@@ -360,9 +360,36 @@ export async function rejectInvitation(req: Request, res: Response) {
     let statusCode = 500;
     if (result.message === "Project not found") {
       statusCode = 404;
-    } else if (result.message === "You were not invited to this project") {
+    } else if (result.message === "You don't have a pending invitation for this project") {
       statusCode = 400;
     }
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Accept an invitation (service provider accepts founder's invitation)
+ */
+export async function acceptInvitation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await FounderProjectService.acceptInvitation(userId, projectId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    let statusCode = 500;
+    if (result.message === "Project not found") statusCode = 404;
+    else if (result.message === "You don't have a pending invitation for this project") statusCode = 400;
     return ApiResponse.error(res, result.message, statusCode);
   }
 }

@@ -6,6 +6,10 @@
 export const CHAT_SYSTEM_MESSAGES = {
   PROJECT_INVITATION_SENT: "Project invitation sent",
   PROJECT_INVITATION_RECEIVED: "New project invitation received",
+  PROJECT_INVITATION_ACCEPTED_SENT: "You accepted the project invitation",
+  PROJECT_INVITATION_ACCEPTED_RECEIVED: "Accepted the project invitation",
+  PROJECT_INVITATION_REJECTED_SENT: "You rejected the project invitation",
+  PROJECT_INVITATION_REJECTED_RECEIVED: "Rejected the project invitation",
 
   PROPOSAL_SUBMITTED_SENT: "Proposal submitted for",
   PROPOSAL_SUBMITTED_RECEIVED: "New proposal submitted for",

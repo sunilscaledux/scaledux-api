@@ -1134,6 +1134,22 @@ export class FounderProjectService {
         }
       });
 
+      const projectTitle = project.project_title || "Project";
+      await ConversationService.syncSystemMessage(
+        project.user_id,
+        userId,
+        "",
+        {
+          activityType: "project_invitation_rejected",
+          projectId: project.unique_id,
+          projectTitle,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_SENT}: ${projectTitle}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_RECEIVED}: ${projectTitle}`
+        },
+        project.id,
+        userId
+      );
+
       return {
         success: true,
         message: "Invitation rejected successfully"
@@ -1144,6 +1160,59 @@ export class FounderProjectService {
         success: false,
         message: "Failed to reject invitation"
       };
+    }
+  }
+
+  /**
+   * Accept an invitation (service provider accepts founder's invitation)
+   */
+  static async acceptInvitation(
+    userId: number,
+    projectId: string
+  ): Promise<ServiceResponse> {
+    try {
+      const project = await prisma.founderProject.findFirst({
+        where: { unique_id: projectId, deleted_at: null }
+      });
+      if (!project) {
+        return { success: false, message: "Project not found" };
+      }
+      const invite = await (prisma as any).projectInvite.findFirst({
+        where: {
+          project_id: project.id,
+          provider_id: userId,
+          status: "PENDING"
+        }
+      });
+      if (!invite) {
+        return { success: false, message: "You don't have a pending invitation for this project" };
+      }
+      await (prisma as any).projectInvite.update({
+        where: { project_id_provider_id: { project_id: project.id, provider_id: userId } },
+        data: { status: "ACCEPTED" }
+      });
+
+      const projectTitle = project.project_title || "Project";
+      await ConversationService.syncSystemMessage(
+        project.user_id,
+        userId,
+        "",
+        {
+          activityType: "project_invitation_accepted",
+          projectId: project.unique_id,
+          projectTitle,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_ACCEPTED_SENT}: ${projectTitle}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_ACCEPTED_RECEIVED}: ${projectTitle}`
+        },
+        project.id,
+        userId
+      );
+      await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
+
+      return { success: true, message: "Invitation accepted successfully" };
+    } catch (error: any) {
+      console.error("Accept Invitation Error:", error);
+      return { success: false, message: error?.message || "Failed to accept invitation" };
     }
   }
 
