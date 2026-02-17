@@ -24,5 +24,12 @@ export const CHAT_SYSTEM_MESSAGES = {
   PROPOSAL_WITHDRAWN_RECEIVED: "Withdrew the proposal", 
 
   REQUEST_MODIFY_SENT: "You requested changes for",
-  REQUEST_MODIFY_RECEIVED: "Requested changes to your proposal for"
+  REQUEST_MODIFY_RECEIVED: "Requested changes to your proposal for",
+
+  CONTRACT_SENT_SENT: "Contract sent",
+  CONTRACT_SENT_RECEIVED: "Contract sent",
+  NDA_SIGN_REQUEST: "Please sign the NDA and upload it to proceed.",
+
+  CONTRACT_SIGNED_SENT: "You signed the contract",
+  CONTRACT_SIGNED_RECEIVED: "Contract signed"
 } as const;

@@ -296,6 +296,39 @@ export async function requestModify(req: Request, res: Response) {
 }
 
 /**
+ * Update proposal NDA fields (founder only)
+ */
+export async function updateProposalNda(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const { is_nda_signed, nda_file_link, nda_sent_at, nda_signed_at, nda_signed_file_link } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const payload: Parameters<typeof ProposalService.updateProposalNda>[2] = {};
+  if (typeof is_nda_signed !== "undefined") payload.is_nda_signed = is_nda_signed === true || is_nda_signed === "true";
+  if (typeof nda_file_link !== "undefined") payload.nda_file_link = nda_file_link ?? null;
+  if (typeof nda_sent_at !== "undefined") payload.nda_sent_at = nda_sent_at ?? null;
+  if (typeof nda_signed_at !== "undefined") payload.nda_signed_at = nda_signed_at ?? null;
+  if (typeof nda_signed_file_link !== "undefined") payload.nda_signed_file_link = nda_signed_file_link ?? null;
+
+  const result = await ProposalService.updateProposalNda(userId, proposalId, payload);
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("permission") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Get proposal activities (founder or proposal provider)
  */
 export async function getProposalActivities(req: Request, res: Response) {

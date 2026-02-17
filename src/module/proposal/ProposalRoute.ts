@@ -6,6 +6,7 @@ import {
   getProposalById,
   updateProposal,
   updateProposalStatus,
+  updateProposalNda,
   withdrawProposal,
   checkProposalStatus,
   requestModify,
@@ -33,6 +34,19 @@ router.post(
   handleMulterError
 );
 
+// NDA document upload (founder, for send-offer flow)
+router.post(
+  "/upload-nda",
+  FileUpload({
+    uploadPath: "proposals/nda",
+    fileFilter: "document",
+    maxSize: 5,
+    maxFiles: 1
+  }).array("files"),
+  uploadFile,
+  handleMulterError
+);
+
 // Service provider routes
 router.post("/", createProposal); // Submit a proposal
 router.get("/", getMyProposals); // Get my proposals
@@ -46,6 +60,8 @@ router.get("/:id", getProposalById); // Get proposal details
 
 // Status update (founder) - must be before PUT /:id
 router.put("/:id/status", updateProposalStatus);
+// NDA update (founder)
+router.patch("/:id/nda", updateProposalNda);
 // Request modify (founder)
 router.post("/:id/request-modify", requestModify);
 // Get activities (founder or provider)

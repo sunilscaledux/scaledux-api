@@ -622,6 +622,114 @@ export class ProposalService {
   }
 
   /**
+   */
+  static async updateProposalNda(
+    userId: number,
+    proposalId: string,
+    data: {
+      is_nda_signed?: boolean;
+      nda_file_link?: string | null;
+      nda_sent_at?: string | Date | null;
+      nda_signed_at?: string | Date | null;
+      nda_signed_file_link?: string | null;
+    }
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: {
+            select: { id: true, user_id: true, project_title: true, unique_id: true }
+          }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      const isFounder = proposal.project.user_id === userId;
+      const isProvider = proposal.provider_id === userId;
+      if (!isFounder && !isProvider) {
+        return { success: false, message: "You don't have permission to update this proposal" };
+      }
+
+      const updateData: Record<string, unknown> = {};
+
+      if (isFounder) {
+        if (data.is_nda_signed !== undefined) updateData.is_nda_signed = data.is_nda_signed;
+        if (data.nda_file_link !== undefined) updateData.nda_file_link = data.nda_file_link ?? null;
+        if (data.nda_sent_at !== undefined) updateData.nda_sent_at = data.nda_sent_at ? new Date(data.nda_sent_at) : null;
+        if (data.nda_signed_at !== undefined) updateData.nda_signed_at = data.nda_signed_at ? new Date(data.nda_signed_at) : null;
+        if (data.nda_file_link && !proposal.nda_sent_at) {
+          updateData.nda_sent_at = new Date();
+        }
+      }
+
+      if (isProvider) {
+        if (data.is_nda_signed !== undefined) updateData.is_nda_signed = data.is_nda_signed;
+        if (data.nda_signed_at !== undefined) updateData.nda_signed_at = data.nda_signed_at ? new Date(data.nda_signed_at) : null;
+        if (data.nda_signed_file_link !== undefined) updateData.nda_signed_file_link = data.nda_signed_file_link ?? null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return { success: true, message: "Nothing to update" };
+      }
+
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: updateData
+      });
+
+      if (isFounder && (data.nda_file_link !== undefined || data.is_nda_signed !== undefined)) {
+        const projectTitle = proposal.project.project_title || "Project";
+        const receivedMsg = data.is_nda_signed
+          ? CHAT_SYSTEM_MESSAGES.CONTRACT_SENT_RECEIVED
+          : `${CHAT_SYSTEM_MESSAGES.CONTRACT_SENT_RECEIVED} ${projectTitle}. ${CHAT_SYSTEM_MESSAGES.NDA_SIGN_REQUEST}`;
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          {
+            activityType: "contract_sent",
+            proposalId: proposal.unique_id,
+            projectId: proposal.project.unique_id,
+            projectTitle: proposal.project.project_title,
+            messageSent: CHAT_SYSTEM_MESSAGES.CONTRACT_SENT_SENT,
+            messageReceived: receivedMsg
+          },
+          proposal.project.id,
+          userId
+        );
+      }
+
+      if (isProvider && (data.is_nda_signed === true || data.nda_signed_file_link)) {
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          {
+            activityType: "contract_signed",
+            proposalId: proposal.unique_id,
+            projectId: proposal.project.unique_id,
+            projectTitle: proposal.project.project_title,
+            messageSent: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_RECEIVED
+          },
+          proposal.project.id,
+          userId
+        );
+      }
+
+      return { success: true, message: "NDA details updated successfully" };
+    } catch (error: any) {
+      console.error("Update Proposal NDA Error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to update NDA details"
+      };
+    }
+  }
+
+  /**
    * Withdraw a proposal (service provider only)
    */
   static async withdrawProposal(
