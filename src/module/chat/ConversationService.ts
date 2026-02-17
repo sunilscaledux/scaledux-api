@@ -143,6 +143,44 @@ export class ConversationService {
   }
 
   /**
+   * Find a conversation between current user and another user (by other's unique_id).
+   * Looks up by user primary keys (user1_id, user2_id). Returns any conversation between
+   * the two users (with or without project_id) so proposal/context conversations are found.
+   * Returns conversation unique_id if found, and otherUserId (id) so frontend can open new-chat when not found.
+   */
+  static async findConversationByOtherUserUniqueId(
+    currentUserId: number,
+    otherUserUniqueId: string
+  ): Promise<ServiceResponse<{ conversationUniqueId?: string; otherUserId: number }>> {
+    try {
+      const other = await (prisma as any).user.findFirst({
+        where: { unique_id: otherUserUniqueId },
+        select: { id: true }
+      });
+      if (!other) return { success: false, message: "User not found" };
+      const otherUserId = other.id as number;
+      if (otherUserId === currentUserId) return { success: false, message: "User not found" };
+
+      const [u1, u2] = currentUserId <= otherUserId ? [currentUserId, otherUserId] : [otherUserId, currentUserId];
+      const conv = await (prisma as any).conversation.findFirst({
+        where: { user1_id: u1, user2_id: u2 },
+        orderBy: { updated_at: "desc" }
+      });
+      return {
+        success: true,
+        message: "OK",
+        data: {
+          ...(conv ? { conversationUniqueId: conv.unique_id } : {}),
+          otherUserId
+        }
+      };
+    } catch (error: any) {
+      console.error("findConversationByOtherUserUniqueId Error:", error);
+      return { success: false, message: error.message || "Failed to find conversation" };
+    }
+  }
+
+  /**
    * Search users by name or email for starting a chat. Excludes current user. Returns at most 15.
    */
   static async searchUsersForChat(

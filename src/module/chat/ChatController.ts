@@ -50,6 +50,17 @@ export async function startConversation(req: Request, res: Response) {
   return ApiResponse.success(res, { unique_id: result.data.unique_id, id: result.data.id }, result.message, 201);
 }
 
+export async function findConversationByUser(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  const otherUserUniqueId = typeof req.query.otherUserUniqueId === "string" ? req.query.otherUserUniqueId.trim() : "";
+  if (!otherUserUniqueId) return ApiResponse.error(res, "otherUserUniqueId is required", 400);
+  const result = await ConversationService.findConversationByOtherUserUniqueId(userId, otherUserUniqueId);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  if (result.message === "User not found") return ApiResponse.error(res, result.message, 404);
+  return ApiResponse.error(res, result.message || "Failed to find conversation", 500);
+}
+
 export async function getConversation(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);
