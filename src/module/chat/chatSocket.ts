@@ -49,13 +49,15 @@ export function emitNewMessageToBothUsersWithIO(
  * Notify socket server via HTTP when API runs in a separate process (no Socket.IO).
  */
 async function notifySocketServerViaHttp(
-  type: "new_message" | "new_message_both",
+  type: "new_message" | "new_message_both" | "conversation_status",
   body: {
     conversationId: string;
-    message: MessagePayload;
+    message?: MessagePayload;
     receiverId?: number;
     userId1?: number;
     userId2?: number;
+    userId?: number;
+    status?: string;
   }
 ) {
   try {
@@ -97,5 +99,20 @@ export function emitNewMessageToBothUsers(
     message,
     userId1,
     userId2
+  });
+}
+
+/**
+ * Emit conversation status to a specific user so their client can refetch and update UI (disable/enable input).
+ */
+export function emitConversationStatusToUser(
+  userId: number,
+  conversationUniqueId: string,
+  status: string
+) {
+  notifySocketServerViaHttp("conversation_status", {
+    conversationId: conversationUniqueId,
+    userId,
+    status
   });
 }

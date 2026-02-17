@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from "@utils/General";
-import { emitNewMessageToBothUsers } from "./chatSocket";
+import { emitNewMessageToBothUsers, emitConversationStatusToUser } from "./chatSocket";
 
 function toProfileImageUrl(profileImage: string | null | undefined): string | null {
   if (!profileImage) return null;
@@ -105,6 +105,32 @@ export class ConversationService {
       where: { user1_id: u1, user2_id: u2, project_id: projectId },
       data: { status: "ACCEPTED" }
     });
+  }
+
+  /**
+   * Get minimal user info by id for "new chat" header (no conversation created). Returns 404 if not found or if userId is current user.
+   */
+  static async getChatUserById(
+    userId: number,
+    otherUserId: number
+  ): Promise<ServiceResponse<{ id: number; unique_id: string | null; first_name: string; last_name: string | null; profile_image: string | null }>> {
+    if (otherUserId === userId) return { success: false, message: "User not found" };
+    const u = await (prisma as any).user.findFirst({
+      where: { id: otherUserId },
+      select: { id: true, unique_id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } }
+    });
+    if (!u) return { success: false, message: "User not found" };
+    return {
+      success: true,
+      message: "OK",
+      data: {
+        id: u.id,
+        unique_id: u.unique_id ?? null,
+        first_name: u.first_name,
+        last_name: u.last_name ?? null,
+        profile_image: toProfileImageUrl(u.personalInfo?.profileImage)
+      }
+    };
   }
 
   /**
@@ -500,7 +526,6 @@ export class ConversationService {
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
-      // Update conversation: NOT_ACCEPTED when first USER message; ACCEPTED when receiver replies (sender !== first message sender).
       let statusUpdate: string | undefined;
       if (firstUserMessage == null) statusUpdate = "NOT_ACCEPTED";
       else if (msg.sender_id !== firstUserMessage.sender_id) statusUpdate = "ACCEPTED";
@@ -511,7 +536,14 @@ export class ConversationService {
           ...(statusUpdate != null ? { status: statusUpdate } : {})
         }
       });
-
+      if (statusUpdate != null) {
+        if (statusUpdate === "NOT_ACCEPTED") {
+          emitConversationStatusToUser(userId, conv.data.unique_id, statusUpdate);
+        } else if (statusUpdate === "ACCEPTED" && convStatus === "NOT_ACCEPTED" && firstUserMessage?.sender_id != null) {
+          emitConversationStatusToUser(firstUserMessage.sender_id, conv.data.unique_id, statusUpdate);
+        }
+      }
+      
       const receiverId = conv.data.otherParticipant.id;
       const senderPayload = msg.sender
         ? {

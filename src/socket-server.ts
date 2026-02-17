@@ -32,20 +32,34 @@ app.post('/emit', (req, res) => {
     res.status(401).json({ ok: false, error: 'Unauthorized' });
     return;
   }
-  const { type, conversationId, message, receiverId, userId1, userId2 } = req.body || {};
-  if (!type || !conversationId || !message) {
-    res.status(400).json({ ok: false, error: 'Missing type, conversationId, or message' });
+  const { type, conversationId, message, receiverId, userId1, userId2, userId, status } = req.body || {};
+  if (!type || !conversationId) {
+    res.status(400).json({ ok: false, error: 'Missing type or conversationId' });
     return;
   }
   try {
     if (type === 'new_message') {
+      if (!message) {
+        res.status(400).json({ ok: false, error: 'message required for new_message' });
+        return;
+      }
       emitNewMessageWithIO(io, conversationId, message, receiverId);
     } else if (type === 'new_message_both') {
+      if (!message) {
+        res.status(400).json({ ok: false, error: 'message required for new_message_both' });
+        return;
+      }
       if (typeof userId1 !== 'number' || typeof userId2 !== 'number') {
         res.status(400).json({ ok: false, error: 'userId1 and userId2 required for new_message_both' });
         return;
       }
       emitNewMessageToBothUsersWithIO(io, conversationId, message, userId1, userId2);
+    } else if (type === 'conversation_status') {
+      if (typeof userId !== 'number' || !status) {
+        res.status(400).json({ ok: false, error: 'userId and status required for conversation_status' });
+        return;
+      }
+      io.to(`user:${userId}`).emit('conversation:status_updated', { conversationId, status });
     } else {
       res.status(400).json({ ok: false, error: 'Unknown type' });
       return;

@@ -26,6 +26,16 @@ export async function searchUsersForChat(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, 500);
 }
 
+export async function getChatUser(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  const otherUserId = req.params.userId != null ? parseInt(String(req.params.userId), 10) : NaN;
+  if (!Number.isInteger(otherUserId)) return ApiResponse.error(res, "User ID required", 400);
+  const result = await ConversationService.getChatUserById(userId, otherUserId);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  return ApiResponse.error(res, result.message || "User not found", 404);
+}
+
 export async function startConversation(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
