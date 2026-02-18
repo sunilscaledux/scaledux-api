@@ -46,6 +46,9 @@ function resolveSystemMessageContent(
     const msg = String(metadata.message).trim();
     return msg ? `${base}\n\n${msg}` : base;
   }
+  if (metadata.activityType === "payment_release" && metadata.projectTitle) {
+    return `${base} ${String(metadata.projectTitle).trim()}`.trim();
+  }
   return base;
 }
 

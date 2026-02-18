@@ -31,5 +31,8 @@ export const CHAT_SYSTEM_MESSAGES = {
   NDA_SIGN_REQUEST: "Please sign the NDA and upload it to proceed.",
 
   CONTRACT_SIGNED_SENT: "You signed the contract",
-  CONTRACT_SIGNED_RECEIVED: "Contract signed"
+  CONTRACT_SIGNED_RECEIVED: "Contract signed",
+
+  PAYMENT_RELEASE_SENT: "Payment for",
+  PAYMENT_RELEASE_RECEIVED: "Payment for"
 } as const;

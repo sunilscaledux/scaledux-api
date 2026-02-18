@@ -2,6 +2,9 @@ import { Request, Response } from "express";
 import { BillingService } from "./BillingService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getStringParam } from "@utils/requestHelpers";
+import { ConversationService } from "@module/chat/ConversationService";
+import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
+import { prisma } from "@services/prismaService";
 
 export class BillingController {
   // Create Razorpay order for card verification
@@ -27,7 +30,7 @@ export class BillingController {
     }
   }
 
-  // Verify Razorpay payment and save payment method
+  // Verify Razorpay payment and save payment method (or record subject-based payment when subjectType + subjectId sent)
   static async verifyAndSavePaymentMethod(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
@@ -35,7 +38,7 @@ export class BillingController {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, proposalId, subjectType, subjectId } = req.body;
 
       // Verify Razorpay signature
       const isValid = BillingService.verifyPaymentSignature({
@@ -48,14 +51,24 @@ export class BillingController {
         return ApiResponse.error(res, "Invalid payment signature", 400);
       }
 
-      // Fetch real card details from Razorpay
+      // Subject-based payment: route by subject type (Proposal, etc.)
+      const subjType = (subjectType ?? (proposalId ? "Proposal" : null)) as string | null;
+      if (subjType === "Proposal" && typeof proposalId === "string" && proposalId.trim()) {
+        const handled = await BillingController.handleProposalPayment(res, userId, proposalId.trim());
+        if (handled) return;
+      }
+      if (subjType && subjectId != null) {
+        const handled = await BillingController.handlePaymentBySubjectType(res, userId, subjType, subjectId);
+        if (handled) return;
+      }
+
+      // Card verification flow: fetch card details and save payment method
       const cardDetails = await BillingService.fetchPaymentDetails(razorpayPaymentId);
-      
+
       if (!cardDetails) {
         return ApiResponse.error(res, "Failed to fetch card details from Razorpay", 500);
       }
 
-      // Create Razorpay customer if not exists (for future charges)
       let customerId = cardDetails.customerId;
       if (!customerId && cardDetails.email && cardDetails.contact) {
         customerId = await BillingService.createOrGetCustomer(
@@ -66,12 +79,11 @@ export class BillingController {
         );
       }
 
-      // Prepare payment method data with real card details and token
       const paymentMethodData = {
         paymentType: 'card' as const,
         razorpayCustomerId: customerId || '',
         razorpayPaymentId: razorpayPaymentId,
-        cardToken: cardDetails.cardToken, // Token for future charges
+        cardToken: cardDetails.cardToken,
         cardBrand: cardDetails.cardBrand,
         lastFourDigits: cardDetails.lastFourDigits,
         cardHolderName: cardDetails.cardHolderName,
@@ -81,13 +93,87 @@ export class BillingController {
         isDefault: false
       };
 
-      // Save payment method after successful verification
       const result = await BillingService.savePaymentMethod(userId.toString(), paymentMethodData);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
       console.error("Error verifying and saving payment method:", error);
       return ApiResponse.error(res, error.message || "Failed to verify and save payment method");
     }
+  }
+
+  /**
+   * Handle payment for subject type "Proposal": load proposal, validate, record one billing row, sync chat.
+   * Returns true if handled (response sent), false otherwise.
+   */
+  private static async handleProposalPayment(res: Response, userId: number, proposalId: string): Promise<boolean> {
+    const proposal = await (prisma as any).proposal.findFirst({
+      where: { unique_id: proposalId },
+      include: {
+        project: { select: { id: true, user_id: true, project_title: true } }
+      }
+    });
+    if (!proposal) {
+      ApiResponse.error(res, "Proposal not found", 404);
+      return true;
+    }
+    if (proposal.project.user_id !== userId) {
+      ApiResponse.error(res, "You are not the project owner for this proposal", 403);
+      return true;
+    }
+    const amount = Number(proposal.proposed_amount) || 0;
+    if (amount <= 0) {
+      ApiResponse.error(res, "Invalid proposal amount", 400);
+      return true;
+    }
+
+    const projectTitle = proposal.project.project_title || "project";
+    await BillingService.recordPayment({
+      actorId: proposal.project.user_id,
+      fromId: proposal.project.user_id,
+      toId: proposal.provider_id,
+      subjectType: "Proposal",
+      subjectId: proposal.id,
+      amount,
+      description: `Payment for ${projectTitle}`
+    });
+
+    const messageContent = `Payment for ${projectTitle}`;
+    const metadata: Record<string, unknown> = {
+      activityType: "payment_release",
+      proposalId: proposal.unique_id,
+      projectTitle,
+      projectId: proposal.project.id,
+      messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_SENT,
+      messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_RECEIVED
+    };
+    await ConversationService.syncSystemMessage(
+      proposal.project.user_id,
+      proposal.provider_id,
+      messageContent,
+      metadata,
+      proposal.project.id,
+      proposal.project.user_id
+    );
+
+    ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
+    return true;
+  }
+
+  /**
+   * Handle payment for other subject types (extend here for future types).
+   * Returns true if handled, false if not supported.
+   */
+  private static async handlePaymentBySubjectType(
+    res: Response,
+    _userId: number,
+    subjectType: string,
+    _subjectId: unknown
+  ): Promise<boolean> {
+    if (subjectType !== "Proposal") {
+      // Future: case "Subscription", "ServicePackage", etc.
+      return false;
+    }
+    return false;
   }
 
   // Get user's payment methods

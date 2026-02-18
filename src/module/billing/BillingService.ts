@@ -256,6 +256,49 @@ export class BillingService {
     }
   }
 
+  /**
+   * Record a payment: one billing row (from payer to payee). Meta stores subject_type and subject_id
+   * for reuse across purposes (Proposal, etc.). Billing history shows it to both sides via from_id/to_id.
+   */
+  static async recordPayment(params: {
+    actorId: number;
+    fromId: number;
+    toId: number;
+    subjectType: string;
+    subjectId: number;
+    amount: number;
+    description: string;
+  }) {
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description } = params;
+    const currencyId = 1;
+
+    const row = await prisma.billingTransaction.create({
+      data: {
+        actor_type: 'User',
+        actor_id: actorId,
+        from_type: 'User',
+        from_id: fromId,
+        to_type: 'User',
+        to_id: toId,
+        subject_type: subjectType,
+        subject_id: subjectId,
+        amount,
+        currency_id: currencyId,
+        type: 'payment',
+        status: 'completed',
+        description
+      }
+    });
+    await prisma.billingTransactionMeta.createMany({
+      data: [
+        { transaction_id: row.id, key: 'subject_type', value: subjectType },
+        { transaction_id: row.id, key: 'subject_id', value: String(subjectId) }
+      ]
+    });
+
+    return { success: true, data: { transactionId: row.id } };
+  }
+
   // Get user's payment methods
   static async getPaymentMethods(userId: string) {
     const userIdNum = parseInt(userId);
@@ -439,30 +482,32 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // Build where clause with date range and search filters
-    const whereClause: any = {
-      actor_type: 'User',
-      from_id: userIdNum
+    // Show transactions where current user is sender (from_id) or receiver (to_id)
+    const baseWhere: any = {
+      OR: [{ from_id: userIdNum }, { to_id: userIdNum }]
     };
-
     if (fromDate || toDate) {
-      whereClause.created_at = {};
-      if (fromDate) {
-        whereClause.created_at.gte = new Date(fromDate);
-      }
+      baseWhere.created_at = {};
+      if (fromDate) baseWhere.created_at.gte = new Date(fromDate);
       if (toDate) {
         const endDate = new Date(toDate);
         endDate.setHours(23, 59, 59, 999);
-        whereClause.created_at.lte = endDate;
+        baseWhere.created_at.lte = endDate;
       }
     }
-
-    if (search) {
-      whereClause.OR = [
-        { unique_id: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ];
-    }
+    const whereClause: any = search
+      ? {
+          AND: [
+            baseWhere,
+            {
+              OR: [
+                { unique_id: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } }
+              ]
+            }
+          ]
+        }
+      : baseWhere;
 
     const [transactions, total] = await Promise.all([
       prisma.billingTransaction.findMany({
@@ -482,18 +527,22 @@ export class BillingService {
     return {
       success: true,
       data: {
-        transactions: transactions.map((t: any) => ({
-          id: t.id,
-          uniqueId: t.unique_id,
-          amount: t.amount,
-          currency: t.currency?.code || 'INR',
-          currencySymbol: t.currency?.symbol || '₹',
-          type: t.type,
-          status: t.status,
-          description: t.description,
-          invoiceUrl: t.invoice_url,
-          createdAt: t.created_at
-        })),
+        transactions: transactions.map((t: any) => {
+          const isCredit = t.to_id === userIdNum;
+          return {
+            id: t.id,
+            uniqueId: t.unique_id,
+            amount: t.amount,
+            currency: t.currency?.code || 'INR',
+            currencySymbol: t.currency?.symbol || '₹',
+            type: t.type,
+            status: t.status,
+            description: t.description,
+            invoiceUrl: t.invoice_url,
+            createdAt: t.created_at,
+            direction: isCredit ? 'credit' : 'debit'
+          };
+        }),
         pagination: {
           page,
           limit,
@@ -508,19 +557,19 @@ export class BillingService {
   static async getUserBalance(userId: string) {
     const userIdNum = parseInt(userId);
 
-    // Get balance in USD (stored currency)
-    const result = await prisma.billingTransaction.aggregate({
-      where: {
-        actor_type: 'User',
-        actor_id: userIdNum,
-        status: 'completed'
-      },
-      _sum: {
-        amount: true
-      }
-    });
+    // Credit = received (to_id = me), debit = sent (from_id = me). Balance = credits - debits.
+    const [credits, debits] = await Promise.all([
+      prisma.billingTransaction.aggregate({
+        where: { to_id: userIdNum, status: 'completed' },
+        _sum: { amount: true }
+      }),
+      prisma.billingTransaction.aggregate({
+        where: { from_id: userIdNum, status: 'completed' },
+        _sum: { amount: true }
+      })
+    ]);
 
-    const balanceInUSD = Number(result._sum?.amount || 0);
+    const balanceInUSD = Number(credits._sum?.amount || 0) - Number(debits._sum?.amount || 0);
     
     // Convert to user's currency using utility function
     const { amount: convertedBalance, currency, currencySymbol } = await convertToUserCurrency(userIdNum, balanceInUSD);
