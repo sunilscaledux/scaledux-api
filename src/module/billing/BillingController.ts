@@ -38,7 +38,7 @@ export class BillingController {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, proposalId, subjectType, subjectId } = req.body;
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, proposalId, subjectType, subjectId, milestoneIndex } = req.body;
 
       // Verify Razorpay signature
       const isValid = BillingService.verifyPaymentSignature({
@@ -49,6 +49,13 @@ export class BillingController {
 
       if (!isValid) {
         return ApiResponse.error(res, "Invalid payment signature", 400);
+      }
+
+      // Milestone payment: proposalId + milestoneIndex (0-based)
+      const mi = milestoneIndex != null ? parseInt(milestoneIndex, 10) : NaN;
+      if (typeof proposalId === "string" && proposalId.trim() && Number.isFinite(mi) && mi >= 0) {
+        const handled = await BillingController.handleMilestonePayment(res, userId, proposalId.trim(), mi);
+        if (handled) return;
       }
 
       // Subject-based payment: route by subject type (Proposal, etc.)
@@ -166,6 +173,94 @@ export class BillingController {
     });
 
     ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
+    return true;
+  }
+
+  /**
+   * Handle milestone payment: pay one milestone; set HIRED on first milestone pay.
+   * Second milestone Pay is only allowed after first is completed.
+   */
+  private static async handleMilestonePayment(
+    res: Response,
+    userId: number,
+    proposalId: string,
+    milestoneIndex: number
+  ): Promise<boolean> {
+    const proposal = await (prisma as any).proposal.findFirst({
+      where: { unique_id: proposalId },
+      include: {
+        project: { select: { id: true, user_id: true, project_title: true } }
+      }
+    });
+    if (!proposal) {
+      ApiResponse.error(res, "Proposal not found", 404);
+      return true;
+    }
+    if (proposal.project.user_id !== userId) {
+      ApiResponse.error(res, "You are not the project owner for this proposal", 403);
+      return true;
+    }
+    if (proposal.status !== "OFFER_ACCEPTED" && proposal.status !== "HIRED") {
+      ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (OFFER_ACCEPTED) or already hired (HIRED).", 400);
+      return true;
+    }
+    const milestones = Array.isArray(proposal.milestones) ? proposal.milestones : [];
+    if (milestoneIndex < 0 || milestoneIndex >= milestones.length) {
+      ApiResponse.error(res, "Invalid milestone index", 400);
+      return true;
+    }
+    const paidIndexes = await BillingService.getPaidMilestoneIndexes(proposal.id);
+    if (paidIndexes.length !== milestoneIndex) {
+      ApiResponse.error(res, "You must complete the previous milestone payment before paying this one.", 400);
+      return true;
+    }
+    const milestone = milestones[milestoneIndex];
+    const amount = Number(milestone?.amount ?? 0) || 0;
+    if (amount <= 0) {
+      ApiResponse.error(res, "Invalid milestone amount", 400);
+      return true;
+    }
+
+    const projectTitle = proposal.project.project_title || "project";
+    const milestoneTitle = milestone?.title || milestone?.description || `Milestone ${milestoneIndex + 1}`;
+    await BillingService.recordPayment({
+      actorId: proposal.project.user_id,
+      fromId: proposal.project.user_id,
+      toId: proposal.provider_id,
+      subjectType: "Proposal",
+      subjectId: proposal.id,
+      amount,
+      description: `Payment for ${projectTitle}: ${milestoneTitle}`,
+      meta: { milestone_index: String(milestoneIndex) }
+    });
+
+    const messageContent = `Payment for ${projectTitle}: ${milestoneTitle}`;
+    const metadata: Record<string, unknown> = {
+      activityType: "payment_release",
+      proposalId: proposal.unique_id,
+      projectTitle,
+      projectId: proposal.project.id,
+      milestoneIndex,
+      messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_SENT,
+      messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_RECEIVED
+    };
+    await ConversationService.syncSystemMessage(
+      proposal.project.user_id,
+      proposal.provider_id,
+      messageContent,
+      metadata,
+      proposal.project.id,
+      proposal.project.user_id
+    );
+
+    if (milestoneIndex === 0) {
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { status: "HIRED" }
+      });
+    }
+
+    ApiResponse.success(res, { proposalPayment: true, milestoneIndex }, "Milestone payment recorded");
     return true;
   }
 

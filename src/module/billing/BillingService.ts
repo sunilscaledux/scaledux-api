@@ -268,8 +268,9 @@ export class BillingService {
     subjectId: number;
     amount: number;
     description: string;
+    meta?: Record<string, string>;
   }) {
-    const { actorId, fromId, toId, subjectType, subjectId, amount, description } = params;
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta } = params;
     const currencyId = 1;
 
     const row = await prisma.billingTransaction.create({
@@ -289,14 +290,43 @@ export class BillingService {
         description
       }
     });
-    await prisma.billingTransactionMeta.createMany({
-      data: [
-        { transaction_id: row.id, key: 'subject_type', value: subjectType },
-        { transaction_id: row.id, key: 'subject_id', value: String(subjectId) }
-      ]
-    });
+    const metaRows: { transaction_id: number; key: string; value: string }[] = [
+      { transaction_id: row.id, key: 'subject_type', value: subjectType },
+      { transaction_id: row.id, key: 'subject_id', value: String(subjectId) }
+    ];
+    if (meta) {
+      for (const [k, v] of Object.entries(meta)) {
+        metaRows.push({ transaction_id: row.id, key: k, value: String(v) });
+      }
+    }
+    await prisma.billingTransactionMeta.createMany({ data: metaRows });
 
     return { success: true, data: { transactionId: row.id } };
+  }
+
+  /** Get paid milestone indices for a proposal (0-based). */
+  static async getPaidMilestoneIndexes(proposalId: number): Promise<number[]> {
+    const txns = await prisma.billingTransaction.findMany({
+      where: {
+        subject_type: 'Proposal',
+        subject_id: proposalId
+      },
+      include: {
+        meta: {
+          where: { key: 'milestone_index' },
+          take: 1
+        }
+      }
+    });
+    const indexes: number[] = [];
+    for (const t of txns) {
+      const mi = t.meta?.[0]?.value;
+      if (mi != null && mi !== '') {
+        const n = parseInt(mi, 10);
+        if (Number.isFinite(n) && n >= 0) indexes.push(n);
+      }
+    }
+    return [...new Set(indexes)].sort((a, b) => a - b);
   }
 
   // Get user's payment methods

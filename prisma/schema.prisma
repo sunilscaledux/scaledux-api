@@ -55,6 +55,7 @@ model User {
   conversationsAsUser1        Conversation[] @relation("ConversationUser1")
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
+  milestoneDocumentUploads     MilestoneDocument[] @relation("MilestoneDocumentUploads")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -656,6 +657,7 @@ model FounderProject {
   invites               ProjectInvite[]
   savedByUsers          SavedProject[]
   proposals             Proposal[]
+  milestones            Milestone[]
 
   @@index([user_id, status])
   @@index([status])
@@ -730,12 +732,58 @@ model Proposal {
   // Relations
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   provider              User @relation("UserProposals", fields: [provider_id], references: [id], onDelete: Cascade)
+  milestonesRows       Milestone[]
 
   @@unique([project_id, provider_id]) // One proposal per provider per project
   @@index([project_id])
   @@index([provider_id])
   @@index([status])
   @@map("scd_proposals")
+}
+
+// Milestones linked to project and proposal (enables per-milestone docs and status)
+model Milestone {
+  id               Int       @id @default(autoincrement())
+  unique_id        String    @unique @default(cuid())
+  project_id       Int
+  proposal_id      Int
+  order_index      Int       @default(0)   // 0-based order within proposal
+  title            String    @db.VarChar(255)
+  description      String?   @db.Text
+  deliverables     Json      @default("[]") // Array of { deliverable: string } - what freelancer must deliver
+  amount           Decimal   @db.Decimal(15, 2)
+  due_date         DateTime? @db.Date
+  status           String    @default("PENDING") @db.VarChar(20) // PENDING, IN_PROGRESS, COMPLETED, PAID
+  submitted_at     DateTime? @db.Timestamptz   // When freelancer submitted (files + remark)
+  submitted_remark String?   @db.Text          // Freelancer remark on submission
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now()) @updatedAt
+
+  project   FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  proposal  Proposal        @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
+  documents MilestoneDocument[]
+
+  @@unique([proposal_id, order_index])
+  @@index([project_id])
+  @@index([proposal_id])
+  @@map("scd_milestones")
+}
+
+// Freelancer uploads: multiple docs per milestone
+model MilestoneDocument {
+  id                  Int      @id @default(autoincrement())
+  unique_id           String   @unique @default(cuid())
+  milestone_id        Int
+  file_url            String   @db.Text
+  uploaded_by_user_id Int      // Freelancer (provider) who uploaded
+  created_at          DateTime @default(now())
+
+  milestone   Milestone @relation(fields: [milestone_id], references: [id], onDelete: Cascade)
+  uploadedBy  User      @relation("MilestoneDocumentUploads", fields: [uploaded_by_user_id], references: [id], onDelete: Cascade)
+
+  @@index([milestone_id])
+  @@index([uploaded_by_user_id])
+  @@map("scd_milestone_documents")
 }
 
 // Chat: one conversation per user pair (user1, user2)

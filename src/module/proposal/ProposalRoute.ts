@@ -13,6 +13,7 @@ import {
   requestModify,
   getProposalActivities
 } from "./ProposalController";
+import { addMilestoneDocument, submitMilestone } from "./MilestoneController";
 import { authenticateToken } from "@middleware/auth";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
@@ -48,6 +49,19 @@ router.post(
   handleMulterError
 );
 
+// Milestone deliverable upload (freelancer): max 5 files per milestone, each up to 500MB
+router.post(
+  "/upload-milestone-document",
+  FileUpload({
+    uploadPath: "proposals/milestone-documents",
+    fileFilter: "document",
+    maxSize: 500,
+    maxFiles: 1
+  }).array("files"),
+  uploadFile,
+  handleMulterError
+);
+
 // Service provider routes
 router.post("/", createProposal); // Submit a proposal
 router.get("/", getMyProposals); // Get my proposals
@@ -55,6 +69,10 @@ router.get("/check/:projectId", checkProposalStatus); // Check if already submit
 
 // Founder routes
 router.get("/project/:projectId", getProposalsByProject); // Get proposals for a project
+
+// Milestone documents (freelancer: upload doc for a milestone) - must be before /:id
+router.post("/milestones/:milestoneId/documents", addMilestoneDocument);
+router.post("/milestones/:milestoneId/submit", submitMilestone);
 
 // Shared routes
 router.get("/:id", getProposalById); // Get proposal details

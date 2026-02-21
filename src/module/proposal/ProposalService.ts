@@ -4,6 +4,7 @@ import { getFileUrl } from '@utils/General';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
+import { BillingService } from '@module/billing/BillingService';
 
 /** NDA + offer data stored in proposal.nda (single JSON column) */
 export interface ProposalNdaData {
@@ -128,6 +129,8 @@ export class ProposalService {
         }
       });
 
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, data.milestones);
+
       // Check if user was invited to this project and update status to ACCEPTED
       const invite = await (prisma as any).projectInvite.findFirst({
         where: {
@@ -182,6 +185,59 @@ export class ProposalService {
         success: false,
         message: error.message || "Failed to submit proposal"
       };
+    }
+  }
+
+  /**
+   * Sync proposal milestones JSON to Milestone table (for per-milestone docs and status).
+   * Upserts by (proposal_id, order_index). Call after create/update proposal.
+   */
+  static async syncProposalMilestonesToTable(
+    proposalId: number,
+    projectId: number,
+    milestones: any[]
+  ): Promise<void> {
+    if (!Array.isArray(milestones)) return;
+    const prismaAny = prisma as any;
+    if (typeof prismaAny.milestone?.upsert !== 'function') return; // table may not exist yet
+    for (let i = 0; i < milestones.length; i++) {
+      const m = milestones[i];
+      const title = m?.title ?? m?.milestoneDescription ?? `Milestone ${i + 1}`;
+      const amount = Number(m?.amount ?? m?.amount?.amount ?? 0) || 0;
+      const dueDate = m?.dueDate != null ? new Date(m.dueDate) : null;
+      const description = m?.description ?? m?.milestoneDescription ?? null;
+      const deliverables = Array.isArray(m?.deliverables)
+        ? m.deliverables
+        : m?.deliverable != null
+          ? [{ deliverable: String(m.deliverable) }]
+          : [];
+      const row = {
+        project_id: projectId,
+        proposal_id: proposalId,
+        order_index: i,
+        title: String(title).slice(0, 255),
+        description: description != null ? String(description) : null,
+        deliverables,
+        amount,
+        due_date: dueDate
+      };
+      try {
+        await prismaAny.milestone.upsert({
+          where: {
+            proposal_id_order_index: { proposal_id: proposalId, order_index: i }
+          },
+          create: { ...row, status: 'PENDING' },
+          update: {
+            title: row.title,
+            description: row.description,
+            deliverables: row.deliverables,
+            amount: row.amount,
+            due_date: row.due_date
+          }
+        });
+      } catch (_) {
+        // ignore if table missing or constraint name differs
+      }
     }
   }
 
@@ -402,6 +458,10 @@ export class ProposalService {
           unique_id: proposalId
         },
         include: {
+          milestonesRows: {
+            orderBy: { order_index: 'asc' },
+            include: { documents: true }
+          },
           project: {
             select: {
               id: true,
@@ -488,6 +548,14 @@ export class ProposalService {
       const transformedProposal: any = {
         ...proposal,
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+        milestonesRows: proposal.milestonesRows?.map((row: any) => {
+          const docs = row.documents?.map((d: any) => ({ ...d, file_url: getFileUrl(d.file_url) })) ?? [];
+          return {
+            ...row,
+            documents: docs,
+            submitted_files: docs.map((d: any) => ({ url: d.file_url, name: d.file_url?.split?.("/")?.pop?.() ?? "file" }))
+          };
+        }) ?? [],
         project: proposal.project ? {
           ...proposal.project,
           budget_currency: proposal.project.user?.currency?.symbol || '₹',
@@ -530,6 +598,9 @@ export class ProposalService {
           transformedProposal.hire_cooldown_until = cooldownUntil.toISOString();
         }
       }
+
+      const paidMilestoneIndexes = await BillingService.getPaidMilestoneIndexes(proposal.id);
+      transformedProposal.paid_milestone_indexes = paidMilestoneIndexes;
 
       return {
         success: true,
@@ -591,6 +662,7 @@ export class ProposalService {
           attachments: data.attachments
         }
       });
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones);
       return { success: true, message: "Proposal updated successfully" };
     } catch (error: any) {
       console.error("Update Proposal Error:", error);
