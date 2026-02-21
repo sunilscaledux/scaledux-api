@@ -22,17 +22,23 @@ function getNda(proposal: any): ProposalNdaData | null {
   return nda as ProposalNdaData;
 }
 
-const OFFER_EXPIRY_DAYS = 7;
+/** Offer expiry in hours (from .env OFFER_EXPIRY_HOURS, default 24). Countdown starts when NDA is sent. */
+function getOfferExpiryHours(): number {
+  const val = process.env.OFFER_EXPIRY_HOURS;
+  if (val == null || val === '') return 24;
+  const n = parseInt(val, 10);
+  return Number.isFinite(n) && n > 0 ? n : 24;
+}
 
 function flattenNdaToProposal(proposal: any): any {
   const nda = getNda(proposal);
   let offer_expires_at = nda?.offer_expires_at ?? null;
-  // When NDA was sent but expiry not set (e.g. old data), derive from nda_sent_at so timer can show
+  // When NDA was sent but expiry not set (e.g. old data), derive from nda_sent_at so countdown can show
   const ndaSentAt = nda?.nda_sent_at;
   if ((offer_expires_at == null || offer_expires_at === '') && ndaSentAt) {
     const sent = new Date(ndaSentAt);
     const expires = new Date(sent);
-    expires.setDate(expires.getDate() + OFFER_EXPIRY_DAYS);
+    expires.setHours(expires.getHours() + getOfferExpiryHours());
     offer_expires_at = expires.toISOString();
   }
   return {
@@ -215,6 +221,7 @@ export class ProposalService {
               user: {
                 select: {
                   id: true,
+                  unique_id: true,
                   first_name: true,
                   last_name: true,
                   currency: {
@@ -806,9 +813,9 @@ export class ProposalService {
         if (data.nda_file_link && !current.nda_sent_at) {
           const now = new Date();
           current.nda_sent_at = now.toISOString();
-          // Timer starts when NDA sign request is sent; offer expires in 7 days
+          // Countdown starts when NDA sign request is sent; expiry from OFFER_EXPIRY_HOURS (default 24)
           const expiresAt = new Date(now);
-          expiresAt.setDate(expiresAt.getDate() + OFFER_EXPIRY_DAYS);
+          expiresAt.setHours(expiresAt.getHours() + getOfferExpiryHours());
           current.offer_expires_at = expiresAt.toISOString();
         }
         if (data.nda_downloaded_at !== undefined) current.nda_downloaded_at = toDateIso(data.nda_downloaded_at);
