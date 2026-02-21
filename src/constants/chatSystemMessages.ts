@@ -17,6 +17,9 @@ export const CHAT_SYSTEM_MESSAGES = {
   PROPOSAL_ACCEPTED_SENT: "You accepted the proposal",
   PROPOSAL_ACCEPTED_RECEIVED: "Accepted the proposal",
 
+  OFFER_SENT_SENT: "You sent an offer",
+  OFFER_SENT_RECEIVED: "You have received an offer",
+
   PROPOSAL_REJECTED_SENT: "You rejected the proposal",
   PROPOSAL_REJECTED_RECEIVED: "Rejected the proposal",
 

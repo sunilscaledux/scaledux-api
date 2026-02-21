@@ -708,7 +708,7 @@ model Proposal {
   unique_id             String    @unique @default(cuid())
   project_id            Int
   provider_id           Int       // Service provider user id
-  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED, WITHDRAWN
+  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED
   
   // Proposal content
   cover_letter          String    @db.Text

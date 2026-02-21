@@ -200,7 +200,8 @@ export class ProposalService {
       };
 
       if (status) {
-        whereClause.status = status;
+        const statuses = status.split(',').map((s: string) => s.trim()).filter(Boolean);
+        whereClause.status = statuses.length > 1 ? { in: statuses } : statuses[0] || status;
       }
 
       const totalCount = await (prisma as any).proposal.count({ where: whereClause });
@@ -598,7 +599,10 @@ export class ProposalService {
   }
 
   /**
-   * Update proposal status (founder only). When rejecting, reason is required and stored in remark + synced to chat.
+   * Update proposal status (founder only).
+   * ACCEPTED = proposal accepted; REJECTED = rejected.
+   * OFFER_SENT is set when founder sends the NDA (in updateProposalNda), not here.
+   * When rejecting, reason is required and stored in remark + synced to chat.
    */
   static async updateProposalStatus(
     userId: number,
@@ -718,8 +722,8 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can withdraw the offer" };
       }
-      if (proposal.status !== 'ACCEPTED') {
-        return { success: false, message: "Only an accepted offer can be withdrawn" };
+      if (proposal.status !== 'OFFER_SENT') {
+        return { success: false, message: "Only an offer that has been sent (and not yet accepted via NDA) can be withdrawn" };
       }
       const nda = getNda(proposal);
       if (nda?.is_nda_signed === true) {
@@ -828,10 +832,61 @@ export class ProposalService {
         if (data.nda_downloaded_at !== undefined) current.nda_downloaded_at = toDateIso(data.nda_downloaded_at);
       }
 
+      // When founder sends the NDA: one-active-offer check before saving (so we don't save NDA then reject)
+      if (isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED')) {
+        const otherActive = await (prisma as any).proposal.count({
+          where: {
+            project_id: proposal.project_id,
+            status: { in: ['OFFER_SENT', 'OFFER_ACCEPTED'] },
+            id: { not: proposal.id }
+          }
+        });
+        if (otherActive > 0) {
+          return {
+            success: false,
+            message: "You can only have one active offer per project. Withdraw the current offer before sending a new one."
+          };
+        }
+      }
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: { nda: current }
       });
+
+      // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT
+      if (isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED')) {
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+          oldStatus: proposal.status,
+          newStatus: 'OFFER_SENT'
+        }, userId);
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status: 'OFFER_SENT' }
+        });
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          {
+            activityType: "proposal_status",
+            proposalId: proposal.unique_id,
+            newStatus: "OFFER_SENT",
+            messageSent: CHAT_SYSTEM_MESSAGES.OFFER_SENT_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.OFFER_SENT_RECEIVED
+          },
+          proposal.project.id,
+          proposal.project.user_id
+        );
+      }
+
+      // When freelancer signs NDA, move status from OFFER_SENT to OFFER_ACCEPTED (so founder can proceed to payment)
+      if (isProvider && (data.is_nda_signed === true || data.nda_signed_file_link) && proposal.status === 'OFFER_SENT') {
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status: 'OFFER_ACCEPTED' }
+        });
+      }
 
       if (isFounder && (data.nda_file_link !== undefined || data.is_nda_signed !== undefined)) {
         const projectTitle = proposal.project.project_title || "Project";

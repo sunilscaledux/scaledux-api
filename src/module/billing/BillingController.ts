@@ -120,6 +120,10 @@ export class BillingController {
       ApiResponse.error(res, "You are not the project owner for this proposal", 403);
       return true;
     }
+    if (proposal.status !== 'OFFER_ACCEPTED') {
+      ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (proposal must be OFFER_ACCEPTED)", 400);
+      return true;
+    }
     const amount = Number(proposal.proposed_amount) || 0;
     if (amount <= 0) {
       ApiResponse.error(res, "Invalid proposal amount", 400);
@@ -154,6 +158,12 @@ export class BillingController {
       proposal.project.id,
       proposal.project.user_id
     );
+
+    // Mark proposal as HIRED after successful payment
+    await (prisma as any).proposal.update({
+      where: { id: proposal.id },
+      data: { status: 'HIRED' }
+    });
 
     ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
     return true;
