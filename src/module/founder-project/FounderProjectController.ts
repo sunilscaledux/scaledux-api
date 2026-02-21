@@ -338,11 +338,13 @@ export async function inviteProvider(req: Request, res: Response) {
 }
 
 /**
- * Reject an invitation (service provider rejects founder's invitation)
+ * Reject an invitation (service provider rejects founder's invitation).
+ * Body: { reason?: string } - optional rejection reason (shown to founder only).
  */
 export async function rejectInvitation(req: Request, res: Response) {
   const userId = req.user?.id;
   const projectId = getStringParam(req.params.id);
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : undefined;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -352,7 +354,7 @@ export async function rejectInvitation(req: Request, res: Response) {
     return ApiResponse.error(res, "Project ID is required", 400);
   }
 
-  const result = await FounderProjectService.rejectInvitation(userId, projectId);
+  const result = await FounderProjectService.rejectInvitation(userId, projectId, reason);
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);

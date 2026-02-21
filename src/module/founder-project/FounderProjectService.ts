@@ -494,6 +494,8 @@ export class FounderProjectService {
       const inviteStatus = inviteData?.status || null;
       // is_invited = had a PENDING invite (for showing Accept/Reject). We also return invite_status so UI can show "Invitation rejected"
       const isInvitedUser = !isOwner && inviteStatus === 'PENDING';
+      // Freelancer side: only show invitation message when PENDING (when REJECTED, message holds rejection reason — do not show to freelancer)
+      const invitationMessageForViewer = !isOwner && inviteStatus === 'REJECTED' ? null : (inviteData?.message || null);
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, ...projectData } = project as any;
@@ -508,7 +510,7 @@ export class FounderProjectService {
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
         invite_status: inviteStatus,
-        invitation_message: inviteData?.message || null,
+        invitation_message: invitationMessageForViewer,
         invitation_date: inviteData?.created_at || null,
         is_owner: isOwner
       };
@@ -925,7 +927,8 @@ export class FounderProjectService {
           is_invited: isInvited,
           invite_status: (invite as any)?.status || null,
           invited_at: (invite as any)?.created_at || null,
-          is_saved: isSaved
+          is_saved: isSaved,
+          invite_rejection_reason: (invite as any)?.status === 'REJECTED' ? (invite as any)?.message || null : null
         };
       });
 
@@ -1083,11 +1086,13 @@ export class FounderProjectService {
   }
 
   /**
-   * Reject an invitation (service provider rejects founder's invitation)
+   * Reject an invitation (service provider rejects founder's invitation).
+   * Optional reason is stored in invite message (founder sees it; freelancer does not).
    */
   static async rejectInvitation(
     userId: number,
-    projectId: string
+    projectId: string,
+    reason?: string
   ): Promise<ServiceResponse> {
     try {
       // Get the project
@@ -1121,7 +1126,7 @@ export class FounderProjectService {
         };
       }
 
-      // Update the invite status to REJECTED
+      // Update the invite status to REJECTED and store rejection reason in message (for founder to see)
       await (prisma as any).projectInvite.update({
         where: {
           project_id_provider_id: {
@@ -1130,7 +1135,8 @@ export class FounderProjectService {
           }
         },
         data: {
-          status: 'REJECTED'
+          status: 'REJECTED',
+          message: (reason && reason.trim()) ? reason.trim() : null
         }
       });
 

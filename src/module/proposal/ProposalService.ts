@@ -356,6 +356,7 @@ export class ProposalService {
               project_description: true,
               budget_amount: true,
               budget_currency: true,
+              is_nda_required: true,
               scope_of_work: true,
               experience_needed: true,
               skills_required: true,
