@@ -719,12 +719,9 @@ model Proposal {
   attachments           Json      @default("[]") // File URLs
   remark                String?   @db.Text       // Last "request changes" message from client (freelancer sees this at top)
 
-  // NDA
-  is_nda_signed         Boolean?  @default(false) // Whether NDA has been signed
-  nda_file_link         String?   @db.Text       // Link to NDA document (founder upload, for download)
-  nda_sent_at           DateTime?                 // When NDA was sent to provider
-  nda_signed_at         DateTime?                 // When provider signed
-  nda_signed_file_link  String?   @db.Text       // Link to signed NDA (provider upload)
+  // NDA + offer: all NDA and offer-expiry fields in one JSON column
+  // Shape: { offer_expires_at?, is_nda_signed?, nda_file_link?, nda_sent_at?, nda_signed_at?, nda_signed_file_link?, nda_downloaded_at? }
+  nda                   Json?     // NDA and offer data (dates as ISO strings in JSON)
 
   // Timestamps
   created_at            DateTime  @default(now())

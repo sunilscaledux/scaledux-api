@@ -6,6 +6,7 @@ import {
   getProposalById,
   updateProposal,
   updateProposalStatus,
+  cancelHire,
   updateProposalNda,
   withdrawProposal,
   checkProposalStatus,
@@ -60,6 +61,8 @@ router.get("/:id", getProposalById); // Get proposal details
 
 // Status update (founder) - must be before PUT /:id
 router.put("/:id/status", updateProposalStatus);
+// Cancel hire / withdraw offer (founder)
+router.post("/:id/cancel-hire", cancelHire);
 // NDA update (founder)
 router.patch("/:id/nda", updateProposalNda);
 // Request modify (founder)

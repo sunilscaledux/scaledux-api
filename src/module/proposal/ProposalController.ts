@@ -219,6 +219,35 @@ export async function updateProposalStatus(req: Request, res: Response) {
 }
 
 /**
+ * Cancel hire / withdraw offer (founder). Allowed only when ACCEPTED and NDA not signed.
+ */
+export async function cancelHire(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const body = req.body as { reason?: string };
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.cancelHire(userId, proposalId, body);
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    let statusCode = 500;
+    if (result.message?.includes("not found")) statusCode = 404;
+    if (result.message?.includes("permission") || result.message?.includes("Only the project owner")) statusCode = 403;
+    if (result.message?.includes("Cannot withdraw")) statusCode = 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Withdraw a proposal (service provider)
  */
 export async function withdrawProposal(req: Request, res: Response) {
@@ -301,7 +330,7 @@ export async function requestModify(req: Request, res: Response) {
 export async function updateProposalNda(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { is_nda_signed, nda_file_link, nda_sent_at, nda_signed_at, nda_signed_file_link } = req.body;
+  const { is_nda_signed, nda_file_link, nda_sent_at, nda_signed_at, nda_signed_file_link, nda_downloaded_at } = req.body;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -317,6 +346,7 @@ export async function updateProposalNda(req: Request, res: Response) {
   if (typeof nda_sent_at !== "undefined") payload.nda_sent_at = nda_sent_at ?? null;
   if (typeof nda_signed_at !== "undefined") payload.nda_signed_at = nda_signed_at ?? null;
   if (typeof nda_signed_file_link !== "undefined") payload.nda_signed_file_link = nda_signed_file_link ?? null;
+  if (typeof nda_downloaded_at !== "undefined") payload.nda_downloaded_at = nda_downloaded_at ?? null;
 
   const result = await ProposalService.updateProposalNda(userId, proposalId, payload);
 

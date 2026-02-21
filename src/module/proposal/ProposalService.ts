@@ -5,6 +5,48 @@ import { createProposalActivity, getProposalActivities as fetchProposalActivitie
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 
+/** NDA + offer data stored in proposal.nda (single JSON column) */
+export interface ProposalNdaData {
+  offer_expires_at?: string | null;
+  is_nda_signed?: boolean;
+  nda_file_link?: string | null;
+  nda_sent_at?: string | null;
+  nda_signed_at?: string | null;
+  nda_signed_file_link?: string | null;
+  nda_downloaded_at?: string | null;
+}
+
+function getNda(proposal: any): ProposalNdaData | null {
+  const nda = proposal?.nda;
+  if (!nda || typeof nda !== 'object') return null;
+  return nda as ProposalNdaData;
+}
+
+const OFFER_EXPIRY_DAYS = 7;
+
+function flattenNdaToProposal(proposal: any): any {
+  const nda = getNda(proposal);
+  let offer_expires_at = nda?.offer_expires_at ?? null;
+  // When NDA was sent but expiry not set (e.g. old data), derive from nda_sent_at so timer can show
+  const ndaSentAt = nda?.nda_sent_at;
+  if ((offer_expires_at == null || offer_expires_at === '') && ndaSentAt) {
+    const sent = new Date(ndaSentAt);
+    const expires = new Date(sent);
+    expires.setDate(expires.getDate() + OFFER_EXPIRY_DAYS);
+    offer_expires_at = expires.toISOString();
+  }
+  return {
+    ...proposal,
+    offer_expires_at,
+    is_nda_signed: nda?.is_nda_signed ?? false,
+    nda_file_link: nda?.nda_file_link ?? null,
+    nda_sent_at: nda?.nda_sent_at ?? null,
+    nda_signed_at: nda?.nda_signed_at ?? null,
+    nda_signed_file_link: nda?.nda_signed_file_link ?? null,
+    nda_downloaded_at: nda?.nda_downloaded_at ?? null
+  };
+}
+
 /**
  * ProposalService
  * Handles all proposal operations for service providers
@@ -199,15 +241,17 @@ export class ProposalService {
         take: limit
       });
 
-      // Transform proposals with file URLs
-      const transformedProposals = proposals.map((proposal: any) => ({
-        ...proposal,
-        attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
-        project: proposal.project ? {
-          ...proposal.project,
-          budget_currency: proposal.project.user?.currency?.symbol || '₹'
-        } : null
-      }));
+      // Transform proposals with file URLs and flatten nda for response
+      const transformedProposals = proposals.map((proposal: any) =>
+        flattenNdaToProposal({
+          ...proposal,
+          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          project: proposal.project ? {
+            ...proposal.project,
+            budget_currency: proposal.project.user?.currency?.symbol || '₹'
+          } : null
+        })
+      );
 
       return {
         success: true,
@@ -298,20 +342,22 @@ export class ProposalService {
         take: limit
       });
 
-      // Transform proposals with file URLs
-      const transformedProposals = proposals.map((proposal: any) => ({
-        ...proposal,
-        attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
-        provider: proposal.provider ? {
-          ...proposal.provider,
-          personalInfo: proposal.provider.personalInfo ? {
-            ...proposal.provider.personalInfo,
-            profileImage: proposal.provider.personalInfo.profileImage 
-              ? getFileUrl(proposal.provider.personalInfo.profileImage)
-              : null
+      // Transform proposals with file URLs and flatten nda for response
+      const transformedProposals = proposals.map((proposal: any) =>
+        flattenNdaToProposal({
+          ...proposal,
+          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          provider: proposal.provider ? {
+            ...proposal.provider,
+            personalInfo: proposal.provider.personalInfo ? {
+              ...proposal.provider.personalInfo,
+              profileImage: proposal.provider.personalInfo.profileImage 
+                ? getFileUrl(proposal.provider.personalInfo.profileImage)
+                : null
+            } : null
           } : null
-        } : null
-      }));
+        })
+      );
 
       return {
         success: true,
@@ -431,7 +477,7 @@ export class ProposalService {
 
       // Transform with file URLs
       const projectUser = proposal.project?.user;
-      const transformedProposal = {
+      const transformedProposal: any = {
         ...proposal,
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
         project: proposal.project ? {
@@ -458,10 +504,29 @@ export class ProposalService {
         } : null
       };
 
+      // Founder view: add 24h hire cooldown (can't hire another for 24h after accepting one)
+      if (isProjectOwner) {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const lastAccepted = await (prisma as any).proposal.findFirst({
+          where: {
+            project: { user_id: userId },
+            status: 'ACCEPTED',
+            id: { not: proposal.id }
+          },
+          orderBy: { updated_at: 'desc' },
+          select: { updated_at: true }
+        });
+        if (lastAccepted && new Date(lastAccepted.updated_at) > twentyFourHoursAgo) {
+          const cooldownUntil = new Date(lastAccepted.updated_at);
+          cooldownUntil.setHours(cooldownUntil.getHours() + 24);
+          transformedProposal.hire_cooldown_until = cooldownUntil.toISOString();
+        }
+      }
+
       return {
         success: true,
         message: "Proposal retrieved successfully",
-        data: transformedProposal
+        data: flattenNdaToProposal(transformedProposal)
       };
     } catch (error: any) {
       console.error("Get Proposal By ID Error:", error);
@@ -581,9 +646,10 @@ export class ProposalService {
           UPDATE scd_proposals SET status = 'REJECTED', remark = ${rejectionReason.trim()}, updated_at = NOW() WHERE id = ${proposal.id}
         `;
       } else {
+        const updateData: any = { status };
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status }
+          data: updateData
         });
       }
 
@@ -623,6 +689,80 @@ export class ProposalService {
   }
 
   /**
+   * Cancel hire (withdraw offer). Allowed only when status is ACCEPTED and NDA is not signed.
+   */
+  static async cancelHire(
+    userId: number,
+    proposalId: string,
+    body: { reason?: string }
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: {
+            select: { id: true, user_id: true, project_title: true }
+          }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "Only the project owner can withdraw the offer" };
+      }
+      if (proposal.status !== 'ACCEPTED') {
+        return { success: false, message: "Only an accepted offer can be withdrawn" };
+      }
+      const nda = getNda(proposal);
+      if (nda?.is_nda_signed === true) {
+        return { success: false, message: "Cannot withdraw offer after the freelancer has signed the NDA" };
+      }
+
+      const nextNda = { ...(nda || {}), offer_expires_at: null };
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: {
+          status: 'PENDING',
+          nda: nextNda
+        }
+      });
+
+      const projectTitle = proposal.project.project_title || "Project";
+      const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
+      const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle}`;
+      const metadata: Record<string, unknown> = {
+        activityType: "offer_cancelled",
+        proposalId: proposal.unique_id,
+        messageSent: sentText,
+        messageReceived: receivedText
+      };
+      if (body.reason?.trim()) {
+        metadata.message = body.reason.trim();
+      }
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        metadata,
+        proposal.project.id,
+        proposal.project.user_id
+      );
+
+      return {
+        success: true,
+        message: "Offer withdrawn successfully"
+      };
+    } catch (error: any) {
+      console.error("Cancel hire Error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to withdraw offer"
+      };
+    }
+  }
+
+  /**
    */
   static async updateProposalNda(
     userId: number,
@@ -633,6 +773,7 @@ export class ProposalService {
       nda_sent_at?: string | Date | null;
       nda_signed_at?: string | Date | null;
       nda_signed_file_link?: string | null;
+      nda_downloaded_at?: string | Date | null;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -653,31 +794,36 @@ export class ProposalService {
         return { success: false, message: "You don't have permission to update this proposal" };
       }
 
-      const updateData: Record<string, unknown> = {};
+      const current = getNda(proposal) || {};
+      const toDateIso = (v: string | Date | null | undefined): string | null =>
+        v == null ? null : typeof v === 'string' ? v : new Date(v).toISOString();
 
       if (isFounder) {
-        if (data.is_nda_signed !== undefined) updateData.is_nda_signed = data.is_nda_signed;
-        if (data.nda_file_link !== undefined) updateData.nda_file_link = data.nda_file_link ?? null;
-        if (data.nda_sent_at !== undefined) updateData.nda_sent_at = data.nda_sent_at ? new Date(data.nda_sent_at) : null;
-        if (data.nda_signed_at !== undefined) updateData.nda_signed_at = data.nda_signed_at ? new Date(data.nda_signed_at) : null;
-        if (data.nda_file_link && !proposal.nda_sent_at) {
-          updateData.nda_sent_at = new Date();
+        if (data.is_nda_signed !== undefined) current.is_nda_signed = data.is_nda_signed;
+        if (data.nda_file_link !== undefined) current.nda_file_link = data.nda_file_link ?? null;
+        if (data.nda_sent_at !== undefined) current.nda_sent_at = toDateIso(data.nda_sent_at);
+        if (data.nda_signed_at !== undefined) current.nda_signed_at = toDateIso(data.nda_signed_at);
+        if (data.nda_file_link && !current.nda_sent_at) {
+          const now = new Date();
+          current.nda_sent_at = now.toISOString();
+          // Timer starts when NDA sign request is sent; offer expires in 7 days
+          const expiresAt = new Date(now);
+          expiresAt.setDate(expiresAt.getDate() + OFFER_EXPIRY_DAYS);
+          current.offer_expires_at = expiresAt.toISOString();
         }
+        if (data.nda_downloaded_at !== undefined) current.nda_downloaded_at = toDateIso(data.nda_downloaded_at);
       }
 
       if (isProvider) {
-        if (data.is_nda_signed !== undefined) updateData.is_nda_signed = data.is_nda_signed;
-        if (data.nda_signed_at !== undefined) updateData.nda_signed_at = data.nda_signed_at ? new Date(data.nda_signed_at) : null;
-        if (data.nda_signed_file_link !== undefined) updateData.nda_signed_file_link = data.nda_signed_file_link ?? null;
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return { success: true, message: "Nothing to update" };
+        if (data.is_nda_signed !== undefined) current.is_nda_signed = data.is_nda_signed;
+        if (data.nda_signed_at !== undefined) current.nda_signed_at = toDateIso(data.nda_signed_at);
+        if (data.nda_signed_file_link !== undefined) current.nda_signed_file_link = data.nda_signed_file_link ?? null;
+        if (data.nda_downloaded_at !== undefined) current.nda_downloaded_at = toDateIso(data.nda_downloaded_at);
       }
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: updateData
+        data: { nda: current }
       });
 
       if (isFounder && (data.nda_file_link !== undefined || data.is_nda_signed !== undefined)) {
