@@ -832,6 +832,8 @@ export class ProposalService {
         }
       });
 
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'PENDING' }, userId);
+
       const projectTitle = proposal.project.project_title || "Project";
       const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
       const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle}`;
@@ -1013,6 +1015,7 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: 'OFFER_ACCEPTED' }
         });
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'OFFER_ACCEPTED' }, userId);
       }
 
       // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
@@ -1107,6 +1110,8 @@ export class ProposalService {
         data: { status: 'WITHDRAWN' }
       });
 
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'PENDING', newStatus: 'WITHDRAWN' }, userId);
+
       // Decrement proposals_count on the project
       await prisma.founderProject.update({
         where: { id: proposal.project.id },
@@ -1185,6 +1190,8 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: "TERMINATED" }
       });
+
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'TERMINATED', message: trimmed }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATED_SENT} ${projectTitle}. Reason: ${trimmed}`;

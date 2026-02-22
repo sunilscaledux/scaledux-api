@@ -3,6 +3,7 @@ import { BillingService } from "./BillingService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getStringParam } from "@utils/requestHelpers";
 import { ConversationService } from "@module/chat/ConversationService";
+import { createProposalActivity } from "@module/proposal/ProposalActivityService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { prisma } from "@services/prismaService";
 
@@ -172,6 +173,8 @@ export class BillingController {
       data: { status: 'HIRED' }
     });
 
+    await createProposalActivity(proposal.unique_id, 'HIRE_PAYMENT', { amount }, userId);
+
     ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
     return true;
   }
@@ -268,6 +271,12 @@ export class BillingController {
         data: { payment_status: "RELEASED" }
       });
     }
+
+    await createProposalActivity(proposal.unique_id, 'MILESTONE_PAYMENT', {
+      milestoneIndex,
+      amount,
+      milestoneTitle
+    }, userId);
 
     ApiResponse.success(res, { proposalPayment: true, milestoneIndex }, "Milestone payment recorded");
     return true;
