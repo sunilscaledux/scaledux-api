@@ -17,6 +17,7 @@ import {
   getProposalActivities
 } from "./ProposalController";
 import { addMilestoneDocument, submitMilestone, requestChangesMilestone } from "./MilestoneController";
+import { submitDeliverable, requestChangesDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
@@ -78,6 +79,10 @@ router.get("/founder/contracts", getFounderContracts); // Get founder contracts 
 router.post("/milestones/:milestoneId/documents", addMilestoneDocument);
 router.post("/milestones/:milestoneId/submit", submitMilestone);
 router.post("/milestones/:milestoneId/request-changes", requestChangesMilestone);
+
+// Per-deliverable submit and request changes
+router.post("/deliverables/:deliverableId/submit", submitDeliverable);
+router.post("/deliverables/:deliverableId/request-changes", requestChangesDeliverable);
 
 // Shared routes
 router.get("/:id", getProposalById); // Get proposal details

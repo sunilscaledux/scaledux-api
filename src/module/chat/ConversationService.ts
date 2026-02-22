@@ -42,6 +42,18 @@ function resolveSystemMessageContent(
     const msg = String(metadata.message).trim();
     return msg ? `${base}\n\n${msg}` : base;
   }
+  if (metadata.activityType === "deliverable_submitted") {
+    const projectTitle = metadata.projectTitle ? ` ${String(metadata.projectTitle).trim()}` : "";
+    const deliverableDesc = metadata.deliverableDescription ? `: ${String(metadata.deliverableDescription).trim()}` : "";
+    return `${base}${projectTitle}${deliverableDesc}`.trim();
+  }
+  if (metadata.activityType === "deliverable_request_changes" && (metadata.message || metadata.feedback)) {
+    const msg = String(metadata.message || metadata.feedback || "").trim();
+    const projectTitle = metadata.projectTitle ? ` ${String(metadata.projectTitle).trim()}` : "";
+    const deliverableDesc = metadata.deliverableDescription ? `: ${String(metadata.deliverableDescription).trim()}` : "";
+    const baseWithContext = `${base}${projectTitle}${deliverableDesc}`.trim();
+    return msg ? `${baseWithContext}\n\n${msg}` : baseWithContext;
+  }
   if (metadata.activityType === "proposal_status" && metadata.message) {
     const msg = String(metadata.message).trim();
     return msg ? `${base}\n\n${msg}` : base;

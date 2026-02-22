@@ -72,7 +72,40 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
     }));
 }
 
-/** Build milestones with submitted_file from documents (for getProposalById / project-overview). */
+/** Build deliverables array from Deliverable table rows or fallback to JSON. */
+function buildDeliverablesFromRow(row: any): any[] {
+  const fromTable = row.deliverablesRow;
+  if (Array.isArray(fromTable) && fromTable.length > 0) {
+    return fromTable
+      .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
+      .map((d: any) => ({
+        id: d.unique_id,
+        description: d.description ?? '',
+        deliverable: d.description ?? '',
+        status: d.status ?? 'PENDING',
+        submitted_at: d.submitted_at ? new Date(d.submitted_at).toISOString() : null,
+        submitted_file: Array.isArray(d.submitted_file)
+          ? (d.submitted_file as any[]).map((f: any) => ({
+              url: typeof f?.url === 'string' ? getFileUrl(f.url) : f?.url,
+              name: f?.name ?? (typeof f?.url === 'string' ? f.url.split('/').pop() : 'file')
+            }))
+          : [],
+        feedback: d.feedback ?? null
+      }));
+  }
+  const fromJson = Array.isArray(row.deliverables) ? row.deliverables : [];
+  return fromJson.map((d: any, idx: number) => ({
+    id: row.unique_id,
+    description: typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? ''),
+    deliverable: typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? ''),
+    status: 'PENDING',
+    submitted_at: null,
+    submitted_file: [],
+    feedback: null
+  }));
+}
+
+/** Build milestones with submitted_file from documents and deliverables from Deliverable table. */
 function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
@@ -85,13 +118,14 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
             name: (d.file_url || '').split('/').pop() || 'file'
           }))
         : (Array.isArray(row.submitted_file) ? row.submitted_file : []);
+      const deliverables = buildDeliverablesFromRow(row);
       return {
         id: row.unique_id,
         title: row.title ?? '',
         description: row.description ?? undefined,
         amount: Number(row.amount ?? 0),
         dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
-        deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+        deliverables,
         payment_status: row.payment_status ?? 'PENDING',
         milestone_status: row.status ?? 'PENDING',
         submitted_file: submittedFile
@@ -267,7 +301,7 @@ export class ProposalService {
         due_date: dueDate
       };
       try {
-        await prismaAny.milestone.upsert({
+        const milestone = await prismaAny.milestone.upsert({
           where: {
             proposal_id_order_index: { proposal_id: proposalId, order_index: i }
           },
@@ -280,6 +314,27 @@ export class ProposalService {
             due_date: row.due_date
           }
         });
+        if (milestone?.id && typeof prismaAny.deliverable?.upsert === 'function') {
+          for (let j = 0; j < deliverables.length; j++) {
+            const d = deliverables[j];
+            const desc = typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? '');
+            try {
+              await prismaAny.deliverable.upsert({
+                where: {
+                  milestone_id_order_index: { milestone_id: milestone.id, order_index: j }
+                },
+                create: {
+                  milestone_id: milestone.id,
+                  order_index: j,
+                  description: desc.slice(0, 500)
+                },
+                update: { description: desc.slice(0, 500) }
+              });
+            } catch (_) {
+              // ignore
+            }
+          }
+        }
       } catch (_) {
         // ignore if table missing or constraint name differs
       }
@@ -632,7 +687,10 @@ export class ProposalService {
         include: {
           milestonesRows: {
             orderBy: { order_index: 'asc' },
-            include: { documents: true }
+            include: {
+              documents: true,
+              deliverablesRow: { orderBy: { order_index: 'asc' } }
+            }
           },
           project: {
             select: {

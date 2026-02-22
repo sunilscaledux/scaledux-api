@@ -29,6 +29,11 @@ export const CHAT_SYSTEM_MESSAGES = {
   REQUEST_MODIFY_SENT: "You requested changes for",
   REQUEST_MODIFY_RECEIVED: "Requested changes to your proposal for",
 
+  DELIVERABLE_SUBMITTED_SENT: "You submitted work for",
+  DELIVERABLE_SUBMITTED_RECEIVED: "Work submitted for review for",
+  DELIVERABLE_REQUEST_CHANGES_SENT: "You requested changes on deliverable for",
+  DELIVERABLE_REQUEST_CHANGES_RECEIVED: "Changes requested on your deliverable for",
+
   CONTRACT_SENT_SENT: "Contract sent",
   CONTRACT_SENT_RECEIVED: "Contract sent",
   NDA_SIGN_REQUEST: "Please sign the NDA and upload it to proceed.",

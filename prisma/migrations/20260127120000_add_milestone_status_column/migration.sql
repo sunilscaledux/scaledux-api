@@ -1,3 +1,7 @@
--- AlterTable: ensure milestone completion status column exists on scd_milestones
--- status: PENDING, IN_PROGRESS, COMPLETED, PAID (used as milestone_status in API/UI)
-ALTER TABLE "scd_milestones" ADD COLUMN IF NOT EXISTS "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING';
+-- AlterTable: only if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scd_milestones') THEN
+    ALTER TABLE "scd_milestones" ADD COLUMN IF NOT EXISTS "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING';
+  END IF;
+END $$;

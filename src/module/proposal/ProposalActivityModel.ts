@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export type ProposalActivityType = 'STATUS_CHANGE' | 'REQUEST_MODIFY' | 'CONTENT_UPDATE' | 'MILESTONE_PAYMENT' | 'HIRE_PAYMENT';
+export type ProposalActivityType = 'STATUS_CHANGE' | 'REQUEST_MODIFY' | 'CONTENT_UPDATE' | 'MILESTONE_PAYMENT' | 'HIRE_PAYMENT' | 'MILESTONE_SUBMITTED';
 
 export interface IProposalActivityPayload {
   oldStatus?: string;
@@ -11,6 +11,7 @@ export interface IProposalActivityPayload {
   milestoneIndex?: number;
   milestoneTitle?: string;
   amount?: number;
+  deliverableDescription?: string;
 }
 
 export interface IProposalActivity extends Document {
@@ -24,7 +25,7 @@ export interface IProposalActivity extends Document {
 const ProposalActivitySchema = new Schema<IProposalActivity>(
   {
     proposalUniqueId: { type: String, required: true, index: true },
-    type: { type: String, required: true, enum: ['STATUS_CHANGE', 'REQUEST_MODIFY', 'CONTENT_UPDATE', 'MILESTONE_PAYMENT', 'HIRE_PAYMENT'] },
+    type: { type: String, required: true, enum: ['STATUS_CHANGE', 'REQUEST_MODIFY', 'CONTENT_UPDATE', 'MILESTONE_PAYMENT', 'HIRE_PAYMENT', 'MILESTONE_SUBMITTED'] },
     payload: { type: Schema.Types.Mixed, required: true },
     createdByUserId: { type: Number, required: true },
     createdAt: { type: Date, default: Date.now }

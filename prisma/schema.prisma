@@ -764,11 +764,35 @@ model Milestone {
   project   FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   proposal  Proposal        @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
   documents MilestoneDocument[]
+  deliverablesRow Deliverable[]
 
   @@unique([proposal_id, order_index])
   @@index([project_id])
   @@index([proposal_id])
   @@map("scd_milestones")
+}
+
+// Per-deliverable work submission (one row per deliverable within a milestone)
+// Documents stored per deliverable in submitted_file; feedback stored when founder requests changes
+model Deliverable {
+  id                Int       @id @default(autoincrement())
+  unique_id         String    @unique @default(cuid())
+  milestone_id      Int
+  order_index      Int       @default(0)   // 0-based within milestone
+  description       String    @db.VarChar(500)
+  status            String    @default("PENDING") @db.VarChar(20) // PENDING | SUBMITTED | CHANGES_REQUESTED | APPROVED
+  submitted_at      DateTime? @db.Timestamptz
+  submitted_remark  String?   @db.Text
+  submitted_file    Json      @default("[]")    // Array of { url, name }
+  feedback          String?   @db.Text           // Founder's message when requesting changes; cleared on resubmit
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @default(now()) @updatedAt
+
+  milestone Milestone @relation(fields: [milestone_id], references: [id], onDelete: Cascade)
+
+  @@unique([milestone_id, order_index])
+  @@index([milestone_id])
+  @@map("scd_deliverables")
 }
 
 // Freelancer uploads: multiple docs per milestone
