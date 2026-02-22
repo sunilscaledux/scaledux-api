@@ -111,6 +111,37 @@ export async function getProposalsByProject(req: Request, res: Response) {
 }
 
 /**
+ * Get founder's contracts by status (OFFER_SENT, OFFER_ACCEPTED, HIRED). Separate call per tab.
+ */
+export async function getFounderContracts(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const { status, page, limit } = req.query;
+  const validStatuses = ['OFFER_SENT', 'OFFER_ACCEPTED', 'HIRED'];
+  const statusParam = typeof status === 'string' ? status : '';
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!validStatuses.includes(statusParam)) {
+    return ApiResponse.error(res, "status must be one of OFFER_SENT, OFFER_ACCEPTED, HIRED", 400);
+  }
+
+  const result = await ProposalService.getFounderContracts(
+    userId,
+    statusParam as 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED',
+    parseInt(page as string) || 1,
+    parseInt(limit as string) || 20
+  );
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    return ApiResponse.error(res, result.message, 500);
+  }
+}
+
+/**
  * Get a single proposal by ID
  */
 export async function getProposalById(req: Request, res: Response) {

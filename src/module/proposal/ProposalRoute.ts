@@ -3,6 +3,7 @@ import {
   createProposal,
   getMyProposals,
   getProposalsByProject,
+  getFounderContracts,
   getProposalById,
   updateProposal,
   updateProposalStatus,
@@ -71,6 +72,7 @@ router.get("/check/:projectId", checkProposalStatus); // Check if already submit
 
 // Founder routes
 router.get("/project/:projectId", getProposalsByProject); // Get proposals for a project
+router.get("/founder/contracts", getFounderContracts); // Get founder contracts by status (OFFER_SENT, OFFER_ACCEPTED, HIRED)
 
 // Milestone documents (freelancer: upload doc for a milestone) - must be before /:id
 router.post("/milestones/:milestoneId/documents", addMilestoneDocument);

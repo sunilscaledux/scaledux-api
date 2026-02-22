@@ -399,6 +399,15 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          project: {
+            select: {
+              id: true,
+              unique_id: true,
+              project_title: true,
+              budget_currency: true,
+              budget_amount: true
+            }
+          },
           milestonesRows: { orderBy: { order_index: 'asc' } },
           provider: {
             select: {
@@ -463,6 +472,106 @@ export class ProposalService {
       return {
         success: false,
         message: error.message || "Failed to retrieve proposals"
+      };
+    }
+  }
+
+  /**
+   * Get founder's proposals by contract status (OFFER_SENT, OFFER_ACCEPTED, HIRED).
+   * Used for "All contracts" tab with sub-tabs; separate call per status.
+   */
+  static async getFounderContracts(
+    userId: number,
+    status: 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED',
+    page: number = 1,
+    limit: number = 20
+  ): Promise<ServiceResponse> {
+    try {
+      const whereClause = {
+        status,
+        project: {
+          user_id: userId,
+          deleted_at: null
+        }
+      };
+
+      const totalCount = await (prisma as any).proposal.count({ where: whereClause });
+
+      const proposals = await (prisma as any).proposal.findMany({
+        where: whereClause,
+        include: {
+          project: {
+            select: {
+              id: true,
+              unique_id: true,
+              project_title: true,
+              budget_currency: true,
+              budget_amount: true
+            }
+          },
+          milestonesRows: { orderBy: { order_index: 'asc' } },
+          provider: {
+            select: {
+              id: true,
+              unique_id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              personalInfo: {
+                select: {
+                  profileImage: true,
+                  title: true,
+                  about: true,
+                  hourly_rate: true,
+                  country: { select: { name: true } },
+                  city: true,
+                  links: true,
+                  languages: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { updated_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit
+      });
+
+      const transformedProposals = proposals.map((proposal: any) =>
+        flattenNdaToProposal({
+          ...proposal,
+          milestones: milestonesFromRows(proposal.milestonesRows),
+          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          provider: proposal.provider ? {
+            ...proposal.provider,
+            personalInfo: proposal.provider.personalInfo ? {
+              ...proposal.provider.personalInfo,
+              profileImage: proposal.provider.personalInfo.profileImage
+                ? getFileUrl(proposal.provider.personalInfo.profileImage)
+                : null
+            } : null
+          } : null
+        })
+      );
+
+      return {
+        success: true,
+        message: "Contracts retrieved successfully",
+        data: {
+          proposals: transformedProposals,
+          pagination: {
+            page,
+            limit,
+            total: totalCount,
+            totalPages: Math.ceil(totalCount / limit)
+          }
+        }
+      };
+    } catch (error: any) {
+      console.error("Get Founder Contracts Error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to retrieve contracts"
       };
     }
   }
