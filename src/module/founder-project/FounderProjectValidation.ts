@@ -102,39 +102,28 @@ export const createFounderProjectSchema = Joi.object({
   })
 })
 
+// Draft: title, description, category and subcategory required; rest optional
 export const saveDraftProjectSchema = Joi.object({
   projectTitle: Joi.string().required().min(1).max(50).messages({
-    'string.base': 'Project title must be a string',
     'string.empty': 'Project title is required',
     'string.min': 'Project title is required',
-    'string.max': 'Project title is too long (max 50 characters)',
     'any.required': 'Project title is required'
   }),
   projectDescription: Joi.string().required().min(1).max(3000).messages({
-    'string.base': 'Description must be a string',
     'string.empty': 'Description is required',
     'string.min': 'Description is required',
-    'string.max': 'Description is too long (max 3000 characters)',
     'any.required': 'Description is required'
   }),
   categoryId: Joi.number().integer().positive().required().messages({
-    'number.base': 'Category ID must be a number',
-    'number.integer': 'Category ID must be an integer',
-    'number.positive': 'Category is required',
     'any.required': 'Category is required'
   }),
   subCategoryId: Joi.number().integer().positive().required().messages({
-    'number.base': 'Sub-category ID must be a number',
-    'number.integer': 'Sub-category ID must be an integer',
-    'number.positive': 'Sub-category is required',
     'any.required': 'Sub-category is required'
   }),
-  // All other fields are optional for draft
-  projectFiles: Joi.array().items(
-    Joi.object({
-      url: Joi.string().required()
-    })
-  ).optional().allow(null),
+  projectFiles: Joi.array()
+    .items(Joi.object({ url: Joi.string().optional().allow('') }))
+    .optional()
+    .allow(null),
   scopeOfWork: Joi.string().optional().allow(''),
   skillsRequired: Joi.array().items(Joi.string()).optional().allow(null),
   experienceNeeded: Joi.string().optional().allow(''),
@@ -142,12 +131,11 @@ export const saveDraftProjectSchema = Joi.object({
     currency: Joi.string().optional().allow(''),
     amount: Joi.string().optional().allow('')
   }).optional(),
-  isNdaRequired: Joi.string().optional().allow(''),
-  screeningQuestions: Joi.array().items(
-    Joi.object({
-      question: Joi.string().required()
-    })
-  ).optional().allow(null),
+  isNdaRequired: Joi.string().optional().allow('', 'yes', 'no'),
+  screeningQuestions: Joi.array()
+    .items(Joi.object({ question: Joi.string().optional().allow('') }))
+    .optional()
+    .allow(null),
   advancedPreferences: Joi.object({
     englishLevel: Joi.string().optional().allow(''),
     hireWithin: Joi.string().optional().allow(''),
@@ -155,9 +143,7 @@ export const saveDraftProjectSchema = Joi.object({
     earnedAmount: Joi.string().optional().allow(''),
     loccation: Joi.string().optional().allow('')
   }).optional(),
-  status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED').messages({
-    'any.only': 'Status must be either DRAFT or PUBLISHED'
-  })
+  status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED')
 })
 
 export const updateFounderProjectSchema = Joi.object({

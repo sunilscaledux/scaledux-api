@@ -3,6 +3,7 @@ import { FounderProjectService } from './FounderProjectService'
 import { ApiResponse } from '@utils/ApiResponse'
 import { getStringParam } from '@utils/requestHelpers'
 import { createFounderProjectSchema, updateFounderProjectSchema, saveDraftProjectSchema } from './FounderProjectValidation'
+import type { CreateFounderProjectInput } from './FounderProjectType'
 
 /**
  * Get all projects for the authenticated user
@@ -143,7 +144,7 @@ export async function saveDraft(req: Request, res: Response) {
     return ApiResponse.error(res, "User not authenticated", 401);
   }
 
-  // Validate request body with draft schema (minimal validation)
+  // Validate request body with draft schema (all fields optional – no validation blocking)
   const { value, error } = saveDraftProjectSchema.validate(req.body, {
     abortEarly: false,
   });
@@ -152,16 +153,20 @@ export async function saveDraft(req: Request, res: Response) {
     return ApiResponse.joiValidationError(res, error);
   }
 
-  // Set default values for missing fields
-  const draftData = {
-    ...value,
-    scopeOfWork: value.scopeOfWork || '',
-    skillsRequired: value.skillsRequired || [],
-    experienceNeeded: value.experienceNeeded || '',
-    budget: value.budget || { currency: '', amount: '' },
-    isNdaRequired: value.isNdaRequired || 'no',
-    screeningQuestions: value.screeningQuestions || [],
-    advancedPreferences: value.advancedPreferences || {
+  // Draft requires title, description, category, subcategory (validated by schema); fill defaults for other fields
+  const draftData: CreateFounderProjectInput = {
+    projectTitle: value.projectTitle,
+    projectDescription: value.projectDescription,
+    categoryId: value.categoryId,
+    subCategoryId: value.subCategoryId ?? null,
+    projectFiles: value.projectFiles ?? [],
+    scopeOfWork: value.scopeOfWork ?? '',
+    skillsRequired: value.skillsRequired ?? [],
+    experienceNeeded: value.experienceNeeded ?? '',
+    budget: value.budget ?? { currency: '₹', amount: '' },
+    isNdaRequired: value.isNdaRequired ?? 'no',
+    screeningQuestions: Array.isArray(value.screeningQuestions) ? value.screeningQuestions.filter((q: any) => q && String(q.question ?? '').trim() !== '') : [],
+    advancedPreferences: value.advancedPreferences ?? {
       englishLevel: '',
       hireWithin: '',
       timeRequirement: '',
