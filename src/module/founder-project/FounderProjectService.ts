@@ -1055,6 +1055,22 @@ export class FounderProjectService {
         };
       }
 
+      // Do not allow re-inviting a provider who had an offer withdrawn for this project
+      const withdrawnProposal = await (prisma as any).proposal.findFirst({
+        where: {
+          project_id: project.id,
+          provider_id: providerId,
+          status: "WITHDRAWN"
+        }
+      });
+
+      if (withdrawnProposal) {
+        return {
+          success: false,
+          message: "You cannot invite this provider again for this project; they had an offer withdrawn."
+        };
+      }
+
       // Create the invite record
       await (prisma as any).projectInvite.create({
         data: {

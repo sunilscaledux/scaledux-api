@@ -1045,12 +1045,12 @@ export class ProposalService {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
-          status: 'PENDING',
+          status: 'WITHDRAWN',
           nda: nextNda
         }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'PENDING' }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'WITHDRAWN' }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
@@ -1082,6 +1082,77 @@ export class ProposalService {
       return {
         success: false,
         message: error.message || "Failed to withdraw offer"
+      };
+    }
+  }
+
+  /**
+   * Decline offer (freelancer only). Allowed only when status is OFFER_SENT. Sets status to REJECTED, stores reason in remark, syncs to chat.
+   */
+  static async declineOffer(
+    userId: number,
+    proposalId: string,
+    body: { reason?: string }
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: {
+            select: { id: true, user_id: true, project_title: true }
+          }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.provider_id !== userId) {
+        return { success: false, message: "Only the freelancer can decline this offer" };
+      }
+      if (proposal.status !== 'OFFER_SENT') {
+        return { success: false, message: "Only an offer that has been sent can be declined" };
+      }
+
+      const remark = body.reason?.trim() || null;
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: {
+          status: 'REJECTED',
+          ...(remark ? { remark } : {})
+        }
+      });
+
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: 'OFFER_SENT',
+        newStatus: 'REJECTED',
+        ...(remark ? { message: remark } : {})
+      }, userId);
+
+      const projectTitle = proposal.project?.project_title || "Project";
+      const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_DECLINED_SENT} ${projectTitle}`;
+      const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_DECLINED_RECEIVED} ${projectTitle}`;
+      const metadata: Record<string, unknown> = {
+        activityType: "offer_declined",
+        proposalId: proposal.unique_id,
+        messageSent: sentText,
+        messageReceived: receivedText
+      };
+      if (remark) metadata.message = remark;
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        metadata,
+        proposal.project.id,
+        userId
+      );
+
+      return { success: true, message: "Offer declined successfully" };
+    } catch (error: any) {
+      console.error("Decline offer Error:", error);
+      return {
+        success: false,
+        message: error.message || "Failed to decline offer"
       };
     }
   }
