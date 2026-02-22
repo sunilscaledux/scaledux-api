@@ -69,7 +69,8 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
       payment_status: row.payment_status ?? 'PENDING',
       milestone_status: row.status ?? 'PENDING',
       submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : [],
-      is_approved: row.is_approved === true
+      is_approved: row.is_approved === true,
+      remark: row.remark ?? undefined
     }));
 }
 
@@ -85,6 +86,7 @@ function buildDeliverablesFromRow(row: any): any[] {
         deliverable: d.description ?? '',
         status: d.status ?? 'PENDING',
         submitted_at: d.submitted_at ? new Date(d.submitted_at).toISOString() : null,
+        submitted_remark: d.submitted_remark ?? null,
         submitted_file: Array.isArray(d.submitted_file)
           ? (d.submitted_file as any[]).map((f: any) => ({
               url: typeof f?.url === 'string' ? getFileUrl(f.url) : f?.url,
@@ -129,7 +131,8 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
         payment_status: row.payment_status ?? 'PENDING',
         milestone_status: row.status ?? 'PENDING',
         submitted_file: submittedFile,
-        is_approved: row.is_approved === true
+        is_approved: row.is_approved === true,
+        remark: row.remark ?? undefined
       };
     });
 }
@@ -368,6 +371,7 @@ export class ProposalService {
       amount: number;
       dueDate: Date | string | null;
       deliverables: { deliverable: string }[];
+      remark?: string | null;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -393,6 +397,10 @@ export class ProposalService {
       const dueDate = data.dueDate != null ? new Date(data.dueDate) : null;
       const description = data.description != null ? String(data.description).slice(0, 500) : null;
       const deliverables = Array.isArray(data.deliverables) ? data.deliverables : [];
+      const remark =
+        data.remark != null && String(data.remark).trim() !== ""
+          ? String(data.remark).trim()
+          : null;
 
       const milestone = await (prisma as any).milestone.create({
         data: {
@@ -405,7 +413,8 @@ export class ProposalService {
           due_date: dueDate,
           deliverables,
           status: "PENDING",
-          is_approved: false
+          is_approved: false,
+          remark
         }
       });
 

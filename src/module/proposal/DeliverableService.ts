@@ -204,3 +204,62 @@ export async function requestChangesDeliverable(
 
   return { success: true, message: "Changes requested successfully" };
 }
+
+/**
+ * Approve a submitted deliverable (founder only). Sets status to APPROVED.
+ */
+export async function approveDeliverable(
+  userId: number,
+  deliverableUniqueId: string
+): Promise<ServiceResponse> {
+  const deliverable = await (prisma as any).deliverable.findFirst({
+    where: { unique_id: deliverableUniqueId },
+    include: {
+      milestone: {
+        include: {
+          proposal: {
+            select: {
+              unique_id: true,
+              provider_id: true,
+              project: { select: { id: true, unique_id: true, user_id: true, project_title: true } }
+            }
+          }
+        }
+      }
+    }
+  });
+  if (!deliverable) {
+    return { success: false, message: "Deliverable not found" };
+  }
+  if (deliverable.milestone.proposal.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner can approve this deliverable" };
+  }
+  if (deliverable.status === "APPROVED") {
+    return { success: true, message: "Deliverable is already approved" };
+  }
+  if (deliverable.status !== "SUBMITTED") {
+    if (deliverable.status === "CHANGES_REQUESTED") {
+      return { success: false, message: "Wait for the freelancer to resubmit after your change request" };
+    }
+    return { success: false, message: "Deliverable must be submitted by the freelancer before you can approve it" };
+  }
+
+  await (prisma as any).deliverable.update({
+    where: { id: deliverable.id },
+    data: { status: "APPROVED" }
+  });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    deliverable.milestone.proposal.unique_id,
+    "STATUS_CHANGE",
+    {
+      message: `Approved deliverable: ${deliverable.description}`,
+      milestoneTitle: deliverable.milestone.title,
+      deliverableDescription: deliverable.description
+    },
+    userId
+  );
+
+  return { success: true, message: "Deliverable approved successfully" };
+}

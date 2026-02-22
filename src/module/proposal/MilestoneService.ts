@@ -90,8 +90,13 @@ export async function requestChangesMilestone(
 
 /**
  * Approve a milestone (founder/project owner only). Sets is_approved = true so the milestone is locked and freelancer can work on it.
+ * Optional remark is stored as client message on the milestone.
  */
-export async function approveMilestone(userId: number, milestoneUniqueId: string): Promise<ServiceResponse> {
+export async function approveMilestone(
+  userId: number,
+  milestoneUniqueId: string,
+  remark?: string | null
+): Promise<ServiceResponse> {
   const milestone = await (prisma as any).milestone.findFirst({
     where: { unique_id: milestoneUniqueId },
     include: {
@@ -109,9 +114,11 @@ export async function approveMilestone(userId: number, milestoneUniqueId: string
     return { success: false, message: "Milestone is already approved" };
   }
 
+  const remarkValue =
+    remark != null && String(remark).trim() !== "" ? String(remark).trim() : null;
   await (prisma as any).milestone.update({
     where: { id: milestone.id },
-    data: { is_approved: true }
+    data: { is_approved: true, remark: remarkValue }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");
@@ -142,4 +149,57 @@ export async function approveMilestone(userId: number, milestoneUniqueId: string
   );
 
   return { success: true, message: "Milestone approved successfully" };
+}
+
+/**
+ * Release payment for a milestone (founder only). Sets milestone payment_status to RELEASED.
+ * All deliverables in the milestone must be APPROVED before release.
+ */
+export async function releaseMilestonePayment(
+  userId: number,
+  milestoneUniqueId: string
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      project: { select: { user_id: true, project_title: true, unique_id: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner can release payment for this milestone" };
+  }
+  if (milestone.payment_status === "RELEASED") {
+    return { success: false, message: "Payment for this milestone is already released" };
+  }
+
+  const deliverables = await (prisma as any).deliverable.findMany({
+    where: { milestone_id: milestone.id }
+  });
+  const allApproved = deliverables.length > 0 && deliverables.every((d: any) => d.status === "APPROVED");
+  if (!allApproved) {
+    return { success: false, message: "Approve all deliverables before releasing payment" };
+  }
+
+  await (prisma as any).milestone.update({
+    where: { id: milestone.id },
+    data: { payment_status: "RELEASED", status: "PAID" }
+  });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    milestone.proposal.unique_id,
+    "MILESTONE_PAYMENT",
+    {
+      milestoneTitle: milestone.title,
+      amount: Number(milestone.amount),
+      message: `Released payment for milestone: ${milestone.title}`
+    },
+    userId
+  );
+
+  return { success: true, message: "Payment released successfully" };
 }

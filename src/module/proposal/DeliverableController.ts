@@ -51,3 +51,20 @@ export async function requestChangesDeliverable(req: Request, res: Response) {
   const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
   return ApiResponse.error(res, result.message, code);
 }
+
+export async function approveDeliverable(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  const deliverableId = getStringParam(req.params.deliverableId);
+  if (!deliverableId) {
+    return ApiResponse.error(res, "Deliverable ID is required", 400);
+  }
+  const result = await DeliverableService.approveDeliverable(userId, deliverableId);
+  if (result.success) {
+    return ApiResponse.success(res, undefined, result.message);
+  }
+  const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+  return ApiResponse.error(res, result.message, code);
+}

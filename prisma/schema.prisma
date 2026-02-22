@@ -762,6 +762,8 @@ model Milestone {
   payment_status   String    @default("PENDING") @db.VarChar(20) // PENDING, FUNDED, RELEASED
   /** When true, this milestone cannot be edited/deleted (e.g. set when proposal is HIRED or milestone approved) */
   is_approved      Boolean   @default(false)
+  /** Client/founder message (e.g. note when approving or general remark) */
+  remark           String?   @db.Text
   created_at       DateTime  @default(now())
   updated_at       DateTime  @default(now()) @updatedAt
 

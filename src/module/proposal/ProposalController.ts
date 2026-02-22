@@ -218,7 +218,7 @@ export async function updateProposal(req: Request, res: Response) {
 export async function addMilestone(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { title, description, amount, dueDate, deliverables } = req.body ?? {};
+  const { title, description, amount, dueDate, deliverables, remark } = req.body ?? {};
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -243,7 +243,8 @@ export async function addMilestone(req: Request, res: Response) {
     description: description != null ? String(description) : null,
     amount: amt,
     dueDate: dueDate != null ? new Date(dueDate) : null,
-    deliverables: dlvs
+    deliverables: dlvs,
+    remark: typeof remark === "string" ? remark : undefined
   });
 
   if (result.success) {

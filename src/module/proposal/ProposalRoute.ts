@@ -18,8 +18,8 @@ import {
   getProposalActivities,
   addMilestone
 } from "./ProposalController";
-import { submitMilestone, requestChangesMilestone, approveMilestone } from "./MilestoneController";
-import { submitDeliverable, requestChangesDeliverable } from "./DeliverableController";
+import { submitMilestone, requestChangesMilestone, approveMilestone, releaseMilestonePayment } from "./MilestoneController";
+import { submitDeliverable, requestChangesDeliverable, approveDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
@@ -81,10 +81,12 @@ router.get("/founder/contracts", getFounderContracts); // Get founder contracts 
 router.post("/milestones/:milestoneId/submit", submitMilestone);
 router.post("/milestones/:milestoneId/request-changes", requestChangesMilestone);
 router.post("/milestones/:milestoneId/approve", approveMilestone);
+router.post("/milestones/:milestoneId/release-payment", releaseMilestonePayment);
 
-// Per-deliverable submit and request changes
+// Per-deliverable submit, request changes, approve
 router.post("/deliverables/:deliverableId/submit", submitDeliverable);
 router.post("/deliverables/:deliverableId/request-changes", requestChangesDeliverable);
+router.post("/deliverables/:deliverableId/approve", approveDeliverable);
 
 // Add new milestone (freelancer, OFFER_ACCEPTED or HIRED)
 router.post("/:id/milestones", addMilestone);
