@@ -1094,7 +1094,7 @@ export class FounderProjectService {
         "",
         {
           activityType: "project_invitation",
-          projectId: project.unique_id,
+          activityId: project.unique_id,
           projectTitle: project.project_title,
           messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_SENT}: ${projectTitle}`,
           messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_RECEIVED}: ${projectTitle}`
@@ -1179,7 +1179,7 @@ export class FounderProjectService {
         "",
         {
           activityType: "project_invitation_rejected",
-          projectId: project.unique_id,
+          activityId: project.unique_id,
           projectTitle,
           messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_SENT}: ${projectTitle}`,
           messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_RECEIVED}: ${projectTitle}`
@@ -1237,7 +1237,7 @@ export class FounderProjectService {
         "",
         {
           activityType: "project_invitation_accepted",
-          projectId: project.unique_id,
+          activityId: project.unique_id,
           projectTitle,
           messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_ACCEPTED_SENT}: ${projectTitle}`,
           messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_ACCEPTED_RECEIVED}: ${projectTitle}`

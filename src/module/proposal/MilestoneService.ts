@@ -131,8 +131,7 @@ export async function approveMilestone(userId: number, milestoneUniqueId: string
     "",
     {
       activityType: "milestone_approved",
-      proposalId: milestone.proposal.unique_id,
-      projectId: milestone.project.unique_id,
+      activityId: milestone.proposal.unique_id,
       projectTitle,
       milestoneTitle: milestone.title,
       messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_APPROVED_SENT ?? "Milestone approved"}: ${milestone.title}`.trim(),

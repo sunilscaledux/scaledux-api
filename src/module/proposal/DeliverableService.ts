@@ -99,8 +99,7 @@ export async function submitDeliverable(
       "",
       {
         activityType: "deliverable_submitted",
-        proposalId: deliverable.milestone.proposal.unique_id,
-        projectId: project.unique_id ?? project.id,
+        activityId: deliverable.milestone.proposal.unique_id,
         projectTitle,
         milestoneTitle: deliverable.milestone.title,
         deliverableDescription: deliverable.description,
@@ -189,8 +188,7 @@ export async function requestChangesDeliverable(
       "",
       {
         activityType: "deliverable_request_changes",
-        proposalId: deliverable.milestone.proposal.unique_id,
-        projectId: project.unique_id ?? project.id,
+        activityId: deliverable.milestone.proposal.unique_id,
         projectTitle,
         milestoneTitle: deliverable.milestone.title,
         deliverableDescription: deliverable.description,

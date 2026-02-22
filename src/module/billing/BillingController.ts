@@ -154,9 +154,8 @@ export class BillingController {
     const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
       activityType: "payment_release",
-      proposalId: proposal.unique_id,
+      activityId: proposal.unique_id,
       projectTitle,
-      projectId: proposal.project.id,
       messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_SENT,
       messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_RECEIVED
     };
@@ -244,9 +243,8 @@ export class BillingController {
     const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
       activityType: "payment_release",
-      proposalId: proposal.unique_id,
+      activityId: proposal.unique_id,
       projectTitle,
-      projectId: proposal.project.id,
       milestoneIndex,
       messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_SENT,
       messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_RECEIVED

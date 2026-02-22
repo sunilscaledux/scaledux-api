@@ -241,8 +241,7 @@ export class ProposalService {
         "",
         {
           activityType: "proposal_submitted",
-          proposalId: proposal.unique_id,
-          projectId: project.unique_id,
+          activityId: proposal.unique_id,
           projectTitle: project.project_title,
           messageSent: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_SUBMITTED_SENT} ${projectTitle}`,
           messageReceived: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_SUBMITTED_RECEIVED} ${projectTitle}`
@@ -443,8 +442,7 @@ export class ProposalService {
         "",
         {
           activityType: "milestone_requested",
-          proposalId: proposal.unique_id,
-          projectId: proposal.project.unique_id,
+          activityId: proposal.unique_id,
           projectTitle,
           milestoneTitle: title,
           messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_REQUESTED_SENT} ${projectTitle}`.trim(),
@@ -1015,8 +1013,7 @@ export class ProposalService {
           "",
           {
             activityType: "proposal_updated",
-            proposalId: proposal.unique_id,
-            projectId: proposal.project.unique_id,
+            activityId: proposal.unique_id,
             projectTitle,
             messageSent: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_UPDATED_SENT} ${projectTitle}`,
             messageReceived: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_UPDATED_RECEIVED} ${projectTitle}`
@@ -1104,7 +1101,7 @@ export class ProposalService {
       const receivedText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
       const metadata: Record<string, unknown> = {
         activityType: "proposal_status",
-        proposalId: proposal.unique_id,
+        activityId: proposal.unique_id,
         newStatus: status,
         messageSent: sentText,
         messageReceived: receivedText
@@ -1181,7 +1178,7 @@ export class ProposalService {
       const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle}`;
       const metadata: Record<string, unknown> = {
         activityType: "offer_cancelled",
-        proposalId: proposal.unique_id,
+        activityId: proposal.unique_id,
         messageSent: sentText,
         messageReceived: receivedText
       };
@@ -1257,7 +1254,7 @@ export class ProposalService {
       const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_DECLINED_RECEIVED} ${projectTitle}`;
       const metadata: Record<string, unknown> = {
         activityType: "offer_declined",
-        proposalId: proposal.unique_id,
+        activityId: proposal.unique_id,
         messageSent: sentText,
         messageReceived: receivedText
       };
@@ -1416,7 +1413,7 @@ export class ProposalService {
           "",
           {
             activityType: "proposal_status",
-            proposalId: proposal.unique_id,
+            activityId: proposal.unique_id,
             newStatus: "OFFER_SENT",
             messageSent: CHAT_SYSTEM_MESSAGES.OFFER_SENT_SENT,
             messageReceived: CHAT_SYSTEM_MESSAGES.OFFER_SENT_RECEIVED
@@ -1447,8 +1444,7 @@ export class ProposalService {
           "",
           {
             activityType: "contract_sent",
-            proposalId: proposal.unique_id,
-            projectId: proposal.project.unique_id,
+            activityId: proposal.unique_id,
             projectTitle: proposal.project.project_title,
             messageSent: CHAT_SYSTEM_MESSAGES.CONTRACT_SENT_SENT,
             messageReceived: receivedMsg
@@ -1465,8 +1461,7 @@ export class ProposalService {
           "",
           {
             activityType: "contract_signed",
-            proposalId: proposal.unique_id,
-            projectId: proposal.project.unique_id,
+            activityId: proposal.unique_id,
             projectTitle: proposal.project.project_title,
             messageSent: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_SENT,
             messageReceived: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_RECEIVED
@@ -1548,8 +1543,7 @@ export class ProposalService {
           "",
           {
             activityType: "proposal_withdrawn",
-            proposalId: proposal.unique_id,
-            projectId: project.unique_id,
+            activityId: proposal.unique_id,
             projectTitle: project.project_title,
             messageSent: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_SENT,
             messageReceived: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_RECEIVED
@@ -1619,8 +1613,7 @@ export class ProposalService {
         "",
         {
           activityType: "contract_terminated",
-          proposalId: proposal.unique_id,
-          projectId: proposal.project.unique_id,
+          activityId: proposal.unique_id,
           projectTitle: proposal.project.project_title,
           reason: trimmed,
           messageSent,
@@ -1725,9 +1718,8 @@ export class ProposalService {
         "",
         {
           activityType: "request_modify",
-          proposalId: proposal.unique_id,
+          activityId: proposal.unique_id,
           message: trimmed,
-          projectId: proposal.project.unique_id,
           projectTitle: proposal.project.project_title,
           messageSent: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_SENT} ${projectTitle}`,
           messageReceived: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_RECEIVED} ${projectTitle}`
