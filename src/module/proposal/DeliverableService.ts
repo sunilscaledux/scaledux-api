@@ -19,13 +19,18 @@ export async function submitDeliverable(
       milestone: {
         include: {
           proposal: {
-            select: { id: true, provider_id: true, unique_id: true },
-            include: { project: { select: { id: true, unique_id: true, user_id: true, project_title: true } } }
+            select: {
+              id: true,
+              provider_id: true,
+              unique_id: true,
+              project: { select: { id: true, unique_id: true, user_id: true, project_title: true } }
+            }
           }
         }
       }
     }
   });
+  const milestoneOrderIndex = deliverable?.milestone?.order_index ?? 0;
   if (!deliverable) {
     return { success: false, message: "Deliverable not found" };
   }
@@ -67,11 +72,19 @@ export async function submitDeliverable(
     });
   }
 
+  const submittedRemark = remark != null && String(remark).trim() !== "" ? String(remark).trim() : undefined;
+  const fileLinks = files.map((f: { url: string; name?: string }) => ({ url: f.url, name: f.name }));
   const { createProposalActivity } = await import("./ProposalActivityService");
   await createProposalActivity(
     deliverable.milestone.proposal.unique_id,
     "MILESTONE_SUBMITTED",
-    { milestoneTitle: deliverable.milestone.title, deliverableDescription: deliverable.description },
+    {
+      milestoneIndex: milestoneOrderIndex,
+      milestoneTitle: deliverable.milestone.title,
+      deliverableDescription: deliverable.description,
+      remark: submittedRemark,
+      submittedFileUrls: fileLinks.length > 0 ? fileLinks : undefined
+    },
     userId
   );
 
@@ -116,8 +129,11 @@ export async function requestChangesDeliverable(
       milestone: {
         include: {
           proposal: {
-            select: { unique_id: true, provider_id: true },
-            include: { project: { select: { id: true, unique_id: true, user_id: true, project_title: true } } }
+            select: {
+              unique_id: true,
+              provider_id: true,
+              project: { select: { id: true, unique_id: true, user_id: true, project_title: true } }
+            }
           }
         }
       }
@@ -126,7 +142,7 @@ export async function requestChangesDeliverable(
   if (!deliverable) {
     return { success: false, message: "Deliverable not found" };
   }
-  if (deliverable.milestone.project.user_id !== userId) {
+  if (deliverable.milestone.proposal.project.user_id !== userId) {
     return { success: false, message: "Only the project owner can request changes on this deliverable" };
   }
   if (deliverable.status !== "SUBMITTED") {

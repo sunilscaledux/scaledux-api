@@ -301,7 +301,7 @@ export class BillingService {
     }
     await prisma.billingTransactionMeta.createMany({ data: metaRows });
 
-    return { success: true, data: { transactionId: row.id } };
+    return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
 
   /** Get paid milestone indices for a proposal (0-based). */

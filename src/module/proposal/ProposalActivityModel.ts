@@ -12,6 +12,11 @@ export interface IProposalActivityPayload {
   milestoneTitle?: string;
   amount?: number;
   deliverableDescription?: string;
+  /** Transaction id (e.g. billing transaction unique_id) for payment activities */
+  transactionId?: string;
+  /** MILESTONE_SUBMITTED: remark and file links */
+  remark?: string;
+  submittedFileUrls?: { url: string; name?: string }[];
 }
 
 export interface IProposalActivity extends Document {

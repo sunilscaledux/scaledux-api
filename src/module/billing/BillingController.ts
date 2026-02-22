@@ -140,7 +140,7 @@ export class BillingController {
     }
 
     const projectTitle = proposal.project.project_title || "project";
-    await BillingService.recordPayment({
+    const payResult = await BillingService.recordPayment({
       actorId: proposal.project.user_id,
       fromId: proposal.project.user_id,
       toId: proposal.provider_id,
@@ -149,6 +149,7 @@ export class BillingController {
       amount,
       description: `Payment for ${projectTitle}`
     });
+    const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
     const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
@@ -174,7 +175,7 @@ export class BillingController {
       data: { status: 'HIRED' }
     });
 
-    await createProposalActivity(proposal.unique_id, 'HIRE_PAYMENT', { amount }, userId);
+    await createProposalActivity(proposal.unique_id, 'HIRE_PAYMENT', { amount, transactionId: transactionUniqueId }, userId);
 
     ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
     return true;
@@ -228,7 +229,7 @@ export class BillingController {
 
     const projectTitle = proposal.project.project_title || "project";
     const milestoneTitle = milestoneRow?.title || milestoneRow?.description || `Milestone ${milestoneIndex + 1}`;
-    await BillingService.recordPayment({
+    const payResult = await BillingService.recordPayment({
       actorId: proposal.project.user_id,
       fromId: proposal.project.user_id,
       toId: proposal.provider_id,
@@ -238,6 +239,7 @@ export class BillingController {
       description: `Payment for ${projectTitle}: ${milestoneTitle}`,
       meta: { milestone_index: String(milestoneIndex) }
     });
+    const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
     const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
@@ -276,7 +278,8 @@ export class BillingController {
     await createProposalActivity(proposal.unique_id, 'MILESTONE_PAYMENT', {
       milestoneIndex,
       amount,
-      milestoneTitle
+      milestoneTitle,
+      transactionId: transactionUniqueId
     }, userId);
 
     ApiResponse.success(res, { proposalPayment: true, milestoneIndex }, "Milestone payment recorded");
