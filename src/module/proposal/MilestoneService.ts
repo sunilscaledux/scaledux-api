@@ -87,3 +87,60 @@ export async function requestChangesMilestone(
 
   return { success: true, message: "Changes requested successfully" };
 }
+
+/**
+ * Approve a milestone (founder/project owner only). Sets is_approved = true so the milestone is locked and freelancer can work on it.
+ */
+export async function approveMilestone(userId: number, milestoneUniqueId: string): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      project: { select: { user_id: true, project_title: true, unique_id: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner (founder) can approve milestones" };
+  }
+  if (milestone.is_approved === true) {
+    return { success: false, message: "Milestone is already approved" };
+  }
+
+  await (prisma as any).milestone.update({
+    where: { id: milestone.id },
+    data: { is_approved: true }
+  });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    milestone.proposal.unique_id,
+    "STATUS_CHANGE",
+    { message: `Milestone "${milestone.title}" approved`, milestoneTitle: milestone.title },
+    userId
+  );
+
+  const { ConversationService } = await import("./../chat/ConversationService");
+  const { CHAT_SYSTEM_MESSAGES } = await import("../../constants/chatSystemMessages");
+  const projectTitle = milestone.project?.project_title ?? "";
+  await ConversationService.syncSystemMessage(
+    milestone.project.user_id,
+    milestone.proposal.provider_id,
+    "",
+    {
+      activityType: "milestone_approved",
+      proposalId: milestone.proposal.unique_id,
+      projectId: milestone.project.unique_id,
+      projectTitle,
+      milestoneTitle: milestone.title,
+      messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_APPROVED_SENT ?? "Milestone approved"}: ${milestone.title}`.trim(),
+      messageReceived: `${CHAT_SYSTEM_MESSAGES.MILESTONE_APPROVED_RECEIVED ?? "Client approved milestone"}: ${milestone.title}`.trim()
+    },
+    milestone.project_id,
+    userId
+  );
+
+  return { success: true, message: "Milestone approved successfully" };
+}

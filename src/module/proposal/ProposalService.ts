@@ -68,7 +68,8 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
       deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
       payment_status: row.payment_status ?? 'PENDING',
       milestone_status: row.status ?? 'PENDING',
-      submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : []
+      submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : [],
+      is_approved: row.is_approved === true
     }));
 }
 
@@ -127,7 +128,8 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
         deliverables,
         payment_status: row.payment_status ?? 'PENDING',
         milestone_status: row.status ?? 'PENDING',
-        submitted_file: submittedFile
+        submitted_file: submittedFile,
+        is_approved: row.is_approved === true
       };
     });
 }
@@ -300,20 +302,34 @@ export class ProposalService {
         due_date: dueDate
       };
       try {
-        const milestone = await prismaAny.milestone.upsert({
+        const existing = await prismaAny.milestone.findUnique({
           where: {
             proposal_id_order_index: { proposal_id: proposalId, order_index: i }
           },
-          create: { ...row, status: 'PENDING' },
-          update: {
-            title: row.title,
-            description: row.description,
-            deliverables: row.deliverables,
-            amount: row.amount,
-            due_date: row.due_date
-          }
+          select: { id: true, is_approved: true }
         });
-        if (milestone?.id && typeof prismaAny.deliverable?.upsert === 'function') {
+        let milestone: any;
+        if (!existing) {
+          milestone = await prismaAny.milestone.create({
+            data: { ...row, status: 'PENDING' }
+          });
+        } else if (existing.is_approved === true) {
+          milestone = existing;
+          // Skip update for approved milestones
+        } else {
+          milestone = await prismaAny.milestone.update({
+            where: { id: existing.id },
+            data: {
+              title: row.title,
+              description: row.description,
+              deliverables: row.deliverables,
+              amount: row.amount,
+              due_date: row.due_date
+            }
+          });
+        }
+        const skipDeliverableSync = existing?.is_approved === true;
+        if (milestone?.id && typeof prismaAny.deliverable?.upsert === 'function' && !skipDeliverableSync) {
           for (let j = 0; j < deliverables.length; j++) {
             const d = deliverables[j];
             const desc = typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? '');
@@ -337,6 +353,111 @@ export class ProposalService {
       } catch (_) {
         // ignore if table missing or constraint name differs
       }
+    }
+  }
+
+  /**
+   * Add a new milestone (freelancer only, proposal OFFER_ACCEPTED or HIRED).
+   * New milestone has is_approved = false until founder approves.
+   */
+  static async addMilestone(
+    userId: number,
+    proposalUniqueId: string,
+    data: {
+      title: string;
+      description?: string | null;
+      amount: number;
+      dueDate: Date | string | null;
+      deliverables: { deliverable: string }[];
+    }
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalUniqueId, provider_id: userId },
+        include: {
+          project: { select: { id: true, user_id: true, project_title: true, unique_id: true } },
+          milestonesRows: { orderBy: { order_index: "asc" }, select: { order_index: true } }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found or you don't have permission" };
+      }
+      const status = (proposal as any).status;
+      if (status !== "OFFER_ACCEPTED" && status !== "HIRED") {
+        return { success: false, message: "You can only add milestones after the offer is accepted or you are hired" };
+      }
+
+      const rows = proposal.milestonesRows ?? [];
+      const nextIndex = rows.length > 0 ? Math.max(...rows.map((r: any) => r.order_index ?? 0)) + 1 : 0;
+      const title = String(data.title || "New milestone").slice(0, 255);
+      const amount = Number(data.amount) || 0;
+      const dueDate = data.dueDate != null ? new Date(data.dueDate) : null;
+      const description = data.description != null ? String(data.description).slice(0, 500) : null;
+      const deliverables = Array.isArray(data.deliverables) ? data.deliverables : [];
+
+      const milestone = await (prisma as any).milestone.create({
+        data: {
+          project_id: proposal.project_id,
+          proposal_id: proposal.id,
+          order_index: nextIndex,
+          title,
+          description,
+          amount,
+          due_date: dueDate,
+          deliverables,
+          status: "PENDING",
+          is_approved: false
+        }
+      });
+
+      const prismaAny = prisma as any;
+      if (milestone?.id && typeof prismaAny.deliverable?.create === "function") {
+        for (let j = 0; j < deliverables.length; j++) {
+          const d = deliverables[j];
+          const desc = typeof d === "object" && d?.deliverable != null ? String(d.deliverable).slice(0, 500) : "";
+          try {
+            await prismaAny.deliverable.create({
+              data: {
+                milestone_id: milestone.id,
+                order_index: j,
+                description: desc || "Deliverable"
+              }
+            });
+          } catch (_) {
+            // ignore
+          }
+        }
+      }
+
+      await createProposalActivity(
+        proposal.unique_id,
+        "STATUS_CHANGE",
+        { message: `New milestone requested: ${title}`, milestoneTitle: title },
+        userId
+      );
+
+      const projectTitle = proposal.project?.project_title ?? "";
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        userId,
+        "",
+        {
+          activityType: "milestone_requested",
+          proposalId: proposal.unique_id,
+          projectId: proposal.project.unique_id,
+          projectTitle,
+          milestoneTitle: title,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_REQUESTED_SENT} ${projectTitle}`.trim(),
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.MILESTONE_REQUESTED_RECEIVED} ${projectTitle}`.trim()
+        },
+        proposal.project_id,
+        userId
+      );
+
+      return { success: true, message: "Milestone added successfully" };
+    } catch (error: any) {
+      console.error("Add Milestone Error:", error);
+      return { success: false, message: error.message || "Failed to add milestone" };
     }
   }
 
@@ -862,6 +983,9 @@ export class ProposalService {
       if (proposal.status !== 'PENDING') {
         return { success: false, message: "Only pending proposals can be edited" };
       }
+      if ((proposal as any).milestones_approved === true) {
+        return { success: false, message: "Milestones are locked after hire and cannot be edited" };
+      }
       const oldSnapshot = {
         status: proposal.status,
         cover_letter: proposal.cover_letter,
@@ -1180,7 +1304,11 @@ export class ProposalService {
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "HIRED" }
+        data: { status: "HIRED", milestones_approved: true }
+      });
+      await (prisma as any).milestone.updateMany({
+        where: { proposal_id: proposal.id },
+        data: { is_approved: true }
       });
 
       return { success: true, message: "Hired successfully" };

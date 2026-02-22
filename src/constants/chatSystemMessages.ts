@@ -37,6 +37,12 @@ export const CHAT_SYSTEM_MESSAGES = {
   DELIVERABLE_REQUEST_CHANGES_SENT: "You requested changes on deliverable for",
   DELIVERABLE_REQUEST_CHANGES_RECEIVED: "Changes requested on your deliverable for",
 
+  MILESTONE_APPROVED_SENT: "You approved the milestone",
+  MILESTONE_APPROVED_RECEIVED: "Client approved your milestone",
+
+  MILESTONE_REQUESTED_SENT: "You requested a new milestone for",
+  MILESTONE_REQUESTED_RECEIVED: "Freelancer requested a new milestone for",
+
   CONTRACT_SENT_SENT: "Contract sent",
   CONTRACT_SENT_RECEIVED: "Contract sent",
   NDA_SIGN_REQUEST: "Please sign the NDA and upload it to proceed.",

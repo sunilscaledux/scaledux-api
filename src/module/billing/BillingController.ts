@@ -263,7 +263,11 @@ export class BillingController {
     if (milestoneIndex === 0) {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "HIRED" }
+        data: { status: "HIRED", milestones_approved: true }
+      });
+      await (prisma as any).milestone.updateMany({
+        where: { proposal_id: proposal.id },
+        data: { is_approved: true }
       });
     }
 

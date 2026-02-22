@@ -213,6 +213,47 @@ export async function updateProposal(req: Request, res: Response) {
 }
 
 /**
+ * Add a new milestone (freelancer only, OFFER_ACCEPTED or HIRED)
+ */
+export async function addMilestone(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const { title, description, amount, dueDate, deliverables } = req.body ?? {};
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+  const titleStr = typeof title === "string" ? title.trim() : "";
+  if (!titleStr) {
+    return ApiResponse.error(res, "Milestone title is required", 400);
+  }
+  const amt = Number(amount);
+  if (isNaN(amt) || amt < 0) {
+    return ApiResponse.error(res, "Valid amount is required", 400);
+  }
+  const dlvs = Array.isArray(deliverables)
+    ? deliverables.map((d: any) => ({ deliverable: typeof d?.deliverable === "string" ? d.deliverable : String(d ?? "") }))
+    : [];
+
+  const result = await ProposalService.addMilestone(userId, proposalId, {
+    title: titleStr,
+    description: description != null ? String(description) : null,
+    amount: amt,
+    dueDate: dueDate != null ? new Date(dueDate) : null,
+    deliverables: dlvs
+  });
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  }
+  const code = result.message?.includes("not found") || result.message?.includes("permission") ? 403 : 400;
+  return ApiResponse.error(res, result.message, code);
+}
+
+/**
  * Update proposal status (founder)
  */
 export async function updateProposalStatus(req: Request, res: Response) {

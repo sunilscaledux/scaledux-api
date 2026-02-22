@@ -724,6 +724,9 @@ model Proposal {
   // Shape: { offer_expires_at?, is_nda_signed?, nda_file_link?, nda_sent_at?, nda_signed_at?, nda_signed_file_link?, nda_downloaded_at? }
   nda                   Json?     // NDA and offer data (dates as ISO strings in JSON)
 
+  // Lock milestones after hire (no more edit/delete)
+  milestones_approved   Boolean   @default(false) // true when status becomes HIRED
+
   // Timestamps
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now()) @updatedAt
@@ -757,6 +760,8 @@ model Milestone {
   submitted_remark String?   @db.Text          // Freelancer remark on submission
   submitted_file   Json      @default("[]")    // Array of { url, name } - submitted files for this milestone
   payment_status   String    @default("PENDING") @db.VarChar(20) // PENDING, FUNDED, RELEASED
+  /** When true, this milestone cannot be edited/deleted (e.g. set when proposal is HIRED or milestone approved) */
+  is_approved      Boolean   @default(false)
   created_at       DateTime  @default(now())
   updated_at       DateTime  @default(now()) @updatedAt
 
