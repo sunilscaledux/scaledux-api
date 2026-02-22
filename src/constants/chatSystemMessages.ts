@@ -37,6 +37,9 @@ export const CHAT_SYSTEM_MESSAGES = {
   DELIVERABLE_REQUEST_CHANGES_SENT: "You requested changes on deliverable for",
   DELIVERABLE_REQUEST_CHANGES_RECEIVED: "Changes requested on your deliverable for",
 
+  DELIVERABLE_APPROVED_SENT: "You approved deliverable for",
+  DELIVERABLE_APPROVED_RECEIVED: "Client approved your deliverable for",
+
   MILESTONE_APPROVED_SENT: "You approved the milestone",
   MILESTONE_APPROVED_RECEIVED: "Client approved your milestone",
 

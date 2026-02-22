@@ -261,5 +261,28 @@ export async function approveDeliverable(
     userId
   );
 
+  const project = deliverable.milestone.proposal.project;
+  if (project?.id != null && project?.user_id != null) {
+    const projectOwnerId = project.user_id;
+    const providerId = deliverable.milestone.proposal.provider_id;
+    const projectTitle = project.project_title ?? "";
+    await ConversationService.syncSystemMessage(
+      projectOwnerId,
+      providerId,
+      "",
+      {
+        activityType: "deliverable_approved",
+        activityId: deliverable.milestone.proposal.unique_id,
+        projectTitle,
+        milestoneTitle: deliverable.milestone.title,
+        deliverableDescription: deliverable.description,
+        messageSent: `${CHAT_SYSTEM_MESSAGES.DELIVERABLE_APPROVED_SENT ?? "You approved deliverable for"} ${projectTitle}`.trim(),
+        messageReceived: `${CHAT_SYSTEM_MESSAGES.DELIVERABLE_APPROVED_RECEIVED ?? "Client approved your deliverable for"} ${projectTitle}`.trim()
+      },
+      project.id,
+      userId
+    );
+  }
+
   return { success: true, message: "Deliverable approved successfully" };
 }
