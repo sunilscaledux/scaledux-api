@@ -219,6 +219,31 @@ export async function updateProposalStatus(req: Request, res: Response) {
 }
 
 /**
+ * Set hire (founder). Sets proposal status to HIRED when NDA is signed (OFFER_ACCEPTED).
+ */
+export async function setHire(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.setHire(userId, proposalId);
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("Only the project owner") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Cancel hire / withdraw offer (founder). Allowed only when ACCEPTED and NDA not signed.
  */
 export async function cancelHire(req: Request, res: Response) {

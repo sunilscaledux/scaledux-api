@@ -54,6 +54,23 @@ function flattenNdaToProposal(proposal: any): any {
   };
 }
 
+/** Build milestones array from Milestone table rows (single source of truth). */
+function milestonesFromRows(rows: any[] | null | undefined): any[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((row) => ({
+      id: row.unique_id,
+      title: row.title ?? '',
+      description: row.description ?? undefined,
+      amount: Number(row.amount ?? 0),
+      dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
+      deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+      payment_status: row.payment_status ?? 'PENDING',
+      submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : []
+    }));
+}
+
 /**
  * ProposalService
  * Handles all proposal operations for service providers
@@ -114,7 +131,7 @@ export class ProposalService {
         };
       }
 
-      // Create the proposal
+      // Create the proposal (milestones live in Milestone table only; proposal.milestones kept empty)
       const proposal = await (prisma as any).proposal.create({
         data: {
           project_id: project.id,
@@ -122,7 +139,7 @@ export class ProposalService {
           cover_letter: data.cover_letter || '',
           proposed_amount: data.proposed_amount,
           payment_schedule: data.payment_schedule,
-          milestones: data.milestones,
+          milestones: [],
           screening_answers: data.screening_answers,
           attachments: data.attachments,
           status: 'PENDING'
@@ -265,6 +282,7 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          milestonesRows: { orderBy: { order_index: 'asc' } },
           project: {
             select: {
               id: true,
@@ -305,10 +323,11 @@ export class ProposalService {
         take: limit
       });
 
-      // Transform proposals with file URLs and flatten nda for response
+      // Transform proposals: milestones from Milestone table; file URLs; flatten nda
       const transformedProposals = proposals.map((proposal: any) =>
         flattenNdaToProposal({
           ...proposal,
+          milestones: milestonesFromRows(proposal.milestonesRows),
           attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
           project: proposal.project ? {
             ...proposal.project,
@@ -379,6 +398,7 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          milestonesRows: { orderBy: { order_index: 'asc' } },
           provider: {
             select: {
               id: true,
@@ -406,10 +426,11 @@ export class ProposalService {
         take: limit
       });
 
-      // Transform proposals with file URLs and flatten nda for response
+      // Transform proposals: milestones from Milestone table; file URLs; flatten nda
       const transformedProposals = proposals.map((proposal: any) =>
         flattenNdaToProposal({
           ...proposal,
+          milestones: milestonesFromRows(proposal.milestonesRows),
           attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
           provider: proposal.provider ? {
             ...proposal.provider,
@@ -543,10 +564,11 @@ export class ProposalService {
         };
       }
 
-      // Transform with file URLs
+      // Transform with file URLs; milestones come from Milestone table (milestonesRows), not proposal.milestones
       const projectUser = proposal.project?.user;
       const transformedProposal: any = {
         ...proposal,
+        milestones: milestonesFromRows(proposal.milestonesRows),
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
         milestonesRows: proposal.milestonesRows?.map((row: any) => {
           const docs = row.documents?.map((d: any) => ({ ...d, file_url: getFileUrl(d.file_url) })) ?? [];
@@ -646,7 +668,6 @@ export class ProposalService {
         cover_letter: proposal.cover_letter,
         proposed_amount: proposal.proposed_amount?.toString?.(),
         payment_schedule: proposal.payment_schedule,
-        milestones: proposal.milestones,
         screening_answers: proposal.screening_answers,
         attachments: proposal.attachments
       };
@@ -657,7 +678,6 @@ export class ProposalService {
           cover_letter: data.cover_letter ?? proposal.cover_letter,
           proposed_amount: data.proposed_amount,
           payment_schedule: data.payment_schedule,
-          milestones: data.milestones,
           screening_answers: data.screening_answers,
           attachments: data.attachments
         }
@@ -846,6 +866,39 @@ export class ProposalService {
   }
 
   /**
+   * Set proposal to HIRED (founder). Allowed only when status is OFFER_ACCEPTED (NDA signed).
+   */
+  static async setHire(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: { select: { id: true, user_id: true } }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "Only the project owner can hire" };
+      }
+      if (proposal.status !== "OFFER_ACCEPTED") {
+        return { success: false, message: "You can only hire after the freelancer has signed the NDA (offer accepted)" };
+      }
+
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { status: "HIRED" }
+      });
+
+      return { success: true, message: "Hired successfully" };
+    } catch (error: any) {
+      console.error("Set hire Error:", error);
+      return { success: false, message: error.message || "Failed to hire" };
+    }
+  }
+
+  /**
    */
   static async updateProposalNda(
     userId: number,
@@ -927,7 +980,8 @@ export class ProposalService {
       });
 
       // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT
-      if (isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED')) {
+      const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED');
+      if (didJustSendOffer) {
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
           oldStatus: proposal.status,
           newStatus: 'OFFER_SENT'
@@ -960,7 +1014,8 @@ export class ProposalService {
         });
       }
 
-      if (isFounder && (data.nda_file_link !== undefined || data.is_nda_signed !== undefined)) {
+      // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
+      if (isFounder && (data.nda_file_link !== undefined || data.is_nda_signed !== undefined) && !didJustSendOffer) {
         const projectTitle = proposal.project.project_title || "Project";
         const receivedMsg = data.is_nda_signed
           ? CHAT_SYSTEM_MESSAGES.CONTRACT_SENT_RECEIVED

@@ -756,6 +756,8 @@ model Milestone {
   status           String    @default("PENDING") @db.VarChar(20) // PENDING, IN_PROGRESS, COMPLETED, PAID
   submitted_at     DateTime? @db.Timestamptz   // When freelancer submitted (files + remark)
   submitted_remark String?   @db.Text          // Freelancer remark on submission
+  submitted_file   Json      @default("[]")    // Array of { url, name } - submitted files for this milestone
+  payment_status   String    @default("PENDING") @db.VarChar(20) // PENDING, FUNDED, RELEASED
   created_at       DateTime  @default(now())
   updated_at       DateTime  @default(now()) @updatedAt
 

@@ -189,7 +189,8 @@ export class BillingController {
     const proposal = await (prisma as any).proposal.findFirst({
       where: { unique_id: proposalId },
       include: {
-        project: { select: { id: true, user_id: true, project_title: true } }
+        project: { select: { id: true, user_id: true, project_title: true } },
+        milestonesRows: { orderBy: { order_index: "asc" } }
       }
     });
     if (!proposal) {
@@ -204,8 +205,8 @@ export class BillingController {
       ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (OFFER_ACCEPTED) or already hired (HIRED).", 400);
       return true;
     }
-    const milestones = Array.isArray(proposal.milestones) ? proposal.milestones : [];
-    if (milestoneIndex < 0 || milestoneIndex >= milestones.length) {
+    const rows = proposal.milestonesRows ?? [];
+    if (milestoneIndex < 0 || milestoneIndex >= rows.length) {
       ApiResponse.error(res, "Invalid milestone index", 400);
       return true;
     }
@@ -214,15 +215,15 @@ export class BillingController {
       ApiResponse.error(res, "You must complete the previous milestone payment before paying this one.", 400);
       return true;
     }
-    const milestone = milestones[milestoneIndex];
-    const amount = Number(milestone?.amount ?? 0) || 0;
+    const milestoneRow = rows[milestoneIndex];
+    const amount = Number(milestoneRow?.amount ?? 0) || 0;
     if (amount <= 0) {
       ApiResponse.error(res, "Invalid milestone amount", 400);
       return true;
     }
 
     const projectTitle = proposal.project.project_title || "project";
-    const milestoneTitle = milestone?.title || milestone?.description || `Milestone ${milestoneIndex + 1}`;
+    const milestoneTitle = milestoneRow?.title || milestoneRow?.description || `Milestone ${milestoneIndex + 1}`;
     await BillingService.recordPayment({
       actorId: proposal.project.user_id,
       fromId: proposal.project.user_id,
@@ -257,6 +258,14 @@ export class BillingController {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: { status: "HIRED" }
+      });
+    }
+
+    // Update milestone payment_status to RELEASED
+    if (milestoneRow?.id) {
+      await (prisma as any).milestone.update({
+        where: { id: milestoneRow.id },
+        data: { payment_status: "RELEASED" }
       });
     }
 

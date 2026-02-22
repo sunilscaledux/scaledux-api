@@ -6,6 +6,7 @@ import {
   getProposalById,
   updateProposal,
   updateProposalStatus,
+  setHire,
   cancelHire,
   updateProposalNda,
   withdrawProposal,
@@ -79,6 +80,8 @@ router.get("/:id", getProposalById); // Get proposal details
 
 // Status update (founder) - must be before PUT /:id
 router.put("/:id/status", updateProposalStatus);
+// Set hire (founder) - after NDA signed
+router.post("/:id/hire", setHire);
 // Cancel hire / withdraw offer (founder)
 router.post("/:id/cancel-hire", cancelHire);
 // NDA update (founder)
