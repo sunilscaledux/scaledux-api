@@ -67,6 +67,7 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
       dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
       deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
       payment_status: row.payment_status ?? 'PENDING',
+      milestone_status: row.status ?? 'PENDING',
       submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : []
     }));
 }

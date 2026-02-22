@@ -753,7 +753,7 @@ model Milestone {
   deliverables     Json      @default("[]") // Array of { deliverable: string } - what freelancer must deliver
   amount           Decimal   @db.Decimal(15, 2)
   due_date         DateTime? @db.Date
-  status           String    @default("PENDING") @db.VarChar(20) // PENDING, IN_PROGRESS, COMPLETED, PAID
+  status           String    @default("PENDING") @db.VarChar(20) // Milestone completion: PENDING, IN_PROGRESS, COMPLETED, PAID (exposed as milestone_status in API)
   submitted_at     DateTime? @db.Timestamptz   // When freelancer submitted (files + remark)
   submitted_remark String?   @db.Text          // Freelancer remark on submission
   submitted_file   Json      @default("[]")    // Array of { url, name } - submitted files for this milestone

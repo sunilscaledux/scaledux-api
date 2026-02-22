@@ -36,8 +36,8 @@ export const CHAT_SYSTEM_MESSAGES = {
   CONTRACT_SIGNED_SENT: "You signed the contract",
   CONTRACT_SIGNED_RECEIVED: "Contract signed",
 
-  PAYMENT_RELEASE_SENT: "Payment for",
-  PAYMENT_RELEASE_RECEIVED: "Payment for",
+  PAYMENT_RELEASE_SENT: "Funded milestone",
+  PAYMENT_RELEASE_RECEIVED: "Funded milestone",
 
   OFFER_CANCELLED_SENT: "You withdrew the hire offer for",
   OFFER_CANCELLED_RECEIVED: "The hire offer was withdrawn for",

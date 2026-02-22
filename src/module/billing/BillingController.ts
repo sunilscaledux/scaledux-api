@@ -148,7 +148,7 @@ export class BillingController {
       description: `Payment for ${projectTitle}`
     });
 
-    const messageContent = `Payment for ${projectTitle}`;
+    const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
       activityType: "payment_release",
       proposalId: proposal.unique_id,
@@ -235,7 +235,7 @@ export class BillingController {
       meta: { milestone_index: String(milestoneIndex) }
     });
 
-    const messageContent = `Payment for ${projectTitle}: ${milestoneTitle}`;
+    const messageContent = "Funded milestone";
     const metadata: Record<string, unknown> = {
       activityType: "payment_release",
       proposalId: proposal.unique_id,
