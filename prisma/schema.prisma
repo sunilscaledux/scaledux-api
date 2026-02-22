@@ -55,7 +55,6 @@ model User {
   conversationsAsUser1        Conversation[] @relation("ConversationUser1")
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
-  milestoneDocumentUploads     MilestoneDocument[] @relation("MilestoneDocumentUploads")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -763,7 +762,6 @@ model Milestone {
 
   project   FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   proposal  Proposal        @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
-  documents MilestoneDocument[]
   deliverablesRow Deliverable[]
 
   @@unique([proposal_id, order_index])
@@ -793,23 +791,6 @@ model Deliverable {
   @@unique([milestone_id, order_index])
   @@index([milestone_id])
   @@map("scd_deliverables")
-}
-
-// Freelancer uploads: multiple docs per milestone
-model MilestoneDocument {
-  id                  Int      @id @default(autoincrement())
-  unique_id           String   @unique @default(cuid())
-  milestone_id        Int
-  file_url            String   @db.Text
-  uploaded_by_user_id Int      // Freelancer (provider) who uploaded
-  created_at          DateTime @default(now())
-
-  milestone   Milestone @relation(fields: [milestone_id], references: [id], onDelete: Cascade)
-  uploadedBy  User      @relation("MilestoneDocumentUploads", fields: [uploaded_by_user_id], references: [id], onDelete: Cascade)
-
-  @@index([milestone_id])
-  @@index([uploaded_by_user_id])
-  @@map("scd_milestone_documents")
 }
 
 // Chat: one conversation per user pair (user1, user2)

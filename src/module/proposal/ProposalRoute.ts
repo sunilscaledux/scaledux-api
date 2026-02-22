@@ -16,7 +16,7 @@ import {
   requestModify,
   getProposalActivities
 } from "./ProposalController";
-import { addMilestoneDocument, submitMilestone, requestChangesMilestone } from "./MilestoneController";
+import { submitMilestone, requestChangesMilestone } from "./MilestoneController";
 import { submitDeliverable, requestChangesDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
 import { uploadFile } from "@module/general/FileController";
@@ -75,8 +75,7 @@ router.get("/check/:projectId", checkProposalStatus); // Check if already submit
 router.get("/project/:projectId", getProposalsByProject); // Get proposals for a project
 router.get("/founder/contracts", getFounderContracts); // Get founder contracts by status (OFFER_SENT, OFFER_ACCEPTED, HIRED)
 
-// Milestone documents (freelancer: upload doc for a milestone) - must be before /:id
-router.post("/milestones/:milestoneId/documents", addMilestoneDocument);
+// Milestone submit (freelancer: submit with remark + submitted_file; no separate documents table)
 router.post("/milestones/:milestoneId/submit", submitMilestone);
 router.post("/milestones/:milestoneId/request-changes", requestChangesMilestone);
 

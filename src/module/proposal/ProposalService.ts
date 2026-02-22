@@ -105,19 +105,18 @@ function buildDeliverablesFromRow(row: any): any[] {
   }));
 }
 
-/** Build milestones with submitted_file from documents and deliverables from Deliverable table. */
+/** Build milestones with submitted_file from milestone row and deliverables from Deliverable table. */
 function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map((row) => {
-      const docs = row.documents ?? [];
-      const submittedFile = docs.length > 0
-        ? docs.map((d: any) => ({
-            url: getFileUrl(d.file_url),
-            name: (d.file_url || '').split('/').pop() || 'file'
+      const submittedFile = Array.isArray(row.submitted_file)
+        ? (row.submitted_file as any[]).map((f: any) => ({
+            url: typeof f?.url === 'string' ? getFileUrl(f.url) : f?.url,
+            name: f?.name ?? (typeof f?.url === 'string' ? (f.url as string).split('/').pop() : 'file')
           }))
-        : (Array.isArray(row.submitted_file) ? row.submitted_file : []);
+        : [];
       const deliverables = buildDeliverablesFromRow(row);
       return {
         id: row.unique_id,
@@ -687,10 +686,7 @@ export class ProposalService {
         include: {
           milestonesRows: {
             orderBy: { order_index: 'asc' },
-            include: {
-              documents: true,
-              deliverablesRow: { orderBy: { order_index: 'asc' } }
-            }
+            include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
           },
           project: {
             select: {
@@ -773,20 +769,13 @@ export class ProposalService {
         };
       }
 
-      // Transform with file URLs; milestones include submitted_file from documents for project-overview
+      // Transform with file URLs; milestones include submitted_file from row
       const projectUser = proposal.project?.user;
       const transformedProposal: any = {
         ...proposal,
         milestones: milestonesFromRowsWithDocuments(proposal.milestonesRows),
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
-        milestonesRows: proposal.milestonesRows?.map((row: any) => {
-          const docs = row.documents?.map((d: any) => ({ ...d, file_url: getFileUrl(d.file_url) })) ?? [];
-          return {
-            ...row,
-            documents: docs,
-            submitted_files: docs.map((d: any) => ({ url: d.file_url, name: d.file_url?.split?.("/")?.pop?.() ?? "file" }))
-          };
-        }) ?? [],
+        milestonesRows: proposal.milestonesRows ?? [],
         project: proposal.project ? {
           ...proposal.project,
           budget_currency: proposal.project.user?.currency?.symbol || '₹',
