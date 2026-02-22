@@ -1150,6 +1150,69 @@ export class ProposalService {
   }
 
   /**
+   * Terminate contract (founder or freelancer). Only when status is HIRED. Requires reason; syncs to chat.
+   */
+  static async terminateContract(
+    userId: number,
+    proposalId: string,
+    reason: string
+  ): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: { select: { id: true, user_id: true, project_title: true, unique_id: true } }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.status !== "HIRED") {
+        return { success: false, message: "Only a hired contract can be terminated" };
+      }
+      const isFounder = proposal.project.user_id === userId;
+      const isProvider = proposal.provider_id === userId;
+      if (!isFounder && !isProvider) {
+        return { success: false, message: "You don't have permission to terminate this contract" };
+      }
+      const trimmed = (reason || "").trim();
+      if (!trimmed) {
+        return { success: false, message: "Reason is required" };
+      }
+
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { status: "TERMINATED" }
+      });
+
+      const projectTitle = proposal.project.project_title || "Project";
+      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATED_SENT} ${projectTitle}. Reason: ${trimmed}`;
+      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATED_RECEIVED} ${projectTitle}. Reason: ${trimmed}`;
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        {
+          activityType: "contract_terminated",
+          proposalId: proposal.unique_id,
+          projectId: proposal.project.unique_id,
+          projectTitle: proposal.project.project_title,
+          reason: trimmed,
+          messageSent,
+          messageReceived
+        },
+        proposal.project.id,
+        userId
+      );
+
+      return { success: true, message: "Contract terminated successfully" };
+    } catch (error: any) {
+      console.error("Terminate contract Error:", error);
+      return { success: false, message: error.message || "Failed to terminate contract" };
+    }
+  }
+
+  /**
    * Check if user has already submitted a proposal for a project
    */
   static async hasSubmittedProposal(

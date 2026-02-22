@@ -273,6 +273,32 @@ export async function cancelHire(req: Request, res: Response) {
 }
 
 /**
+ * Terminate contract (founder or freelancer). Only when status is HIRED. Requires reason; syncs to chat.
+ */
+export async function terminateContract(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+  const { reason } = req.body as { reason?: string };
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.terminateContract(userId, proposalId, reason ?? "");
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("permission") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Withdraw a proposal (service provider)
  */
 export async function withdrawProposal(req: Request, res: Response) {

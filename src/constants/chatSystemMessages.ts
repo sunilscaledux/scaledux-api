@@ -40,5 +40,8 @@ export const CHAT_SYSTEM_MESSAGES = {
   PAYMENT_RELEASE_RECEIVED: "Payment for",
 
   OFFER_CANCELLED_SENT: "You withdrew the hire offer for",
-  OFFER_CANCELLED_RECEIVED: "The hire offer was withdrawn for"
+  OFFER_CANCELLED_RECEIVED: "The hire offer was withdrawn for",
+
+  CONTRACT_TERMINATED_SENT: "You terminated the contract for",
+  CONTRACT_TERMINATED_RECEIVED: "The contract was terminated for"
 } as const;

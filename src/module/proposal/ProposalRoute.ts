@@ -8,6 +8,7 @@ import {
   updateProposalStatus,
   setHire,
   cancelHire,
+  terminateContract,
   updateProposalNda,
   withdrawProposal,
   checkProposalStatus,
@@ -84,6 +85,8 @@ router.put("/:id/status", updateProposalStatus);
 router.post("/:id/hire", setHire);
 // Cancel hire / withdraw offer (founder)
 router.post("/:id/cancel-hire", cancelHire);
+// Terminate contract (founder or freelancer, HIRED only)
+router.post("/:id/terminate", terminateContract);
 // NDA update (founder)
 router.patch("/:id/nda", updateProposalNda);
 // Request modify (founder)
