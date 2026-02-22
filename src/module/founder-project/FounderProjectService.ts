@@ -480,12 +480,28 @@ export class FounderProjectService {
       const isOwner = userId && project.user_id === userId;
       const isPublished = project.status === 'PUBLISHED';
 
-      // Non-owners can only view published projects
+      // Non-owners: allow if published OR if user is hired freelancer on this project
       if (!isOwner && !isPublished) {
-        return {
-          success: false,
-          message: "Project not found"
-        };
+        if (userId) {
+          const hiredProposal = await (prisma as any).proposal.findFirst({
+            where: {
+              project_id: project.id,
+              provider_id: userId,
+              status: 'HIRED'
+            }
+          });
+          if (!hiredProposal) {
+            return {
+              success: false,
+              message: "Project not found"
+            };
+          }
+        } else {
+          return {
+            success: false,
+            message: "Project not found"
+          };
+        }
       }
 
       // Check user status using relations (already filtered by userId in query)

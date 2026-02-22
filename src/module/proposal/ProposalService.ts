@@ -72,6 +72,33 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
     }));
 }
 
+/** Build milestones with submitted_file from documents (for getProposalById / project-overview). */
+function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
+    .map((row) => {
+      const docs = row.documents ?? [];
+      const submittedFile = docs.length > 0
+        ? docs.map((d: any) => ({
+            url: getFileUrl(d.file_url),
+            name: (d.file_url || '').split('/').pop() || 'file'
+          }))
+        : (Array.isArray(row.submitted_file) ? row.submitted_file : []);
+      return {
+        id: row.unique_id,
+        title: row.title ?? '',
+        description: row.description ?? undefined,
+        amount: Number(row.amount ?? 0),
+        dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
+        deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
+        payment_status: row.payment_status ?? 'PENDING',
+        milestone_status: row.status ?? 'PENDING',
+        submitted_file: submittedFile
+      };
+    });
+}
+
 /**
  * ProposalService
  * Handles all proposal operations for service providers
@@ -360,7 +387,9 @@ export class ProposalService {
   }
 
   /**
-   * Get all proposals for a project (founder view)
+   * Get proposals for a project.
+   * - Project owner: returns all proposals for the project.
+   * - Hired freelancer: returns only their own proposal(s) for that project (for project-overview).
    */
   static async getProposalsByProject(
     userId: number,
@@ -370,11 +399,9 @@ export class ProposalService {
     limit: number = 20
   ): Promise<ServiceResponse> {
     try {
-      // Find the project and verify ownership
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,
-          user_id: userId,
           deleted_at: null
         }
       });
@@ -382,13 +409,27 @@ export class ProposalService {
       if (!project) {
         return {
           success: false,
-          message: "Project not found or you don't have permission"
+          message: "Project not found"
         };
       }
 
+      const isOwner = project.user_id === userId;
       const whereClause: any = {
         project_id: project.id
       };
+
+      if (!isOwner) {
+        const hasProposal = await (prisma as any).proposal.findFirst({
+          where: { project_id: project.id, provider_id: userId }
+        });
+        if (!hasProposal) {
+          return {
+            success: false,
+            message: "You don't have permission to view proposals for this project"
+          };
+        }
+        whereClause.provider_id = userId;
+      }
 
       if (status) {
         whereClause.status = status;
@@ -674,11 +715,11 @@ export class ProposalService {
         };
       }
 
-      // Transform with file URLs; milestones come from Milestone table (milestonesRows), not proposal.milestones
+      // Transform with file URLs; milestones include submitted_file from documents for project-overview
       const projectUser = proposal.project?.user;
       const transformedProposal: any = {
         ...proposal,
-        milestones: milestonesFromRows(proposal.milestonesRows),
+        milestones: milestonesFromRowsWithDocuments(proposal.milestonesRows),
         attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
         milestonesRows: proposal.milestonesRows?.map((row: any) => {
           const docs = row.documents?.map((d: any) => ({ ...d, file_url: getFileUrl(d.file_url) })) ?? [];

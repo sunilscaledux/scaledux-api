@@ -45,6 +45,37 @@ const chatFileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
+// File filter for milestone deliverable: images (png, jpg, jpeg, webp, gif), video, audio, zip, documents
+const milestoneDeliverableFileFilter = (req: any, file: any, cb: any) => {
+  const allowedMimeTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'image/gif',
+    'video/mp4',
+    'video/quicktime',
+    'video/x-msvideo',
+    'video/x-matroska',
+    'video/webm',
+    'audio/mpeg',
+    'audio/wav',
+    'audio/aac',
+    'audio/flac',
+    'audio/webm',
+    'application/zip',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ];
+  if (allowedMimeTypes.includes(file.mimetype) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/') || file.mimetype.startsWith('audio/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Allowed: PNG, JPG, JPEG, WebP, GIF, video, audio, ZIP, PDF, DOC, DOCX.'), false);
+  }
+};
+
 // Generic storage configuration
 const createStorage = (uploadPath: string) => {
   return multer.diskStorage({
@@ -71,7 +102,7 @@ const createStorage = (uploadPath: string) => {
 // Multer configurations for different use cases
 export const FileUpload = (options: {
   uploadPath: string;
-  fileFilter?: 'image' | 'document' | 'chat' | 'any';
+  fileFilter?: 'image' | 'document' | 'chat' | 'milestoneDeliverable' | 'any';
   maxSize?: number; // in MB
   maxFiles?: number;
 }) => {
@@ -87,6 +118,9 @@ export const FileUpload = (options: {
       break;
     case 'chat':
       filter = chatFileFilter;
+      break;
+    case 'milestoneDeliverable':
+      filter = milestoneDeliverableFileFilter;
       break;
     default:
       filter = undefined;

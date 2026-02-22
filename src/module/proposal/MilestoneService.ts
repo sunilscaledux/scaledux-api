@@ -80,3 +80,49 @@ export async function submitMilestone(
 
   return { success: true, message: "Milestone submitted successfully" };
 }
+
+/**
+ * Request changes on a submitted milestone (founder/project owner only).
+ * Resets milestone status to PENDING so freelancer can resubmit.
+ */
+export async function requestChangesMilestone(
+  userId: number,
+  milestoneUniqueId: string,
+  message: string | undefined
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, project_id: true } },
+      project: { select: { user_id: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner can request changes on this milestone" };
+  }
+  if (milestone.status !== "COMPLETED") {
+    return { success: false, message: "Milestone is not submitted for review" };
+  }
+
+  await (prisma as any).milestone.update({
+    where: { id: milestone.id },
+    data: {
+      status: "PENDING",
+      submitted_at: null,
+      submitted_remark: null
+    }
+  });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    milestone.proposal.unique_id,
+    "REQUEST_MODIFY",
+    { message: message?.trim() || "Requested changes on milestone", milestoneTitle: milestone.title },
+    userId
+  );
+
+  return { success: true, message: "Changes requested successfully" };
+}
