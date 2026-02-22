@@ -853,7 +853,8 @@ export class ProposalService {
   ): Promise<ServiceResponse> {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
-        where: { unique_id: proposalId, provider_id: userId }
+        where: { unique_id: proposalId, provider_id: userId },
+        include: { project: { select: { id: true, unique_id: true, user_id: true, project_title: true } } }
       });
       if (!proposal) {
         return { success: false, message: "Proposal not found or you don't have permission" };
@@ -881,6 +882,26 @@ export class ProposalService {
         }
       });
       await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones);
+
+      if (proposal.project?.id != null && proposal.project?.user_id != null) {
+        const projectTitle = proposal.project.project_title || "Project";
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          userId,
+          "",
+          {
+            activityType: "proposal_updated",
+            proposalId: proposal.unique_id,
+            projectId: proposal.project.unique_id,
+            projectTitle,
+            messageSent: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_UPDATED_SENT} ${projectTitle}`,
+            messageReceived: `${CHAT_SYSTEM_MESSAGES.PROPOSAL_UPDATED_RECEIVED} ${projectTitle}`
+          },
+          proposal.project.id,
+          userId
+        );
+      }
+
       return { success: true, message: "Proposal updated successfully" };
     } catch (error: any) {
       console.error("Update Proposal Error:", error);

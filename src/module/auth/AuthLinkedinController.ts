@@ -219,14 +219,19 @@ const linkedinCallback = async (req: Request, res: Response) => {
     });
 
     if (user) {
-      // User exists, update their LinkedIn info if needed
+      // User exists, update their LinkedIn info if needed; ensure unique_id if missing
+      const updates: { linkedinId?: string; provider?: string; unique_id?: string } = {};
       if (!user.linkedinId && linkedinUser.id) {
+        updates.linkedinId = linkedinUser.id;
+        updates.provider = "linkedin";
+      }
+      if (!user.unique_id || user.unique_id.trim() === '') {
+        updates.unique_id = ulid();
+      }
+      if (Object.keys(updates).length > 0) {
         user = await prisma.user.update({
           where: { id: user.id },
-          data: {
-            linkedinId: linkedinUser.id,
-            provider: "linkedin",
-          },
+          data: updates,
         });
       }
     } else {
@@ -238,6 +243,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
           email: userEmail,
           linkedinId: linkedinUser.id,
           provider: "linkedin",
+          unique_id: ulid(),
           email_verified_at: new Date(),
           status: 1,
         },

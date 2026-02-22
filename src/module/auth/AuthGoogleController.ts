@@ -61,14 +61,19 @@ const googleCallback = async (req: Request, res: Response) => {
     });
 
     if (user) {
-      // User exists, update their Google info if needed
+      // User exists, update their Google info if needed; ensure unique_id if missing
+      const updates: { googleId?: string; provider?: string; unique_id?: string } = {};
       if (!user.googleId && googleUser.id) {
+        updates.googleId = googleUser.id;
+        updates.provider = "google";
+      }
+      if (!user.unique_id || user.unique_id.trim() === '') {
+        updates.unique_id = ulid();
+      }
+      if (Object.keys(updates).length > 0) {
         user = await prisma.user.update({
           where: { id: user.id },
-          data: {
-            googleId: googleUser.id,
-            provider: "google",
-          },
+          data: updates,
         });
       }
     } else {
@@ -83,6 +88,7 @@ const googleCallback = async (req: Request, res: Response) => {
           email: googleUser.email,
           googleId: googleUser.id,
           provider: "google",
+          unique_id: ulid(),
           email_verified_at: new Date(),
           status: 1,
         },

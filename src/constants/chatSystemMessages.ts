@@ -14,6 +14,9 @@ export const CHAT_SYSTEM_MESSAGES = {
   PROPOSAL_SUBMITTED_SENT: "You submitted a proposal for",
   PROPOSAL_SUBMITTED_RECEIVED: "A new proposal received for",
 
+  PROPOSAL_UPDATED_SENT: "You updated your proposal for",
+  PROPOSAL_UPDATED_RECEIVED: "Proposal was updated for",
+
   PROPOSAL_ACCEPTED_SENT: "You accepted the proposal",
   PROPOSAL_ACCEPTED_RECEIVED: "Accepted the proposal",
 
