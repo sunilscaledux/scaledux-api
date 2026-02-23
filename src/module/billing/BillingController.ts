@@ -214,11 +214,6 @@ export class BillingController {
       ApiResponse.error(res, "Invalid milestone index", 400);
       return true;
     }
-    const paidIndexes = await BillingService.getPaidMilestoneIndexes(proposal.id);
-    if (paidIndexes.length !== milestoneIndex) {
-      ApiResponse.error(res, "You must complete the previous milestone payment before paying this one.", 400);
-      return true;
-    }
     const milestoneRow = rows[milestoneIndex];
     const amount = Number(milestoneRow?.amount ?? 0) || 0;
     if (amount <= 0) {

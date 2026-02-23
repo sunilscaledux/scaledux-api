@@ -946,9 +946,6 @@ export class ProposalService {
         }
       }
 
-      const paidMilestoneIndexes = await BillingService.getPaidMilestoneIndexes(proposal.id);
-      transformedProposal.paid_milestone_indexes = paidMilestoneIndexes;
-
       return {
         success: true,
         message: "Proposal retrieved successfully",

@@ -304,31 +304,6 @@ export class BillingService {
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
 
-  /** Get paid milestone indices for a proposal (0-based). */
-  static async getPaidMilestoneIndexes(proposalId: number): Promise<number[]> {
-    const txns = await prisma.billingTransaction.findMany({
-      where: {
-        subject_type: 'Proposal',
-        subject_id: proposalId
-      },
-      include: {
-        meta: {
-          where: { key: 'milestone_index' },
-          take: 1
-        }
-      }
-    });
-    const indexes: number[] = [];
-    for (const t of txns) {
-      const mi = t.meta?.[0]?.value;
-      if (mi != null && mi !== '') {
-        const n = parseInt(mi, 10);
-        if (Number.isFinite(n) && n >= 0) indexes.push(n);
-      }
-    }
-    return [...new Set(indexes)].sort((a, b) => a - b);
-  }
-
   // Get user's payment methods
   static async getPaymentMethods(userId: string) {
     const userIdNum = parseInt(userId);
