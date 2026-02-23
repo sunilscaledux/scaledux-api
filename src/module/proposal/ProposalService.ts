@@ -54,24 +54,27 @@ function flattenNdaToProposal(proposal: any): any {
   };
 }
 
-/** Build milestones array from Milestone table rows (single source of truth). */
+/** Build milestones array from Milestone table rows; deliverables from Deliverable table. */
 function milestonesFromRows(rows: any[] | null | undefined): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((row) => ({
-      id: row.unique_id,
-      title: row.title ?? '',
-      description: row.description ?? undefined,
-      amount: Number(row.amount ?? 0),
-      dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
-      deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
-      payment_status: row.payment_status ?? 'PENDING',
-      milestone_status: row.status ?? 'PENDING',
-      submitted_file: [],
-      is_approved: row.is_approved === true,
-      remark: row.remark ?? undefined
-    }));
+    .map((row) => {
+      const deliverables = buildDeliverablesFromRow(row);
+      return {
+        id: row.unique_id,
+        title: row.title ?? '',
+        description: row.description ?? undefined,
+        amount: Number(row.amount ?? 0),
+        dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
+        deliverables,
+        payment_status: row.payment_status ?? 'PENDING',
+        milestone_status: row.status ?? 'PENDING',
+        submitted_file: [],
+        is_approved: row.is_approved === true,
+        remark: row.remark ?? undefined
+      };
+    });
 }
 
 /** Build deliverables array from Deliverable table rows or fallback to JSON. */
@@ -100,16 +103,7 @@ function buildDeliverablesFromRow(row: any): any[] {
       };
       });
   }
-  const fromJson = Array.isArray(row.deliverables) ? row.deliverables : [];
-  return fromJson.map((d: any, idx: number) => ({
-    id: row.unique_id,
-    description: typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? ''),
-    deliverable: typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? ''),
-    status: 'PENDING',
-    submitted_at: null,
-    submitted_file: [],
-    feedback: null
-  }));
+  return [];
 }
 
 /** Build milestones with submitted_file derived from deliverables (Deliverable table). */
@@ -298,7 +292,6 @@ export class ProposalService {
         order_index: i,
         title: String(title).slice(0, 255),
         description: description != null ? String(description) : null,
-        deliverables,
         amount,
         due_date: dueDate
       };
@@ -323,7 +316,6 @@ export class ProposalService {
             data: {
               title: row.title,
               description: row.description,
-              deliverables: row.deliverables,
               amount: row.amount,
               due_date: row.due_date
             }
@@ -410,7 +402,6 @@ export class ProposalService {
           description,
           amount,
           due_date: dueDate,
-          deliverables,
           status: "PENDING",
           is_approved: false,
           remark
@@ -491,7 +482,10 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
-          milestonesRows: { orderBy: { order_index: 'asc' } },
+          milestonesRows: {
+            orderBy: { order_index: 'asc' },
+            include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
+          },
           project: {
             select: {
               id: true,
@@ -630,7 +624,10 @@ export class ProposalService {
               budget_amount: true
             }
           },
-          milestonesRows: { orderBy: { order_index: 'asc' } },
+          milestonesRows: {
+            orderBy: { order_index: 'asc' },
+            include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
+          },
           provider: {
             select: {
               id: true,
@@ -731,7 +728,10 @@ export class ProposalService {
               budget_amount: true
             }
           },
-          milestonesRows: { orderBy: { order_index: 'asc' } },
+          milestonesRows: {
+            orderBy: { order_index: 'asc' },
+            include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
+          },
           provider: {
             select: {
               id: true,

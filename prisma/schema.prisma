@@ -752,7 +752,6 @@ model Milestone {
   order_index      Int       @default(0)   // 0-based order within proposal
   title            String    @db.VarChar(255)
   description      String?   @db.Text
-  deliverables     Json      @default("[]") // Array of { deliverable: string } - what freelancer must deliver
   amount           Decimal   @db.Decimal(15, 2)
   due_date         DateTime? @db.Date
   status           String    @default("PENDING") @db.VarChar(20) // Milestone completion: PENDING, IN_PROGRESS, COMPLETED, PAID (exposed as milestone_status in API)
