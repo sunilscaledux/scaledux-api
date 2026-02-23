@@ -504,7 +504,7 @@ export async function requestModify(req: Request, res: Response) {
 export async function updateProposalNda(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { is_nda_signed, nda_file_link, nda_sent_at, nda_signed_at, nda_signed_file_link, nda_downloaded_at } = req.body;
+  const { is_nda_signed, nda_file_link, nda_sent_at, nda_signed_at, nda_signed_file_link, nda_downloaded_at, send_offer, accept_offer } = req.body;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -521,6 +521,8 @@ export async function updateProposalNda(req: Request, res: Response) {
   if (typeof nda_signed_at !== "undefined") payload.nda_signed_at = nda_signed_at ?? null;
   if (typeof nda_signed_file_link !== "undefined") payload.nda_signed_file_link = nda_signed_file_link ?? null;
   if (typeof nda_downloaded_at !== "undefined") payload.nda_downloaded_at = nda_downloaded_at ?? null;
+  if (typeof send_offer !== "undefined") payload.send_offer = send_offer === true || send_offer === "true";
+  if (typeof accept_offer !== "undefined") payload.accept_offer = accept_offer === true || accept_offer === "true";
 
   const result = await ProposalService.updateProposalNda(userId, proposalId, payload);
 

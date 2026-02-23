@@ -11,7 +11,7 @@ export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   ACCEPTED: 'Proposal Accepted',
   OFFER_SENT: 'Offer sent',
-  OFFER_ACCEPTED: 'NDA signed',
+  OFFER_ACCEPTED: 'Offer accepted',
   HIRED: 'Hired',
   REJECTED: 'Proposal Rejected',
   WITHDRAWN: 'Offer withdrawn',
@@ -1310,7 +1310,9 @@ export class ProposalService {
   }
 
   /**
-   * Set proposal to HIRED (founder). Allowed only when status is OFFER_ACCEPTED (NDA signed).
+   * Hire is no longer set via this endpoint. HIRED is set only when the founder completes the first
+   * payment (first milestone or full proposal payment) in the billing flow. This endpoint returns
+   * an error so clients use the payment screen.
    */
   static async setHire(userId: number, proposalId: string): Promise<ServiceResponse> {
     try {
@@ -1330,16 +1332,10 @@ export class ProposalService {
         return { success: false, message: "You can only hire after the freelancer has signed the NDA (offer accepted)" };
       }
 
-      await (prisma as any).proposal.update({
-        where: { id: proposal.id },
-        data: { status: "HIRED", milestones_approved: true }
-      });
-      await (prisma as any).milestone.updateMany({
-        where: { proposal_id: proposal.id },
-        data: { is_approved: true }
-      });
-
-      return { success: true, message: "Hired successfully" };
+      return {
+        success: false,
+        message: "Hire is completed when you complete the first payment. Please use the payment screen to hire and proceed to pay."
+      };
     } catch (error: any) {
       console.error("Set hire Error:", error);
       return { success: false, message: error.message || "Failed to hire" };
@@ -1409,6 +1405,10 @@ export class ProposalService {
       nda_signed_at?: string | Date | null;
       nda_signed_file_link?: string | null;
       nda_downloaded_at?: string | Date | null;
+      /** When true and project has no NDA: founder sends offer (ACCEPTED -> OFFER_SENT). */
+      send_offer?: boolean;
+      /** When true and project has no NDA: freelancer accepts offer (OFFER_SENT -> OFFER_ACCEPTED). */
+      accept_offer?: boolean;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -1416,7 +1416,7 @@ export class ProposalService {
         where: { unique_id: proposalId },
         include: {
           project: {
-            select: { id: true, user_id: true, project_title: true, unique_id: true }
+            select: { id: true, user_id: true, project_title: true, unique_id: true, is_nda_required: true }
           }
         }
       });
@@ -1427,6 +1427,85 @@ export class ProposalService {
       const isProvider = proposal.provider_id === userId;
       if (!isFounder && !isProvider) {
         return { success: false, message: "You don't have permission to update this proposal" };
+      }
+
+      const isNdaRequired = proposal.project.is_nda_required === true;
+
+      // Founder: send offer when NDA not required (ACCEPTED/PENDING -> OFFER_SENT)
+      if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === 'ACCEPTED' || proposal.status === 'PENDING')) {
+        const otherActive = await (prisma as any).proposal.count({
+          where: {
+            project_id: proposal.project_id,
+            status: { in: ['OFFER_SENT', 'OFFER_ACCEPTED'] },
+            id: { not: proposal.id }
+          }
+        });
+        if (otherActive > 0) {
+          return {
+            success: false,
+            message: "You can only have one active offer per project. Withdraw the current offer before sending a new one."
+          };
+        }
+        const nda = getNda(proposal) || {};
+        const now = new Date();
+        const expiresAt = new Date(now);
+        expiresAt.setHours(expiresAt.getHours() + getOfferExpiryHours());
+        const ndaUpdate = { ...nda, offer_expires_at: expiresAt.toISOString() };
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status: 'OFFER_SENT', nda: ndaUpdate }
+        });
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: proposal.status, newStatus: 'OFFER_SENT' }, userId);
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          {
+            activityType: "proposal_status",
+            activityId: proposal.unique_id,
+            newStatus: "OFFER_SENT",
+            messageSent: CHAT_SYSTEM_MESSAGES.OFFER_SENT_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.OFFER_SENT_RECEIVED
+          },
+          proposal.project.id,
+          proposal.project.user_id
+        );
+        return { success: true, message: "Offer sent" };
+      }
+
+      // Freelancer: accept offer when NDA not required (OFFER_SENT -> OFFER_ACCEPTED)
+      if (isProvider && !isNdaRequired && data.accept_offer === true && proposal.status === 'OFFER_SENT') {
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status: 'OFFER_ACCEPTED' }
+        });
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'OFFER_ACCEPTED' }, userId);
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          {
+            activityType: "proposal_status",
+            activityId: proposal.unique_id,
+            newStatus: "OFFER_ACCEPTED",
+            messageSent: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.CONTRACT_SIGNED_RECEIVED
+          },
+          proposal.project.id,
+          proposal.provider_id
+        );
+        return { success: true, message: "Offer accepted" };
+      }
+
+      if (data.send_offer === true && isFounder) {
+        return { success: false, message: isNdaRequired
+          ? "This project requires an NDA. Use the NDA section to upload and send the offer."
+          : "Proposal must be accepted before sending the offer." };
+      }
+      if (data.accept_offer === true && isProvider) {
+        return { success: false, message: isNdaRequired
+          ? "This project requires NDA. Sign and upload the NDA to accept."
+          : "Offer is not in a state that can be accepted." };
       }
 
       const current = getNda(proposal) || {};
