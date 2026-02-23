@@ -5,7 +5,7 @@ import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 
 /**
  * Submit one deliverable (freelancer only). Sets status SUBMITTED, stores remark + files; clears feedback.
- * If all deliverables in the milestone are now SUBMITTED/APPROVED, sets milestone status to COMPLETED.
+ * Milestone is set to COMPLETED only when all deliverables are APPROVED (see approveDeliverable).
  */
 export async function submitDeliverable(
   userId: number,
@@ -53,19 +53,6 @@ export async function submitDeliverable(
       feedback: null
     }
   });
-
-  const allDeliverables = await (prisma as any).deliverable.findMany({
-    where: { milestone_id: deliverable.milestone_id }
-  });
-  const allDone = allDeliverables.every(
-    (d: any) => d.status === "SUBMITTED" || d.status === "APPROVED"
-  );
-  if (allDone) {
-    await (prisma as any).milestone.update({
-      where: { id: deliverable.milestone_id },
-      data: { status: "COMPLETED" }
-    });
-  }
 
   const submittedRemark = remark != null && String(remark).trim() !== "" ? String(remark).trim() : undefined;
   const fileLinks = files.map((f: { url: string; name?: string }) => ({ url: f.url, name: f.name }));
@@ -245,6 +232,18 @@ export async function approveDeliverable(
     where: { id: deliverable.id },
     data: { status: "APPROVED", approved_at: now }
   });
+
+  // Set milestone to COMPLETED only when all deliverables in this milestone are APPROVED
+  const allDeliverables = await (prisma as any).deliverable.findMany({
+    where: { milestone_id: deliverable.milestone_id }
+  });
+  const allApproved = allDeliverables.every((d: any) => d.status === "APPROVED");
+  if (allApproved) {
+    await (prisma as any).milestone.update({
+      where: { id: deliverable.milestone_id },
+      data: { status: "COMPLETED" }
+    });
+  }
 
   const { createProposalActivity } = await import("./ProposalActivityService");
   await createProposalActivity(

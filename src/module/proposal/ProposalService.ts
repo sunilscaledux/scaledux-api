@@ -345,6 +345,7 @@ export class ProposalService {
           for (let j = 0; j < deliverables.length; j++) {
             const d = deliverables[j];
             const desc = typeof d === 'object' && d?.deliverable != null ? String(d.deliverable) : String(d ?? '');
+            if (desc.length === 0) continue;
             try {
               await prismaAny.deliverable.upsert({
                 where: {
@@ -357,9 +358,20 @@ export class ProposalService {
                 },
                 update: { description: desc.slice(0, 500) }
               });
-            } catch (_) {
-              // ignore
+            } catch (err) {
+              console.error('Deliverable upsert error:', err);
             }
+          }
+          // Remove any deliverables beyond the new list (e.g. user removed some in the form)
+          try {
+            await prismaAny.deliverable.deleteMany({
+              where: {
+                milestone_id: milestone.id,
+                order_index: { gte: deliverables.length }
+              }
+            });
+          } catch (err) {
+            console.error('Deliverable deleteMany error:', err);
           }
         }
       } catch (_) {
