@@ -398,6 +398,30 @@ export async function terminateContract(req: Request, res: Response) {
 }
 
 /**
+ * Mark project completed (founder). Allowed when HIRED and all milestones PAID/COMPLETED.
+ */
+export async function markProjectCompleted(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.markProjectCompleted(userId, proposalId);
+
+  if (result.success) {
+    return ApiResponse.success(res, null, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("permission") || result.message?.includes("Only the project owner") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Withdraw a proposal (service provider)
  */
 export async function withdrawProposal(req: Request, res: Response) {

@@ -6,6 +6,24 @@ import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
 
+/** Human-readable labels for proposal status (single source of truth for API and activities). */
+export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Pending',
+  ACCEPTED: 'Proposal Accepted',
+  OFFER_SENT: 'Offer sent',
+  OFFER_ACCEPTED: 'NDA signed',
+  HIRED: 'Hired',
+  REJECTED: 'Proposal Rejected',
+  WITHDRAWN: 'Offer withdrawn',
+  TERMINATED: 'Terminated',
+  PROJECT_COMPLETED: 'Project completed'
+};
+
+export function getProposalStatusLabel(status: string | undefined | null): string {
+  if (status == null || status === '') return '';
+  return PROPOSAL_STATUS_LABELS[String(status).toUpperCase()] ?? status;
+}
+
 /** NDA + offer data stored in proposal.nda (single JSON column) */
 export interface ProposalNdaData {
   offer_expires_at?: string | null;
@@ -50,7 +68,8 @@ function flattenNdaToProposal(proposal: any): any {
     nda_sent_at: nda?.nda_sent_at ?? null,
     nda_signed_at: nda?.nda_signed_at ?? null,
     nda_signed_file_link: nda?.nda_signed_file_link ?? null,
-    nda_downloaded_at: nda?.nda_downloaded_at ?? null
+    nda_downloaded_at: nda?.nda_downloaded_at ?? null,
+    status_label: getProposalStatusLabel(proposal.status)
   };
 }
 
@@ -377,6 +396,9 @@ export class ProposalService {
         return { success: false, message: "Proposal not found or you don't have permission" };
       }
       const status = (proposal as any).status;
+      if (status === "PROJECT_COMPLETED") {
+        return { success: false, message: "You cannot add milestones after the project is completed" };
+      }
       if (status !== "OFFER_ACCEPTED" && status !== "HIRED") {
         return { success: false, message: "You can only add milestones after the offer is accepted or you are hired" };
       }
@@ -706,8 +728,12 @@ export class ProposalService {
     limit: number = 20
   ): Promise<ServiceResponse> {
     try {
+      // Hired tab includes both HIRED and PROJECT_COMPLETED so both can view offer and project overview
+      const statusFilter = status === 'HIRED'
+        ? { in: ['HIRED', 'PROJECT_COMPLETED'] as const }
+        : status;
       const whereClause = {
-        status,
+        status: statusFilter,
         project: {
           user_id: userId,
           deleted_at: null
@@ -1317,6 +1343,57 @@ export class ProposalService {
     } catch (error: any) {
       console.error("Set hire Error:", error);
       return { success: false, message: error.message || "Failed to hire" };
+    }
+  }
+
+  /**
+   * Mark project completed (founder only). Allowed when status is HIRED and all milestones are PAID (or COMPLETED).
+   * Sets proposal status to PROJECT_COMPLETED.
+   */
+  static async markProjectCompleted(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: { select: { id: true, user_id: true } },
+          milestonesRows: { orderBy: { order_index: 'asc' } }
+        }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "Only the project owner can mark the project as completed" };
+      }
+      if (proposal.status === "PROJECT_COMPLETED") {
+        return { success: true, message: "Project is already marked as completed" };
+      }
+      if (proposal.status !== "HIRED") {
+        return { success: false, message: "Project can only be marked completed when the contract is hired" };
+      }
+      const rows = proposal.milestonesRows ?? [];
+      const allDone = rows.length > 0 && rows.every((m: any) => {
+        const s = String(m.status ?? "").toUpperCase();
+        return s === "PAID" || s === "COMPLETED";
+      });
+      if (!allDone) {
+        return { success: false, message: "Complete and pay all milestones before marking the project as completed" };
+      }
+
+      await createProposalActivity(proposal.unique_id, "STATUS_CHANGE", {
+        oldStatus: proposal.status,
+        newStatus: "PROJECT_COMPLETED"
+      }, userId);
+
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { status: "PROJECT_COMPLETED" }
+      });
+
+      return { success: true, message: "Project marked as completed" };
+    } catch (error: any) {
+      console.error("Mark project completed Error:", error);
+      return { success: false, message: error.message || "Failed to mark project as completed" };
     }
   }
 
