@@ -804,6 +804,7 @@ model Conversation {
   user1_id              Int       // smaller user id for consistent lookup
   user2_id              Int       // larger user id
   status                String?   @db.VarChar(20) // NOT_ACCEPTED | ACCEPTED | BLOCKED; null = no restriction
+  blocked_by_user_id    Int?      // user who blocked (only they can unblock); null when not blocked
   user1_has_new_message Boolean   @default(false) // true when user1 has unread messages
   user2_has_new_message Boolean   @default(false) // true when user2 has unread messages
   created_at            DateTime  @default(now())

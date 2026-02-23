@@ -383,6 +383,13 @@ export class ConversationService {
       });
       if (!c) return { success: false, message: "Conversation not found" };
       if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
+      const blockRows = await (prisma as any).$queryRawUnsafe(
+        "SELECT status, blocked_by_user_id FROM scd_conversations WHERE id = $1 LIMIT 1",
+        c.id
+      ) as Array<{ status: string | null; blocked_by_user_id: number | null }>;
+      const blockRow = blockRows[0];
+      const status = blockRow?.status ?? (c as any).status ?? null;
+      const blockedByUserId = blockRow?.blocked_by_user_id ?? (c as any).blocked_by_user_id ?? null;
       const other = c.user1_id === userId ? c.user2 : c.user1;
       const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
       const otherParticipant = {
@@ -399,8 +406,9 @@ export class ConversationService {
         select: { sender_id: true }
       });
       const isInitiator = firstUserMsg?.sender_id != null && userId === firstUserMsg.sender_id;
-      const status = (c as any).status as string | null | undefined;
       const receiverAccepted = status === "ACCEPTED";
+      const isBlocked = status === "BLOCKED";
+      const blockedByMe = isBlocked && blockedByUserId != null && blockedByUserId === userId;
       return {
         success: true,
         message: "OK",
@@ -413,7 +421,9 @@ export class ConversationService {
           updated_at: c.updated_at,
           status: status ?? null,
           receiverAccepted,
-          isInitiator
+          isInitiator,
+          isBlocked,
+          blockedByMe
         }
       };
     } catch (error: any) {
@@ -447,6 +457,62 @@ export class ConversationService {
     } catch (error: any) {
       console.error("markConversationAsRead Error:", error);
       return { success: false, message: error.message || "Failed to mark as read" };
+    }
+  }
+
+  /**
+   * Block conversation: neither participant can send messages. Only the blocker can unblock.
+   * Uses raw update so updated_at is NOT changed.
+   */
+  static async blockConversation(conversationUniqueId: string, userId: number): Promise<ServiceResponse<void>> {
+    try {
+      const c = await (prisma as any).conversation.findFirst({
+        where: { unique_id: conversationUniqueId },
+        select: { id: true, user1_id: true, user2_id: true }
+      });
+      if (!c) return { success: false, message: "Conversation not found" };
+      if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
+      await (prisma as any).$executeRawUnsafe(
+        "UPDATE scd_conversations SET status = $1, blocked_by_user_id = $2 WHERE id = $3",
+        "BLOCKED",
+        userId,
+        c.id
+      );
+      return { success: true, message: "OK" };
+    } catch (error: any) {
+      console.error("blockConversation Error:", error);
+      return { success: false, message: error.message || "Failed to block" };
+    }
+  }
+
+  /**
+   * Unblock conversation. Only the user who blocked can unblock.
+   * Uses raw query for blocked_by_user_id so it works even if Prisma client was not regenerated.
+   */
+  static async unblockConversation(conversationUniqueId: string, userId: number): Promise<ServiceResponse<void>> {
+    try {
+      const c = await (prisma as any).conversation.findFirst({
+        where: { unique_id: conversationUniqueId },
+        select: { id: true, user1_id: true, user2_id: true }
+      });
+      if (!c) return { success: false, message: "Conversation not found" };
+      if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
+      const blockRows = await (prisma as any).$queryRawUnsafe(
+        "SELECT blocked_by_user_id FROM scd_conversations WHERE id = $1 LIMIT 1",
+        c.id
+      ) as Array<{ blocked_by_user_id: number | null }>;
+      const blockedBy = blockRows[0]?.blocked_by_user_id ?? null;
+      if (blockedBy != null && blockedBy !== userId) return { success: false, message: "Only the person who blocked can unblock" };
+      await (prisma as any).$executeRawUnsafe(
+        "UPDATE scd_conversations SET status = $1, blocked_by_user_id = $2 WHERE id = $3",
+        "ACCEPTED",
+        null,
+        c.id
+      );
+      return { success: true, message: "OK" };
+    } catch (error: any) {
+      console.error("unblockConversation Error:", error);
+      return { success: false, message: error.message || "Failed to unblock" };
     }
   }
 

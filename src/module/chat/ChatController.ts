@@ -102,6 +102,31 @@ export async function markConversationAsRead(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, 500);
 }
 
+export async function blockConversation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const conversationId = getStringParam(req.params.id);
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
+  const result = await ConversationService.blockConversation(conversationId, userId);
+  if (result.success) return ApiResponse.success(res, undefined, result.message);
+  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
+  return ApiResponse.error(res, result.message, 500);
+}
+
+export async function unblockConversation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const conversationId = getStringParam(req.params.id);
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
+  const result = await ConversationService.unblockConversation(conversationId, userId);
+  if (result.success) return ApiResponse.success(res, undefined, result.message);
+  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
+  if (result.message?.includes("Only the person who blocked")) return ApiResponse.error(res, result.message, 403);
+  return ApiResponse.error(res, result.message, 500);
+}
+
 export async function searchMessages(req: Request, res: Response) {
   const userId = req.user?.id;
   const conversationId = getStringParam(req.params.id);
