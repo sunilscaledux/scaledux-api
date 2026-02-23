@@ -341,6 +341,7 @@ export class ConversationService {
           : null;
         const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
         const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
+        const new_message = c.user1_id === userId ? !!c.user1_has_new_message : !!c.user2_has_new_message;
         return {
           id: c.id,
           unique_id: c.unique_id,
@@ -353,7 +354,8 @@ export class ConversationService {
             location: location || null
           },
           lastMessage: lastMsg ? { content: lastContent, type: lastMsg.type, created_at: lastMsg.created_at } : null,
-          updated_at: c.updated_at
+          updated_at: c.updated_at,
+          new_message
         };
       });
 
@@ -417,6 +419,34 @@ export class ConversationService {
     } catch (error: any) {
       console.error("getConversationByUniqueId Error:", error);
       return { success: false, message: error.message || "Failed to get conversation" };
+    }
+  }
+
+  /**
+   * Mark conversation as read for the current user (sets new_message = false for this participant).
+   * Uses raw update so updated_at is NOT changed — list order stays by last message/activity only.
+   */
+  static async markConversationAsRead(conversationUniqueId: string, userId: number): Promise<ServiceResponse<void>> {
+    try {
+      const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
+      if (!conv.success || !conv.data) return { success: false, message: conv.message };
+
+      const c = await (prisma as any).conversation.findFirst({
+        where: { unique_id: conversationUniqueId },
+        select: { id: true, user1_id: true, user2_id: true }
+      });
+      if (!c) return { success: false, message: "Conversation not found" };
+      if (c.user1_id !== userId && c.user2_id !== userId) return { success: false, message: "Forbidden" };
+
+      const column = c.user1_id === userId ? "user1_has_new_message" : "user2_has_new_message";
+      await (prisma as any).$executeRawUnsafe(
+        `UPDATE scd_conversations SET ${column} = false WHERE id = $1`,
+        c.id
+      );
+      return { success: true, message: "OK" };
+    } catch (error: any) {
+      console.error("markConversationAsRead Error:", error);
+      return { success: false, message: error.message || "Failed to mark as read" };
     }
   }
 
@@ -596,12 +626,15 @@ export class ConversationService {
       let statusUpdate: string | undefined;
       if (firstUserMessage == null) statusUpdate = "NOT_ACCEPTED";
       else if (msg.sender_id !== firstUserMessage.sender_id) statusUpdate = "ACCEPTED";
+      const isUser1 = conv.data.user1_id === userId;
+      const sendUpdateData: Record<string, unknown> = {
+        updated_at: new Date(),
+        ...(statusUpdate != null ? { status: statusUpdate } : {}),
+        ...(isUser1 ? { user2_has_new_message: true } : { user1_has_new_message: true })
+      };
       await (prisma as any).conversation.update({
         where: { id: conv.data.id },
-        data: {
-          updated_at: new Date(),
-          ...(statusUpdate != null ? { status: statusUpdate } : {})
-        }
+        data: sendUpdateData
       });
       if (statusUpdate != null) {
         if (statusUpdate === "NOT_ACCEPTED") {

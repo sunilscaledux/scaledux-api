@@ -799,13 +799,15 @@ model Deliverable {
 
 // Chat: one conversation per user pair (user1, user2)
 model Conversation {
-  id         Int       @id @default(autoincrement())
-  unique_id  String    @unique @default(cuid())
-  user1_id   Int       // smaller user id for consistent lookup
-  user2_id   Int       // larger user id
-  status     String?   @db.VarChar(20) // NOT_ACCEPTED | ACCEPTED | BLOCKED; null = no restriction
-  created_at DateTime  @default(now())
-  updated_at DateTime  @updatedAt
+  id                    Int       @id @default(autoincrement())
+  unique_id             String    @unique @default(cuid())
+  user1_id              Int       // smaller user id for consistent lookup
+  user2_id              Int       // larger user id
+  status                String?   @db.VarChar(20) // NOT_ACCEPTED | ACCEPTED | BLOCKED; null = no restriction
+  user1_has_new_message Boolean   @default(false) // true when user1 has unread messages
+  user2_has_new_message Boolean   @default(false) // true when user2 has unread messages
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
 
   user1    User     @relation("ConversationUser1", fields: [user1_id], references: [id], onDelete: Cascade)
   user2    User     @relation("ConversationUser2", fields: [user2_id], references: [id], onDelete: Cascade)

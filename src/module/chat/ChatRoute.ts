@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "@middleware/auth";
-import { getConversations, getConversation, getMessages, searchMessages, sendMessage, searchUsersForChat, startConversation, getChatUser, findConversationByUser } from "./ChatController";
+import { getConversations, getConversation, getMessages, searchMessages, sendMessage, searchUsersForChat, startConversation, getChatUser, findConversationByUser, markConversationAsRead } from "./ChatController";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 
@@ -13,6 +13,7 @@ router.get("/conversations/find-by-user", findConversationByUser);
 router.get("/conversations/chat-user/:userId", getChatUser);
 router.post("/conversations/start", startConversation);
 router.get("/conversations/:id", getConversation);
+router.put("/conversations/:id/read", markConversationAsRead);
 router.get("/conversations/:id/messages", getMessages);
 router.get("/conversations/:id/search", searchMessages);
 router.post("/conversations/:id/messages", sendMessage);

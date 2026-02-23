@@ -82,8 +82,23 @@ export async function getMessages(req: Request, res: Response) {
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
   if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
   const result = await ConversationService.getMessages(conversationId, userId, { limit, before: before || undefined });
-  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  if (result.success) {
+    await ConversationService.markConversationAsRead(conversationId, userId);
+    return ApiResponse.success(res, result.data, result.message);
+  }
   if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  return ApiResponse.error(res, result.message, 500);
+}
+
+export async function markConversationAsRead(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const conversationId = getStringParam(req.params.id);
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  if (!conversationId) return ApiResponse.error(res, "Conversation ID required", 400);
+  const result = await ConversationService.markConversationAsRead(conversationId, userId);
+  if (result.success) return ApiResponse.success(res, undefined, result.message);
+  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, 404);
+  if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
   return ApiResponse.error(res, result.message, 500);
 }
 
