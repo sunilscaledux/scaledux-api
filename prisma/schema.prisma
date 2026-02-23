@@ -756,9 +756,6 @@ model Milestone {
   amount           Decimal   @db.Decimal(15, 2)
   due_date         DateTime? @db.Date
   status           String    @default("PENDING") @db.VarChar(20) // Milestone completion: PENDING, IN_PROGRESS, COMPLETED, PAID (exposed as milestone_status in API)
-  submitted_at     DateTime? @db.Timestamptz   // When freelancer submitted (files + remark)
-  submitted_remark String?   @db.Text          // Freelancer remark on submission
-  submitted_file   Json      @default("[]")    // Array of { url, name } - submitted files for this milestone
   payment_status   String    @default("PENDING") @db.VarChar(20) // PENDING, FUNDED, RELEASED
   /** When true, this milestone cannot be edited/deleted (e.g. set when proposal is HIRED or milestone approved) */
   is_approved      Boolean   @default(false)

@@ -68,7 +68,7 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
       deliverables: Array.isArray(row.deliverables) ? row.deliverables : [],
       payment_status: row.payment_status ?? 'PENDING',
       milestone_status: row.status ?? 'PENDING',
-      submitted_file: Array.isArray(row.submitted_file) ? row.submitted_file : [],
+      submitted_file: [],
       is_approved: row.is_approved === true,
       remark: row.remark ?? undefined
     }));
@@ -112,19 +112,14 @@ function buildDeliverablesFromRow(row: any): any[] {
   }));
 }
 
-/** Build milestones with submitted_file from milestone row and deliverables from Deliverable table. */
+/** Build milestones with submitted_file derived from deliverables (Deliverable table). */
 function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] {
   if (!Array.isArray(rows)) return [];
   return rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map((row) => {
-      const submittedFile = Array.isArray(row.submitted_file)
-        ? (row.submitted_file as any[]).map((f: any) => ({
-            url: typeof f?.url === 'string' ? getFileUrl(f.url) : f?.url,
-            name: f?.name ?? (typeof f?.url === 'string' ? (f.url as string).split('/').pop() : 'file')
-          }))
-        : [];
       const deliverables = buildDeliverablesFromRow(row);
+      const submittedFile = deliverables.flatMap((d: any) => (Array.isArray(d.submitted_file) ? d.submitted_file : []));
       return {
         id: row.unique_id,
         title: row.title ?? '',
@@ -901,7 +896,7 @@ export class ProposalService {
         };
       }
 
-      // Transform with file URLs; milestones include submitted_file from row
+      // Transform with file URLs; milestones include submitted_file derived from deliverables
       const projectUser = proposal.project?.user;
       const transformedProposal: any = {
         ...proposal,

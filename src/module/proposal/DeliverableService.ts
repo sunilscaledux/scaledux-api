@@ -63,12 +63,7 @@ export async function submitDeliverable(
   if (allDone) {
     await (prisma as any).milestone.update({
       where: { id: deliverable.milestone_id },
-      data: {
-        status: "COMPLETED",
-        submitted_at: now,
-        submitted_remark: null,
-        submitted_file: allDeliverables.flatMap((d: any) => (Array.isArray(d.submitted_file) ? d.submitted_file : []))
-      }
+      data: { status: "COMPLETED" }
     });
   }
 
@@ -163,7 +158,7 @@ export async function requestChangesDeliverable(
 
   await (prisma as any).milestone.update({
     where: { id: deliverable.milestone_id },
-    data: { status: "PENDING", submitted_at: null, submitted_remark: null }
+    data: { status: "PENDING" }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");
