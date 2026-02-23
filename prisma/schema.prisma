@@ -789,6 +789,7 @@ model Deliverable {
   submitted_at      DateTime? @db.Timestamptz
   submitted_remark  String?   @db.Text
   submitted_file    Json      @default("[]")    // Array of { url, name }
+  approved_at       DateTime? @db.Timestamptz   // When founder approved this deliverable
   feedback          String?   @db.Text           // Founder's message when requesting changes; cleared on resubmit
   created_at        DateTime  @default(now())
   updated_at        DateTime  @default(now()) @updatedAt

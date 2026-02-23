@@ -156,6 +156,7 @@ export async function requestChangesDeliverable(
       submitted_at: null,
       submitted_remark: null,
       submitted_file: [],
+      approved_at: null,
       feedback: feedbackText
     }
   });
@@ -244,9 +245,10 @@ export async function approveDeliverable(
     return { success: false, message: "Deliverable must be submitted by the freelancer before you can approve it" };
   }
 
+  const now = new Date();
   await (prisma as any).deliverable.update({
     where: { id: deliverable.id },
-    data: { status: "APPROVED" }
+    data: { status: "APPROVED", approved_at: now }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");

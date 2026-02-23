@@ -80,12 +80,15 @@ function buildDeliverablesFromRow(row: any): any[] {
   if (Array.isArray(fromTable) && fromTable.length > 0) {
     return fromTable
       .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((d: any) => ({
+      .map((d: any) => {
+        const approvedAt = d.approved_at ?? (d.status === 'APPROVED' && d.updated_at ? d.updated_at : null);
+        return {
         id: d.unique_id,
         description: d.description ?? '',
         deliverable: d.description ?? '',
         status: d.status ?? 'PENDING',
-        submitted_at: d.submitted_at ? new Date(d.submitted_at).toISOString() : null,
+        submitted_at: d.submitted_at ?? null,
+        approved_at: approvedAt ?? null,
         submitted_remark: d.submitted_remark ?? null,
         submitted_file: Array.isArray(d.submitted_file)
           ? (d.submitted_file as any[]).map((f: any) => ({
@@ -94,7 +97,8 @@ function buildDeliverablesFromRow(row: any): any[] {
             }))
           : [],
         feedback: d.feedback ?? null
-      }));
+      };
+      });
   }
   const fromJson = Array.isArray(row.deliverables) ? row.deliverables : [];
   return fromJson.map((d: any, idx: number) => ({

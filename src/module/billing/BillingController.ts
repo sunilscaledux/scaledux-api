@@ -269,11 +269,11 @@ export class BillingController {
       });
     }
 
-    // Update milestone payment_status to RELEASED
+    // Update milestone payment_status to FUNDED (money in escrow; RELEASED when founder releases after work approved)
     if (milestoneRow?.id) {
       await (prisma as any).milestone.update({
         where: { id: milestoneRow.id },
-        data: { payment_status: "RELEASED" }
+        data: { payment_status: "FUNDED" }
       });
     }
 
