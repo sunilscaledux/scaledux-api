@@ -19,6 +19,7 @@ import {
   getRevenueModels,
   getTeamRoles,
   getFundingStages,
+  getContractEndReasons,
   searchSkills,
   getAllSkills,
   getServiceCategories,
@@ -53,6 +54,7 @@ router.get("/business-models", getBusinessModels)
 router.get("/revenue-models", getRevenueModels)
 router.get("/team-roles", getTeamRoles)
 router.get("/funding-stages", getFundingStages)
+router.get("/contract-end-reasons", getContractEndReasons)
 
 // Skills endpoints (for large datasets)
 router.get("/skills/search", searchSkills) // GET /skills/search?q=javascript&limit=20

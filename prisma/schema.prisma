@@ -52,6 +52,8 @@ model User {
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
   proposals                    Proposal[] @relation("UserProposals")
+  reviewsGiven                 Review[]   @relation("ReviewsGiven")
+  reviewsReceived              Review[]   @relation("ReviewsReceived")
   conversationsAsUser1        Conversation[] @relation("ConversationUser1")
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
@@ -741,6 +743,34 @@ model Proposal {
   @@index([provider_id])
   @@index([status])
   @@map("scd_proposals")
+}
+
+// Polymorphic review: one row per public or private review (review_type). Used for contracts, mentor sessions, etc.
+model Review {
+  id              Int       @id @default(autoincrement())
+  unique_id       String    @unique @default(cuid())
+
+  review_from_id  Int       // User id of reviewer
+  review_to_id    Int       // User id being reviewed
+  action_type     String    @db.VarChar(50)   // e.g. PROPOSAL_CONTRACT, MENTOR_SESSION
+  action_id       String    @db.VarChar(100)  // e.g. proposal unique_id
+
+  review_type     String    @db.VarChar(20)  // PUBLIC | PRIVATE
+  rating          Decimal   @db.Decimal(3, 2) // 0-10 private, 0-5 public overall
+  feedback        String?   @db.Text
+  end_reason      String?   @db.VarChar(255) // For PRIVATE; null for PUBLIC
+  ratings_extra   Json?     // For PUBLIC category breakdown { skills, qualityOfWork, ... }; null for PRIVATE
+
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  review_from     User      @relation("ReviewsGiven", fields: [review_from_id], references: [id], onDelete: Cascade)
+  review_to       User      @relation("ReviewsReceived", fields: [review_to_id], references: [id], onDelete: Cascade)
+
+  @@unique([review_from_id, review_to_id, action_type, action_id, review_type])
+  @@index([review_to_id, action_type])
+  @@index([action_type, action_id])
+  @@map("scd_reviews")
 }
 
 // Milestones linked to project and proposal (enables per-milestone docs and status)

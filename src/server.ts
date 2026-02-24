@@ -25,6 +25,7 @@ import chatRoutes from './module/chat/ChatRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
 import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
 import billingRoutes from './module/billing/BillingRoute';
+import reviewRoutes from './module/review/ReviewRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -62,6 +63,7 @@ app.use("/api/v1", chatRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/service-categories", serviceCategoryRoutes);
 app.use("/api/v1/billing", billingRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
 
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {

@@ -6,6 +6,7 @@ import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getFileUrl } from "@utils/General"
 import { FUNDING_STAGES } from "../../constants/fundingStages"
+import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
 
 // Cache invalidation helper function
 export async function invalidateLocationCache(countryId?: string) {
@@ -651,6 +652,19 @@ export async function getFundingStages(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Get Funding Stages Error:", error)
     return ApiResponse.error(res, "Failed to retrieve funding stages")
+  }
+}
+
+/**
+ * Get contract end reasons (for private review "reason for ending this contract")
+ * GET /api/v1/contract-end-reasons
+ */
+export async function getContractEndReasons(req: Request, res: Response) {
+  try {
+    return ApiResponse.success(res, CONTRACT_END_REASONS, "Contract end reasons retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Contract End Reasons Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve contract end reasons")
   }
 }
 
