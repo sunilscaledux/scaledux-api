@@ -63,7 +63,7 @@ export async function browseProjects(req: Request, res: Response) {
     experienceLevel: experienceLevel as string,
     sortBy: sortBy as 'newest' | 'oldest' | 'budget_high' | 'budget_low',
     page: page ? parseInt(page as string) : 1,
-    limit: limit ? parseInt(limit as string) : 20,
+    limit: limit ? parseInt(limit as string) : (Number(process.env.FOUNDER_PROJECT_PAGE_LIMIT) || 20),
     filter: filter as 'all' | 'saved'
   });
 
@@ -285,11 +285,12 @@ export async function getMatchingServiceProviders(req: Request, res: Response) {
     return ApiResponse.error(res, "Project ID is required", 400);
   }
 
+  const defaultProvidersLimit = Number(process.env.FOUNDER_PROJECT_PROVIDERS_PAGE_LIMIT) || 10;
   const result = await FounderProjectService.getMatchingServiceProviders(
     userId,
     projectId,
     page ? parseInt(page as string) : 1,
-    limit ? parseInt(limit as string) : 10,
+    limit ? parseInt(limit as string) : defaultProvidersLimit,
     sortBy as 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed',
     filter as 'all' | 'invited' | 'saved'
   );

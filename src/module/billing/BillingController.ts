@@ -402,8 +402,9 @@ export class BillingController {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
+      const defaultBillingLimit = Number(process.env.BILLING_PAGE_LIMIT) || 10;
       const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const limit = parseInt(req.query.limit as string) || defaultBillingLimit;
       const fromDate = req.query.fromDate as string | undefined;
       const toDate = req.query.toDate as string | undefined;
       const search = req.query.search as string | undefined;

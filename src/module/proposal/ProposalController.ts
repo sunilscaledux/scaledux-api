@@ -9,6 +9,8 @@ function getStringParam(param: any): string {
   return typeof param === 'string' ? param : '';
 }
 
+const DEFAULT_PROPOSAL_PAGE_LIMIT = Number(process.env.PROPOSAL_PAGE_LIMIT) || 50;
+
 /**
  * Create a new proposal
  */
@@ -68,7 +70,7 @@ export async function getMyProposals(req: Request, res: Response) {
     userId,
     status as string,
     parseInt(page as string) || 1,
-    parseInt(limit as string) || 20
+    parseInt(limit as string) || DEFAULT_PROPOSAL_PAGE_LIMIT
   );
 
   if (result.success) {
@@ -99,7 +101,7 @@ export async function getProposalsByProject(req: Request, res: Response) {
     projectId,
     status as string,
     parseInt(page as string) || 1,
-    parseInt(limit as string) || 20
+    parseInt(limit as string) || DEFAULT_PROPOSAL_PAGE_LIMIT
   );
 
   if (result.success) {
@@ -131,7 +133,7 @@ export async function getFounderContracts(req: Request, res: Response) {
     userId,
     statusParam as 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED',
     parseInt(page as string) || 1,
-    parseInt(limit as string) || 20
+    parseInt(limit as string) || DEFAULT_PROPOSAL_PAGE_LIMIT
   );
 
   if (result.success) {
