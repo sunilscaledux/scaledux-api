@@ -8,6 +8,7 @@ import {
   userOtpLogin,
   createUserAfterOtpVerification,
 } from "./AuthService";
+import { setProfileSectionsForRole } from "../profile/ProfileCompletionService";
 import {
   RegisterInput,
   VerifyOtpInput,
@@ -621,6 +622,8 @@ export async function updateUserRole(req: Request, res: Response) {
       where: { id: userId },
       data: { role }
     });
+
+    await setProfileSectionsForRole(userId, role);
 
     return ApiResponse.success(
       res,

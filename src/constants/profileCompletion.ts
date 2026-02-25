@@ -1,6 +1,6 @@
 /**
  * Profile completion: role-based section config.
- * Section keys are stored in User.profile_completion_sections as { [key]: boolean }.
+ * Section keys are stored in User.profile_sections as { [key]: boolean }. Initialized per role on first login/register.
  * When a user updates a section (e.g. profile picture), we set that key to true; when they remove content, false.
  */
 

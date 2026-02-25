@@ -67,7 +67,6 @@ export async function createUserAfterOtpVerification(
     const user = await prisma.user.create({
       data: userData,
     });
-
     const { password, ...safeUser } = user;
     return {
       success: true,

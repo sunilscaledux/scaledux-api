@@ -27,14 +27,21 @@ function normalizeRole(role: string | null | undefined): UserRole {
 }
 
 /**
- * Ensure user has profile_completion_sections initialized (all false for their role's keys).
+ * Ensure user has profile_sections initialized (all false for their role's keys). Used when sections are null (e.g. first time completion API is called).
  */
 export async function ensureSectionsInitialized(userId: number, role: UserRole | string | null): Promise<void> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { profile_completion_sections: true },
+    select: { profile_sections: true },
   });
-  if (!user || user.profile_completion_sections != null) return;
+  if (!user || user.profile_sections != null) return;
+  await setProfileSectionsForRole(userId, role);
+}
+
+/**
+ * Set profile_sections for the given role (all keys false, percentage 0). Call when user selects/updates role (PATCH /auth/role).
+ */
+export async function setProfileSectionsForRole(userId: number, role: UserRole | string | null): Promise<void> {
   const roleSections = getSectionsForRole(role);
   const initial: ProfileCompletionSectionsMap = {};
   for (const s of roleSections) {
@@ -42,7 +49,10 @@ export async function ensureSectionsInitialized(userId: number, role: UserRole |
   }
   await prisma.user.update({
     where: { id: userId },
-    data: { profile_completion_sections: initial as object },
+    data: {
+      profile_sections: initial as object,
+      profile_completion_percentage: 0,
+    },
   });
 }
 
@@ -56,40 +66,40 @@ export async function updateCompletionSection(
 ): Promise<void> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { profile_completion_sections: true, role: true },
+    select: { profile_sections: true, role: true },
   });
   if (!user) return;
-  const current = (user.profile_completion_sections as ProfileCompletionSectionsMap) || {};
+  const current = (user.profile_sections as ProfileCompletionSectionsMap) || {};
   const next = { ...current, [sectionKey]: completed };
   const role = normalizeRole(user.role);
   const percentage = computeCompletionPercentage(next, role);
   await prisma.user.update({
     where: { id: userId },
     data: {
-      profile_completion_sections: next as object,
+      profile_sections: next as object,
       profile_completion_percentage: percentage,
     },
   });
 }
 
 /**
- * Get profile completion for the user. Uses stored profile_completion_sections and role; returns role-based % and section list.
+ * Get profile completion for the user. Uses stored profile_sections and role; returns role-based % and section list.
  */
 export async function calculateProfileCompletion(userId: number): Promise<ProfileCompletionResult> {
   let user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { profile_completion_sections: true, profile_completion_percentage: true, role: true },
+    select: { profile_sections: true, profile_completion_percentage: true, role: true },
   });
   if (!user) throw new Error('User not found');
   const role = normalizeRole(user.role);
   await ensureSectionsInitialized(userId, role);
-  if (user.profile_completion_sections == null) {
+  if (user.profile_sections == null) {
     user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { profile_completion_sections: true, profile_completion_percentage: true, role: true },
+      select: { profile_sections: true, profile_completion_percentage: true, role: true },
     }) as typeof user;
   }
-  const sections = (user!.profile_completion_sections as ProfileCompletionSectionsMap) || {};
+  const sections = (user!.profile_sections as ProfileCompletionSectionsMap) || {};
   const roleSections = getSectionsForRole(role);
   const totalPercentage =
     user!.profile_completion_percentage != null
@@ -122,4 +132,5 @@ export default {
   calculateProfileCompletion,
   updateCompletionSection,
   ensureSectionsInitialized,
+  setProfileSectionsForRole,
 };
