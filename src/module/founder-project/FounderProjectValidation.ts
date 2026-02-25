@@ -93,6 +93,9 @@ export const createFounderProjectSchema = Joi.object({
     loccation: Joi.string().optional().allow(null).allow('').messages({
       'string.empty': 'Location is required',
       'any.required': 'Location is required'
+    }),
+    estimatedHours: Joi.number().integer().min(0).optional().allow(null).messages({
+      'number.min': 'Estimated hours must be 0 or more'
     })
   }).required().messages({
     'any.required': 'Advanced preferences are required'
@@ -141,7 +144,8 @@ export const saveDraftProjectSchema = Joi.object({
     hireWithin: Joi.string().optional().allow(''),
     timeRequirement: Joi.string().optional().allow(''),
     earnedAmount: Joi.string().optional().allow(''),
-    loccation: Joi.string().optional().allow('')
+    loccation: Joi.string().optional().allow(''),
+    estimatedHours: Joi.number().integer().min(0).optional().allow(null)
   }).optional(),
   status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED')
 })
@@ -193,7 +197,8 @@ export const updateFounderProjectSchema = Joi.object({
     hireWithin: Joi.string().optional().allow(''),
     timeRequirement: Joi.string().optional().allow(''),
     earnedAmount: Joi.string().optional().allow(''),
-    loccation: Joi.string().optional().allow('')
+    loccation: Joi.string().optional().allow(''),
+    estimatedHours: Joi.number().integer().min(0).optional().allow(null)
   }).optional(),
   status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED').messages({
     'any.only': 'Status must be either DRAFT or PUBLISHED'

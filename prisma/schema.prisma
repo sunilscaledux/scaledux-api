@@ -81,6 +81,7 @@ model PersonalInfo {
   website               String?
   zipCode               String?
   hourly_rate           Float?
+  available_hours_per_week Int?
   links                 Json?     // Social media links
   languages             Json?
   show_as_agency        Boolean   @default(false)
@@ -717,6 +718,8 @@ model Proposal {
   cover_letter          String    @db.Text
   proposed_amount       Decimal   @db.Decimal(15, 2)
   payment_schedule      String    @db.VarChar(20) // byProject, byMilestone
+  /** Freelancer’s estimated hours for the whole project (not per milestone). */
+  hours_required        Int?
   milestones            Json      @default("[]") // Array of milestone objects
   screening_answers     Json      @default("[]") // Answers to screening questions
   attachments           Json      @default("[]") // File URLs
@@ -784,6 +787,7 @@ model Milestone {
   description      String?   @db.Text
   amount           Decimal   @db.Decimal(15, 2)
   due_date         DateTime? @db.Date
+  hours_required   Int?
   status           String    @default("PENDING") @db.VarChar(20) // Milestone completion: PENDING, IN_PROGRESS, COMPLETED, PAID (exposed as milestone_status in API)
   payment_status   String    @default("PENDING") @db.VarChar(20) // PENDING, FUNDED, RELEASED
   /** When true, this milestone cannot be edited/deleted (e.g. set when proposal is HIRED or milestone approved) */

@@ -164,6 +164,7 @@ export class ProposalService {
       cover_letter?: string;
       proposed_amount: number;
       payment_schedule: string;
+      hours_required?: number | null;
       milestones: any[];
       screening_answers: any[];
       attachments: string[];
@@ -210,6 +211,10 @@ export class ProposalService {
       }
 
       // Create the proposal (milestones live in Milestone table only; proposal.milestones kept empty)
+      const hoursRequired =
+        data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
+          ? data.hours_required
+          : null;
       const proposal = await (prisma as any).proposal.create({
         data: {
           project_id: project.id,
@@ -217,6 +222,7 @@ export class ProposalService {
           cover_letter: data.cover_letter || '',
           proposed_amount: data.proposed_amount,
           payment_schedule: data.payment_schedule,
+          hours_required: hoursRequired,
           milestones: [],
           screening_answers: data.screening_answers,
           attachments: data.attachments,
@@ -1007,6 +1013,7 @@ export class ProposalService {
       cover_letter?: string;
       proposed_amount: number;
       payment_schedule: string;
+      hours_required?: number | null;
       milestones: any[];
       screening_answers: any[];
       attachments: string[];
@@ -1035,12 +1042,19 @@ export class ProposalService {
         attachments: proposal.attachments
       };
       await createProposalActivity(proposal.unique_id, 'CONTENT_UPDATE', { oldSnapshot }, userId);
+      const hoursRequired =
+        data.hours_required !== undefined
+          ? (data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
+              ? data.hours_required
+              : null)
+          : undefined;
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
           cover_letter: data.cover_letter ?? proposal.cover_letter,
           proposed_amount: data.proposed_amount,
           payment_schedule: data.payment_schedule,
+          ...(hoursRequired !== undefined && { hours_required: hoursRequired }),
           screening_answers: data.screening_answers,
           attachments: data.attachments
         }

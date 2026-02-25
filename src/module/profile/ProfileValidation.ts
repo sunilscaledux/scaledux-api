@@ -1,5 +1,5 @@
 import Joi from "joi";
-import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from "./ProfileType";
+import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from "./ProfileType";
 
 export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
   title: Joi.string().required(),
@@ -66,5 +66,12 @@ export const updateHourlyRateSchema = Joi.object<HourlyRateInput>({
     'number.base': 'Please select a valid currency',
     'number.positive': 'Please select a valid currency',
     'any.required': 'Currency selection is required'
+  }),
+});
+
+export const updateAvailableHoursPerWeekSchema = Joi.object<AvailableHoursPerWeekInput>({
+  available_hours_per_week: Joi.number().integer().min(0).max(168).allow(null).messages({
+    'number.min': 'Available hours must be at least 0',
+    'number.max': 'Available hours cannot exceed 168 per week'
   }),
 });

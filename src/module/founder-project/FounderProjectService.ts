@@ -574,7 +574,8 @@ export class FounderProjectService {
             hire_within: data.advancedPreferences.hireWithin,
             time_requirement: data.advancedPreferences.timeRequirement,
             earned_amount: data.advancedPreferences.earnedAmount,
-            location: data.advancedPreferences.loccation
+            location: data.advancedPreferences.loccation,
+            estimated_hours: data.advancedPreferences.estimatedHours ?? null
           },
           status: data.status || 'DRAFT'
         }
@@ -655,7 +656,8 @@ export class FounderProjectService {
           hire_within: data.advancedPreferences.hireWithin ?? currentPrefs.hire_within,
           time_requirement: data.advancedPreferences.timeRequirement ?? currentPrefs.time_requirement,
           earned_amount: data.advancedPreferences.earnedAmount ?? currentPrefs.earned_amount,
-          location: data.advancedPreferences.loccation ?? currentPrefs.location
+          location: data.advancedPreferences.loccation ?? currentPrefs.location,
+          estimated_hours: data.advancedPreferences.estimatedHours ?? currentPrefs.estimated_hours ?? null
         };
       }
 

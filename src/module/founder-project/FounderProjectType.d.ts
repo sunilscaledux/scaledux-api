@@ -19,6 +19,7 @@ export interface CreateFounderProjectInput {
     timeRequirement: string
     earnedAmount: string
     loccation: string
+    estimatedHours?: number | null
   }
   status?: 'DRAFT' | 'PUBLISHED'
 }
@@ -44,6 +45,7 @@ export interface UpdateFounderProjectInput {
     timeRequirement: string
     earnedAmount: string
     loccation: string
+    estimatedHours?: number | null
   }
   status?: 'DRAFT' | 'PUBLISHED'
 }

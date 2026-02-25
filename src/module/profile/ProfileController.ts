@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PersonalInfoService } from './ProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
-import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema } from './ProfileValidation';
+import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema } from './ProfileValidation';
 
 export class ProfileController {
   
@@ -85,6 +85,30 @@ export class ProfileController {
       }
     } catch (error: any) {
       return ApiResponse.error(res, error.message || 'Failed to update hourly rate');
+    }
+  }
+
+  /**
+   * Update available hours per week (freelancer)
+   * PATCH /api/v1/profile/available-hours-per-week
+   */
+  static async updateAvailableHoursPerWeek(req: Request, res: Response) {
+    try {
+      const { value, error } = updateAvailableHoursPerWeekSchema.validate(req.body, { abortEarly: false });
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+
+      const userId = req.user.id;
+      const result = await PersonalInfoService.updateAvailableHoursPerWeek(userId, value);
+
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to update available hours per week');
     }
   }
 

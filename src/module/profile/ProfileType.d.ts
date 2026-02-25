@@ -117,6 +117,10 @@ export interface HourlyRateInput {
     currency_id: number;
 }
 
+export interface AvailableHoursPerWeekInput {
+    available_hours_per_week: number | null;
+}
+
 // Response type for user profile
 export interface UserProfileResponse {
     id: number;
@@ -131,6 +135,7 @@ export interface UserProfileResponse {
     website?: string;
     zipCode?: string;
     hourly_rate?: number;
+    available_hours_per_week?: number | null;
     links?: any;
     languages?: any;
     // Founder fields

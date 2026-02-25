@@ -1,7 +1,7 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
-import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput } from './ProfileType';
+import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { ulid } from 'ulid';
 
 /**
@@ -48,6 +48,7 @@ export class PersonalInfoService {
         city: profile.city,
         website: profile.website,
         hourly_rate: profile.hourly_rate,
+        available_hours_per_week: profile.available_hours_per_week,
         links: profile.links,
         languages: profile.languages,
         country: profile.country,
@@ -129,6 +130,7 @@ export class PersonalInfoService {
         website: profile.website,
         zipCode: profile.zipCode,
         hourly_rate: profile.hourly_rate,
+        available_hours_per_week: profile.available_hours_per_week,
         links: profile.links,
         languages: profile.languages,
         // Relations
@@ -295,6 +297,36 @@ export class PersonalInfoService {
       return {
         success: false,
         message: 'Failed to update hourly rate',
+      };
+    }
+  }
+
+  /**
+   * Update available hours per week (freelancer)
+   */
+  static async updateAvailableHoursPerWeek(userId: number, data: AvailableHoursPerWeekInput): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.personalInfo.upsert({
+        where: { user_id: userId },
+        update: {
+          available_hours_per_week: data.available_hours_per_week,
+        },
+        create: {
+          user_id: userId,
+          available_hours_per_week: data.available_hours_per_week,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Available hours per week updated successfully',
+        data: profile,
+      };
+    } catch (error: any) {
+      console.error('Update Available Hours Per Week Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update available hours per week',
       };
     }
   }

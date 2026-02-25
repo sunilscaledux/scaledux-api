@@ -22,6 +22,7 @@ router.get("/me", authenticateToken, ProfileController.getMyProfile);
 router.patch('/summary', authenticateToken, ProfileController.updateSummary);
 router.patch('/personal-info', authenticateToken, ProfileController.updatePersonalInfo);
 router.patch('/hourly-rate', authenticateToken, ProfileController.updateHourlyRate);
+router.patch('/available-hours-per-week', authenticateToken, ProfileController.updateAvailableHoursPerWeek);
 router.patch('/languages', authenticateToken, ProfileController.updateLanguages);
 router.post(
   '/profile-image',
