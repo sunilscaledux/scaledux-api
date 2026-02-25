@@ -254,6 +254,8 @@ export class BillingController {
     );
 
     if (milestoneIndex === 0) {
+      const hireDate = new Date();
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: { status: "HIRED", milestones_approved: true }
@@ -262,6 +264,22 @@ export class BillingController {
         where: { proposal_id: proposal.id },
         data: { is_approved: true }
       });
+
+      // Auto-adjust each milestone's due_date: preserve the original offset
+      // (due_date - created_at) and apply it from the hire date.
+      for (const row of rows) {
+        if (row.due_date) {
+          const created = new Date(row.created_at);
+          const original = new Date(row.due_date);
+          const daysOffset = Math.round((original.getTime() - created.getTime()) / 86_400_000);
+          const newDue = new Date(hireDate);
+          newDue.setDate(newDue.getDate() + Math.max(0, daysOffset));
+          await (prisma as any).milestone.update({
+            where: { id: row.id },
+            data: { due_date: newDue }
+          });
+        }
+      }
     }
 
     // Update milestone payment_status to FUNDED (money in escrow; RELEASED when founder releases after work approved)
