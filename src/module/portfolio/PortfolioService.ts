@@ -2,8 +2,8 @@ import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
-import fs from 'fs';
-import path from 'path';
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
+
 
 export class PortfolioService {
   /**
@@ -159,6 +159,7 @@ export class PortfolioService {
       const portfolio = await prisma.portfolio.create({
         data: createData
       });
+      await updateCompletionSection(userId, 'portfolio', true);
 
       // Transform URLs to full URLs
       const transformedPortfolio = {
@@ -294,7 +295,8 @@ export class PortfolioService {
         where: { id: existingPortfolio.id },
         data: { deleted_at: new Date() }
       });
-
+      const remaining = await prisma.portfolio.count({ where: { user_id: userId, deleted_at: null } });
+      await updateCompletionSection(userId, 'portfolio', remaining > 0);
       return {
         success: true,
         message: "Portfolio deleted successfully",

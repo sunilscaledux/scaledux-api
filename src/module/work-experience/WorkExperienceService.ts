@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateWorkExperienceInput, UpdateWorkExperienceInput } from "./WorkExperienceType";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 export class WorkExperienceService {
   /**
@@ -56,7 +57,7 @@ export class WorkExperienceService {
           is_current: workExperienceData.is_current
         }
       });
-
+      await updateCompletionSection(userId, 'workExperience', true);
       return {
         success: true,
         message: 'Work experience created successfully',
@@ -153,7 +154,8 @@ export class WorkExperienceService {
           id: workExperienceId
         }
       });
-
+      const remaining = await prisma.workExperience.count({ where: { user_id: userId } });
+      await updateCompletionSection(userId, 'workExperience', remaining > 0);
       return {
         success: true,
         message: 'Work experience deleted successfully',

@@ -1,140 +1,125 @@
 import { prisma } from '../../services/prismaService';
+import {
+  type ProfileCompletionSectionKey,
+  type ProfileCompletionSectionsMap,
+  type UserRole,
+  getSectionsForRole,
+  computeCompletionPercentage,
+  getPendingSectionKeys,
+} from '../../constants/profileCompletion';
 
-
-// Profile completion percentages
-export const PROFILE_COMPLETION_WEIGHTS = {
-  profilePicture: 3,
-  profileCover: 3,
-  profileSummary: 12, // title + about combined
-  personalInfo: 6,
-  skillsExpertise: 16,
-  workExperience: 8,
-  portfolio: 14,
-  hourlyRate: 6,
-  education: 4,
-  licenseCertifications: 4,
-  languages: 2,
-  achievements: 2,
-  emailVerification: 3,
-  phoneVerification: 3,
-  identityVerification: 14 // Total verification: 20%
-} as const;
-
-/**
- * Calculate profile completion percentage based on user data
- */
-export const calculateProfileCompletion = async (
-  userId: number
-): Promise<{
+export type ProfileCompletionResult = {
   totalPercentage: number;
   completedFields: Record<string, boolean>;
   fieldPercentages: Record<string, number>;
-}> => {
-  try {
-    // Fetch user data with all relations
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        personalInfo: true,
-        companyProfile: true,
-        education: true,
-        licenses: true,
-        workExperiences: true,
-        achievements: true,
-        expertises: true,
-        portfolios: true,
-      },
-    });
-
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    // Get personal info (default profile type for completion)
-    const userProfile = user.personalInfo;
-
-    const completedFields: Record<string, boolean> = {};
-    const fieldPercentages = PROFILE_COMPLETION_WEIGHTS;
-
-    // Profile Picture (3%)
-    completedFields.profilePicture = !!userProfile?.profileImage;
-
-    // Profile Cover (3%)
-    completedFields.profileCover = !!userProfile?.coverImage;
-
-    // Profile Summary (12%) - Title + About
-    const hasTitle = !!userProfile?.title;
-    const hasAbout = !!userProfile?.about;
-    completedFields.profileSummary = hasTitle && hasAbout;
-
-    // Personal Info (6%) - Address, city, country, website
-    const hasAddress = !!userProfile?.address;
-    const hasCity = !!userProfile?.city;
-    const hasCountry = !!userProfile?.country_id;
-    const hasWebsite = !!userProfile?.website;
-    completedFields.personalInfo = hasAddress && hasCity && hasCountry;
-
-    // Skills/Expertise (16%)
-    completedFields.skillsExpertise = (user.expertises?.length || 0) > 0;
-
-    // Work Experience (8%)
-    completedFields.workExperience = (user.workExperiences?.length || 0) > 0;
-
-    // Portfolio (14%)
-    completedFields.portfolio = (user.portfolios?.length || 0) > 0;
-
-    // Hourly Rate (6%)
-    completedFields.hourlyRate = !!userProfile?.hourly_rate;
-
-    // Education (4%)
-    completedFields.education = (user.education?.length || 0) > 0;
-
-    // License & Certifications (4%)
-    completedFields.licenseCertifications = (user.licenses?.length || 0) > 0;
-
-    // Languages (2%)
-    const hasLanguages = !!(
-      userProfile?.languages &&
-      Array.isArray(userProfile.languages) &&
-      (userProfile.languages as any[]).length > 0
-    );
-    completedFields.languages = hasLanguages;
-
-    // Achievements (2%)
-    completedFields.achievements = (user.achievements?.length || 0) > 0;
-
-    // Email Verification (3%)
-    completedFields.emailVerification = !!user.email_verified_at;
-
-    // Phone Verification (3%)
-    completedFields.phoneVerification = !!user.phone_verified_at;
-
-    // Identity Verification (14%)
-    completedFields.identityVerification =
-      user.identity_verification_status === "APPROVED" &&
-      !!user.identity_verified_at;
-
-    // Calculate total percentage
-    let totalPercentage = 0;
-    Object.entries(completedFields).forEach(([field, isCompleted]) => {
-      if (isCompleted) {
-        totalPercentage +=
-          fieldPercentages[field as keyof typeof fieldPercentages] || 0;
-      }
-    });
-
-    return {
-      totalPercentage: Math.min(totalPercentage, 100),
-      completedFields,
-      fieldPercentages,
-    };
-  } catch (error) {
-    console.error("Error calculating profile completion:", error);
-    throw error;
-  }
+  pendingSectionKeys: ProfileCompletionSectionKey[];
+  sectionsForRole: Array<{ key: string; label: string; weight: number; route: string; isCompleted: boolean }>;
 };
+
+/**
+ * Normalize role from DB (may be uppercase or different).
+ */
+function normalizeRole(role: string | null | undefined): UserRole {
+  if (!role) return 'freelancer';
+  const r = role.toLowerCase();
+  if (r === 'founder' || r === 'mentor' || r === 'investor') return r as UserRole;
+  return 'freelancer';
+}
+
+/**
+ * Ensure user has profile_completion_sections initialized (all false for their role's keys).
+ */
+export async function ensureSectionsInitialized(userId: number, role: UserRole | string | null): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profile_completion_sections: true },
+  });
+  if (!user || user.profile_completion_sections != null) return;
+  const roleSections = getSectionsForRole(role);
+  const initial: ProfileCompletionSectionsMap = {};
+  for (const s of roleSections) {
+    initial[s.key] = false;
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profile_completion_sections: initial as object },
+  });
+}
+
+/**
+ * Update one section's completion and recompute percentage. Call this whenever profile data changes.
+ */
+export async function updateCompletionSection(
+  userId: number,
+  sectionKey: ProfileCompletionSectionKey,
+  completed: boolean
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profile_completion_sections: true, role: true },
+  });
+  if (!user) return;
+  const current = (user.profile_completion_sections as ProfileCompletionSectionsMap) || {};
+  const next = { ...current, [sectionKey]: completed };
+  const role = normalizeRole(user.role);
+  const percentage = computeCompletionPercentage(next, role);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      profile_completion_sections: next as object,
+      profile_completion_percentage: percentage,
+    },
+  });
+}
+
+/**
+ * Get profile completion for the user. Uses stored profile_completion_sections and role; returns role-based % and section list.
+ */
+export async function calculateProfileCompletion(userId: number): Promise<ProfileCompletionResult> {
+  let user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { profile_completion_sections: true, profile_completion_percentage: true, role: true },
+  });
+  if (!user) throw new Error('User not found');
+  const role = normalizeRole(user.role);
+  await ensureSectionsInitialized(userId, role);
+  if (user.profile_completion_sections == null) {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { profile_completion_sections: true, profile_completion_percentage: true, role: true },
+    }) as typeof user;
+  }
+  const sections = (user!.profile_completion_sections as ProfileCompletionSectionsMap) || {};
+  const roleSections = getSectionsForRole(role);
+  const totalPercentage =
+    user!.profile_completion_percentage != null
+      ? user!.profile_completion_percentage
+      : computeCompletionPercentage(sections, role);
+  const completedFields: Record<string, boolean> = {};
+  const fieldPercentages: Record<string, number> = {};
+  for (const s of roleSections) {
+    completedFields[s.key] = sections[s.key] === true;
+    fieldPercentages[s.key] = s.weight;
+  }
+  const pendingSectionKeys = getPendingSectionKeys(sections, role);
+  const sectionsForRole = roleSections.map((s) => ({
+    key: s.key,
+    label: s.label,
+    weight: s.weight,
+    route: s.route,
+    isCompleted: sections[s.key] === true,
+  }));
+  return {
+    totalPercentage,
+    completedFields,
+    fieldPercentages,
+    pendingSectionKeys,
+    sectionsForRole,
+  };
+}
 
 export default {
   calculateProfileCompletion,
-  PROFILE_COMPLETION_WEIGHTS,
+  updateCompletionSection,
+  ensureSectionsInitialized,
 };

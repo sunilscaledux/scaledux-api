@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateLicenseInput, UpdateLicenseInput } from "./LicenseType";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 export class LicenseService {
   /**
@@ -47,7 +48,7 @@ export class LicenseService {
           skills: licenseData.skills || []
         }
       });
-
+      await updateCompletionSection(userId, 'licenseCertifications', true);
       return {
         success: true,
         message: 'License created successfully',
@@ -135,7 +136,8 @@ export class LicenseService {
           id: licenseId
         }
       });
-
+      const remaining = await prisma.license.count({ where: { user_id: userId } });
+      await updateCompletionSection(userId, 'licenseCertifications', remaining > 0);
       return {
         success: true,
         message: 'License deleted successfully',

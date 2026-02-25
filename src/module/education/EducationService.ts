@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 export class EducationService {
   /**
@@ -23,7 +24,7 @@ export class EducationService {
           skills: data.skills || []
         }
       });
-
+      await updateCompletionSection(userId, 'education', true);
       return {
         success: true,
         message: "Education added successfully",
@@ -143,7 +144,8 @@ export class EducationService {
           id: educationId
         }
       });
-
+      const remaining = await prisma.education.count({ where: { user_id: userId } });
+      await updateCompletionSection(userId, 'education', remaining > 0);
       return {
         success: true,
         message: "Education deleted successfully",

@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General';
 import TwilioService from "@services/TwilioService";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import fs from 'fs';
 import path from 'path';
 
@@ -226,7 +227,7 @@ export class VerificationService {
           email_verified_at: new Date()
         }
       });
-
+      await updateCompletionSection(userId, 'emailVerification', true);
       return {
         success: true,
         message: "Email verified successfully",
@@ -317,7 +318,7 @@ export class VerificationService {
             phone_verified_at: new Date()
           }
         });
-
+        await updateCompletionSection(userId, 'phoneVerification', true);
         return {
           success: true,
           message: "Phone number verified successfully",

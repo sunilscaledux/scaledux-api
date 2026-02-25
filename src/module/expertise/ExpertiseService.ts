@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseType";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 export class ExpertiseService {
   /**
@@ -47,7 +48,7 @@ export class ExpertiseService {
           }
         }
       });
-
+      await updateCompletionSection(userId, 'skillsExpertise', true);
       return {
         success: true,
         message: "Expertise added successfully",
@@ -199,7 +200,8 @@ export class ExpertiseService {
           id: expertiseId
         }
       });
-
+      const remaining = await prisma.userExpertise.count({ where: { user_id: userId } });
+      await updateCompletionSection(userId, 'skillsExpertise', remaining > 0);
       return {
         success: true,
         message: "User expertise deleted successfully",

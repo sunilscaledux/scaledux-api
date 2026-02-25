@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateAchievementInput, UpdateAchievementInput } from "./AchievementType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from "@utils/General";
+import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 
 export class AchievementService {
@@ -65,7 +66,7 @@ export class AchievementService {
           media_files: normalizedMediaFiles
         }
       });
-
+      await updateCompletionSection(userId, 'achievements', true);
       return {
         success: true,
         message: 'Achievement created successfully',
@@ -159,7 +160,8 @@ export class AchievementService {
           id: achievementId
         }
       });
-
+      const remaining = await prisma.achievement.count({ where: { user_id: userId } });
+      await updateCompletionSection(userId, 'achievements', remaining > 0);
       return {
         success: true,
         message: 'Achievement deleted successfully',

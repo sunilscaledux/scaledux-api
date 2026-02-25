@@ -3,6 +3,7 @@ import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { ulid } from 'ulid';
+import { updateCompletionSection } from './ProfileCompletionService';
 
 /**
  * PersonalInfoService
@@ -199,7 +200,7 @@ export class PersonalInfoService {
           state: true,
         },
       });
-
+      await updateCompletionSection(userId, 'profileSummary', !!(data.title && data.about));
       return {
         success: true,
         message: 'Profile summary updated successfully',
@@ -247,7 +248,8 @@ export class PersonalInfoService {
           state: true,
         },
       });
-
+      const personalInfoComplete = !!(profile.address && profile.city && profile.country_id);
+      await updateCompletionSection(userId, 'personalInfo', personalInfoComplete);
       return {
         success: true,
         message: 'Personal information updated successfully',
@@ -286,7 +288,7 @@ export class PersonalInfoService {
           currency_id: data.currency_id,
         },
       });
-
+      await updateCompletionSection(userId, 'hourlyRate', profile.hourly_rate != null);
       return {
         success: true,
         message: 'Hourly rate updated successfully',
@@ -316,7 +318,7 @@ export class PersonalInfoService {
           available_hours_per_week: data.available_hours_per_week,
         },
       });
-
+      await updateCompletionSection(userId, 'availableHoursPerWeek', profile.available_hours_per_week != null);
       return {
         success: true,
         message: 'Available hours per week updated successfully',
@@ -346,7 +348,8 @@ export class PersonalInfoService {
           languages: languages,
         },
       });
-
+      const hasLanguages = Array.isArray(profile.languages) && (profile.languages as any[]).length > 0;
+      await updateCompletionSection(userId, 'languages', hasLanguages);
       return {
         success: true,
         message: 'Languages updated successfully',
@@ -377,7 +380,7 @@ export class PersonalInfoService {
           profileImage: relativePath,
         },
       });
-
+      await updateCompletionSection(userId, 'profilePicture', true);
       return {
         success: true,
         message: 'Profile image uploaded successfully',
@@ -410,7 +413,7 @@ export class PersonalInfoService {
           coverImage: relativePath,
         },
       });
-
+      await updateCompletionSection(userId, 'profileCover', true);
       return {
         success: true,
         message: 'Cover image uploaded successfully',

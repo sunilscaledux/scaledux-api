@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import { extractRelativePath, normalizeUploadedPaths, getRelativePath, getFileUrl } from '@utils/General'
+import { updateCompletionSection } from '../profile/ProfileCompletionService'
 import { uploadFile } from '@module/general/FileController'
 import fs from 'fs'
 import path from 'path'
@@ -212,6 +213,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         identity_verification_status: 'UNDER_REVIEW'
       }
     })
+    await updateCompletionSection(userId, 'identityVerification', false)
 
     return ApiResponse.success(res, {
       verificationId: identityVerification.id,

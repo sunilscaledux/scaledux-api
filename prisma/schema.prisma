@@ -49,6 +49,8 @@ model User {
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
+  profile_completion_sections  Json?     // { sectionKey: boolean } - updated when user completes/unchanges a section
+  profile_completion_percentage Int?    // 0-100, cached from profile_completion_sections + role weights
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
   proposals                    Proposal[] @relation("UserProposals")
