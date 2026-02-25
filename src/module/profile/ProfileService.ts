@@ -152,6 +152,7 @@ export class PersonalInfoService {
         agency_verification_status: profile.user.agency_verification_status,
         agency_verified_at: profile.user.agency_verified_at?.toISOString(),
         show_as_agency: profile.user.show_as_agency,
+        profile_completion_percentage: profile.user.profile_completion_percentage ?? null,
       };
 
       // Include agency name only when agency is verified
