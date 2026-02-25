@@ -309,6 +309,116 @@ export async function updateReview(
 }
 
 /**
+ * Get PUBLIC reviews received by a user (by profile unique_id). Public endpoint for profile page.
+ */
+export async function getPublicReviewsByProfileUniqueId(
+  profileUniqueId: string,
+  options: { limit?: number; offset?: number } = {}
+): Promise<ServiceResponse> {
+  try {
+    const limit = Math.min(Math.max(Number(options.limit) || 20, 1), 100);
+    const offset = Math.max(Number(options.offset) || 0, 0);
+
+    const user = await prisma.user.findUnique({
+      where: { unique_id: profileUniqueId },
+      select: { id: true }
+    });
+    if (!user) {
+      return { success: false, message: 'Profile not found' };
+    }
+
+    const where = { review_to_id: user.id, review_type: 'PUBLIC' as const };
+
+    const [reviews, total] = await Promise.all([
+      (prisma as any).review.findMany({
+        where,
+        select: {
+          id: true,
+          unique_id: true,
+          review_from_id: true,
+          review_to_id: true,
+          action_type: true,
+          action_id: true,
+          review_type: true,
+          rating: true,
+          feedback: true,
+          created_at: true,
+          updated_at: true,
+          review_from: {
+            select: {
+              id: true,
+              unique_id: true,
+              first_name: true,
+              last_name: true,
+              personalInfo: { select: { profileImage: true } }
+            }
+          }
+        },
+        orderBy: { created_at: 'desc' },
+        take: limit,
+        skip: offset
+      }),
+      (prisma as any).review.count({ where })
+    ]);
+
+    const ratingCounts = await (prisma as any).review.groupBy({
+      by: ['rating'],
+      where: { review_to_id: user.id, review_type: 'PUBLIC' },
+      _count: { id: true }
+    });
+
+    const distribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    ratingCounts.forEach((r: any) => {
+      const star = Math.round(Number(r.rating));
+      if (star >= 1 && star <= 5) distribution[star] += r._count?.id ?? 0;
+    });
+
+    const avgResult = await (prisma as any).review.aggregate({
+      where: { review_to_id: user.id, review_type: 'PUBLIC' },
+      _avg: { rating: true }
+    });
+    const averageRating = avgResult._avg?.rating != null ? Number(Number(avgResult._avg.rating).toFixed(1)) : 0;
+
+    const list = reviews.map((r: any) => ({
+      id: r.id,
+      unique_id: r.unique_id,
+      review_from_id: r.review_from_id,
+      review_to_id: r.review_to_id,
+      action_type: r.action_type,
+      action_id: r.action_id,
+      review_type: r.review_type,
+      rating: Number(r.rating),
+      feedback: r.feedback,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      review_from: r.review_from
+        ? {
+            id: r.review_from.id,
+            unique_id: r.review_from.unique_id,
+            first_name: r.review_from.first_name,
+            last_name: r.review_from.last_name,
+            profileImage: r.review_from.personalInfo?.profileImage ?? null
+          }
+        : undefined
+    }));
+
+    return {
+      success: true,
+      data: {
+        reviews: list,
+        pagination: { limit, offset, total },
+        averageRating,
+        distribution
+      },
+      message: 'OK'
+    };
+  } catch (error: any) {
+    console.error('ReviewService.getPublicReviewsByProfileUniqueId error:', error);
+    return { success: false, message: error.message || 'Failed to get reviews' };
+  }
+}
+
+/**
  * Delete own review. Only review_from_id can delete.
  */
 export async function deleteReview(userId: number, reviewUniqueId: string): Promise<ServiceResponse> {

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PersonalInfoService } from './ProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema } from './ProfileValidation';
+import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
 
 export class ProfileController {
   
@@ -236,6 +237,25 @@ export class ProfileController {
       }
     } catch (error: any) {
       return ApiResponse.error(res, error.message || 'Failed to update agency settings');
+    }
+  }
+
+  /**
+   * Get PUBLIC reviews received by this profile (by unique_id). For profile page.
+   * GET /api/v1/profile/:uniqueId/reviews?limit=20&offset=0
+   */
+  static async getPublicProfileReviews(req: Request, res: Response) {
+    try {
+      const rawId = req.params.uniqueId;
+      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
+      if (!uniqueId) return ApiResponse.error(res, 'Unique ID is required', 400);
+      const limit = req.query.limit != null ? Number(req.query.limit) : 20;
+      const offset = req.query.offset != null ? Number(req.query.offset) : 0;
+      const result = await getPublicReviewsByProfileUniqueId(uniqueId, { limit, offset });
+      if (!result.success) return ApiResponse.error(res, result.message!, 404);
+      return ApiResponse.success(res, result.data, result.message!);
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to fetch reviews');
     }
   }
 

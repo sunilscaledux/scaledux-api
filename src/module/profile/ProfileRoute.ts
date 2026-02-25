@@ -115,6 +115,7 @@ router.post(
  * Public & Completion Routes
  */
 router.get("/completion/status", authenticateToken, getProfileCompletion);
+router.get("/:uniqueId/reviews", ProfileController.getPublicProfileReviews);
 router.get("/:uniqueId", ProfileController.getPublicProfile);
 
 export default router;
