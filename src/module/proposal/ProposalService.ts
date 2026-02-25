@@ -730,12 +730,11 @@ export class ProposalService {
   }
 
   /**
-   * Get founder's proposals by contract status (OFFER_SENT, OFFER_ACCEPTED, HIRED).
-   * Used for "All contracts" tab with sub-tabs; separate call per status.
+   * Get founder's proposals by contract status (ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, REJECTED, TERMINATED, WITHDRAWN).
    */
   static async getFounderContracts(
     userId: number,
-    status: 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED',
+    status: 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
     page: number = 1,
     limit: number = 20
   ): Promise<ServiceResponse> {

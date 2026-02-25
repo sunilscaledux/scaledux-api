@@ -113,12 +113,12 @@ export async function getProposalsByProject(req: Request, res: Response) {
 }
 
 /**
- * Get founder's contracts by status (OFFER_SENT, OFFER_ACCEPTED, HIRED). Separate call per tab.
+ * Get founder's contracts by status (ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, REJECTED, TERMINATED, WITHDRAWN).
  */
 export async function getFounderContracts(req: Request, res: Response) {
   const userId = req.user?.id;
   const { status, page, limit } = req.query;
-  const validStatuses = ['OFFER_SENT', 'OFFER_ACCEPTED', 'HIRED'];
+  const validStatuses = ['ACCEPTED', 'OFFER_SENT', 'OFFER_ACCEPTED', 'HIRED', 'REJECTED', 'TERMINATED', 'WITHDRAWN'];
   const statusParam = typeof status === 'string' ? status : '';
 
   if (!userId) {
@@ -126,12 +126,12 @@ export async function getFounderContracts(req: Request, res: Response) {
   }
 
   if (!validStatuses.includes(statusParam)) {
-    return ApiResponse.error(res, "status must be one of OFFER_SENT, OFFER_ACCEPTED, HIRED", 400);
+    return ApiResponse.error(res, "status must be one of ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, REJECTED, TERMINATED, WITHDRAWN", 400);
   }
 
   const result = await ProposalService.getFounderContracts(
     userId,
-    statusParam as 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED',
+    statusParam as 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
     parseInt(page as string) || 1,
     parseInt(limit as string) || DEFAULT_PROPOSAL_PAGE_LIMIT
   );
