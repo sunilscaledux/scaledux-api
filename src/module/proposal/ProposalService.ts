@@ -1847,7 +1847,7 @@ export class ProposalService {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
-        include: { project: { select: { user_id: true } } }
+        include: { project: { select: { user_id: true, project_title: true, id: true } } }
       });
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
@@ -1867,6 +1867,24 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: "HIRED", terminate_at: null, terminate_by: null }
       });
+
+      const projectTitle = proposal.project?.project_title ?? "Project";
+      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_RESTORED_SENT} ${projectTitle}.`;
+      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_RESTORED_RECEIVED} ${projectTitle}.`;
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        {
+          activityType: "contract_restored",
+          activityId: proposal.unique_id,
+          projectTitle,
+          messageSent,
+          messageReceived
+        },
+        proposal.project.id,
+        userId
+      );
 
       return { success: true, message: "Contract restored successfully" };
     } catch (error: any) {

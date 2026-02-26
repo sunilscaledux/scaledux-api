@@ -44,7 +44,7 @@ export const CHAT_SYSTEM_MESSAGES = {
   MILESTONE_APPROVED_RECEIVED: "Client approved your milestone",
 
   MILESTONE_REQUESTED_SENT: "You requested a new milestone for",
-  MILESTONE_REQUESTED_RECEIVED: "Freelancer requested a new milestone for",
+  MILESTONE_REQUESTED_RECEIVED: "Requested a new milestone for",
 
   CONTRACT_SENT_SENT: "Contract sent",
   CONTRACT_SENT_RECEIVED: "Contract sent",
@@ -60,11 +60,14 @@ export const CHAT_SYSTEM_MESSAGES = {
   OFFER_CANCELLED_RECEIVED: "The hire offer was withdrawn for",
 
   OFFER_DECLINED_SENT: "You declined the offer for",
-  OFFER_DECLINED_RECEIVED: "The freelancer declined the offer for",
+  OFFER_DECLINED_RECEIVED: "Declined the offer for",
 
   CONTRACT_TERMINATED_SENT: "You terminated the contract for",
   CONTRACT_TERMINATED_RECEIVED: "The contract was terminated for",
 
   CONTRACT_TERMINATE_SCHEDULED_SENT: "You scheduled the contract to terminate in 7 days for",
-  CONTRACT_TERMINATE_SCHEDULED_RECEIVED: "The contract was scheduled to terminate in 7 days for. You can restore it before then."
+  CONTRACT_TERMINATE_SCHEDULED_RECEIVED: "The contract was scheduled to terminate in 7 days for. You can restore it before then.",
+
+  CONTRACT_RESTORED_SENT: "You restored the contract for",
+  CONTRACT_RESTORED_RECEIVED: "The contract was restored for"
 } as const;

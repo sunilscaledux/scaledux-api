@@ -289,6 +289,18 @@ export class ConversationService {
     const msg = await this.createSystemMessage(conv.data.id, content, metadata, initiatorUserId);
     if (!msg.success) return { success: false, message: msg.message };
 
+    // Bump conversation updated_at so this chat appears at top of list; mark new message for the other user when initiator is set
+    const data: Record<string, unknown> = { updated_at: new Date() };
+    if (initiatorUserId != null) {
+      const [u1] = userId1 <= userId2 ? [userId1, userId2] : [userId2, userId1];
+      const receiverId = initiatorUserId === userId1 ? userId2 : userId1;
+      data[receiverId === u1 ? "user1_has_new_message" : "user2_has_new_message"] = true;
+    }
+    await (prisma as any).conversation.update({
+      where: { id: conv.data.id },
+      data
+    });
+
     // Realtime: emit to conversation room and both user rooms
     const payload = {
       id: msg.data!.id,
