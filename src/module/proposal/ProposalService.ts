@@ -13,6 +13,7 @@ export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
   OFFER_SENT: 'Offer sent',
   OFFER_ACCEPTED: 'Offer accepted',
   HIRED: 'Hired',
+  TERMINATING: 'Terminating',
   REJECTED: 'Proposal Rejected',
   WITHDRAWN: 'Offer withdrawn',
   TERMINATED: 'Terminated',
@@ -740,14 +741,14 @@ export class ProposalService {
    */
   static async getFounderContracts(
     userId: number,
-    status: 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
+    status: 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'TERMINATING' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
     page: number = 1,
     limit: number = 20
   ): Promise<ServiceResponse> {
     try {
-      // Hired tab includes both HIRED and PROJECT_COMPLETED so both can view offer and project overview
+      // Hired tab includes HIRED, TERMINATING, and PROJECT_COMPLETED so all can view offer and project overview
       const statusFilter = status === 'HIRED'
-        ? { in: ['HIRED', 'PROJECT_COMPLETED'] as const }
+        ? { in: ['HIRED', 'TERMINATING', 'PROJECT_COMPLETED'] as const }
         : status;
       const whereClause = {
         status: statusFilter,
@@ -928,15 +929,16 @@ export class ProposalService {
         };
       }
 
-      // If termination was scheduled and the date has passed, apply it now
+      // If status is TERMINATING and the date has passed, apply termination now
       const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
-      if (proposal.status === "HIRED" && terminateAt && terminateAt <= new Date()) {
+      if (proposal.status === "TERMINATING" && terminateAt && terminateAt <= new Date()) {
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: "TERMINATED", terminate_at: null }
+          data: { status: "TERMINATED", terminate_at: null, terminate_by: null }
         });
         (proposal as any).status = "TERMINATED";
         (proposal as any).terminate_at = null;
+        (proposal as any).terminate_by = null;
       }
 
       // Check if user is either the proposal owner or the project owner
@@ -1400,6 +1402,9 @@ export class ProposalService {
       if (proposal.status === "PROJECT_COMPLETED") {
         return { success: true, message: "Project is already marked as completed" };
       }
+      if (proposal.status === "TERMINATING") {
+        return { success: false, message: "Cannot mark project completed while contract is scheduled to terminate. Restore the contract first." };
+      }
       if (proposal.status !== "HIRED") {
         return { success: false, message: "Project can only be marked completed when the contract is hired" };
       }
@@ -1784,7 +1789,7 @@ export class ProposalService {
       if (proposal.status !== "HIRED") {
         return { success: false, message: "Only a hired contract can be terminated" };
       }
-      if ((proposal as any).terminate_at) {
+      if (proposal.status === "TERMINATING" || (proposal as any).terminate_at) {
         return { success: false, message: "Termination is already scheduled. Restore first if you want to cancel it." };
       }
       const isFounder = proposal.project.user_id === userId;
@@ -1797,16 +1802,16 @@ export class ProposalService {
         return { success: false, message: "Reason is required" };
       }
 
-      // Schedule termination 1 week from now; user can restore before then
+      // Schedule termination 1 week from now; set status to TERMINATING so hire/fund are blocked
       const terminateAt = new Date();
       terminateAt.setDate(terminateAt.getDate() + 7);
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { terminate_at: terminateAt }
+        data: { status: "TERMINATING", terminate_at: terminateAt, terminate_by: userId }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'HIRED', message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'TERMINATING', message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${trimmed}. You can restore before the date.`;
@@ -1836,7 +1841,7 @@ export class ProposalService {
   }
 
   /**
-   * Restore contract: clear terminate_at so scheduled termination is cancelled. Only when status is HIRED and terminate_at is in the future.
+   * Restore contract: only the user who scheduled termination (terminate_by) can restore.
    */
   static async restoreContract(userId: number, proposalId: string): Promise<ServiceResponse> {
     try {
@@ -1847,13 +1852,11 @@ export class ProposalService {
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
       }
-      if (proposal.status !== "HIRED") {
-        return { success: false, message: "Only a hired contract can be restored" };
+      if (proposal.status !== "TERMINATING" && proposal.status !== "HIRED") {
+        return { success: false, message: "Only a contract with scheduled termination can be restored" };
       }
-      const isFounder = proposal.project.user_id === userId;
-      const isProvider = proposal.provider_id === userId;
-      if (!isFounder && !isProvider) {
-        return { success: false, message: "You don't have permission to restore this contract" };
+      if (proposal.terminate_by != null && proposal.terminate_by !== userId) {
+        return { success: false, message: "Only the person who scheduled the termination can restore the contract" };
       }
       const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
       if (!terminateAt || terminateAt <= new Date()) {
@@ -1862,7 +1865,7 @@ export class ProposalService {
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { terminate_at: null }
+        data: { status: "HIRED", terminate_at: null, terminate_by: null }
       });
 
       return { success: true, message: "Contract restored successfully" };

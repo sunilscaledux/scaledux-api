@@ -714,7 +714,7 @@ model Proposal {
   unique_id             String    @unique @default(cuid())
   project_id            Int
   provider_id           Int       // Service provider user id
-  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED
+  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED, TERMINATING, TERMINATED
   
   // Proposal content
   cover_letter          String    @db.Text
@@ -737,8 +737,10 @@ model Proposal {
   // Timestamps
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now()) @updatedAt
-  /** When set, contract is scheduled to terminate at this time (1 week from user action). User can restore before then. */
+  /** When set, contract is scheduled to terminate at this time (1 week from user action). Only terminate_by can restore. */
   terminate_at          DateTime?
+  /** User id who scheduled termination; only this user can restore. */
+  terminate_by          Int?
 
   // Relations
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)

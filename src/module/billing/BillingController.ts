@@ -132,7 +132,18 @@ export class BillingController {
       ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (proposal must be OFFER_ACCEPTED)", 400);
       return true;
     }
-    
+    const existingHiredOrTerminating = await (prisma as any).proposal.findFirst({
+      where: {
+        project_id: proposal.project.id,
+        id: { not: proposal.id },
+        status: { in: ['HIRED', 'TERMINATING'] }
+      }
+    });
+    if (existingHiredOrTerminating) {
+      ApiResponse.error(res, "This project already has an active or terminating contract. You cannot hire until that contract is terminated or restored.", 400);
+      return true;
+    }
+
     const amount = Number(proposal.proposed_amount) || 0;
     if (amount <= 0) {
       ApiResponse.error(res, "Invalid proposal amount", 400);
@@ -205,9 +216,26 @@ export class BillingController {
       ApiResponse.error(res, "You are not the project owner for this proposal", 403);
       return true;
     }
+    if (proposal.status === "TERMINATING") {
+      ApiResponse.error(res, "Cannot fund a contract that is scheduled to terminate. Restore the contract first if you want to continue.", 400);
+      return true;
+    }
     if (proposal.status !== "OFFER_ACCEPTED" && proposal.status !== "HIRED") {
       ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (OFFER_ACCEPTED) or already hired (HIRED).", 400);
       return true;
+    }
+    if (milestoneIndex === 0) {
+      const existingHiredOrTerminating = await (prisma as any).proposal.findFirst({
+        where: {
+          project_id: proposal.project.id,
+          id: { not: proposal.id },
+          status: { in: ['HIRED', 'TERMINATING'] }
+        }
+      });
+      if (existingHiredOrTerminating) {
+        ApiResponse.error(res, "This project already has an active or terminating contract. You cannot hire until that contract is terminated or restored.", 400);
+        return true;
+      }
     }
     const rows = proposal.milestonesRows ?? [];
     if (milestoneIndex < 0 || milestoneIndex >= rows.length) {
