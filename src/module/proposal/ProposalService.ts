@@ -928,6 +928,17 @@ export class ProposalService {
         };
       }
 
+      // If termination was scheduled and the date has passed, apply it now
+      const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
+      if (proposal.status === "HIRED" && terminateAt && terminateAt <= new Date()) {
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: { status: "TERMINATED", terminate_at: null }
+        });
+        (proposal as any).status = "TERMINATED";
+        (proposal as any).terminate_at = null;
+      }
+
       // Check if user is either the proposal owner or the project owner
       const isProposalOwner = proposal.provider_id === userId;
       const isProjectOwner = proposal.project?.user_id === userId;
@@ -1773,6 +1784,9 @@ export class ProposalService {
       if (proposal.status !== "HIRED") {
         return { success: false, message: "Only a hired contract can be terminated" };
       }
+      if ((proposal as any).terminate_at) {
+        return { success: false, message: "Termination is already scheduled. Restore first if you want to cancel it." };
+      }
       const isFounder = proposal.project.user_id === userId;
       const isProvider = proposal.provider_id === userId;
       if (!isFounder && !isProvider) {
@@ -1783,25 +1797,30 @@ export class ProposalService {
         return { success: false, message: "Reason is required" };
       }
 
+      // Schedule termination 1 week from now; user can restore before then
+      const terminateAt = new Date();
+      terminateAt.setDate(terminateAt.getDate() + 7);
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "TERMINATED" }
+        data: { terminate_at: terminateAt }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'TERMINATED', message: trimmed }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'HIRED', message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
-      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATED_SENT} ${projectTitle}. Reason: ${trimmed}`;
-      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATED_RECEIVED} ${projectTitle}. Reason: ${trimmed}`;
+      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${trimmed}. You can restore before the date.`;
+      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_RECEIVED} ${projectTitle}. Reason: ${trimmed}.`;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         "",
         {
-          activityType: "contract_terminated",
+          activityType: "contract_terminate_scheduled",
           activityId: proposal.unique_id,
           projectTitle: proposal.project.project_title,
           reason: trimmed,
+          terminateAt: terminateAt.toISOString(),
           messageSent,
           messageReceived
         },
@@ -1809,10 +1828,47 @@ export class ProposalService {
         userId
       );
 
-      return { success: true, message: "Contract terminated successfully" };
+      return { success: true, message: "Contract will terminate in 7 days. You can restore it before then." };
     } catch (error: any) {
       console.error("Terminate contract Error:", error);
       return { success: false, message: error.message || "Failed to terminate contract" };
+    }
+  }
+
+  /**
+   * Restore contract: clear terminate_at so scheduled termination is cancelled. Only when status is HIRED and terminate_at is in the future.
+   */
+  static async restoreContract(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: { project: { select: { user_id: true } } }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.status !== "HIRED") {
+        return { success: false, message: "Only a hired contract can be restored" };
+      }
+      const isFounder = proposal.project.user_id === userId;
+      const isProvider = proposal.provider_id === userId;
+      if (!isFounder && !isProvider) {
+        return { success: false, message: "You don't have permission to restore this contract" };
+      }
+      const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
+      if (!terminateAt || terminateAt <= new Date()) {
+        return { success: false, message: "No scheduled termination to restore or it has already passed" };
+      }
+
+      await (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { terminate_at: null }
+      });
+
+      return { success: true, message: "Contract restored successfully" };
+    } catch (error: any) {
+      console.error("Restore contract Error:", error);
+      return { success: false, message: error.message || "Failed to restore contract" };
     }
   }
 

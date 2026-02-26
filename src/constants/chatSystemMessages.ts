@@ -63,5 +63,8 @@ export const CHAT_SYSTEM_MESSAGES = {
   OFFER_DECLINED_RECEIVED: "The freelancer declined the offer for",
 
   CONTRACT_TERMINATED_SENT: "You terminated the contract for",
-  CONTRACT_TERMINATED_RECEIVED: "The contract was terminated for"
+  CONTRACT_TERMINATED_RECEIVED: "The contract was terminated for",
+
+  CONTRACT_TERMINATE_SCHEDULED_SENT: "You scheduled the contract to terminate in 7 days for",
+  CONTRACT_TERMINATE_SCHEDULED_RECEIVED: "The contract was scheduled to terminate in 7 days for. You can restore it before then."
 } as const;

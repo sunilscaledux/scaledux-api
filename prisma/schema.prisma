@@ -737,7 +737,9 @@ model Proposal {
   // Timestamps
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now()) @updatedAt
-  
+  /** When set, contract is scheduled to terminate at this time (1 week from user action). User can restore before then. */
+  terminate_at          DateTime?
+
   // Relations
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   provider              User @relation("UserProposals", fields: [provider_id], references: [id], onDelete: Cascade)

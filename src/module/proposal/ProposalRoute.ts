@@ -11,6 +11,7 @@ import {
   cancelHire,
   declineOffer,
   terminateContract,
+  restoreContract,
   markProjectCompleted,
   updateProposalNda,
   withdrawProposal,
@@ -103,8 +104,10 @@ router.post("/:id/hire", setHire);
 router.post("/:id/cancel-hire", cancelHire);
 // Decline offer (freelancer only, OFFER_SENT only)
 router.post("/:id/decline-offer", declineOffer);
-// Terminate contract (founder or freelancer, HIRED only)
+// Terminate contract (founder or freelancer, HIRED only) - schedules termination in 7 days
 router.post("/:id/terminate", terminateContract);
+// Restore contract (cancel scheduled termination)
+router.post("/:id/restore", restoreContract);
 // Mark project completed (founder, HIRED only, all milestones PAID/COMPLETED)
 router.post("/:id/mark-project-completed", markProjectCompleted);
 // NDA update (founder)
