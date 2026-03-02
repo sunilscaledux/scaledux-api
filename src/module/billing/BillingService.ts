@@ -257,8 +257,8 @@ export class BillingService {
   }
 
   /**
-   * Record a payment: one billing row (from payer to payee). Meta stores subject_type and subject_id
-   * for reuse across purposes (Proposal, etc.). Billing history shows it to both sides via from_id/to_id.
+   * Record a payment: one billing row (from payer to payee). subject_type and subject_id are on the row.
+   * Optional meta (e.g. milestone_index, razorpay_payment_id) is stored in BillingTransactionMeta.
    */
   static async recordPayment(params: {
     actorId: number;
@@ -290,16 +290,15 @@ export class BillingService {
         description
       }
     });
-    const metaRows: { transaction_id: number; key: string; value: string }[] = [
-      { transaction_id: row.id, key: 'subject_type', value: subjectType },
-      { transaction_id: row.id, key: 'subject_id', value: String(subjectId) }
-    ];
+    const metaRows: { transaction_id: number; key: string; value: string }[] = [];
     if (meta) {
       for (const [k, v] of Object.entries(meta)) {
         metaRows.push({ transaction_id: row.id, key: k, value: String(v) });
       }
     }
-    await prisma.billingTransactionMeta.createMany({ data: metaRows });
+    if (metaRows.length > 0) {
+      await prisma.billingTransactionMeta.createMany({ data: metaRows });
+    }
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
