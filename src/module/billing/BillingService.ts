@@ -529,11 +529,38 @@ export class BillingService {
       })
     ]);
 
+    // Resolve client name: if to_id is me then client = from (payer), else client = to (recipient)
+    const counterpartyIds = [...new Set(transactions.map((t: any) => t.to_id === userIdNum ? t.from_id : t.to_id))];
+    const users = counterpartyIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: counterpartyIds } },
+          select: { id: true, first_name: true, last_name: true }
+        })
+      : [];
+    const nameByUserId: Record<number, string> = {};
+    for (const u of users) {
+      nameByUserId[u.id] = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || '—';
+    }
+
+    // Resolve contractTitle for Proposal transactions (project title)
+    const proposalIds = [...new Set(transactions.filter((t: any) => t.subject_type === 'Proposal').map((t: any) => t.subject_id))];
+    let contractTitleByProposalId: Record<number, string> = {};
+    if (proposalIds.length > 0) {
+      const proposals = await (prisma as any).proposal.findMany({
+        where: { id: { in: proposalIds } },
+        include: { project: { select: { project_title: true } } }
+      });
+      for (const p of proposals) {
+        contractTitleByProposalId[p.id] = p.project?.project_title ?? p.project?.title ?? '';
+      }
+    }
+
     return {
       success: true,
       data: {
         transactions: transactions.map((t: any) => {
           const isCredit = t.to_id === userIdNum;
+          const counterpartyId = isCredit ? t.from_id : t.to_id;
           return {
             id: t.id,
             uniqueId: t.unique_id,
@@ -545,7 +572,11 @@ export class BillingService {
             description: t.description,
             invoiceUrl: t.invoice_url,
             createdAt: t.created_at,
-            direction: isCredit ? 'credit' : 'debit'
+            direction: isCredit ? 'credit' : 'debit',
+            clientName: nameByUserId[counterpartyId] ?? '—',
+            subjectType: t.subject_type,
+            subjectId: t.subject_id,
+            contractTitle: t.subject_type === 'Proposal' ? (contractTitleByProposalId[t.subject_id] ?? t.description) : undefined
           };
         }),
         pagination: {
@@ -654,6 +685,97 @@ export class BillingService {
       console.error('Error triggering invoice generation:', error);
       throw error;
     }
+  }
+
+  // Get transaction detail by uniqueId; if Proposal, include milestone payments for this proposal
+  static async getTransactionDetail(uniqueId: string, userId: string) {
+    const userIdNum = parseInt(userId);
+    const transaction = await prisma.billingTransaction.findUnique({
+      where: { unique_id: uniqueId },
+      include: { currency: true, meta: true }
+    });
+    if (!transaction) {
+      return { success: false, message: 'Transaction not found' };
+    }
+    if (transaction.from_id !== userIdNum && transaction.to_id !== userIdNum) {
+      return { success: false, message: 'Unauthorized' };
+    }
+    const counterpartyId = transaction.to_id === userIdNum ? transaction.from_id : transaction.to_id;
+    const [counterparty] = await prisma.user.findMany({
+      where: { id: counterpartyId },
+      select: { id: true, first_name: true, last_name: true }
+    });
+    const clientName = counterparty
+      ? [counterparty.first_name, counterparty.last_name].filter(Boolean).join(' ').trim() || '—'
+      : '—';
+    const isCredit = transaction.to_id === userIdNum;
+    const metaMap: Record<string, string> = {};
+    for (const m of transaction.meta) {
+      metaMap[m.key] = m.value;
+    }
+    const milestoneIndex = metaMap.milestone_index != null ? parseInt(metaMap.milestone_index, 10) : undefined;
+
+    const base: any = {
+      id: transaction.id,
+      uniqueId: transaction.unique_id,
+      amount: parseFloat(transaction.amount.toString()),
+      currency: transaction.currency?.code || 'INR',
+      currencySymbol: transaction.currency?.symbol || '₹',
+      type: transaction.type,
+      status: transaction.status,
+      description: transaction.description,
+      invoiceUrl: transaction.invoice_url,
+      createdAt: transaction.created_at,
+      direction: isCredit ? 'credit' : 'debit',
+      clientName,
+      subjectType: transaction.subject_type,
+      subjectId: transaction.subject_id,
+      contractTitle: undefined as string | undefined,
+      milestonePayments: undefined as any[] | undefined
+    };
+
+    if (transaction.subject_type === 'Proposal' && transaction.subject_id) {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { id: transaction.subject_id },
+        include: {
+          project: { select: { project_title: true } },
+          milestonesRows: { orderBy: { order_index: 'asc' } }
+        }
+      });
+      if (proposal) {
+        base.contractTitle = proposal.project?.project_title ?? '';
+        const proposalTxns = await prisma.billingTransaction.findMany({
+          where: { subject_type: 'Proposal', subject_id: transaction.subject_id },
+          include: { meta: true, currency: true }
+        });
+        const txByMilestoneIndex: Record<number, any> = {};
+        for (const tx of proposalTxns) {
+          const mIndex = tx.meta?.find((m: any) => m.key === 'milestone_index')?.value;
+          if (mIndex != null) {
+            const idx = parseInt(mIndex, 10);
+            if (!Number.isNaN(idx)) txByMilestoneIndex[idx] = tx;
+          }
+        }
+        const milestones = proposal.milestonesRows ?? [];
+        const paidUpTo = milestoneIndex != null && !Number.isNaN(milestoneIndex) ? milestoneIndex : (milestones.length - 1);
+        const rowsToShow = Math.max(paidUpTo + 1, milestones.length);
+        base.milestonePayments = [];
+        for (let i = 0; i < rowsToShow; i++) {
+          const row = milestones[i];
+          const tx = txByMilestoneIndex[i];
+          base.milestonePayments.push({
+            milestoneIndex: i + 1,
+            title: row?.title ?? row?.description ?? `Milestone ${i + 1}`,
+            amount: row ? parseFloat(String(row.amount)) : 0,
+            paid: !!tx,
+            transactionUniqueId: tx?.unique_id ?? null,
+            date: tx?.created_at ?? null
+          });
+        }
+      }
+    }
+
+    return { success: true, data: base };
   }
 
   // Download invoice by transaction unique ID

@@ -52,6 +52,11 @@ router.get(
   BillingController.getBillingHistory
 );
 
+router.get(
+  "/transaction/:uniqueId",
+  BillingController.getTransactionDetail
+);
+
 // Balance Route
 router.get(
   "/balance",

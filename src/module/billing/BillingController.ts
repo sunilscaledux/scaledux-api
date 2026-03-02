@@ -486,6 +486,28 @@ export class BillingController {
     }
   }
 
+  // Get transaction detail (for modal); if Proposal, includes milestone payments
+  static async getTransactionDetail(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return ApiResponse.error(res, "User not authenticated", 401);
+      }
+      const { uniqueId } = req.params;
+      if (!uniqueId || Array.isArray(uniqueId)) {
+        return ApiResponse.error(res, "Transaction ID is required", 400);
+      }
+      const result = await BillingService.getTransactionDetail(uniqueId, userId.toString());
+      if (!result.success) {
+        return ApiResponse.error(res, result.message, 404);
+      }
+      return ApiResponse.success(res, result.data);
+    } catch (error: any) {
+      console.error("Error fetching transaction detail:", error);
+      return ApiResponse.error(res, error.message || "Failed to fetch transaction detail");
+    }
+  }
+
   // Download invoice PDF
   static async downloadInvoice(req: Request, res: Response) {
     try {
