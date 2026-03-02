@@ -17,6 +17,8 @@ export function generateTokenAndSetCookie(
       email: user.email,
       phone: user.phone,
       rememberMe: rememberMe,
+      role: user.role ?? undefined,
+      profile_type: user.profile_type ?? undefined,
     },
     process.env.JWT_SECRET || "fallback-secret",
     { expiresIn: tokenExpiry }

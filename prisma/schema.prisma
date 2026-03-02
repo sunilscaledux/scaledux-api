@@ -47,6 +47,7 @@ model User {
   investmentProfile            InvestmentProfile?
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
+  withdrawalMethods            WithdrawalMethod[]
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
@@ -1145,6 +1146,28 @@ model PaymentMethod {
   @@index([is_default])
   @@index([razorpay_customer_id])
   @@map("scd_payment_methods")
+}
+
+// Withdrawal methods for freelancers (bank account, UPI) – selected at withdrawal time
+model WithdrawalMethod {
+  id                    Int      @id @default(autoincrement())
+  user_id               Int
+  type                  String   @db.VarChar(20)   // 'bank_account' | 'upi'
+  display_label         String   @db.VarChar(255)  // e.g. "HDFC ****1234" or "UPI: user@paytm"
+  bank_name             String?  @db.VarChar(100)
+  account_number        String?  @db.VarChar(34)  // full account number for payouts (bank only)
+  account_number_last4  String?  @db.VarChar(4)   // last 4 digits for display only
+  ifsc                  String?  @db.VarChar(11)
+  upi_id                String?  @db.VarChar(255)
+  is_default            Boolean  @default(false)
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([is_default])
+  @@map("scd_withdrawal_methods")
 }
 
 model TaxInformation {

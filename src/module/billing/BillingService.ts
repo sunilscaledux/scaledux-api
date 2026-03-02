@@ -619,6 +619,148 @@ export class BillingService {
     };
   }
 
+  // ----- Withdrawal methods (freelancer only) -----
+
+  static async getWithdrawalMethods(userId: string) {
+    const userIdNum = parseInt(userId);
+    const methods = await (prisma as any).withdrawalMethod.findMany({
+      where: { user_id: userIdNum },
+      orderBy: [{ is_default: 'desc' }, { created_at: 'desc' }]
+    });
+    return {
+      success: true,
+      data: methods.map((m: any) => ({
+        id: m.id,
+        type: m.type,
+        displayLabel: m.display_label,
+        bankName: m.bank_name,
+        accountNumberLast4: m.account_number_last4,
+        ifsc: m.ifsc,
+        upiId: m.upi_id,
+        isDefault: m.is_default,
+        createdAt: m.created_at
+      }))
+    };
+  }
+
+  static async createWithdrawalMethod(
+    userId: string,
+    data: { type: string; displayLabel: string; bankName?: string; accountNumber?: string; accountNumberLast4?: string; ifsc?: string; upiId?: string; isDefault?: boolean }
+  ) {
+    const userIdNum = parseInt(userId);
+    if (data.type === 'bank_account' && !data.accountNumber?.trim()) {
+      return { success: false, message: 'Bank account number is required' };
+    }
+    const accountNumber = data.accountNumber?.replace(/\D/g, '').trim() || null;
+    const accountNumberLast4 = accountNumber
+      ? accountNumber.slice(-4)
+      : (data.accountNumberLast4?.replace(/\D/g, '').slice(-4) || null);
+    if (data.isDefault) {
+      await (prisma as any).withdrawalMethod.updateMany({
+        where: { user_id: userIdNum },
+        data: { is_default: false }
+      });
+    }
+    const method = await (prisma as any).withdrawalMethod.create({
+      data: {
+        user_id: userIdNum,
+        type: data.type,
+        display_label: data.displayLabel,
+        bank_name: data.bankName ?? null,
+        account_number: data.type === 'bank_account' ? accountNumber : null,
+        account_number_last4: data.type === 'bank_account' ? accountNumberLast4 : null,
+        ifsc: data.ifsc ?? null,
+        upi_id: data.upiId ?? null,
+        is_default: data.isDefault ?? false
+      }
+    });
+    return {
+      success: true,
+      message: 'Withdrawal method added',
+      data: {
+        id: method.id,
+        type: method.type,
+        displayLabel: method.display_label,
+        bankName: method.bank_name,
+        accountNumberLast4: method.account_number_last4,
+        ifsc: method.ifsc,
+        upiId: method.upi_id,
+        isDefault: method.is_default,
+        createdAt: method.created_at
+      }
+    };
+  }
+
+  static async setDefaultWithdrawalMethod(userId: string, methodId: string) {
+    const userIdNum = parseInt(userId);
+    const methodIdNum = parseInt(methodId);
+    await (prisma as any).withdrawalMethod.updateMany({
+      where: { user_id: userIdNum },
+      data: { is_default: false }
+    });
+    await (prisma as any).withdrawalMethod.update({
+      where: { id: methodIdNum, user_id: userIdNum },
+      data: { is_default: true }
+    });
+    return { success: true, message: 'Default withdrawal method updated' };
+  }
+
+  static async deleteWithdrawalMethod(userId: string, methodId: string) {
+    const userIdNum = parseInt(userId);
+    const methodIdNum = parseInt(methodId);
+    await (prisma as any).withdrawalMethod.deleteMany({
+      where: { id: methodIdNum, user_id: userIdNum }
+    });
+    return { success: true, message: 'Withdrawal method removed' };
+  }
+
+  /** Request withdrawal (freelancer only). Creates a withdrawal billing transaction. */
+  static async requestWithdrawal(userId: string, amount: number, withdrawalMethodId: number) {
+    const userIdNum = parseInt(userId);
+    if (!amount || amount <= 0) {
+      return { success: false, message: 'Invalid amount' };
+    }
+    const method = await (prisma as any).withdrawalMethod.findFirst({
+      where: { id: withdrawalMethodId, user_id: userIdNum }
+    });
+    if (!method) {
+      return { success: false, message: 'Withdrawal method not found' };
+    }
+    const balanceResult = await this.getUserBalance(userId);
+    const balance = (balanceResult as any).data?.balance ?? 0;
+    if (amount > balance) {
+      return { success: false, message: 'Insufficient balance' };
+    }
+    const currencyId = 1;
+    const row = await prisma.billingTransaction.create({
+      data: {
+        actor_type: 'User',
+        actor_id: userIdNum,
+        from_type: 'User',
+        from_id: userIdNum,
+        to_type: 'Platform',
+        to_id: 0,
+        subject_type: 'Withdrawal',
+        subject_id: withdrawalMethodId,
+        amount,
+        currency_id: currencyId,
+        type: 'withdrawal',
+        status: 'pending',
+        description: `Withdrawal to ${method.display_label}`
+      }
+    });
+    await prisma.billingTransactionMeta.createMany({
+      data: [
+        { transaction_id: row.id, key: 'withdrawal_method_id', value: String(withdrawalMethodId) }
+      ]
+    });
+    return {
+      success: true,
+      data: { transactionId: row.id, transactionUniqueId: row.unique_id },
+      message: 'Withdrawal requested'
+    };
+  }
+
   // Refund verification amount if needed
   static async refundVerificationAmount(paymentId: string) {
     try {

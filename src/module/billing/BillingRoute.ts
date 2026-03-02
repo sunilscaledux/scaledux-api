@@ -63,6 +63,28 @@ router.get(
   BillingController.getUserBalance
 );
 
+// Withdrawal methods and withdraw (freelancer only)
+router.get(
+  "/withdrawal-methods",
+  BillingController.getWithdrawalMethods
+);
+router.post(
+  "/withdrawal-methods",
+  BillingController.createWithdrawalMethod
+);
+router.put(
+  "/withdrawal-method/:withdrawalMethodId/set-default",
+  BillingController.setDefaultWithdrawalMethod
+);
+router.delete(
+  "/withdrawal-method/:withdrawalMethodId",
+  BillingController.deleteWithdrawalMethod
+);
+router.post(
+  "/withdraw",
+  BillingController.requestWithdrawal
+);
+
 // Invoice Download Route
 router.get(
   "/invoice/:uniqueId",

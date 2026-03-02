@@ -512,6 +512,108 @@ export class BillingController {
     }
   }
 
+  // ----- Withdrawal (freelancer only) -----
+
+  private static isFreelancer(req: Request): boolean {
+    const user = req.user as { id?: number; role?: string; profile_type?: string } | undefined;
+    if (!user) return false;
+    const role = user.role?.toLowerCase();
+    const profileType = (user as any).profile_type?.toLowerCase();
+    return role === 'freelancer' || role === 'service-provider' || profileType === 'freelancer';
+  }
+
+  /** If JWT has no role, fetch from DB so old tokens / missing payload still work. */
+  private static async ensureFreelancer(req: Request): Promise<boolean> {
+    if (BillingController.isFreelancer(req)) return true;
+    const userId = req.user?.id;
+    if (!userId) return false;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: Number(userId) },
+      select: { role: true }
+    });
+    if (!dbUser) return false;
+    const role = (dbUser.role || '').toLowerCase();
+    const ok = role === 'freelancer' || role === 'service-provider';
+    if (ok && req.user) (req.user as any).role = dbUser.role;
+    return ok;
+  }
+
+  static async getWithdrawalMethods(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can manage withdrawal methods", 403);
+      const result = await BillingService.getWithdrawalMethods(userId.toString());
+      return ApiResponse.success(res, result.data);
+    } catch (error: any) {
+      console.error("Error fetching withdrawal methods:", error);
+      return ApiResponse.error(res, error.message || "Failed to fetch withdrawal methods");
+    }
+  }
+
+  static async createWithdrawalMethod(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can add withdrawal methods", 403);
+      const result = await BillingService.createWithdrawalMethod(userId.toString(), req.body);
+      return ApiResponse.success(res, result.data, result.message);
+    } catch (error: any) {
+      console.error("Error creating withdrawal method:", error);
+      return ApiResponse.error(res, error.message || "Failed to create withdrawal method");
+    }
+  }
+
+  static async setDefaultWithdrawalMethod(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can update withdrawal methods", 403);
+      const methodId = getStringParam(req.params.withdrawalMethodId);
+      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
+      await BillingService.setDefaultWithdrawalMethod(userId.toString(), methodId);
+      return ApiResponse.success(res, null, "Default withdrawal method updated");
+    } catch (error: any) {
+      console.error("Error setting default withdrawal method:", error);
+      return ApiResponse.error(res, error.message || "Failed to update withdrawal method");
+    }
+  }
+
+  static async deleteWithdrawalMethod(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can remove withdrawal methods", 403);
+      const methodId = getStringParam(req.params.withdrawalMethodId);
+      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
+      await BillingService.deleteWithdrawalMethod(userId.toString(), methodId);
+      return ApiResponse.success(res, null, "Withdrawal method removed");
+    } catch (error: any) {
+      console.error("Error deleting withdrawal method:", error);
+      return ApiResponse.error(res, error.message || "Failed to delete withdrawal method");
+    }
+  }
+
+  static async requestWithdrawal(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request withdrawals", 403);
+      const { amount, withdrawalMethodId } = req.body;
+      const amountNum = amount != null ? Number(amount) : NaN;
+      const methodIdNum = withdrawalMethodId != null ? parseInt(String(withdrawalMethodId), 10) : NaN;
+      if (!Number.isFinite(amountNum) || !Number.isFinite(methodIdNum)) {
+        return ApiResponse.error(res, "Amount and withdrawal method ID are required", 400);
+      }
+      const result = await BillingService.requestWithdrawal(userId.toString(), amountNum, methodIdNum);
+      if (!result.success) return ApiResponse.error(res, result.message, 400);
+      return ApiResponse.success(res, result.data, result.message);
+    } catch (error: any) {
+      console.error("Error requesting withdrawal:", error);
+      return ApiResponse.error(res, error.message || "Failed to request withdrawal");
+    }
+  }
+
   // Download invoice PDF
   static async downloadInvoice(req: Request, res: Response) {
     try {
