@@ -5,6 +5,7 @@ import { CompanyProfileController } from "./CompanyProfileController";
 import { TeamMemberController } from "./TeamMemberController";
 import { FundingRoundController } from "./FundingRoundController";
 import { RaisingFundController } from "./RaisingFundController";
+import { getInvestmentProfile, updateInvestmentProfile } from "./InvestmentProfileController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -110,6 +111,12 @@ router.post(
   TeamMemberController.uploadProfileImage,
   handleMulterError
 );
+
+/**
+ * Investment Profile Routes (investor)
+ */
+router.get("/investment-profile", authenticateToken, getInvestmentProfile);
+router.patch("/investment-profile", authenticateToken, updateInvestmentProfile);
 
 /**
  * Public & Completion Routes

@@ -5,7 +5,7 @@ import redisClient from "@services/redisService";
 import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getFileUrl } from "@utils/General"
-import { FUNDING_STAGES } from "../../constants/fundingStages"
+import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
 
 // Cache invalidation helper function
@@ -652,6 +652,33 @@ export async function getFundingStages(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Get Funding Stages Error:", error)
     return ApiResponse.error(res, "Failed to retrieve funding stages")
+  }
+}
+
+/**
+ * Get all investor types (for investment profile form)
+ * GET /api/v1/investor-types
+ */
+export async function getInvestorTypes(req: Request, res: Response) {
+  try {
+    return ApiResponse.success(res, INVESTOR_TYPES, "Investor types retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Investor Types Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve investor types")
+  }
+}
+
+/**
+ * Get investment profile form options (investment criteria only; stages use GET /funding-stages)
+ * GET /api/v1/investment-profile-options
+ */
+export async function getInvestmentProfileOptions(req: Request, res: Response) {
+  try {
+    const data = { criteria: [...INVESTMENT_CRITERIA_OPTIONS] }
+    return ApiResponse.success(res, data, "Investment profile options retrieved successfully")
+  } catch (error: any) {
+    console.error("Get Investment Profile Options Error:", error)
+    return ApiResponse.error(res, "Failed to retrieve investment profile options")
   }
 }
 

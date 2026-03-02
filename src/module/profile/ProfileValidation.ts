@@ -75,3 +75,10 @@ export const updateAvailableHoursPerWeekSchema = Joi.object<AvailableHoursPerWee
     'number.max': 'Available hours cannot exceed 168 per week'
   }),
 });
+
+export const updateInvestorPreferencesSchema = Joi.object({
+  investorTypes: Joi.array().items(Joi.string().trim()).min(1).required().messages({
+    'array.min': 'Please select at least one investor type',
+    'any.required': 'Investor types are required',
+  }),
+});

@@ -44,6 +44,7 @@ model User {
   show_as_agency               Boolean   @default(false)
   portfolios                   Portfolio[]
   investmentPortfolios         InvestorPortfolio[]
+  investmentProfile            InvestmentProfile?
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
   taxInformation               TaxInformation?
@@ -87,7 +88,6 @@ model PersonalInfo {
   links                 Json?     // Social media links
   languages             Json?
   show_as_agency        Boolean   @default(false)
-  
   // Relations
   country_id            Int?
   state_id              Int?
@@ -287,6 +287,7 @@ model Industry {
   investorPortfolios InvestorPortfolio[]
   subIndustries   SubIndustry[]
   companyProfiles CompanyProfile[]
+  investmentProfilePreferredIndustries InvestmentProfilePreferredIndustry[]
 
   @@map("scd_industries")
 }
@@ -302,6 +303,7 @@ model SubIndustry {
   industry        Industry         @relation(fields: [industry_id], references: [id], onDelete: Cascade)
   companyProfiles CompanyProfile[]
   investorPortfolios InvestorPortfolio[]
+  investmentProfilePreferredIndustries InvestmentProfilePreferredIndustry[]
 
   @@unique([industry_id, name])
   @@index([industry_id])
@@ -414,6 +416,7 @@ model Country {
   states             State[]
   personalInfos      PersonalInfo[]
   companyProfiles    CompanyProfile[]
+  investmentProfileGeoPreferences InvestmentProfileGeoPreference[]
 
   @@map("scd_countries")
 }
@@ -428,6 +431,7 @@ model State {
   country            Country             @relation(fields: [country_id], references: [id], onDelete: Cascade)
   personalInfos      PersonalInfo[]
   companyProfiles    CompanyProfile[]
+  investmentProfileGeoPreferences InvestmentProfileGeoPreference[]
 
   @@unique([name, country_id])
   @@map("scd_states")
@@ -627,6 +631,97 @@ model InvestorPortfolio {
   @@index([industry_id])
   @@index([deleted_at])
   @@map("scd_investor_portfolios")
+}
+
+// Investment profile - one per user (investor); single-value details and links to detail tables
+model InvestmentProfile {
+  id                      Int       @id @default(autoincrement())
+  unique_id               String    @unique @default(cuid())
+  user_id                 Int       @unique
+
+  // Single-value fields (investor type, thesis, diligence, ticket size, equity range)
+  investor_types          Json?     // ["Angel investor", "Micro VCs"] - selected values from constants
+  thesis_summary          String?   @db.Text
+  diligence_process       String?   @db.Text
+  diligence_document      String?   // file path
+  investment_size_min     Decimal?  @db.Decimal(15, 2)
+  investment_size_max     Decimal?  @db.Decimal(15, 2)
+  investment_size_currency String?  // USD, INR
+  equity_range_min       Int?      // percentage 0-100
+  equity_range_max       Int?      // percentage 0-100
+
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  user                    User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  preferredIndustries      InvestmentProfilePreferredIndustry[]
+  committeeMembers        InvestmentProfileCommitteeMember[]
+  geoPreferences          InvestmentProfileGeoPreference[]
+
+  @@index([user_id])
+  @@map("scd_investment_profiles")
+}
+
+// Preferred investment industry - many per profile (industry + optional specialisation, stage, criteria)
+model InvestmentProfilePreferredIndustry {
+  id                    Int       @id @default(autoincrement())
+  investment_profile_id Int
+  industry_id           Int
+  sub_industry_id       Int?
+  specialisation        String?   @db.VarChar(500)
+  investment_stage     String?   @db.VarChar(255)
+  investment_criteria   String?   @db.Text
+  order_index          Int       @default(0)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  investmentProfile     InvestmentProfile @relation(fields: [investment_profile_id], references: [id], onDelete: Cascade)
+  industry              Industry         @relation(fields: [industry_id], references: [id], onDelete: Cascade)
+  subIndustry           SubIndustry?      @relation(fields: [sub_industry_id], references: [id], onDelete: SetNull)
+
+  @@index([investment_profile_id])
+  @@index([industry_id])
+  @@map("scd_investment_profile_preferred_industries")
+}
+
+// Investment committee structure - many members per profile
+model InvestmentProfileCommitteeMember {
+  id                    Int       @id @default(autoincrement())
+  unique_id             String    @unique @default(cuid())
+  investment_profile_id Int
+  name                  String    @db.VarChar(255)
+  role                  String?   @db.VarChar(255)   // e.g. Founder & CEO, CEO, CTO
+  role_description      String?   @db.Text
+  photo                 String?   // file path
+  email                 String?   @db.VarChar(255)
+  hide_email            Boolean   @default(false)
+  order_index           Int       @default(0)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  investmentProfile     InvestmentProfile @relation(fields: [investment_profile_id], references: [id], onDelete: Cascade)
+
+  @@index([investment_profile_id])
+  @@map("scd_investment_profile_committee_members")
+}
+
+// Geographic preference - many country/state entries per profile
+model InvestmentProfileGeoPreference {
+  id                    Int       @id @default(autoincrement())
+  investment_profile_id Int
+  country_id            Int
+  state_id              Int?
+  order_index           Int       @default(0)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  investmentProfile     InvestmentProfile @relation(fields: [investment_profile_id], references: [id], onDelete: Cascade)
+  country               Country          @relation(fields: [country_id], references: [id], onDelete: Cascade)
+  state                 State?           @relation(fields: [state_id], references: [id], onDelete: SetNull)
+
+  @@index([investment_profile_id])
+  @@index([country_id])
+  @@map("scd_investment_profile_geo_preferences")
 }
 
 model FounderProject {
