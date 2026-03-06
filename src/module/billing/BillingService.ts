@@ -120,7 +120,7 @@ export class BillingService {
   }
 
   /**
-   * Fetch Razorpay payment and return a flat Record for BillingTransactionMeta.
+   * Fetch Razorpay payment and return a flat Record for transaction meta (JSON column).
    * Stores: payment_id, order_id, method, status, bank, card_last4, card_network, bank_transaction_id (if any), etc.
    */
   static async fetchRazorpayPaymentMeta(razorpayPaymentId: string, razorpayOrderId?: string): Promise<Record<string, string>> {
@@ -346,7 +346,8 @@ export class BillingService {
 
   /**
    * Record a payment: one billing row (from payer to payee). subject_type and subject_id are on the row.
-   * Optional meta (e.g. milestone_index, razorpay_payment_id, razorpay_order_id) is stored in BillingTransactionMeta.
+   * For proposal/milestone payments use status: 'pending' (released later via releasePaymentTransaction).
+   * User totals are updated only when status is 'completed'.
    */
   static async recordPayment(params: {
     actorId: number;
@@ -357,8 +358,9 @@ export class BillingService {
     amount: number;
     description: string;
     meta?: Record<string, string>;
+    status?: 'pending' | 'completed';
   }) {
-    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta } = params;
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed' } = params;
     const currencyId = 1;
 
     const row = await prisma.billingTransaction.create({
@@ -374,22 +376,37 @@ export class BillingService {
         amount,
         currency_id: currencyId,
         type: 'payment',
-        status: 'completed',
-        description
+        status,
+        description,
+        meta: meta ? (meta as object) : undefined
       }
     });
-    const metaRows: { transaction_id: number; key: string; value: string }[] = [];
-    if (meta) {
-      for (const [k, v] of Object.entries(meta)) {
-        metaRows.push({ transaction_id: row.id, key: k, value: String(v) });
-      }
+    if (status === 'completed') {
+      await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
     }
-    if (metaRows.length > 0) {
-      await prisma.billingTransactionMeta.createMany({ data: metaRows });
-    }
-    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
+  }
+
+  /**
+   * Release a pending payment (founder only). Sets transaction to completed and updates user totals.
+   */
+  static async releasePaymentTransaction(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
+    const tx = await prisma.billingTransaction.findUnique({
+      where: { unique_id: transactionUniqueId }
+    });
+    if (!tx) return { success: false, message: 'Transaction not found' };
+    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
+    if (tx.status !== 'pending') return { success: false, message: 'Payment is already completed or not pending' };
+    if (tx.from_id !== userId) return { success: false, message: 'Only the payer can release this payment' };
+
+    await prisma.billingTransaction.update({
+      where: { id: tx.id },
+      data: { status: 'completed' }
+    });
+    const amount = Number(tx.amount);
+    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount);
+    return { success: true };
   }
 
   // Get user's payment methods
@@ -865,15 +882,11 @@ export class BillingService {
         currency_id: currencyId,
         type: 'withdrawal',
         status: 'pending',
-        description: `Withdrawal to ${method.display_label}`
-      }
+        description: `Withdrawal to ${method.display_label}`,
+        meta: { withdrawal_method_id: String(withdrawalMethodId) } as object
+      } as any
     });
     await this.updateUserBillingTotalsAfterTransaction('withdrawal', 'pending', userIdNum, 0, amount);
-    await prisma.billingTransactionMeta.createMany({
-      data: [
-        { transaction_id: row.id, key: 'withdrawal_method_id', value: String(withdrawalMethodId) }
-      ]
-    });
     return {
       success: true,
       data: { transactionId: row.id, transactionUniqueId: row.unique_id },
@@ -953,7 +966,7 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const transaction = await prisma.billingTransaction.findUnique({
       where: { unique_id: uniqueId },
-      include: { currency: true, meta: true }
+      include: { currency: true }
     });
     if (!transaction) {
       return { success: false, message: 'Transaction not found' };
@@ -970,9 +983,12 @@ export class BillingService {
       ? [counterparty.first_name, counterparty.last_name].filter(Boolean).join(' ').trim() || '—'
       : '—';
     const isCredit = transaction.to_id === userIdNum;
+    const metaObj = (transaction as any).meta as Record<string, unknown> | null;
     const metaMap: Record<string, string> = {};
-    for (const m of transaction.meta) {
-      metaMap[m.key] = m.value;
+    if (metaObj && typeof metaObj === 'object') {
+      for (const [k, v] of Object.entries(metaObj)) {
+        if (v != null) metaMap[k] = String(v);
+      }
     }
     const milestoneIndex = metaMap.milestone_index != null ? parseInt(metaMap.milestone_index, 10) : undefined;
 
@@ -1017,11 +1033,12 @@ export class BillingService {
         base.contractTitle = proposal.project?.project_title ?? '';
         const proposalTxns = await prisma.billingTransaction.findMany({
           where: { subject_type: 'Proposal', subject_id: transaction.subject_id },
-          include: { meta: true, currency: true }
+          include: { currency: true }
         });
         const txByMilestoneIndex: Record<number, any> = {};
         for (const tx of proposalTxns) {
-          const mIndex = tx.meta?.find((m: any) => m.key === 'milestone_index')?.value;
+          const txMeta = (tx as any).meta as Record<string, unknown> | null;
+          const mIndex = txMeta?.milestone_index != null ? String(txMeta.milestone_index) : null;
           if (mIndex != null) {
             const idx = parseInt(mIndex, 10);
             if (!Number.isNaN(idx)) txByMilestoneIndex[idx] = tx;

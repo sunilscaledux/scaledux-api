@@ -57,6 +57,11 @@ router.get(
   BillingController.getTransactionDetail
 );
 
+router.post(
+  "/transaction/:uniqueId/release",
+  BillingController.releasePayment
+);
+
 // Balance Route
 router.get(
   "/balance",

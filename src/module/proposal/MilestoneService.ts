@@ -173,6 +173,28 @@ export async function releaseMilestonePayment(
     return { success: false, message: "Approve all deliverables before releasing payment" };
   }
 
+  // Find the pending billing transaction for this milestone and release it (updates status + user totals)
+  const { BillingService } = await import("../billing/BillingService");
+  const pendingTxns = await (prisma as any).billingTransaction.findMany({
+    where: {
+      subject_type: "Proposal",
+      subject_id: milestone.proposal.id,
+      type: "payment",
+      status: "pending"
+    }
+  });
+  const milestoneIndex = milestone.order_index;
+  const txn = pendingTxns.find((t: any) => {
+    const m = t.meta as Record<string, unknown> | null;
+    return m && String(m.milestone_index) === String(milestoneIndex);
+  });
+  if (txn) {
+    const releaseResult = await BillingService.releasePaymentTransaction(txn.unique_id, userId);
+    if (!releaseResult.success) {
+      return { success: false, message: releaseResult.message ?? "Failed to release payment" };
+    }
+  }
+
   await (prisma as any).milestone.update({
     where: { id: milestone.id },
     data: { payment_status: "RELEASED", status: "PAID" }

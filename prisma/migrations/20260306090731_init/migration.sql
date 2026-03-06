@@ -27,6 +27,12 @@ CREATE TABLE "public"."scd_users" (
     "agency_verification_status" TEXT DEFAULT 'PENDING',
     "show_as_agency" BOOLEAN NOT NULL DEFAULT false,
     "currency_id" INTEGER,
+    "profile_sections" JSONB,
+    "profile_completion_percentage" INTEGER,
+    "total_earning" DECIMAL(15,2),
+    "total_withdrawal" DECIMAL(15,2),
+    "wallet_amount" DECIMAL(15,2),
+    "pending_amount" DECIMAL(15,2),
 
     CONSTRAINT "scd_users_pkey" PRIMARY KEY ("id")
 );
@@ -47,6 +53,7 @@ CREATE TABLE "public"."scd_personal_info" (
     "website" TEXT,
     "zipCode" TEXT,
     "hourly_rate" DOUBLE PRECISION,
+    "available_hours_per_week" INTEGER,
     "links" JSONB,
     "languages" JSONB,
     "show_as_agency" BOOLEAN NOT NULL DEFAULT false,
@@ -510,6 +517,73 @@ CREATE TABLE "public"."scd_investor_portfolios" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."scd_investment_profiles" (
+    "id" SERIAL NOT NULL,
+    "unique_id" TEXT NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "investor_types" JSONB,
+    "thesis_summary" TEXT,
+    "diligence_process" TEXT,
+    "diligence_document" TEXT,
+    "investment_size_min" DECIMAL(15,2),
+    "investment_size_max" DECIMAL(15,2),
+    "investment_size_currency" TEXT,
+    "equity_range_min" INTEGER,
+    "equity_range_max" INTEGER,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_investment_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."scd_investment_profile_preferred_industries" (
+    "id" SERIAL NOT NULL,
+    "investment_profile_id" INTEGER NOT NULL,
+    "industry_id" INTEGER NOT NULL,
+    "sub_industry_id" INTEGER,
+    "specialisation" VARCHAR(500),
+    "investment_stage" VARCHAR(255),
+    "investment_criteria" TEXT,
+    "order_index" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_investment_profile_preferred_industries_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."scd_investment_profile_committee_members" (
+    "id" SERIAL NOT NULL,
+    "unique_id" TEXT NOT NULL,
+    "investment_profile_id" INTEGER NOT NULL,
+    "name" VARCHAR(255) NOT NULL,
+    "role" VARCHAR(255),
+    "role_description" TEXT,
+    "photo" TEXT,
+    "email" VARCHAR(255),
+    "hide_email" BOOLEAN NOT NULL DEFAULT false,
+    "order_index" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_investment_profile_committee_members_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."scd_investment_profile_geo_preferences" (
+    "id" SERIAL NOT NULL,
+    "investment_profile_id" INTEGER NOT NULL,
+    "country_id" INTEGER NOT NULL,
+    "state_id" INTEGER,
+    "order_index" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_investment_profile_geo_preferences_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."scd_founder_projects" (
     "id" SERIAL NOT NULL,
     "unique_id" TEXT NOT NULL,
@@ -572,15 +646,38 @@ CREATE TABLE "public"."scd_proposals" (
     "cover_letter" TEXT NOT NULL,
     "proposed_amount" DECIMAL(15,2) NOT NULL,
     "payment_schedule" VARCHAR(20) NOT NULL,
+    "hours_required" INTEGER,
     "milestones" JSONB NOT NULL DEFAULT '[]',
     "screening_answers" JSONB NOT NULL DEFAULT '[]',
     "attachments" JSONB NOT NULL DEFAULT '[]',
     "remark" TEXT,
     "nda" JSONB,
+    "milestones_approved" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "terminate_at" TIMESTAMP(3),
+    "terminate_by" INTEGER,
 
     CONSTRAINT "scd_proposals_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."scd_reviews" (
+    "id" SERIAL NOT NULL,
+    "unique_id" TEXT NOT NULL,
+    "review_from_id" INTEGER NOT NULL,
+    "review_to_id" INTEGER NOT NULL,
+    "action_type" VARCHAR(50) NOT NULL,
+    "action_id" VARCHAR(100) NOT NULL,
+    "review_type" VARCHAR(20) NOT NULL,
+    "rating" DECIMAL(3,2) NOT NULL,
+    "feedback" TEXT,
+    "end_reason" VARCHAR(255),
+    "ratings_extra" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_reviews_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -592,14 +689,13 @@ CREATE TABLE "public"."scd_milestones" (
     "order_index" INTEGER NOT NULL DEFAULT 0,
     "title" VARCHAR(255) NOT NULL,
     "description" TEXT,
-    "deliverables" JSONB NOT NULL DEFAULT '[]',
     "amount" DECIMAL(15,2) NOT NULL,
     "due_date" DATE,
+    "hours_required" INTEGER,
     "status" VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    "submitted_at" TIMESTAMPTZ,
-    "submitted_remark" TEXT,
-    "submitted_file" JSONB NOT NULL DEFAULT '[]',
     "payment_status" VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    "is_approved" BOOLEAN NOT NULL DEFAULT false,
+    "remark" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -617,6 +713,7 @@ CREATE TABLE "public"."scd_deliverables" (
     "submitted_at" TIMESTAMPTZ,
     "submitted_remark" TEXT,
     "submitted_file" JSONB NOT NULL DEFAULT '[]',
+    "approved_at" TIMESTAMPTZ,
     "feedback" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -631,6 +728,9 @@ CREATE TABLE "public"."scd_conversations" (
     "user1_id" INTEGER NOT NULL,
     "user2_id" INTEGER NOT NULL,
     "status" VARCHAR(20),
+    "blocked_by_user_id" INTEGER,
+    "user1_has_new_message" BOOLEAN NOT NULL DEFAULT false,
+    "user2_has_new_message" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -761,6 +861,24 @@ CREATE TABLE "public"."scd_payment_methods" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."scd_withdrawal_methods" (
+    "id" SERIAL NOT NULL,
+    "user_id" INTEGER NOT NULL,
+    "type" VARCHAR(20) NOT NULL,
+    "display_label" VARCHAR(255) NOT NULL,
+    "bank_name" VARCHAR(100),
+    "account_number" VARCHAR(34),
+    "account_number_last4" VARCHAR(4),
+    "ifsc" VARCHAR(11),
+    "upi_id" VARCHAR(255),
+    "is_default" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "scd_withdrawal_methods_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."scd_tax_information" (
     "id" SERIAL NOT NULL,
     "user_id" INTEGER NOT NULL,
@@ -791,20 +909,11 @@ CREATE TABLE "public"."scd_billing_transactions" (
     "status" VARCHAR(20) NOT NULL,
     "description" TEXT NOT NULL,
     "invoice_url" VARCHAR(500),
+    "meta" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "scd_billing_transactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "public"."scd_billing_transaction_meta" (
-    "id" SERIAL NOT NULL,
-    "transaction_id" INTEGER NOT NULL,
-    "key" VARCHAR(100) NOT NULL,
-    "value" TEXT NOT NULL,
-
-    CONSTRAINT "scd_billing_transaction_meta_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -976,6 +1085,33 @@ CREATE INDEX "scd_investor_portfolios_industry_id_idx" ON "public"."scd_investor
 CREATE INDEX "scd_investor_portfolios_deleted_at_idx" ON "public"."scd_investor_portfolios"("deleted_at");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "scd_investment_profiles_unique_id_key" ON "public"."scd_investment_profiles"("unique_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "scd_investment_profiles_user_id_key" ON "public"."scd_investment_profiles"("user_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profiles_user_id_idx" ON "public"."scd_investment_profiles"("user_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profile_preferred_industries_investment_prof_idx" ON "public"."scd_investment_profile_preferred_industries"("investment_profile_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profile_preferred_industries_industry_id_idx" ON "public"."scd_investment_profile_preferred_industries"("industry_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "scd_investment_profile_committee_members_unique_id_key" ON "public"."scd_investment_profile_committee_members"("unique_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profile_committee_members_investment_profile_idx" ON "public"."scd_investment_profile_committee_members"("investment_profile_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profile_geo_preferences_investment_profile_i_idx" ON "public"."scd_investment_profile_geo_preferences"("investment_profile_id");
+
+-- CreateIndex
+CREATE INDEX "scd_investment_profile_geo_preferences_country_id_idx" ON "public"."scd_investment_profile_geo_preferences"("country_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "scd_founder_projects_unique_id_key" ON "public"."scd_founder_projects"("unique_id");
 
 -- CreateIndex
@@ -1031,6 +1167,18 @@ CREATE INDEX "scd_proposals_status_idx" ON "public"."scd_proposals"("status");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "scd_proposals_project_id_provider_id_key" ON "public"."scd_proposals"("project_id", "provider_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "scd_reviews_unique_id_key" ON "public"."scd_reviews"("unique_id");
+
+-- CreateIndex
+CREATE INDEX "scd_reviews_review_to_id_action_type_idx" ON "public"."scd_reviews"("review_to_id", "action_type");
+
+-- CreateIndex
+CREATE INDEX "scd_reviews_action_type_action_id_idx" ON "public"."scd_reviews"("action_type", "action_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "scd_reviews_review_from_id_review_to_id_action_type_action__key" ON "public"."scd_reviews"("review_from_id", "review_to_id", "action_type", "action_id", "review_type");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "scd_milestones_unique_id_key" ON "public"."scd_milestones"("unique_id");
@@ -1138,6 +1286,12 @@ CREATE INDEX "scd_payment_methods_is_default_idx" ON "public"."scd_payment_metho
 CREATE INDEX "scd_payment_methods_razorpay_customer_id_idx" ON "public"."scd_payment_methods"("razorpay_customer_id");
 
 -- CreateIndex
+CREATE INDEX "scd_withdrawal_methods_user_id_idx" ON "public"."scd_withdrawal_methods"("user_id");
+
+-- CreateIndex
+CREATE INDEX "scd_withdrawal_methods_is_default_idx" ON "public"."scd_withdrawal_methods"("is_default");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "scd_tax_information_user_id_key" ON "public"."scd_tax_information"("user_id");
 
 -- CreateIndex
@@ -1166,12 +1320,6 @@ CREATE INDEX "scd_billing_transactions_created_at_idx" ON "public"."scd_billing_
 
 -- CreateIndex
 CREATE INDEX "scd_billing_transactions_unique_id_idx" ON "public"."scd_billing_transactions"("unique_id");
-
--- CreateIndex
-CREATE INDEX "scd_billing_transaction_meta_transaction_id_idx" ON "public"."scd_billing_transaction_meta"("transaction_id");
-
--- CreateIndex
-CREATE INDEX "scd_billing_transaction_meta_key_idx" ON "public"."scd_billing_transaction_meta"("key");
 
 -- AddForeignKey
 ALTER TABLE "public"."scd_users" ADD CONSTRAINT "scd_users_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "public"."scd_currencies"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1273,6 +1421,30 @@ ALTER TABLE "public"."scd_investor_portfolios" ADD CONSTRAINT "scd_investor_port
 ALTER TABLE "public"."scd_investor_portfolios" ADD CONSTRAINT "scd_investor_portfolios_sub_industry_id_fkey" FOREIGN KEY ("sub_industry_id") REFERENCES "public"."scd_sub_industries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."scd_investment_profiles" ADD CONSTRAINT "scd_investment_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_preferred_industries" ADD CONSTRAINT "scd_investment_profile_preferred_industries_investment_pro_fkey" FOREIGN KEY ("investment_profile_id") REFERENCES "public"."scd_investment_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_preferred_industries" ADD CONSTRAINT "scd_investment_profile_preferred_industries_industry_id_fkey" FOREIGN KEY ("industry_id") REFERENCES "public"."scd_industries"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_preferred_industries" ADD CONSTRAINT "scd_investment_profile_preferred_industries_sub_industry_i_fkey" FOREIGN KEY ("sub_industry_id") REFERENCES "public"."scd_sub_industries"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_committee_members" ADD CONSTRAINT "scd_investment_profile_committee_members_investment_profil_fkey" FOREIGN KEY ("investment_profile_id") REFERENCES "public"."scd_investment_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_geo_preferences" ADD CONSTRAINT "scd_investment_profile_geo_preferences_investment_profile__fkey" FOREIGN KEY ("investment_profile_id") REFERENCES "public"."scd_investment_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_geo_preferences" ADD CONSTRAINT "scd_investment_profile_geo_preferences_country_id_fkey" FOREIGN KEY ("country_id") REFERENCES "public"."scd_countries"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_investment_profile_geo_preferences" ADD CONSTRAINT "scd_investment_profile_geo_preferences_state_id_fkey" FOREIGN KEY ("state_id") REFERENCES "public"."scd_states"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."scd_founder_projects" ADD CONSTRAINT "scd_founder_projects_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1298,6 +1470,12 @@ ALTER TABLE "public"."scd_proposals" ADD CONSTRAINT "scd_proposals_project_id_fk
 
 -- AddForeignKey
 ALTER TABLE "public"."scd_proposals" ADD CONSTRAINT "scd_proposals_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_reviews" ADD CONSTRAINT "scd_reviews_review_from_id_fkey" FOREIGN KEY ("review_from_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."scd_reviews" ADD CONSTRAINT "scd_reviews_review_to_id_fkey" FOREIGN KEY ("review_to_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."scd_milestones" ADD CONSTRAINT "scd_milestones_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "public"."scd_founder_projects"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1342,10 +1520,10 @@ ALTER TABLE "public"."scd_service_packages" ADD CONSTRAINT "scd_service_packages
 ALTER TABLE "public"."scd_payment_methods" ADD CONSTRAINT "scd_payment_methods_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "public"."scd_withdrawal_methods" ADD CONSTRAINT "scd_withdrawal_methods_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "public"."scd_tax_information" ADD CONSTRAINT "scd_tax_information_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."scd_users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "public"."scd_billing_transactions" ADD CONSTRAINT "scd_billing_transactions_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "public"."scd_currencies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."scd_billing_transaction_meta" ADD CONSTRAINT "scd_billing_transaction_meta_transaction_id_fkey" FOREIGN KEY ("transaction_id") REFERENCES "public"."scd_billing_transactions"("id") ON DELETE CASCADE ON UPDATE CASCADE;

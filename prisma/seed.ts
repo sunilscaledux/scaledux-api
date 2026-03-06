@@ -42,7 +42,7 @@ async function main() {
   // 9. Seed Revenue Models
   await seedRevenueModels(prisma);
 
-  await seedBillingData(prisma);
+  // await seedBillingData(prisma);
 
   console.log("✅ All seeding completed successfully!");
 }

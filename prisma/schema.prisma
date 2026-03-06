@@ -1218,12 +1218,12 @@ model BillingTransaction {
 
   description     String   @db.Text
   invoice_url     String?  @db.VarChar(500)
+  meta            Json?    // e.g. { milestone_index, razorpay_payment_id, razorpay_order_id, ... }
 
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
   currency Currency @relation(fields: [currency_id], references: [id], onDelete: Cascade)
-  meta     BillingTransactionMeta[]
 
   @@index([actor_type, actor_id])
   @@index([from_type, from_id])
@@ -1233,17 +1233,4 @@ model BillingTransaction {
   @@index([created_at])
   @@index([unique_id])
   @@map("scd_billing_transactions")
-}
-
-model BillingTransactionMeta {
-  id              Int      @id @default(autoincrement())
-  transaction_id  Int
-  key             String   @db.VarChar(100)
-  value           String   @db.Text
-
-  transaction BillingTransaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
-
-  @@index([transaction_id])
-  @@index([key])
-  @@map("scd_billing_transaction_meta")
 }

@@ -162,7 +162,8 @@ export class BillingController {
       subjectId: proposal.id,
       amount,
       description: `Payment for ${projectTitle}`,
-      meta: Object.keys(meta).length ? meta : undefined
+      meta: Object.keys(meta).length ? meta : undefined,
+      status: 'pending'
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
@@ -272,7 +273,8 @@ export class BillingController {
       subjectId: proposal.id,
       amount,
       description: `Payment for ${projectTitle}: ${milestoneTitle}`,
-      meta
+      meta,
+      status: 'pending'
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
@@ -496,6 +498,25 @@ export class BillingController {
     } catch (error: any) {
       console.error("Error fetching user balance:", error);
       return ApiResponse.error(res, error.message || "Failed to fetch user balance");
+    }
+  }
+
+  // Release a pending payment (payer only). Sets transaction to completed and updates user totals.
+  static async releasePayment(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      const uniqueId = getStringParam(req.params.uniqueId);
+      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+      const result = await BillingService.releasePaymentTransaction(uniqueId, userId);
+      if (!result.success) {
+        const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+        return ApiResponse.error(res, result.message ?? "Failed to release payment", code);
+      }
+      return ApiResponse.success(res, null, "Payment released successfully");
+    } catch (error: any) {
+      console.error("Error releasing payment:", error);
+      return ApiResponse.error(res, error.message || "Failed to release payment");
     }
   }
 
