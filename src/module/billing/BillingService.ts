@@ -119,6 +119,41 @@ export class BillingService {
     }
   }
 
+  /**
+   * Fetch Razorpay payment and return a flat Record for BillingTransactionMeta.
+   * Stores: payment_id, order_id, method, status, bank, card_last4, card_network, bank_transaction_id (if any), etc.
+   */
+  static async fetchRazorpayPaymentMeta(razorpayPaymentId: string, razorpayOrderId?: string): Promise<Record<string, string>> {
+    if (!razorpay || !razorpayPaymentId) return {};
+    const set = (m: Record<string, string>, k: string, v: unknown) => {
+      if (v != null && String(v).trim() !== '') m[k] = String(v).trim();
+    };
+    try {
+      const payment = await razorpay.payments.fetch(razorpayPaymentId) as any;
+      const meta: Record<string, string> = {};
+      set(meta, 'razorpay_payment_id', payment?.id ?? razorpayPaymentId);
+      set(meta, 'razorpay_order_id', payment?.order_id ?? razorpayOrderId);
+      set(meta, 'razorpay_method', payment?.method);
+      set(meta, 'razorpay_status', payment?.status);
+      set(meta, 'razorpay_bank', payment?.bank);
+      set(meta, 'razorpay_card_last4', payment?.card?.last4);
+      set(meta, 'razorpay_card_network', payment?.card?.network);
+      set(meta, 'razorpay_vpa', payment?.vpa);
+      const acquirerData = payment?.acquirer_data;
+      if (acquirerData && typeof acquirerData === 'object') {
+        const bankRef = acquirerData.bank_transaction_id ?? acquirerData.utr ?? acquirerData.rrn;
+        set(meta, 'razorpay_bank_transaction_id', bankRef);
+        set(meta, 'razorpay_auth_code', acquirerData.auth_code);
+      }
+      return meta;
+    } catch (error) {
+      console.error('Error fetching Razorpay payment for meta:', error);
+      const fallback: Record<string, string> = { razorpay_payment_id: razorpayPaymentId };
+      set(fallback, 'razorpay_order_id', razorpayOrderId);
+      return fallback;
+    }
+  }
+
   // Charge a saved card for future payments
   static async chargeSavedCard(paymentMethodId: string, amount: number, description: string) {
     if (!razorpay) {
@@ -257,8 +292,61 @@ export class BillingService {
   }
 
   /**
+   * Update user billing totals after a transaction. Call after every billing transaction create.
+   * Amount is in the same unit as BillingTransaction.amount (base currency).
+   */
+  private static async updateUserBillingTotalsAfterTransaction(
+    type: 'payment' | 'refund' | 'withdrawal',
+    status: string,
+    fromId: number,
+    toId: number,
+    amount: number
+  ) {
+    const amt = Number(amount);
+    if (type === 'payment' || type === 'refund') {
+      if (status !== 'completed') return;
+      // Receiver (to_id) gains total_earning and wallet; sender (from_id) loses wallet only
+      if (toId > 0) {
+        await prisma.$executeRaw`
+          UPDATE scd_users SET
+            total_earning = COALESCE(total_earning, 0) + ${amt},
+            wallet_amount = COALESCE(wallet_amount, 0) + ${amt},
+            updated_at = NOW()
+          WHERE id = ${toId}
+        `;
+      }
+      if (fromId > 0) {
+        await prisma.$executeRaw`
+          UPDATE scd_users SET
+            wallet_amount = COALESCE(wallet_amount, 0) - ${amt},
+            updated_at = NOW()
+          WHERE id = ${fromId}
+        `;
+      }
+    } else if (type === 'withdrawal') {
+      if (fromId > 0) {
+        if (status === 'pending') {
+          await prisma.$executeRaw`
+            UPDATE scd_users SET
+              wallet_amount = COALESCE(wallet_amount, 0) - ${amt},
+              updated_at = NOW()
+            WHERE id = ${fromId}
+          `;
+        } else if (status === 'completed') {
+          await prisma.$executeRaw`
+            UPDATE scd_users SET
+              total_withdrawal = COALESCE(total_withdrawal, 0) + ${amt},
+              updated_at = NOW()
+            WHERE id = ${fromId}
+          `;
+        }
+      }
+    }
+  }
+
+  /**
    * Record a payment: one billing row (from payer to payee). subject_type and subject_id are on the row.
-   * Optional meta (e.g. milestone_index, razorpay_payment_id) is stored in BillingTransactionMeta.
+   * Optional meta (e.g. milestone_index, razorpay_payment_id, razorpay_order_id) is stored in BillingTransactionMeta.
    */
   static async recordPayment(params: {
     actorId: number;
@@ -299,6 +387,7 @@ export class BillingService {
     if (metaRows.length > 0) {
       await prisma.billingTransactionMeta.createMany({ data: metaRows });
     }
+    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
@@ -588,33 +677,63 @@ export class BillingService {
     };
   }
 
-  // Get user's balance
+  // Get user's balance and billing totals (uses User cache when set, else aggregates from transactions)
   static async getUserBalance(userId: string) {
     const userIdNum = parseInt(userId);
+    const user = await (prisma as any).user.findUnique({
+      where: { id: userIdNum },
+      select: { total_earning: true, total_withdrawal: true, wallet_amount: true, pending_amount: true }
+    }) as { total_earning?: unknown; total_withdrawal?: unknown; wallet_amount?: unknown; pending_amount?: unknown } | null;
 
-    // Credit = received (to_id = me), debit = sent (from_id = me). Balance = credits - debits.
-    const [credits, debits] = await Promise.all([
-      prisma.billingTransaction.aggregate({
-        where: { to_id: userIdNum, status: 'completed' },
-        _sum: { amount: true }
-      }),
-      prisma.billingTransaction.aggregate({
-        where: { from_id: userIdNum, status: 'completed' },
-        _sum: { amount: true }
-      })
-    ]);
+    let totalEarning = 0;
+    let totalWithdrawal = 0;
+    let walletAmount = 0;
+    let pendingAmount = 0;
 
-    const balanceInUSD = Number(credits._sum?.amount || 0) - Number(debits._sum?.amount || 0);
-    
-    // Convert to user's currency using utility function
-    const { amount: convertedBalance, currency, currencySymbol } = await convertToUserCurrency(userIdNum, balanceInUSD);
+    if (user?.total_earning != null || user?.wallet_amount != null) {
+      totalEarning = Number(user?.total_earning ?? 0);
+      totalWithdrawal = Number(user?.total_withdrawal ?? 0);
+      walletAmount = Number(user?.wallet_amount ?? 0);
+      pendingAmount = Number(user?.pending_amount ?? 0);
+    } else {
+      const [credits, debits, withdrawals, pendingCredits] = await Promise.all([
+        prisma.billingTransaction.aggregate({
+          where: { to_id: userIdNum, status: 'completed' },
+          _sum: { amount: true }
+        }),
+        prisma.billingTransaction.aggregate({
+          where: { from_id: userIdNum, status: 'completed' },
+          _sum: { amount: true }
+        }),
+        prisma.billingTransaction.aggregate({
+          where: { from_id: userIdNum, type: 'withdrawal', status: 'completed' },
+          _sum: { amount: true }
+        }),
+        prisma.billingTransaction.aggregate({
+          where: { to_id: userIdNum, status: 'pending' },
+          _sum: { amount: true }
+        })
+      ]);
+      totalEarning = Number(credits._sum?.amount || 0);
+      totalWithdrawal = Number(withdrawals._sum?.amount || 0);
+      walletAmount = Number(credits._sum?.amount || 0) - Number(debits._sum?.amount || 0);
+      pendingAmount = Number(pendingCredits._sum?.amount || 0);
+    }
+
+    const { amount: convertedBalance, currency, currencySymbol } = await convertToUserCurrency(userIdNum, walletAmount);
+    const { amount: convertedTotalEarning } = await convertToUserCurrency(userIdNum, totalEarning);
+    const { amount: convertedTotalWithdrawal } = await convertToUserCurrency(userIdNum, totalWithdrawal);
+    const { amount: convertedPending } = await convertToUserCurrency(userIdNum, pendingAmount);
 
     return {
       success: true,
       data: {
         balance: convertedBalance,
         currency,
-        currencySymbol
+        currencySymbol,
+        totalEarning: convertedTotalEarning,
+        totalWithdrawal: convertedTotalWithdrawal,
+        pendingBalance: convertedPending
       }
     };
   }
@@ -749,6 +868,7 @@ export class BillingService {
         description: `Withdrawal to ${method.display_label}`
       }
     });
+    await this.updateUserBillingTotalsAfterTransaction('withdrawal', 'pending', userIdNum, 0, amount);
     await prisma.billingTransactionMeta.createMany({
       data: [
         { transaction_id: row.id, key: 'withdrawal_method_id', value: String(withdrawalMethodId) }
@@ -872,7 +992,17 @@ export class BillingService {
       subjectType: transaction.subject_type,
       subjectId: transaction.subject_id,
       contractTitle: undefined as string | undefined,
-      milestonePayments: undefined as any[] | undefined
+      milestonePayments: undefined as any[] | undefined,
+      razorpayPaymentId: metaMap.razorpay_payment_id ?? undefined,
+      razorpayOrderId: metaMap.razorpay_order_id ?? undefined,
+      razorpayMethod: metaMap.razorpay_method ?? undefined,
+      razorpayStatus: metaMap.razorpay_status ?? undefined,
+      razorpayBank: metaMap.razorpay_bank ?? undefined,
+      razorpayCardLast4: metaMap.razorpay_card_last4 ?? undefined,
+      razorpayCardNetwork: metaMap.razorpay_card_network ?? undefined,
+      razorpayVpa: metaMap.razorpay_vpa ?? undefined,
+      razorpayBankTransactionId: metaMap.razorpay_bank_transaction_id ?? undefined,
+      razorpayAuthCode: metaMap.razorpay_auth_code ?? undefined
     };
 
     if (transaction.subject_type === 'Proposal' && transaction.subject_id) {

@@ -55,14 +55,14 @@ export class BillingController {
       // Milestone payment: proposalId + milestoneIndex (0-based)
       const mi = milestoneIndex != null ? parseInt(milestoneIndex, 10) : NaN;
       if (typeof proposalId === "string" && proposalId.trim() && Number.isFinite(mi) && mi >= 0) {
-        const handled = await BillingController.handleMilestonePayment(res, userId, proposalId.trim(), mi, razorpayPaymentId);
+        const handled = await BillingController.handleMilestonePayment(res, userId, proposalId.trim(), mi, razorpayPaymentId, razorpayOrderId);
         if (handled) return;
       }
 
       // Subject-based payment: route by subject type (Proposal, etc.)
       const subjType = (subjectType ?? (proposalId ? "Proposal" : null)) as string | null;
       if (subjType === "Proposal" && typeof proposalId === "string" && proposalId.trim()) {
-        const handled = await BillingController.handleProposalPayment(res, userId, proposalId.trim(), razorpayPaymentId);
+        const handled = await BillingController.handleProposalPayment(res, userId, proposalId.trim(), razorpayPaymentId, razorpayOrderId);
         if (handled) return;
       }
       if (subjType && subjectId != null) {
@@ -113,7 +113,7 @@ export class BillingController {
    * Handle payment for subject type "Proposal": load proposal, validate, record one billing row, sync chat.
    * Returns true if handled (response sent), false otherwise.
    */
-  private static async handleProposalPayment(res: Response, userId: number, proposalId: string, razorpayPaymentId?: string): Promise<boolean> {
+  private static async handleProposalPayment(res: Response, userId: number, proposalId: string, razorpayPaymentId?: string, razorpayOrderId?: string): Promise<boolean> {
     const proposal = await (prisma as any).proposal.findFirst({
       where: { unique_id: proposalId },
       include: {
@@ -151,6 +151,9 @@ export class BillingController {
     }
 
     const projectTitle = proposal.project.project_title || "project";
+    const meta: Record<string, string> = razorpayPaymentId
+      ? await BillingService.fetchRazorpayPaymentMeta(razorpayPaymentId, razorpayOrderId)
+      : {};
     const payResult = await BillingService.recordPayment({
       actorId: proposal.project.user_id,
       fromId: proposal.project.user_id,
@@ -159,7 +162,7 @@ export class BillingController {
       subjectId: proposal.id,
       amount,
       description: `Payment for ${projectTitle}`,
-      meta: razorpayPaymentId ? { razorpay_payment_id: razorpayPaymentId } : undefined
+      meta: Object.keys(meta).length ? meta : undefined
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
@@ -201,7 +204,8 @@ export class BillingController {
     userId: number,
     proposalId: string,
     milestoneIndex: number,
-    razorpayPaymentId?: string
+    razorpayPaymentId?: string,
+    razorpayOrderId?: string
   ): Promise<boolean> {
     const proposal = await (prisma as any).proposal.findFirst({
       where: { unique_id: proposalId },
@@ -254,7 +258,12 @@ export class BillingController {
     const projectTitle = proposal.project.project_title || "project";
     const milestoneTitle = milestoneRow?.title || milestoneRow?.description || `Milestone ${milestoneIndex + 1}`;
     const meta: Record<string, string> = { milestone_index: String(milestoneIndex) };
-    if (razorpayPaymentId) meta.razorpay_payment_id = razorpayPaymentId;
+    if (razorpayPaymentId) {
+      const razorpayMeta = await BillingService.fetchRazorpayPaymentMeta(razorpayPaymentId, razorpayOrderId);
+      Object.assign(meta, razorpayMeta);
+    } else if (razorpayOrderId) {
+      meta.razorpay_order_id = razorpayOrderId;
+    }
     const payResult = await BillingService.recordPayment({
       actorId: proposal.project.user_id,
       fromId: proposal.project.user_id,

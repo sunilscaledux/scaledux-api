@@ -53,6 +53,11 @@ model User {
   currency                     Currency? @relation(fields: [currency_id], references: [id])
   profile_sections              Json?     // role-based: { sectionKey: boolean } - init on first login/register with role's sections only
   profile_completion_percentage Int?    // 0-100, cached from profile_sections + role weights
+  // Billing totals (updated on every billing transaction)
+  total_earning    Decimal?  @db.Decimal(15, 2)  // sum of all completed credits (received)
+  total_withdrawal Decimal?  @db.Decimal(15, 2)  // sum of all completed withdrawals
+  wallet_amount    Decimal?  @db.Decimal(15, 2)  // current balance (total_earning - debits)
+  pending_amount   Decimal?  @db.Decimal(15, 2)  // sum of pending credits (to be received)
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
   proposals                    Proposal[] @relation("UserProposals")
