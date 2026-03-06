@@ -6,6 +6,163 @@ import { ulid } from "ulid";
 import { emailService } from "../../services/emailService";
 import { generateOtpCode, normalizeContact } from "@utils/General";
 import mailConfig from "@config/mail";
+import { generateRefreshToken } from "@utils/jwtUtils";
+
+// ─── Device / refresh token helpers ─────────────────────────────────────────
+
+function parseUserAgent(ua: string = ""): {
+  browser: string;
+  os: string;
+  deviceType: string;
+  deviceName: string;
+} {
+  let browser = "Unknown";
+  let os = "Unknown";
+  let deviceType = "web";
+
+  if (/Chrome\//.test(ua) && !/Chromium|Edg|OPR/.test(ua)) browser = "Chrome";
+  else if (/Firefox\//.test(ua)) browser = "Firefox";
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = "Safari";
+  else if (/Edg\//.test(ua)) browser = "Edge";
+  else if (/OPR\/|Opera\//.test(ua)) browser = "Opera";
+
+  if (/Windows/.test(ua)) os = "Windows";
+  else if (/Macintosh|Mac OS X/.test(ua)) os = "macOS";
+  else if (/Linux/.test(ua) && !/Android/.test(ua)) os = "Linux";
+  else if (/Android/.test(ua)) { os = "Android"; deviceType = "mobile"; }
+  else if (/iPhone|iPad/.test(ua)) { os = "iOS"; deviceType = "mobile"; }
+
+  const deviceName = `${browser} on ${os}`;
+  return { browser, os, deviceType, deviceName };
+}
+
+export async function createLoginDevice(
+  userId: number,
+  refreshToken: string,
+  expiresAt: Date,
+  ipAddress?: string,
+  userAgent?: string,
+  rememberMe?: boolean
+): Promise<void> {
+  const { browser, os, deviceType, deviceName } = parseUserAgent(userAgent);
+
+  // Mark all previous devices for this user as not current
+  await prisma.loginDevice.updateMany({
+    where: { user_id: userId },
+    data: { is_current: false },
+  });
+
+  // Clean up expired devices (keep last 10 active)
+  const expired = await prisma.loginDevice.findMany({
+    where: { user_id: userId, expires_at: { lt: new Date() } },
+    select: { id: true },
+  });
+  if (expired.length > 0) {
+    await prisma.loginDevice.deleteMany({
+      where: { id: { in: expired.map((d) => d.id) } },
+    });
+  }
+
+  await prisma.loginDevice.create({
+    data: {
+      user_id: userId,
+      refresh_token: refreshToken,
+      device_name: deviceName,
+      device_type: deviceType,
+      browser,
+      os,
+      ip_address: ipAddress,
+      is_current: true,
+      last_used_at: new Date(),
+      expires_at: expiresAt,
+    },
+  });
+}
+
+export async function rotateRefreshToken(
+  oldToken: string,
+  rememberMe: boolean,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<ServiceResponse> {
+  const device = await prisma.loginDevice.findUnique({
+    where: { refresh_token: oldToken },
+    include: { user: true },
+  });
+
+  if (!device || device.expires_at < new Date()) {
+    if (device) {
+      await prisma.loginDevice.delete({ where: { id: device.id } });
+    }
+    return { success: false, message: "Invalid or expired refresh token" };
+  }
+
+  const { token: newRefreshToken, expiresAt } = generateRefreshToken(rememberMe);
+  const { browser, os, deviceType, deviceName } = parseUserAgent(userAgent);
+
+  await prisma.loginDevice.update({
+    where: { id: device.id },
+    data: {
+      refresh_token: newRefreshToken,
+      expires_at: expiresAt,
+      last_used_at: new Date(),
+      ip_address: ipAddress ?? device.ip_address,
+      browser,
+      os,
+      device_type: deviceType,
+      device_name: deviceName,
+    },
+  });
+
+  return {
+    success: true,
+    message: "Token rotated",
+    data: { user: device.user, newRefreshToken, expiresAt },
+  };
+}
+
+export async function getLoginDevices(userId: number): Promise<ServiceResponse> {
+  const devices = await prisma.loginDevice.findMany({
+    where: { user_id: userId, expires_at: { gt: new Date() } },
+    orderBy: { last_used_at: "desc" },
+    select: {
+      id: true,
+      device_name: true,
+      device_type: true,
+      browser: true,
+      os: true,
+      ip_address: true,
+      is_current: true,
+      last_used_at: true,
+      created_at: true,
+    },
+  });
+  return { success: true, message: "Devices fetched", data: devices };
+}
+
+export async function revokeLoginDevice(
+  userId: number,
+  deviceId: number
+): Promise<ServiceResponse> {
+  const device = await prisma.loginDevice.findFirst({
+    where: { id: deviceId, user_id: userId },
+  });
+  if (!device) {
+    return { success: false, message: "Device not found" };
+  }
+  await prisma.loginDevice.delete({ where: { id: deviceId } });
+  return { success: true, message: "Device logged out successfully" };
+}
+
+export async function revokeAllOtherDevices(
+  userId: number,
+  currentRefreshToken: string
+): Promise<ServiceResponse> {
+  await prisma.loginDevice.deleteMany({
+    where: { user_id: userId, refresh_token: { not: currentRefreshToken } },
+  });
+  return { success: true, message: "All other devices logged out" };
+}
 
 export async function checkUserExists(input: string): Promise<boolean> {
   const existingUser = await prisma.user.findFirst({

@@ -1,12 +1,17 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
 import { prisma } from "@services/prismaService";
-import { generateTokenAndSetCookie } from "@utils/jwtUtils";
+import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from "@utils/jwtUtils";
 import {
   checkUserExists,
   userLogin,
   userOtpLogin,
   createUserAfterOtpVerification,
+  createLoginDevice,
+  rotateRefreshToken,
+  getLoginDevices,
+  revokeLoginDevice,
+  revokeAllOtherDevices,
 } from "./AuthService";
 import { setProfileSectionsForRole } from "../profile/ProfileCompletionService";
 import {
@@ -110,12 +115,23 @@ export async function register(req: Request, res: Response) {
       return ApiResponse.error(res, userResult.message);
     }
 
-    // Generate token, set cookie, and get token for response
+    // Generate access token
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
       userResult.data,
       false
     );
     res.cookie("auth_token", token, cookieOptions);
+
+    // Generate refresh token & store device
+    const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(false);
+    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry));
+    await createLoginDevice(
+      userResult.data.id,
+      refreshToken,
+      rfExpiry,
+      req.ip,
+      req.headers["user-agent"] as string
+    );
 
     return ApiResponse.created(
       res,
@@ -159,12 +175,24 @@ export async function login(req: Request, res: Response) {
       return ApiResponse.error(res, loginResult.message);
     }
 
-    // Generate token and cookie options with rememberMe
+    const rememberMe = body.rememberMe || false;
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
       loginResult.data,
-      body.rememberMe || false
+      rememberMe
     );
     res.cookie("auth_token", token, cookieOptions);
+
+    // Generate refresh token & store device
+    const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(rememberMe);
+    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry));
+    await createLoginDevice(
+      loginResult.data.id,
+      refreshToken,
+      rfExpiry,
+      req.ip,
+      req.headers["user-agent"] as string,
+      rememberMe
+    );
 
     return ApiResponse.success(
       res,
@@ -173,7 +201,7 @@ export async function login(req: Request, res: Response) {
         token,
         authenticated: true,
         expiresIn: expiresIn,
-        rememberMe: body.rememberMe || false,
+        rememberMe,
       },
       loginResult.message
     );
@@ -388,14 +416,10 @@ export async function verifyOtp(req: Request, res: Response) {
           "OTP verified successfully. You can now complete registration.";
         break;
 
-      case "login":
-        // Perform OTP login to get user and token
+      case "login": {
         const loginResult = await userOtpLogin(identifier);
         if (!loginResult.success || !loginResult.data) {
-          return ApiResponse.error(
-            res,
-            loginResult.message || "User not found"
-          );
+          return ApiResponse.error(res, loginResult.message || "User not found");
         }
 
         const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
@@ -404,14 +428,25 @@ export async function verifyOtp(req: Request, res: Response) {
         );
         res.cookie("auth_token", token, cookieOptions);
 
+        const { token: rfToken, expiresAt: rfExpiry } = generateRefreshToken(false);
+        res.cookie("refresh_token", rfToken, getRefreshCookieOptions(rfExpiry));
+        await createLoginDevice(
+          loginResult.data.id,
+          rfToken,
+          rfExpiry,
+          req.ip,
+          req.headers["user-agent"] as string
+        );
+
         responseData = {
           user: loginResult.data,
           token,
           authenticated: true,
-          expiresIn: expiresIn,
+          expiresIn,
         };
         responseData.message = "Login successful";
         break;
+      }
 
       case "forgot-password":
         responseData.message =
@@ -554,13 +589,14 @@ export async function resetPassword(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
-    // Clear the authentication cookie
-    res.clearCookie("auth_token", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-      path: "/",
-    });
+    const clearOpts = { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" };
+    res.clearCookie("auth_token", clearOpts);
+
+    const refreshToken = req.cookies?.refresh_token;
+    if (refreshToken) {
+      res.clearCookie("refresh_token", clearOpts);
+      await prisma.loginDevice.deleteMany({ where: { refresh_token: refreshToken } });
+    }
 
     return ApiResponse.success(
       res,
@@ -570,6 +606,91 @@ export async function logout(req: Request, res: Response) {
   } catch (error: any) {
     console.error("Logout Error:", error);
     return ApiResponse.error(res, "Failed to logout. Please try again.");
+  }
+}
+
+export async function refreshAccessToken(req: Request, res: Response) {
+  try {
+    const oldRefreshToken = req.cookies?.refresh_token;
+    if (!oldRefreshToken) {
+      return ApiResponse.unauthorized(res, "No refresh token provided");
+    }
+
+    const rememberMe = req.cookies?.auth_token
+      ? (() => {
+          try {
+            const decoded: any = require("jsonwebtoken").decode(req.cookies.auth_token);
+            return decoded?.rememberMe ?? false;
+          } catch { return false; }
+        })()
+      : false;
+
+    const result = await rotateRefreshToken(
+      oldRefreshToken,
+      rememberMe,
+      req.ip,
+      req.headers["user-agent"] as string
+    );
+
+    if (!result.success) {
+      return ApiResponse.unauthorized(res, result.message);
+    }
+
+    const { user, newRefreshToken, expiresAt } = result.data;
+    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, rememberMe);
+
+    res.cookie("auth_token", token, cookieOptions);
+    res.cookie("refresh_token", newRefreshToken, getRefreshCookieOptions(expiresAt));
+
+    return ApiResponse.success(res, { token, expiresIn }, "Token refreshed");
+  } catch (error: any) {
+    console.error("Refresh token error:", error);
+    return ApiResponse.unauthorized(res, "Invalid refresh token");
+  }
+}
+
+export async function listLoginDevices(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+
+    const result = await getLoginDevices(userId);
+    return ApiResponse.success(res, result.data, result.message);
+  } catch (error: any) {
+    console.error("List devices error:", error);
+    return ApiResponse.error(res, "Failed to fetch devices");
+  }
+}
+
+export async function logoutDevice(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+
+    const deviceId = Number(req.params.deviceId);
+    if (!deviceId) return ApiResponse.error(res, "Invalid device id", 400);
+
+    const result = await revokeLoginDevice(userId, deviceId);
+    if (!result.success) return ApiResponse.error(res, result.message, 404);
+
+    return ApiResponse.success(res, null, result.message);
+  } catch (error: any) {
+    console.error("Logout device error:", error);
+    return ApiResponse.error(res, "Failed to logout device");
+  }
+}
+
+export async function logoutAllOtherDevices(req: Request, res: Response) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+
+    const currentRefreshToken = req.cookies?.refresh_token ?? "";
+    const result = await revokeAllOtherDevices(userId, currentRefreshToken);
+    return ApiResponse.success(res, null, result.message);
+  } catch (error: any) {
+    console.error("Logout all devices error:", error);
+    return ApiResponse.error(res, "Failed to logout other devices");
   }
 }
 
