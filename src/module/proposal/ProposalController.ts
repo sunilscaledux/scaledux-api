@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ProposalService } from "./ProposalService";
 import { ApiResponse } from "@utils/ApiResponse";
+import { calculateProfileCompletion } from "../profile/ProfileCompletionService";
 
 /**
  * Get helper for safe string params
@@ -10,6 +11,7 @@ function getStringParam(param: any): string {
 }
 
 const DEFAULT_PROPOSAL_PAGE_LIMIT = Number(process.env.PROPOSAL_PAGE_LIMIT) || 50;
+const MIN_PROFILE_COMPLETION_PERCENT = Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50;
 
 /**
  * Create a new proposal
@@ -36,6 +38,20 @@ export async function createProposal(req: Request, res: Response) {
 
   if (!proposed_amount || proposed_amount <= 0) {
     return ApiResponse.error(res, "Valid proposed amount is required", 400);
+  }
+
+  try {
+    const completion = await calculateProfileCompletion(userId);
+    if (completion.totalPercentage < MIN_PROFILE_COMPLETION_PERCENT) {
+      return ApiResponse.error(
+        res,
+        `Complete your profile to submit a proposal. Your profile is ${completion.totalPercentage}% complete; at least ${MIN_PROFILE_COMPLETION_PERCENT}% is required.`,
+        400
+      );
+    }
+  } catch (err) {
+    console.error("Profile completion check failed:", err);
+    return ApiResponse.error(res, "Unable to verify profile completion", 500);
   }
 
   const result = await ProposalService.createProposal(userId, projectId, {
@@ -195,6 +211,20 @@ export async function updateProposal(req: Request, res: Response) {
 
   if (proposed_amount == null || proposed_amount <= 0) {
     return ApiResponse.error(res, "Valid proposed amount is required", 400);
+  }
+
+  try {
+    const completion = await calculateProfileCompletion(userId);
+    if (completion.totalPercentage < MIN_PROFILE_COMPLETION_PERCENT) {
+      return ApiResponse.error(
+        res,
+        `Complete your profile to submit a proposal. Your profile is ${completion.totalPercentage}% complete; at least ${MIN_PROFILE_COMPLETION_PERCENT}% is required.`,
+        400
+      );
+    }
+  } catch (err) {
+    console.error("Profile completion check failed:", err);
+    return ApiResponse.error(res, "Unable to verify profile completion", 500);
   }
 
   const result = await ProposalService.updateProposal(userId, proposalId, {
