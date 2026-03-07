@@ -4,6 +4,7 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
+import { queueNotification } from '@services/notificationQueueService';
 
 // Force server restart to pick up database changes
 
@@ -1031,7 +1032,8 @@ export class FounderProjectService {
           id: providerId,
           role: 'freelancer',
           status: 1
-        }
+        },
+        select: { id: true, first_name: true }
       });
 
       if (!provider) {
@@ -1105,6 +1107,25 @@ export class FounderProjectService {
         project.id,
         project.user_id
       );
+
+      await queueNotification({
+        userId: providerId,
+        type: 'PROJECT_INVITATION',
+        title: `Project invitation: ${projectTitle}`,
+        body: `You've been invited to work on "${projectTitle}".`,
+        link: `/project/${project.unique_id}`,
+        emailSubject: `You're invited to project: ${projectTitle}`,
+        template: 'notification',
+        templateVars: {
+          FIRST_NAME: provider.first_name || 'there',
+          TITLE: `Project invitation: ${projectTitle}`,
+          MESSAGE: `You've been invited to work on "${projectTitle}".`,
+          LINK: `${process.env.APP_URL || ''}/project/${project.unique_id}`
+        },
+        actorId: userId,
+        subjectType: 'FounderProject',
+        subjectId: project.id
+      });
 
       return {
         success: true,

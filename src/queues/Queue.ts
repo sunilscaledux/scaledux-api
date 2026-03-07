@@ -2,10 +2,10 @@ import { Queue } from 'bullmq';
 import defaultQueueConfig from '../config/queue';
 import { JobMetadata, JobClass } from '../jobs/BaseJob';
 
-// Main queue for all job types (Laravel style - single queue)
+// Main queue for all job types
 export const mainQueue = new Queue<JobMetadata>('main-queue', defaultQueueConfig);
 
-// Dispatch a job to the queue (Laravel style - pass the class itself)
+// Dispatch a job to the queue 
 export async function dispatch<T = any>(
   jobClass: JobClass<T>,
   data: T,

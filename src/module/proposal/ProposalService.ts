@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from '@utils/General';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
+import { queueNotification } from '@services/notificationQueueService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
@@ -274,6 +275,24 @@ export class ProposalService {
         project.id,
         userId
       );
+
+      await queueNotification({
+        userId: project.user_id,
+        type: 'PROPOSAL_RECEIVED',
+        title: `New proposal for "${projectTitle}"`,
+        body: `A new proposal was submitted for "${projectTitle}".`,
+        link: `/project/${project.unique_id}`,
+        emailSubject: `New proposal received for "${projectTitle}"`,
+        template: 'notification',
+        templateVars: {
+          TITLE: `New proposal for "${projectTitle}"`,
+          MESSAGE: `A new proposal was submitted for "${projectTitle}".`,
+          LINK: `${process.env.APP_URL || ''}/project/${project.unique_id}`
+        },
+        actorId: userId,
+        subjectType: 'Proposal',
+        subjectId: proposal.id
+      });
 
       return {
         success: true,

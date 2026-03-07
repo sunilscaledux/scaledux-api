@@ -31,8 +31,7 @@ import path from "path";
 import { corsMiddleware } from "@middleware/cors";
 import { connectMongo } from '@services/mongoService';
 
-// Start main worker for background job processing (Laravel style)
-import './workers/Worker';
+// Worker runs in a separate process on port 8000: npm run worker
 
 // Bull Board for queue monitoring
 import { serverAdapter } from './config/bullBoard';

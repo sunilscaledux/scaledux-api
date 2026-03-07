@@ -37,4 +37,16 @@ export class NotificationPreferencesService {
     });
     return { success: true, message: 'Preferences updated', data: preferences };
   }
+
+  /**
+   * Returns false only if the user has explicitly disabled email for this type; otherwise true (send email).
+   * Used by the notification queue worker before sending event emails.
+   */
+  static async shouldSendNotificationEmail(userId: number, type: NotificationEmailType): Promise<boolean> {
+    const result = await this.getPreferences(userId);
+    if (!result.success || !result.data) return true;
+    const prefs = result.data;
+    if (prefs[type] === false) return false;
+    return true;
+  }
 }

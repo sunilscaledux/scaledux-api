@@ -10,7 +10,7 @@ export const redisConnection = {
 };
 
 // Default queue configuration for BullMQ
-export const defaultQueueConfig: QueueOptions = {
+export const  defaultQueueConfig: QueueOptions = {
   connection: redisConnection,
   defaultJobOptions: {
     attempts: 3,

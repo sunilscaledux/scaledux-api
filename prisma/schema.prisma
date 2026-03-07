@@ -69,6 +69,7 @@ model User {
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
   loginDevices                 LoginDevice[]
+  notifications                Notification[]
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -1264,4 +1265,25 @@ model LoginDevice {
   @@index([user_id])
   @@index([refresh_token])
   @@map("scd_login_devices")
+}
+
+// In-app notifications (and email sent via queue after preference check)
+model Notification {
+  id           Int       @id @default(autoincrement())
+  user_id      Int
+  type         String    @db.VarChar(80)   // NotificationEmailType
+  title        String    @db.VarChar(500)
+  body         String?   @db.Text
+  link         String?   @db.VarChar(1024)
+  read_at      DateTime?
+  actor_id     Int?      // User who triggered (e.g. inviter, proposer)
+  subject_type String?   @db.VarChar(80)   // FounderProject, Proposal, etc.
+  subject_id   Int?
+  created_at   DateTime  @default(now())
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([user_id, read_at])
+  @@index([created_at])
+  @@map("scd_notifications")
 }

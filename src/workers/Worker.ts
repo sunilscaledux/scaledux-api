@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { JobMetadata, getJobHandler, getRegisteredJobTypes } from '../jobs/BaseJob';
 import '../jobs/GenerateInvoiceJob'; // Auto-registers via @Job() decorator
+import '../jobs/SendNotificationJob';
 import { mainQueue } from '../queues/Queue';
 import { defaultWorkerConfig } from '../config/queue';
 
@@ -20,7 +21,7 @@ const mainWorker = new Worker<JobMetadata>(
     }
 
     try {
-      // Call the handle() method (Laravel style)
+      // Call the handle()
       const result = await handler.handle(data);
       console.log(`✅ Job completed: ${jobClass} (${job.id})`);
       return result;
