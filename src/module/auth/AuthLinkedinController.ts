@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
-import { generateTokenAndSetCookie } from '../../utils/jwtUtils';
+import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from '../../utils/jwtUtils';
 import { prisma } from '../../services/prismaService';
+import { createLoginDevice } from './AuthService';
 import axios from 'axios';
 import { ulid } from 'ulid';
 
@@ -259,12 +260,23 @@ const linkedinCallback = async (req: Request, res: Response) => {
       console.log("✅ New user created via LinkedIn OAuth:", userEmail);
     }
 
-    // Generate JWT token and set cookie
+    // Generate access token
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
       user,
       false
     );
     res.cookie("auth_token", token, cookieOptions);
+
+    // Generate refresh token & store device (same as email/password login)
+    const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(false);
+    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry));
+    await createLoginDevice(
+      user.id,
+      refreshToken,
+      rfExpiry,
+      req.ip,
+      req.headers["user-agent"] as string
+    );
 
     return ApiResponse.success(
       res,
