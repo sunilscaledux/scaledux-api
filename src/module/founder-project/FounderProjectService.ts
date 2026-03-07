@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
+import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 
@@ -551,8 +551,8 @@ export class FounderProjectService {
    */
   static async createProject(userId: number, data: CreateFounderProjectInput): Promise<ServiceResponse> {
     try {
-      // Extract and normalize file paths
-      const projectFiles = data.projectFiles?.map(file => getRelativePath(file.url)) || [];
+      // Store relative paths only (like chat); map with getFileUrl when returning
+      const projectFiles = data.projectFiles?.map(file => extractRelativePath(file.url)).filter(Boolean) || [];
 
       const project = await prisma.founderProject.create({
         data: {
@@ -637,7 +637,7 @@ export class FounderProjectService {
       if (data.status !== undefined) updateData.status = data.status;
 
       if (data.projectFiles !== undefined) {
-        updateData.project_files = data.projectFiles.map(file => getRelativePath(file.url));
+        updateData.project_files = data.projectFiles.map(file => extractRelativePath(file.url)).filter(Boolean);
       }
 
       if (data.budget !== undefined) {

@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl } from '@utils/General';
+import { getFileUrl, extractRelativePath } from '@utils/General';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
@@ -216,6 +216,9 @@ export class ProposalService {
         data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
           ? data.hours_required
           : null;
+      const attachmentPaths = Array.isArray(data.attachments)
+        ? data.attachments.map((url: string) => extractRelativePath(url)).filter(Boolean)
+        : [];
       const proposal = await (prisma as any).proposal.create({
         data: {
           project_id: project.id,
@@ -226,7 +229,7 @@ export class ProposalService {
           hours_required: hoursRequired,
           milestones: [],
           screening_answers: data.screening_answers,
-          attachments: data.attachments,
+          attachments: attachmentPaths,
           status: 'PENDING'
         }
       });
@@ -1069,7 +1072,11 @@ export class ProposalService {
           payment_schedule: data.payment_schedule,
           ...(hoursRequired !== undefined && { hours_required: hoursRequired }),
           screening_answers: data.screening_answers,
-          attachments: data.attachments,
+          ...(data.attachments !== undefined && {
+            attachments: Array.isArray(data.attachments)
+              ? data.attachments.map((url: string) => extractRelativePath(url)).filter(Boolean)
+              : []
+          }),
           remark: null // Clear "message from client" when freelancer updates proposal
         }
       });
