@@ -274,7 +274,8 @@ export class BillingController {
       amount,
       description: `Payment for ${projectTitle}: ${milestoneTitle}`,
       meta,
-      status: 'pending'
+      status: 'pending',
+      milestoneId: milestoneRow?.id ?? null
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 

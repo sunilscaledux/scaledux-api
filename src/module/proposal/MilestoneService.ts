@@ -1,5 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { BillingService } from "../billing/BillingService";
 
 /**
  * Submit milestone as complete (freelancer only). Sets status COMPLETED.
@@ -173,21 +174,29 @@ export async function releaseMilestonePayment(
     return { success: false, message: "Approve all deliverables before releasing payment" };
   }
 
-  // Find the pending billing transaction for this milestone and release it (updates status + user totals)
-  const { BillingService } = await import("../billing/BillingService");
-  const pendingTxns = await (prisma as any).billingTransaction.findMany({
+  // Find the pending billing transaction for this milestone and release it (by milestone_id or fallback to meta)
+  let txn = await (prisma as any).billingTransaction.findFirst({
     where: {
-      subject_type: "Proposal",
-      subject_id: milestone.proposal.id,
+      milestone_id: milestone.id,
       type: "payment",
       status: "pending"
     }
   });
-  const milestoneIndex = milestone.order_index;
-  const txn = pendingTxns.find((t: any) => {
-    const m = t.meta as Record<string, unknown> | null;
-    return m && String(m.milestone_index) === String(milestoneIndex);
-  });
+  if (!txn) {
+    const pendingTxns = await (prisma as any).billingTransaction.findMany({
+      where: {
+        subject_type: "Proposal",
+        subject_id: milestone.proposal.id,
+        type: "payment",
+        status: "pending"
+      }
+    });
+    const milestoneIndex = milestone.order_index;
+    txn = pendingTxns.find((t: any) => {
+      const m = t.meta as Record<string, unknown> | null;
+      return m && String(m.milestone_index) === String(milestoneIndex);
+    }) ?? null;
+  }
   if (txn) {
     const releaseResult = await BillingService.releasePaymentTransaction(txn.unique_id, userId);
     if (!releaseResult.success) {
@@ -212,5 +221,6 @@ export async function releaseMilestonePayment(
     userId
   );
 
+  // Chat sync is done in BillingService.releasePaymentTransaction so both milestone flow and direct billing release get it
   return { success: true, message: "Payment released successfully" };
 }

@@ -56,6 +56,9 @@ export const CHAT_SYSTEM_MESSAGES = {
   PAYMENT_RELEASE_SENT: "Funded milestone",
   PAYMENT_RELEASE_RECEIVED: "Funded milestone",
 
+  PAYMENT_RELEASED_SENT: "You released payment for milestone",
+  PAYMENT_RELEASED_RECEIVED: "Payment released for milestone",
+
   OFFER_CANCELLED_SENT: "You withdrew the hire offer for",
   OFFER_CANCELLED_RECEIVED: "The hire offer was withdrawn for",
 

@@ -65,6 +65,9 @@ function resolveSystemMessageContent(
   if (metadata.activityType === "payment_release" && metadata.projectTitle) {
     return `${base} ${String(metadata.projectTitle).trim()}`.trim();
   }
+  if (metadata.activityType === "payment_released" && metadata.milestoneTitle) {
+    return `${base}: ${String(metadata.milestoneTitle).trim()}`.trim();
+  }
   return base;
 }
 

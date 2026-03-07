@@ -294,51 +294,45 @@ export class BillingService {
   /**
    * Update user billing totals after a transaction. Call after every billing transaction create.
    * Amount is in the same unit as BillingTransaction.amount (base currency).
+   * receiverAmount = credit to total_earning (and wallet if receiverWalletAmount not set).
+   * receiverWalletAmount = optional separate wallet credit (e.g. full amount before service_fee debit).
    */
   private static async updateUserBillingTotalsAfterTransaction(
     type: 'payment' | 'refund' | 'withdrawal',
     status: string,
     fromId: number,
     toId: number,
-    amount: number
+    amount: number,
+    receiverAmount?: number,
+    receiverWalletAmount?: number
   ) {
     const amt = Number(amount);
+    const toAmt = receiverAmount !== undefined ? Number(receiverAmount) : amt;
+    const toWalletAmt = receiverWalletAmount !== undefined ? Number(receiverWalletAmount) : toAmt;
     if (type === 'payment' || type === 'refund') {
       if (status !== 'completed') return;
-      // Receiver (to_id) gains total_earning and wallet; sender (from_id) loses wallet only
+      // Receiver (to_id) gains total_earning and wallet; sender (from_id) wallet is not changed on release (already debited when funding)
       if (toId > 0) {
-        await prisma.$executeRaw`
-          UPDATE scd_users SET
-            total_earning = COALESCE(total_earning, 0) + ${amt},
-            wallet_amount = COALESCE(wallet_amount, 0) + ${amt},
-            updated_at = NOW()
-          WHERE id = ${toId}
-        `;
-      }
-      if (fromId > 0) {
-        await prisma.$executeRaw`
-          UPDATE scd_users SET
-            wallet_amount = COALESCE(wallet_amount, 0) - ${amt},
-            updated_at = NOW()
-          WHERE id = ${fromId}
-        `;
+        await prisma.user.update({
+          where: { id: toId },
+          data: {
+            total_earning: { increment: toAmt },
+            wallet_amount: { increment: toWalletAmt },
+          },
+        });
       }
     } else if (type === 'withdrawal') {
       if (fromId > 0) {
         if (status === 'pending') {
-          await prisma.$executeRaw`
-            UPDATE scd_users SET
-              wallet_amount = COALESCE(wallet_amount, 0) - ${amt},
-              updated_at = NOW()
-            WHERE id = ${fromId}
-          `;
+          await prisma.user.update({
+            where: { id: fromId },
+            data: { wallet_amount: { decrement: amt } },
+          });
         } else if (status === 'completed') {
-          await prisma.$executeRaw`
-            UPDATE scd_users SET
-              total_withdrawal = COALESCE(total_withdrawal, 0) + ${amt},
-              updated_at = NOW()
-            WHERE id = ${fromId}
-          `;
+          await prisma.user.update({
+            where: { id: fromId },
+            data: { total_withdrawal: { increment: amt } },
+          });
         }
       }
     }
@@ -359,11 +353,12 @@ export class BillingService {
     description: string;
     meta?: Record<string, string>;
     status?: 'pending' | 'completed';
+    milestoneId?: number | null;
   }) {
-    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed' } = params;
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed', milestoneId } = params;
     const currencyId = 1;
 
-    const row = await prisma.billingTransaction.create({
+    const row = await (prisma as any).billingTransaction.create({
       data: {
         actor_type: 'User',
         actor_id: actorId,
@@ -373,6 +368,7 @@ export class BillingService {
         to_id: toId,
         subject_type: subjectType,
         subject_id: subjectId,
+        milestone_id: milestoneId ?? undefined,
         amount,
         currency_id: currencyId,
         type: 'payment',
@@ -383,13 +379,20 @@ export class BillingService {
     });
     if (status === 'completed') {
       await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
+    } else if (status === 'pending' && toId > 0) {
+      // Founder funded milestone: add full amount to freelancer's pending (to be received)
+      await prisma.user.update({
+        where: { id: toId },
+        data: { pending_amount: { increment: Number(amount) } },
+      });
     }
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
 
   /**
-   * Release a pending payment (founder only). Sets transaction to completed and updates user totals.
+   * Release a pending payment (founder only). Sets transaction to completed and credits freelancer (to_id) with net amount only.
+   * Founder (from_id) wallet is not changed on release. Platform fee (SERVICE_FEE_PERCENT) is deducted from the freelancer.
    */
   static async releasePaymentTransaction(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
     const tx = await prisma.billingTransaction.findUnique({
@@ -405,7 +408,106 @@ export class BillingService {
       data: { status: 'completed' }
     });
     const amount = Number(tx.amount);
-    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount);
+    const feePercent = Math.min(100, Math.max(0, Number(process.env.SERVICE_FEE_PERCENT) || 10));
+    const netAmount = Math.round(amount * (1 - feePercent / 100) * 100) / 100;
+    const feeAmount = Math.round((amount - netAmount) * 100) / 100;
+    
+    // Remove full amount from freelancer's pending (was added when founder funded)
+    if (tx.to_id > 0) {
+      await prisma.user.update({
+        where: { id: tx.to_id },
+        data: { pending_amount: { decrement: amount } },
+      });
+    }
+    // Credit freelancer: total_earning += net, wallet += full; service_fee row will debit wallet by fee
+    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount, netAmount, amount);
+
+    const milestoneId = (tx as any).milestone_id as number | null | undefined;
+
+    // Record service charge: billing row + reduce freelancer wallet + update milestone.service_fee_amount
+    if (feeAmount > 0) {
+      await (prisma as any).billingTransaction.create({
+        data: {
+          actor_type: 'User',
+          actor_id: userId,
+          from_type: 'User',
+          from_id: tx.to_id,
+          to_type: 'Platform',
+          to_id: 0,
+          subject_type: tx.subject_type,
+          subject_id: tx.subject_id,
+          milestone_id: milestoneId ?? undefined,
+          amount: feeAmount,
+          currency_id: tx.currency_id,
+          type: 'service_fee',
+          status: 'completed',
+          description: `Platform service fee (${feePercent}%)`,
+          meta: { source_transaction_unique_id: tx.unique_id, fee_percent: feePercent }
+        }
+      });
+      if (tx.to_id > 0) {
+        await prisma.user.update({
+          where: { id: tx.to_id },
+          data: { wallet_amount: { decrement: feeAmount } },
+        });
+      }
+      if (milestoneId != null) {
+        await (prisma as any).milestone.updateMany({
+          where: { id: milestoneId },
+          data: { service_fee_amount: feeAmount }
+        });
+      }
+    }
+
+    // Sync release payment to chat (founder + freelancer); same for both milestone flow and direct billing release
+    if (tx.subject_type === 'Proposal' && tx.subject_id != null && tx.from_id > 0 && tx.to_id > 0) {
+      let proposal: any = null;
+      let milestoneTitle = '';
+      if (milestoneId != null) {
+        const milestone = await (prisma as any).milestone.findUnique({
+          where: { id: milestoneId },
+          include: { proposal: { include: { project: { select: { id: true, project_title: true } } } } }
+        });
+        if (milestone) {
+          proposal = milestone.proposal;
+          milestoneTitle = milestone.title ?? milestone.description ?? `Milestone`;
+        }
+      }
+      if (!proposal) {
+        proposal = await (prisma as any).proposal.findFirst({
+          where: { id: tx.subject_id },
+          include: { project: { select: { id: true, project_title: true } } }
+        });
+        const metaObj = (tx as any).meta as Record<string, unknown> | null;
+        const milestoneIndexMeta = metaObj?.milestone_index != null ? parseInt(String(metaObj.milestone_index), 10) : 0;
+        const milestones = await (prisma as any).milestone.findMany({
+          where: { proposal_id: tx.subject_id },
+          orderBy: { order_index: 'asc' }
+        });
+        const row = milestones[milestoneIndexMeta];
+        milestoneTitle = row?.title ?? row?.description ?? `Milestone ${(milestoneIndexMeta ?? 0) + 1}`;
+      }
+      if (proposal) {
+        const projectTitle = proposal.project?.project_title ?? '';
+        const { ConversationService } = await import('../chat/ConversationService');
+        const { CHAT_SYSTEM_MESSAGES } = await import('../../constants/chatSystemMessages');
+        await ConversationService.syncSystemMessage(
+          tx.from_id,
+          tx.to_id,
+          '',
+          {
+            activityType: 'payment_released',
+            activityId: proposal.unique_id,
+            projectTitle,
+            milestoneTitle,
+            messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASED_SENT,
+            messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASED_RECEIVED
+          },
+          proposal.project?.id,
+          userId
+        );
+      }
+    }
     return { success: true };
   }
 
@@ -592,7 +694,7 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // Show transactions where current user is sender (from_id) or receiver (to_id)
+    // Show transactions where current user is sender (from_id) or receiver (to_id), including service_fee (platform fee when payment is released)
     const baseWhere: any = {
       OR: [{ from_id: userIdNum }, { to_id: userIdNum }]
     };
@@ -666,6 +768,9 @@ export class BillingService {
         transactions: transactions.map((t: any) => {
           const isCredit = t.to_id === userIdNum;
           const counterpartyId = isCredit ? t.from_id : t.to_id;
+          const clientName = t.type === 'service_fee' && counterpartyId === 0
+            ? 'Platform'
+            : (nameByUserId[counterpartyId] ?? '—');
           return {
             id: t.id,
             uniqueId: t.unique_id,
@@ -678,7 +783,7 @@ export class BillingService {
             invoiceUrl: t.invoice_url,
             createdAt: t.created_at,
             direction: isCredit ? 'credit' : 'debit',
-            clientName: nameByUserId[counterpartyId] ?? '—',
+            clientName,
             subjectType: t.subject_type,
             subjectId: t.subject_id,
             contractTitle: t.subject_type === 'Proposal' ? (contractTitleByProposalId[t.subject_id] ?? t.description) : undefined
@@ -975,13 +1080,16 @@ export class BillingService {
       return { success: false, message: 'Unauthorized' };
     }
     const counterpartyId = transaction.to_id === userIdNum ? transaction.from_id : transaction.to_id;
-    const [counterparty] = await prisma.user.findMany({
-      where: { id: counterpartyId },
-      select: { id: true, first_name: true, last_name: true }
-    });
-    const clientName = counterparty
-      ? [counterparty.first_name, counterparty.last_name].filter(Boolean).join(' ').trim() || '—'
-      : '—';
+    const clientName =
+      (transaction as any).type === 'service_fee' && counterpartyId === 0
+        ? 'Platform'
+        : (await prisma.user.findMany({
+            where: { id: counterpartyId },
+            select: { first_name: true, last_name: true }
+          }).then((users) => {
+            const u = users[0];
+            return u ? [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || '—' : '—';
+          }));
     const isCredit = transaction.to_id === userIdNum;
     const metaObj = (transaction as any).meta as Record<string, unknown> | null;
     const metaMap: Record<string, string> = {};
@@ -990,7 +1098,8 @@ export class BillingService {
         if (v != null) metaMap[k] = String(v);
       }
     }
-    const milestoneIndex = metaMap.milestone_index != null ? parseInt(metaMap.milestone_index, 10) : undefined;
+    const transactionMilestoneId = (transaction as any).milestone_id as number | null | undefined;
+    const milestoneIndexFallback = metaMap.milestone_index != null ? parseInt(metaMap.milestone_index, 10) : undefined;
 
     const base: any = {
       id: transaction.id,
@@ -1024,41 +1133,38 @@ export class BillingService {
     if (transaction.subject_type === 'Proposal' && transaction.subject_id) {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { id: transaction.subject_id },
-        include: {
-          project: { select: { project_title: true } },
-          milestonesRows: { orderBy: { order_index: 'asc' } }
-        }
+        include: { project: { select: { project_title: true } } }
       });
       if (proposal) {
         base.contractTitle = proposal.project?.project_title ?? '';
-        const proposalTxns = await prisma.billingTransaction.findMany({
-          where: { subject_type: 'Proposal', subject_id: transaction.subject_id },
-          include: { currency: true }
-        });
-        const txByMilestoneIndex: Record<number, any> = {};
-        for (const tx of proposalTxns) {
-          const txMeta = (tx as any).meta as Record<string, unknown> | null;
-          const mIndex = txMeta?.milestone_index != null ? String(txMeta.milestone_index) : null;
-          if (mIndex != null) {
-            const idx = parseInt(mIndex, 10);
-            if (!Number.isNaN(idx)) txByMilestoneIndex[idx] = tx;
-          }
-        }
-        const milestones = proposal.milestonesRows ?? [];
-        const paidUpTo = milestoneIndex != null && !Number.isNaN(milestoneIndex) ? milestoneIndex : (milestones.length - 1);
-        const rowsToShow = Math.max(paidUpTo + 1, milestones.length);
         base.milestonePayments = [];
-        for (let i = 0; i < rowsToShow; i++) {
-          const row = milestones[i];
-          const tx = txByMilestoneIndex[i];
-          base.milestonePayments.push({
-            milestoneIndex: i + 1,
-            title: row?.title ?? row?.description ?? `Milestone ${i + 1}`,
-            amount: row ? parseFloat(String(row.amount)) : 0,
-            paid: !!tx,
-            transactionUniqueId: tx?.unique_id ?? null,
-            date: tx?.created_at ?? null
-          });
+        // For payment tx: show only the one milestone this transaction paid for (use milestone_id when set)
+        if ((transaction as any).type === 'payment') {
+          let row: any = null;
+          if (transactionMilestoneId != null) {
+            row = await (prisma as any).milestone.findUnique({
+              where: { id: transactionMilestoneId }
+            });
+          }
+          if (!row && milestoneIndexFallback != null && !Number.isNaN(milestoneIndexFallback)) {
+            const milestones = await (prisma as any).milestone.findMany({
+              where: { proposal_id: transaction.subject_id },
+              orderBy: { order_index: 'asc' }
+            });
+            row = milestones.find((m: any) => m.order_index === milestoneIndexFallback);
+          }
+          if (row) {
+            const serviceFeeAmount = row.service_fee_amount != null ? parseFloat(String(row.service_fee_amount)) : undefined;
+            base.milestonePayments.push({
+              milestoneIndex: (row.order_index ?? 0) + 1,
+              title: row.title ?? row.description ?? `Milestone ${(row.order_index ?? 0) + 1}`,
+              amount: parseFloat(String(row.amount)),
+              paid: true,
+              transactionUniqueId: transaction.unique_id,
+              date: transaction.created_at,
+              serviceFeeAmount: serviceFeeAmount != null && serviceFeeAmount > 0 ? serviceFeeAmount : undefined
+            });
+          }
         }
       }
     }
