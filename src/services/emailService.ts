@@ -161,7 +161,7 @@ class EmailService {
       const template = await templateService.getCustomTemplate(
         templateName,
         variables,
-        subject || `Notification from ${mailConfig.COMPANY_NAME}`
+        subject || `Notification from ${mailConfig.APP_NAME}`
       );
 
       return await this.sendEmail({

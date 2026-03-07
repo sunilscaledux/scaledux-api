@@ -1108,20 +1108,16 @@ export class FounderProjectService {
         project.user_id
       );
 
+      const notificationTitle = `You're invited to work on "${projectTitle}"`;
+      const notificationBody = `A project owner invited you to submit a proposal for "${projectTitle}".`;
+      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+
       await queueNotification({
         userId: providerId,
         type: 'PROJECT_INVITATION',
-        title: `Project invitation: ${projectTitle}`,
-        body: `You've been invited to work on "${projectTitle}".`,
-        link: `/project/${project.unique_id}`,
-        emailSubject: `You're invited to project: ${projectTitle}`,
-        template: 'notification',
-        templateVars: {
-          FIRST_NAME: provider.first_name || 'there',
-          TITLE: `Project invitation: ${projectTitle}`,
-          MESSAGE: `You've been invited to work on "${projectTitle}".`,
-          LINK: `${process.env.APP_URL || ''}/project/${project.unique_id}`
-        },
+        notificationTitle,
+        notificationBody,
+        notificationLink,
         actorId: userId,
         subjectType: 'FounderProject',
         subjectId: project.id

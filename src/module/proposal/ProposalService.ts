@@ -276,19 +276,16 @@ export class ProposalService {
         userId
       );
 
+      const notificationTitle = `New proposal for "${projectTitle}"`;
+      const notificationBody = `A new proposal was submitted for "${projectTitle}".`;
+      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+
       await queueNotification({
         userId: project.user_id,
         type: 'PROPOSAL_RECEIVED',
-        title: `New proposal for "${projectTitle}"`,
-        body: `A new proposal was submitted for "${projectTitle}".`,
-        link: `/project/${project.unique_id}`,
-        emailSubject: `New proposal received for "${projectTitle}"`,
-        template: 'notification',
-        templateVars: {
-          TITLE: `New proposal for "${projectTitle}"`,
-          MESSAGE: `A new proposal was submitted for "${projectTitle}".`,
-          LINK: `${process.env.APP_URL || ''}/project/${project.unique_id}`
-        },
+        notificationTitle,
+        notificationBody,
+        notificationLink,
         actorId: userId,
         subjectType: 'Proposal',
         subjectId: proposal.id

@@ -8,17 +8,11 @@ import { isNotificationEmailType, type NotificationEmailType } from '../constant
 export interface SendNotificationJobData {
   userId: number;
   type: string; // NotificationEmailType
-  title: string;
-  body?: string | null;
-  link?: string | null;
-  /** Email subject (used when sending email) */
-  emailSubject?: string | null;
-  /** Pre-rendered HTML for email (if not set, template + templateVars used) */
-  emailHtml?: string | null;
-  /** Template name (e.g. 'notification' or 'project-invitation') */
-  template?: string | null;
-  /** Variables for template (e.g. FIRST_NAME, MESSAGE, LINK) */
-  templateVars?: Record<string, string | number | boolean> | null;
+  /** Same title for in-app notification and email subject */
+  notificationTitle: string;
+  /** Same body for in-app notification and email content */
+  notificationBody?: string | null;
+  notificationLink?: string | null;
   actorId?: number | null;
   subjectType?: string | null;
   subjectId?: number | null;
@@ -42,64 +36,45 @@ export class SendNotificationJob extends BaseJob<SendNotificationJobData> {
       return;
     }
 
-    // 1) Create in-app notification
+    // 1) Create in-app notification (same title/body as email)
     await prisma.notification.create({
       data: {
         user_id: data.userId,
         type: data.type,
-        title: data.title,
-        body: data.body ?? null,
-        link: data.link ?? null,
+        title: data.notificationTitle,
+        body: data.notificationBody ?? null,
+        link: data.notificationLink ?? null,
         actor_id: data.actorId ?? null,
         subject_type: data.subjectType ?? null,
         subject_id: data.subjectId ?? null
       }
     });
 
-    // 2) Send email only if user has not opted out
+    // 2) Send email only if user has not opted out (same title = subject, same body = content)
     const shouldSend = await NotificationPreferencesService.shouldSendNotificationEmail(data.userId, type);
     if (!shouldSend || !user.email) {
       if (!shouldSend) console.log(`SendNotificationJob: user ${data.userId} opted out of email for ${type}`);
       return;
     }
 
-    let html: string | undefined;
-    if (data.emailHtml) {
-      html = data.emailHtml;
-    } else if (data.template) {
-      const vars = data.templateVars ?? {};
-      if (!vars.FIRST_NAME && user.first_name) vars.FIRST_NAME = user.first_name;
-      if (!vars.MESSAGE && data.body) vars.MESSAGE = data.body;
-      if (!vars.LINK && data.link) vars.LINK = data.link.startsWith('http') ? data.link : `${process.env.APP_URL || ''}${data.link}`;
-      if (!vars.TITLE && data.title) vars.TITLE = data.title;
-      const compiled = await templateService.getCustomTemplate(
-        data.template,
-        vars as Record<string, string | number | boolean>,
-        data.emailSubject || data.title,
-        true
-      );
-      html = compiled.html;
-    } else {
-      const link = data.link ? (data.link.startsWith('http') ? data.link : `${process.env.APP_URL || ''}${data.link}`) : '#';
-      const compiled = await templateService.getCustomTemplate(
-        'notification',
-        {
-          FIRST_NAME: user.first_name || 'there',
-          TITLE: data.title,
-          MESSAGE: data.body || '',
-          LINK: link
-        },
-        data.emailSubject || data.title,
-        true
-      );
-      html = compiled.html;
-    }
+    const link = data.notificationLink
+      ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}${data.notificationLink}`)
+      : '#';
+    const compiled = await templateService.getCustomTemplate(
+      'notification',
+      {
+        TITLE: data.notificationTitle,
+        MESSAGE: data.notificationBody || '',
+        LINK: link
+      },
+      data.notificationTitle,
+      true
+    );
 
-    const subject = data.emailSubject || data.title;
     await emailService.sendEmail({
       to: user.email,
-      subject,
-      html
+      subject: data.notificationTitle,
+      html: compiled.html
     });
   }
 }

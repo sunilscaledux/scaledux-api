@@ -102,7 +102,7 @@ class TemplateService {
       HEADER_TITLE: '📧 Verify Your Email Address',
       FIRST_NAME: variables.firstName || 'there',
       OTP_CODE: variables.otpCode,
-      COMPANY_NAME: variables.companyName || 'ScaleDux',
+      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
       OTP_VALIDITY: variables.otpValidity || 10,
       FOOTER_MESSAGE: 'Best regards,',
       FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
@@ -124,10 +124,10 @@ class TemplateService {
     companyName?: string;
   }): Promise<EmailTemplate> {
     const templateVariables: TemplateVariables = {
-      TITLE: `Welcome to ${variables.companyName || 'ScaleDux'}`,
-      HEADER_TITLE: `🎉 Welcome to ${variables.companyName || 'ScaleDux'}!`,
+      TITLE: `Welcome to ${variables.companyName || mailConfig.APP_NAME}`,
+      HEADER_TITLE: `🎉 Welcome to ${variables.companyName || mailConfig.APP_NAME}!`,
       FIRST_NAME: variables.firstName,
-      COMPANY_NAME: variables.companyName || 'ScaleDux',
+      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
       FOOTER_MESSAGE: 'Welcome aboard!',
       FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
     };
@@ -152,7 +152,7 @@ class TemplateService {
       TITLE: 'Reset Your Password',
       HEADER_TITLE: '🔐 Reset Your Password',
       OTP_CODE: variables.OTP_CODE,
-      COMPANY_NAME: variables.companyName || 'ScaleDux',
+      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
       LINK_VALIDITY: variables.linkValidity || 10,
       FOOTER_MESSAGE: 'Best regards,',
       FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
