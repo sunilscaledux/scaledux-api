@@ -59,7 +59,7 @@ export class PersonalInfoService {
         currency: user.currency,
         role: user.role,
         firstName: user.first_name,
-        lastName: user.last_name,
+        lastName: user.last_name ? `${user.last_name.charAt(0)}.` : null,
         // Only show email/phone if not hidden
         email: profile.hideEmail ? null : user.email,
         phone: profile.hidePhone ? null : user.phone,
@@ -155,6 +155,8 @@ export class PersonalInfoService {
         agency_verified_at: profile.user.agency_verified_at?.toISOString(),
         show_as_agency: profile.user.show_as_agency,
         profile_completion_percentage: profile.user.profile_completion_percentage ?? null,
+        min_profile_completion_percent: Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50,
+        can_submit_proposal: (profile.user.profile_completion_percentage ?? 0) >= (Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50),
         sections: (() => {
           const role = profile.user.role;
           const sectionsMap = (profile.user as { profile_sections?: ProfileCompletionSectionsMap | null }).profile_sections ?? null;
