@@ -6,6 +6,7 @@ import { TeamMemberController } from "./TeamMemberController";
 import { FundingRoundController } from "./FundingRoundController";
 import { RaisingFundController } from "./RaisingFundController";
 import { getInvestmentProfile, updateInvestmentProfile } from "./InvestmentProfileController";
+import { NotificationPreferencesController } from "./NotificationPreferencesController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -117,6 +118,13 @@ router.post(
  */
 router.get("/investment-profile", authenticateToken, getInvestmentProfile);
 router.patch("/investment-profile", authenticateToken, updateInvestmentProfile);
+
+/**
+ * Notification / Email preferences
+ */
+router.get("/notification-preferences/types", authenticateToken, NotificationPreferencesController.getTypes);
+router.get("/notification-preferences", authenticateToken, NotificationPreferencesController.getPreferences);
+router.patch("/notification-preferences", authenticateToken, NotificationPreferencesController.updatePreferences);
 
 /**
  * Public & Completion Routes
