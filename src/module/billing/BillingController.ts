@@ -470,6 +470,7 @@ export class BillingController {
       const fromDate = req.query.fromDate as string | undefined;
       const toDate = req.query.toDate as string | undefined;
       const search = req.query.search as string | undefined;
+      const creditsOnly = req.query.creditsOnly === 'true' || req.query.creditsOnly === '1';
 
       const result = await BillingService.getBillingHistory(
         userId.toString(), 
@@ -477,7 +478,8 @@ export class BillingController {
         limit,
         fromDate,
         toDate,
-        search
+        search,
+        creditsOnly
       );
       return ApiResponse.success(res, result.data);
     } catch (error: any) {

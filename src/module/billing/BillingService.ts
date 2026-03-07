@@ -689,15 +689,16 @@ export class BillingService {
     limit: number = 10,
     fromDate?: string,
     toDate?: string,
-    search?: string
+    search?: string,
+    creditsOnly?: boolean
   ) {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // Show transactions where current user is sender (from_id) or receiver (to_id), including service_fee (platform fee when payment is released)
-    const baseWhere: any = {
-      OR: [{ from_id: userIdNum }, { to_id: userIdNum }]
-    };
+    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0. Otherwise show all.
+    const baseWhere: any = creditsOnly
+      ? { to_id: userIdNum, amount: { gte: 0 } }
+      : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }] };
     if (fromDate || toDate) {
       baseWhere.created_at = {};
       if (fromDate) baseWhere.created_at.gte = new Date(fromDate);
