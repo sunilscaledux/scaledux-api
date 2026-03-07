@@ -23,6 +23,7 @@ export async function createProposal(req: Request, res: Response) {
     cover_letter, 
     proposed_amount, 
     payment_schedule, 
+    hours_required,
     milestones, 
     screening_answers,
     attachments 
@@ -58,6 +59,7 @@ export async function createProposal(req: Request, res: Response) {
     cover_letter,
     proposed_amount: parseFloat(proposed_amount),
     payment_schedule: payment_schedule || 'byProject',
+    hours_required: hours_required != null ? (typeof hours_required === 'number' ? hours_required : parseFloat(hours_required)) : undefined,
     milestones: milestones || [],
     screening_answers: screening_answers || [],
     attachments: attachments || []
@@ -196,6 +198,7 @@ export async function updateProposal(req: Request, res: Response) {
     cover_letter,
     proposed_amount,
     payment_schedule,
+    hours_required,
     milestones,
     screening_answers,
     attachments
@@ -231,6 +234,7 @@ export async function updateProposal(req: Request, res: Response) {
     cover_letter,
     proposed_amount: parseFloat(proposed_amount),
     payment_schedule: payment_schedule || 'byProject',
+    hours_required: hours_required != null ? (typeof hours_required === 'number' ? hours_required : parseFloat(hours_required)) : undefined,
     milestones: milestones || [],
     screening_answers: screening_answers || [],
     attachments: attachments || []

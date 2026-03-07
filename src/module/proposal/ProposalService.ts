@@ -381,8 +381,8 @@ export class ProposalService {
             console.error('Deliverable deleteMany error:', err);
           }
         }
-      } catch (_) {
-        // ignore if table missing or constraint name differs
+      } catch (err) {
+        console.error(`Milestone sync failed for proposal_id=${proposalId} order_index=${i}:`, err);
       }
     }
   }
@@ -1069,7 +1069,8 @@ export class ProposalService {
           payment_schedule: data.payment_schedule,
           ...(hoursRequired !== undefined && { hours_required: hoursRequired }),
           screening_answers: data.screening_answers,
-          attachments: data.attachments
+          attachments: data.attachments,
+          remark: null // Clear "message from client" when freelancer updates proposal
         }
       });
       await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones);
