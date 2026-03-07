@@ -1,8 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import mailConfig from '@config/mail';
 
 export interface TemplateVariables {
   [key: string]: string | number | boolean;
+}
+
+/** Layout variables filled from env when using base layout (so {{HEADER_TITLE}}, {{FOOTER_MESSAGE}}, etc. are never raw) */
+function getLayoutDefaultsFromEnv(variables: TemplateVariables): TemplateVariables {
+  return {
+    COMPANY_NAME: mailConfig.COMPANY_NAME,
+    FOOTER_MESSAGE: mailConfig.FOOTER_MESSAGE,
+    FOOTER_NOTE: mailConfig.FOOTER_NOTE,
+    HEADER_TITLE: variables.HEADER_TITLE ?? variables.TITLE ?? 'Notification',
+  };
 }
 
 export interface EmailTemplate {
@@ -40,12 +51,14 @@ class TemplateService {
       // Replace variables in template content
       templateContent = this.replaceVariables(templateContent, variables);
 
-      // If using layout, wrap content in base layout
+      // If using layout, wrap content in base layout (layout vars from env so {{HEADER_TITLE}}, {{FOOTER_MESSAGE}}, etc. are always replaced)
       if (useLayout) {
         const layoutContent = fs.readFileSync(this.baseLayoutPath, 'utf8');
+        const layoutDefaults = getLayoutDefaultsFromEnv(variables);
         const layoutVariables = {
+          ...layoutDefaults,
           ...variables,
-          CONTENT: templateContent // this will inject in layout as main content
+          CONTENT: templateContent
         };
         return this.replaceVariables(layoutContent, layoutVariables);
       }

@@ -8,6 +8,11 @@ export interface EmailOptions {
   subject: string;
   html?: string;
   text?: string;
+  /** Optional. If omitted, uses ZEPTO_FROM_EMAIL / ZEPTO_FROM_NAME from config */
+  from?: {
+    address: string;
+    name?: string;
+  };
 }
 
 class EmailService {
@@ -41,10 +46,12 @@ class EmailService {
     }
 
     try {
+      const fromAddress = options.from?.address ?? mailConfig.ZEPTO_FROM_EMAIL ?? "test@scaledux.com";
+      const fromName = options.from?.name ?? mailConfig.ZEPTO_FROM_NAME ?? "";
       const mailData = {
         from: {
-          address: mailConfig.ZEPTO_FROM_EMAIL || "test@scaledux.com",
-          name: mailConfig.ZEPTO_FROM_NAME,
+          address: fromAddress,
+          name: fromName,
         },
         to: [
           {
