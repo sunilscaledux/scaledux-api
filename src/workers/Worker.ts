@@ -1,9 +1,13 @@
 import { Worker, Job } from 'bullmq';
-import { JobMetadata, getJobHandler, getRegisteredJobTypes } from '../jobs/BaseJob';
-import '../jobs/GenerateInvoiceJob'; // Auto-registers via @Job() decorator
-import '../jobs/SendNotificationJob';
+import { JobMetadata, getJobHandler, getRegisteredJobTypes, registerJobHandler } from '../jobs/BaseJob';
+import { GenerateInvoiceJob } from '../jobs/GenerateInvoiceJob';
+import { SendNotificationJob } from '../jobs/SendNotificationJob';
 import { mainQueue } from '../queues/Queue';
 import { defaultWorkerConfig } from '../config/queue';
+
+// Explicit registration so handlers are always available (avoids "No handler found" if worker started before job was added)
+registerJobHandler(GenerateInvoiceJob);
+registerJobHandler(SendNotificationJob);
 
 
 const mainWorker = new Worker<JobMetadata>(

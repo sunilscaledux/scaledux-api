@@ -167,7 +167,7 @@ export class ProposalService {
       proposed_amount: number;
       payment_schedule: string;
       hours_required?: number | null;
-      milestones: any[];
+      milestones?: any[];
       screening_answers: any[];
       attachments: string[];
     }
@@ -228,14 +228,14 @@ export class ProposalService {
           proposed_amount: data.proposed_amount,
           payment_schedule: data.payment_schedule,
           hours_required: hoursRequired,
-          milestones: [],
+          // milestones: [],
           screening_answers: data.screening_answers,
           attachments: attachmentPaths,
           status: 'PENDING'
         }
       });
 
-      await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, data.milestones);
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, data.milestones ?? []);
 
       // Check if user was invited to this project and update status to ACCEPTED
       const invite = await (prisma as any).projectInvite.findFirst({
@@ -1046,7 +1046,7 @@ export class ProposalService {
       proposed_amount: number;
       payment_schedule: string;
       hours_required?: number | null;
-      milestones: any[];
+      milestones?: any[];
       screening_answers: any[];
       attachments: string[];
     }
@@ -1096,7 +1096,7 @@ export class ProposalService {
           remark: null // Clear "message from client" when freelancer updates proposal
         }
       });
-      await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones);
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones ?? []);
 
       if (proposal.project?.id != null && proposal.project?.user_id != null) {
         const projectTitle = proposal.project.project_title || "Project";
@@ -1149,6 +1149,7 @@ export class ProposalService {
           project: {
             select: {
               id: true,
+              unique_id: true,
               user_id: true,
               project_title: true
             }
@@ -1210,6 +1211,34 @@ export class ProposalService {
         proposal.project.id,
         proposal.project.user_id
       );
+
+      const projectTitle = proposal.project.project_title || 'Project';
+      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${proposal.project.unique_id}`;
+      if (status === 'ACCEPTED') {
+        await queueNotification({
+          userId: proposal.provider_id,
+          type: 'PROPOSAL_ACCEPTED',
+          notificationTitle: 'Proposal accepted',
+          notificationBody: `Your proposal for "${projectTitle}" was accepted.`,
+          notificationLink,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
+      } else {
+        await queueNotification({
+          userId: proposal.provider_id,
+          type: 'PROPOSAL_REJECTED',
+          notificationTitle: 'Proposal rejected',
+          notificationBody: rejectionReason?.trim()
+            ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionReason.trim()}`
+            : `Your proposal for "${projectTitle}" was rejected.`,
+          notificationLink,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
+      }
 
       return {
         success: true,

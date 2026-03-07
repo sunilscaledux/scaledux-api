@@ -14,7 +14,10 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'NO_INTERVIEWS_INITIATED', label: 'No interviews have been initiated', category: 'Recruiting' },
   // Proposals
   { type: 'PROJECT_INVITATION', label: 'Project invitation', category: 'Proposals' },
+  { type: 'INVITATION_ACCEPTED', label: 'An invitation is accepted', category: 'Proposals' },
+  { type: 'INVITATION_REJECTED', label: 'An invitation is rejected', category: 'Proposals' },
   { type: 'PROPOSAL_RECEIVED', label: 'A proposal is received', category: 'Proposals' },
+  { type: 'PROPOSAL_ACCEPTED', label: 'A proposal is accepted', category: 'Proposals' },
   { type: 'PROPOSAL_REJECTED', label: 'A proposal is rejected', category: 'Proposals' },
   { type: 'JOB_APPLIED_CANCELLED_OR_CLOSED', label: 'A job I applied to has been cancelled or closed', category: 'Proposals' },
   { type: 'PROPOSAL_WITHDRAWN', label: 'A proposal is withdrawn', category: 'Proposals' },

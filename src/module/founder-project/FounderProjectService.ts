@@ -1208,6 +1208,18 @@ export class FounderProjectService {
         userId
       );
 
+      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      await queueNotification({
+        userId: project.user_id,
+        type: 'INVITATION_REJECTED',
+        notificationTitle: 'Invitation declined',
+        notificationBody: `A freelancer declined your invitation for "${projectTitle}".`,
+        notificationLink,
+        actorId: userId,
+        subjectType: 'FounderProject',
+        subjectId: project.id
+      });
+
       return {
         success: true,
         message: "Invitation rejected successfully"
@@ -1266,6 +1278,18 @@ export class FounderProjectService {
         userId
       );
       await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
+
+      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      await queueNotification({
+        userId: project.user_id,
+        type: 'INVITATION_ACCEPTED',
+        notificationTitle: 'Invitation accepted',
+        notificationBody: `A freelancer accepted your invitation for "${projectTitle}".`,
+        notificationLink,
+        actorId: userId,
+        subjectType: 'FounderProject',
+        subjectId: project.id
+      });
 
       return { success: true, message: "Invitation accepted successfully" };
     } catch (error: any) {

@@ -34,6 +34,11 @@ export function Job() {
   };
 }
 
+/** Explicitly register a job class (use in worker so handler is always registered). */
+export function registerJobHandler(JobClass: JobClass<any>): void {
+  jobHandlers.set(JobClass.name, JobClass);
+}
+
 // Get handler instance by class name
 export function getJobHandler(className: string): JobHandler<any> | null {
   const HandlerClass = jobHandlers.get(className);

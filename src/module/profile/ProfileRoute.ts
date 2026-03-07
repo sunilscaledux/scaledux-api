@@ -7,6 +7,7 @@ import { FundingRoundController } from "./FundingRoundController";
 import { RaisingFundController } from "./RaisingFundController";
 import { getInvestmentProfile, updateInvestmentProfile } from "./InvestmentProfileController";
 import { NotificationPreferencesController } from "./NotificationPreferencesController";
+import { NotificationController as InAppNotificationController } from "../notification/NotificationController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -125,6 +126,15 @@ router.patch("/investment-profile", authenticateToken, updateInvestmentProfile);
 router.get("/notification-preferences/types", authenticateToken, NotificationPreferencesController.getTypes);
 router.get("/notification-preferences", authenticateToken, NotificationPreferencesController.getPreferences);
 router.patch("/notification-preferences", authenticateToken, NotificationPreferencesController.updatePreferences);
+
+/**
+ * In-app notifications (list, mark read, delete)
+ */
+router.get("/notifications/unread-count", authenticateToken, InAppNotificationController.getUnreadCount);
+router.patch("/notifications/read-all", authenticateToken, InAppNotificationController.markAllAsRead);
+router.get("/notifications", authenticateToken, InAppNotificationController.list);
+router.patch("/notifications/:id/read", authenticateToken, InAppNotificationController.markAsRead);
+router.delete("/notifications/:id", authenticateToken, InAppNotificationController.remove);
 
 /**
  * Public & Completion Routes
