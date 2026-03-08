@@ -30,7 +30,7 @@ import reviewRoutes from './module/review/ReviewRoute';
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
 import { connectMongo } from '@services/mongoService';
-import { startScheduledTerminationCron } from './jobs/scheduledTerminationJob';
+import { startSchedule } from "./schedule/schedule";
 
 // Worker runs in a separate process on port 8000: npm run worker
 
@@ -83,7 +83,7 @@ async function start() {
   }
   httpServer.listen(PORT, () => {
     console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
-    startScheduledTerminationCron();
+    startSchedule();
   });
 }
 
