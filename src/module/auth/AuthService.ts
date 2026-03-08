@@ -194,6 +194,26 @@ export async function revokeAllOtherDevices(
   return { success: true, message: "All other devices logged out", deviceIds };
 }
 
+/**
+ * Revoke all devices for a user; returns their ids so caller can emit session_revoked_many (e.g. on deactivate).
+ */
+export async function revokeAllDevices(
+  userId: number
+): Promise<{ deviceIds: number[] }> {
+  const devices = await prisma.loginDevice.findMany({
+    where: { user_id: userId, deleted_at: null },
+    select: { id: true },
+  });
+  const deviceIds = devices.map((d) => d.id);
+  if (deviceIds.length > 0) {
+    await prisma.loginDevice.updateMany({
+      where: { id: { in: deviceIds } },
+      data: { deleted_at: new Date() },
+    });
+  }
+  return { deviceIds };
+}
+
 export async function checkUserExists(input: string): Promise<boolean> {
   const existingUser = await prisma.user.findFirst({
     where: {

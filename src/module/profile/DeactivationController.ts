@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { ApiResponse } from "@utils/ApiResponse";
 import * as DeactivationService from "./DeactivationService";
-import { prisma } from "@services/prismaService";
+import { revokeAllDevices } from "@module/auth/AuthService";
+import { emitSessionRevokedMany } from "@module/auth/authSocket";
 
 const clearAuthCookieOpts = { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" };
 
@@ -16,16 +17,12 @@ export async function confirmDeactivate(req: Request, res: Response) {
     const result = await DeactivationService.confirmDeactivateWithPassword(userId, password);
     if (!result.success) return ApiResponse.error(res, result.message, 400);
 
-    // Deactivation = logout: clear auth cookies and soft-delete current device
+    // Revoke all devices (same as logout-all); notify connected clients via existing socket
+    const { deviceIds } = await revokeAllDevices(userId);
+    if (deviceIds.length > 0) await emitSessionRevokedMany(userId, deviceIds);
+
     res.clearCookie("auth_token", clearAuthCookieOpts);
-    const refreshToken = req.cookies?.refresh_token;
-    if (refreshToken) {
-      res.clearCookie("refresh_token", clearAuthCookieOpts);
-      await prisma.loginDevice.updateMany({
-        where: { refresh_token: refreshToken },
-        data: { deleted_at: new Date() },
-      });
-    }
+    res.clearCookie("refresh_token", clearAuthCookieOpts);
 
     return ApiResponse.success(res, result.data, result.message);
   } catch (e: any) {
