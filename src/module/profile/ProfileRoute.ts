@@ -8,6 +8,7 @@ import { RaisingFundController } from "./RaisingFundController";
 import { getInvestmentProfile, updateInvestmentProfile } from "./InvestmentProfileController";
 import { NotificationPreferencesController } from "./NotificationPreferencesController";
 import { NotificationController as InAppNotificationController } from "../notification/NotificationController";
+import * as DeactivationController from "./DeactivationController";
 import { authenticateToken } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
@@ -138,6 +139,14 @@ router.patch("/notifications/read-all", authenticateToken, InAppNotificationCont
 router.get("/notifications", authenticateToken, InAppNotificationController.list);
 router.patch("/notifications/:id/read", authenticateToken, InAppNotificationController.markAsRead);
 router.delete("/notifications/:id", authenticateToken, InAppNotificationController.remove);
+
+/**
+ * Account deactivation (password confirm → logout) and delete (password confirm → schedule only)
+ */
+router.post("/deactivate/confirm", authenticateToken, DeactivationController.confirmDeactivate);
+router.post("/delete/schedule", authenticateToken, DeactivationController.scheduleDelete);
+router.get("/deactivation-status", authenticateToken, DeactivationController.getDeactivationStatus);
+router.post("/delete/cancel", authenticateToken, DeactivationController.cancelDeactivation);
 
 /**
  * Public & Completion Routes

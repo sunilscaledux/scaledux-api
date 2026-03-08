@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
-import { getFileUrl, getRelativePath } from '@utils/General';
+import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { ulid } from 'ulid';
 import { updateCompletionSection } from './ProfileCompletionService';
@@ -39,7 +39,15 @@ export class PersonalInfoService {
         };
       }
 
+      if ((user as { is_deactivated?: boolean }).is_deactivated) {
+        return {
+          success: false,
+          message: 'Profile not found',
+        };
+      }
+
       const profile = user.personalInfo;
+      const { firstName, lastName } = getDisplayName(user as { first_name: string; last_name?: string | null; is_deactivated?: boolean });
 
       // Return public profile data (hide sensitive information)
       const publicProfile = {
@@ -59,8 +67,8 @@ export class PersonalInfoService {
         state: profile.state,
         currency: user.currency,
         role: user.role,
-        firstName: user.first_name,
-        lastName: user.last_name ? `${user.last_name.charAt(0)}.` : null,
+        firstName,
+        lastName,
         // Only show email/phone if not hidden
         email: profile.hideEmail ? null : user.email,
         phone: profile.hidePhone ? null : user.phone,
@@ -143,8 +151,7 @@ export class PersonalInfoService {
         currency: profile.user.currency,
         // User account data (from User table)
         role: profile.user.role, // User's role from backend
-        firstName: profile.user.first_name,
-        lastName: profile.user.last_name,
+        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,
@@ -540,6 +547,29 @@ export class PersonalInfoService {
     } catch (error: any) {
       console.error('Set Password Error:', error);
       return { success: false, message: 'Failed to set password' };
+    }
+  }
+
+  /**
+   * Verify user password (for sensitive actions like deactivate/delete).
+   * Returns success: false with message if no password set or password incorrect.
+   */
+  static async verifyPassword(userId: number, password: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, password: true },
+      });
+      if (!user) return { success: false, message: 'User not found' };
+      if (!user.password) {
+        return { success: false, message: 'Please set a password first. You signed in with Google or LinkedIn.' };
+      }
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) return { success: false, message: 'Incorrect password' };
+      return { success: true, message: 'OK', data: null };
+    } catch (error: any) {
+      console.error('Verify Password Error:', error);
+      return { success: false, message: 'Failed to verify password' };
     }
   }
 

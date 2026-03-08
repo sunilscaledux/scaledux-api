@@ -70,6 +70,8 @@ model User {
   sentMessages                 Message[]
   loginDevices                 LoginDevice[]
   notifications                Notification[]
+  is_deactivated               Boolean   @default(false)
+  scheduleTermination          ScheduleTermination?
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -988,6 +990,18 @@ enum OtpType {
   LOGIN_VERIFICATION
   FORGOT_PASSWORD_VERIFICATION
   PHONE_VERIFICATION
+  DEACTIVATE_ACCOUNT
+}
+
+model ScheduleTermination {
+  id           Int       @id @default(autoincrement())
+  user_id      Int       @unique
+  scheduled_at DateTime
+  created_at   DateTime  @default(now())
+  cancelled_at DateTime?
+  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  @@index([scheduled_at])
+  @@map("scd_schedule_termination")
 }
 
 

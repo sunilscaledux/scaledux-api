@@ -419,7 +419,7 @@ export async function userOtpLogin(
  * Clean up expired OTPs for identifier and specific type
  */
 async function cleanupExpiredOtps(
-  identifier: string, 
+  identifier: string,
   otpType?: "REGISTRATION_VERIFICATION" | "LOGIN_VERIFICATION" | "FORGOT_PASSWORD_VERIFICATION"
 ): Promise<void> {
   try {
@@ -604,7 +604,7 @@ export async function verifyOtpByType(
     });
 
     if (!otp) {
-      const typeMessages = {
+      const typeMessages: Record<string, string> = {
         REGISTRATION_VERIFICATION: "Invalid or expired OTP",
         LOGIN_VERIFICATION: "Invalid or expired OTP",
         FORGOT_PASSWORD_VERIFICATION: "Invalid or expired OTP",
@@ -636,10 +636,10 @@ export async function verifyOtpByType(
     });
 
     const verificationType = otp.email ? "Email" : "Phone";
-    const successMessages = {
+    const successMessages: Record<string, string> = {
       "REGISTRATION_VERIFICATION": `${verificationType} verified successfully`,
       "LOGIN_VERIFICATION": `${verificationType} login OTP verified successfully`,
-      "FORGOT_PASSWORD_VERIFICATION": `${verificationType} password reset OTP verified successfully`
+      "FORGOT_PASSWORD_VERIFICATION": `${verificationType} password reset OTP verified successfully`,
     };
     
     return {

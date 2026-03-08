@@ -3,6 +3,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from '../../utils/jwtUtils';
 import { prisma } from '../../services/prismaService';
 import { createLoginDevice } from './AuthService';
+import { reactivateOnLogin } from '../profile/DeactivationService';
 import axios from 'axios';
 import { ulid } from 'ulid';
 
@@ -104,6 +105,9 @@ const googleCallback = async (req: Request, res: Response) => {
 
       console.log('✅ New user created via Google OAuth:', user.email);
     }
+
+    // Auto-reactivate if they were deactivated (login = become active again)
+    await reactivateOnLogin(user.id);
 
     // Generate access token
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, false);

@@ -32,6 +32,7 @@ import {
 } from "./AuthValidation";
 import { ApiResponse } from "@utils/ApiResponse";
 import * as AuthService from "@module/auth/AuthService";
+import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { getFileUrl, normalizeContact } from '@utils/General';
 
 export async function initiateRegistration(req: Request, res: Response) {
@@ -174,6 +175,9 @@ export async function login(req: Request, res: Response) {
     if (!loginResult.success) {
       return ApiResponse.error(res, loginResult.message);
     }
+
+    // Auto-reactivate if they were deactivated (login = become active again)
+    await reactivateOnLogin(loginResult.data.id);
 
     const rememberMe = body.rememberMe || false;
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
@@ -422,6 +426,9 @@ export async function verifyOtp(req: Request, res: Response) {
           return ApiResponse.error(res, loginResult.message || "User not found");
         }
 
+        // Auto-reactivate if they were deactivated (login = become active again)
+        await reactivateOnLogin(loginResult.data.id);
+
         const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
           loginResult.data,
           false
@@ -640,6 +647,10 @@ export async function refreshAccessToken(req: Request, res: Response) {
     }
 
     const { user, newRefreshToken, expiresAt } = result.data;
+
+    // Auto-reactivate if they were deactivated (login = become active again)
+    await reactivateOnLogin(user.id);
+
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, rememberMe);
 
     res.cookie("auth_token", token, cookieOptions);

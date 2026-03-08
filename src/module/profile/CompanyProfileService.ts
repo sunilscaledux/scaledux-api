@@ -1,7 +1,7 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { ulid } from 'ulid';
-import { getFileUrl, getRelativePath } from '@utils/General';
+import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
 
 /**
  * CompanyProfileService
@@ -105,8 +105,7 @@ export class CompanyProfileService {
         currency: profile.user.currency,
         
         // User data
-        firstName: profile.user.first_name,
-        lastName: profile.user.last_name,
+        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,
@@ -137,6 +136,9 @@ export class CompanyProfileService {
       });
       if (!user) {
         return { success: false, message: 'Founder not found' };
+      }
+      if ((user as { is_deactivated?: boolean }).is_deactivated) {
+        return { success: false, message: 'Company profile not found' };
       }
 
       const profile = await prisma.companyProfile.findUnique({
@@ -206,8 +208,7 @@ export class CompanyProfileService {
         country: profile.country,
         state: profile.state,
         currency: profile.user.currency,
-        firstName: profile.user.first_name,
-        lastName: profile.user.last_name,
+        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
         email: null,
         phone: null,
         emailVerified: false,
@@ -409,8 +410,7 @@ export class CompanyProfileService {
         currency: profile.user.currency,
         
         // User data
-        firstName: profile.user.first_name,
-        lastName: profile.user.last_name,
+        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,
