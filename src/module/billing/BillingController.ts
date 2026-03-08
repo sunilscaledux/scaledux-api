@@ -32,14 +32,14 @@ export class BillingController {
   }
 
   // Verify Razorpay payment and save payment method (or record subject-based payment when subjectType + subjectId sent)
-  static async verifyAndSavePaymentMethod(req: Request, res: Response) {
+  static async verifyPaymentSignature(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
       if (!userId) {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, proposalId, subjectType, subjectId, milestoneIndex } = req.body;
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, milestoneId, subjectType, subjectId } = req.body;
 
       // Verify Razorpay signature
       const isValid = BillingService.verifyPaymentSignature({
@@ -52,19 +52,13 @@ export class BillingController {
         return ApiResponse.error(res, "Invalid payment signature", 400);
       }
 
-      // Milestone payment: proposalId + milestoneIndex (0-based)
-      const mi = milestoneIndex != null ? parseInt(milestoneIndex, 10) : NaN;
-      if (typeof proposalId === "string" && proposalId.trim() && Number.isFinite(mi) && mi >= 0) {
-        const handled = await BillingController.handleMilestonePayment(res, userId, proposalId.trim(), mi, razorpayPaymentId, razorpayOrderId);
+      // Proposal payment: pass milestoneId from frontend
+      const mid = milestoneId != null ? parseInt(milestoneId, 10) : NaN;
+      if (Number.isFinite(mid) && mid > 0) {
+        const handled = await BillingController.handleMilestonePayment(res, userId, mid, razorpayPaymentId, razorpayOrderId);
         if (handled) return;
       }
-
-      // Subject-based payment: route by subject type (Proposal, etc.)
-      const subjType = (subjectType ?? (proposalId ? "Proposal" : null)) as string | null;
-      if (subjType === "Proposal" && typeof proposalId === "string" && proposalId.trim()) {
-        const handled = await BillingController.handleProposalPayment(res, userId, proposalId.trim(), razorpayPaymentId, razorpayOrderId);
-        if (handled) return;
-      }
+      const subjType = (subjectType ?? null) as string | null;
       if (subjType && subjectId != null) {
         const handled = await BillingController.handlePaymentBySubjectType(res, userId, subjType, subjectId);
         if (handled) return;
@@ -110,113 +104,36 @@ export class BillingController {
   }
 
   /**
-   * Handle payment for subject type "Proposal": load proposal, validate, record one billing row, sync chat.
-   * Returns true if handled (response sent), false otherwise.
-   */
-  private static async handleProposalPayment(res: Response, userId: number, proposalId: string, razorpayPaymentId?: string, razorpayOrderId?: string): Promise<boolean> {
-    const proposal = await (prisma as any).proposal.findFirst({
-      where: { unique_id: proposalId },
-      include: {
-        project: { select: { id: true, user_id: true, project_title: true } }
-      }
-    });
-    if (!proposal) {
-      ApiResponse.error(res, "Proposal not found", 404);
-      return true;
-    }
-    if (proposal.project.user_id !== userId) {
-      ApiResponse.error(res, "You are not the project owner for this proposal", 403);
-      return true;
-    }
-    if (proposal.status !== 'OFFER_ACCEPTED') {
-      ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (proposal must be OFFER_ACCEPTED)", 400);
-      return true;
-    }
-    const existingHiredOrTerminating = await (prisma as any).proposal.findFirst({
-      where: {
-        project_id: proposal.project.id,
-        id: { not: proposal.id },
-        status: { in: ['HIRED', 'TERMINATING'] }
-      }
-    });
-    if (existingHiredOrTerminating) {
-      ApiResponse.error(res, "This project already has an active or terminating contract. You cannot hire until that contract is terminated or restored.", 400);
-      return true;
-    }
-
-    const amount = Number(proposal.proposed_amount) || 0;
-    if (amount <= 0) {
-      ApiResponse.error(res, "Invalid proposal amount", 400);
-      return true;
-    }
-
-    const projectTitle = proposal.project.project_title || "project";
-    const meta: Record<string, string> = razorpayPaymentId
-      ? await BillingService.fetchRazorpayPaymentMeta(razorpayPaymentId, razorpayOrderId)
-      : {};
-    const payResult = await BillingService.recordPayment({
-      actorId: proposal.project.user_id,
-      fromId: proposal.project.user_id,
-      toId: proposal.provider_id,
-      subjectType: "Proposal",
-      subjectId: proposal.id,
-      amount,
-      description: `Payment for ${projectTitle}`,
-      meta: Object.keys(meta).length ? meta : undefined,
-      status: 'pending'
-    });
-    const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
-
-    const messageContent = "Funded milestone";
-    const metadata: Record<string, unknown> = {
-      activityType: "payment_release",
-      activityId: proposal.unique_id,
-      projectTitle,
-      messageSent: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_SENT,
-      messageReceived: CHAT_SYSTEM_MESSAGES.PAYMENT_RELEASE_RECEIVED
-    };
-    await ConversationService.syncSystemMessage(
-      proposal.project.user_id,
-      proposal.provider_id,
-      messageContent,
-      metadata,
-      proposal.project.id,
-      proposal.project.user_id
-    );
-
-    // Mark proposal as HIRED after successful payment
-    await (prisma as any).proposal.update({
-      where: { id: proposal.id },
-      data: { status: 'HIRED' }
-    });
-
-    await createProposalActivity(proposal.unique_id, 'HIRE_PAYMENT', { amount, transactionId: transactionUniqueId }, userId);
-
-    ApiResponse.success(res, { proposalPayment: true }, "Payment recorded and synced to chat");
-    return true;
-  }
-
-  /**
-   * Handle milestone payment: pay one milestone; set HIRED on first milestone pay.
+   * Handle milestone payment: pay one milestone by id; set HIRED on first milestone pay.
    * Second milestone Pay is only allowed after first is completed.
    */
   private static async handleMilestonePayment(
     res: Response,
     userId: number,
-    proposalId: string,
-    milestoneIndex: number,
+    milestoneId: number,
     razorpayPaymentId?: string,
     razorpayOrderId?: string
   ): Promise<boolean> {
-    const proposal = await (prisma as any).proposal.findFirst({
-      where: { unique_id: proposalId },
+    const milestoneRow = await (prisma as any).milestone.findUnique({
+      where: { id: milestoneId },
       include: {
-        project: { select: { id: true, user_id: true, project_title: true } },
-        milestonesRows: { orderBy: { order_index: "asc" } }
+        proposal: {
+          include: {
+            project: { select: { id: true, user_id: true, project_title: true } },
+            milestonesRows: { orderBy: { order_index: "asc" } }
+          }
+        }
       }
     });
-    if (!proposal) {
-      ApiResponse.error(res, "Proposal not found", 404);
+    if (!milestoneRow?.proposal) {
+      ApiResponse.error(res, "Milestone not found", 404);
+      return true;
+    }
+    const proposal = milestoneRow.proposal;
+    const rows = proposal.milestonesRows ?? [];
+    const milestoneIndex = rows.findIndex((r: any) => r.id === milestoneId);
+    if (milestoneIndex < 0) {
+      ApiResponse.error(res, "Milestone not found for this proposal", 400);
       return true;
     }
     if (proposal.project.user_id !== userId) {
@@ -244,12 +161,6 @@ export class BillingController {
         return true;
       }
     }
-    const rows = proposal.milestonesRows ?? [];
-    if (milestoneIndex < 0 || milestoneIndex >= rows.length) {
-      ApiResponse.error(res, "Invalid milestone index", 400);
-      return true;
-    }
-    const milestoneRow = rows[milestoneIndex];
     const amount = Number(milestoneRow?.amount ?? 0) || 0;
     if (amount <= 0) {
       ApiResponse.error(res, "Invalid milestone amount", 400);
@@ -275,7 +186,7 @@ export class BillingController {
       description: `Payment for ${projectTitle}: ${milestoneTitle}`,
       meta,
       status: 'pending',
-      milestoneId: milestoneRow?.id ?? null
+      milestoneId: milestoneRow.id
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
 
@@ -309,8 +220,6 @@ export class BillingController {
         data: { is_approved: true }
       });
 
-      // Auto-adjust each milestone's due_date: preserve the original offset
-      // (due_date - created_at) and apply it from the hire date.
       for (const row of rows) {
         if (row.due_date) {
           const created = new Date(row.created_at);
@@ -326,13 +235,10 @@ export class BillingController {
       }
     }
 
-    // Update milestone payment_status to FUNDED (money in escrow; RELEASED when founder releases after work approved)
-    if (milestoneRow?.id) {
-      await (prisma as any).milestone.update({
-        where: { id: milestoneRow.id },
-        data: { payment_status: "FUNDED" }
-      });
-    }
+    await (prisma as any).milestone.update({
+      where: { id: milestoneRow.id },
+      data: { payment_status: "FUNDED" }
+    });
 
     await createProposalActivity(proposal.unique_id, 'MILESTONE_PAYMENT', {
       milestoneIndex,

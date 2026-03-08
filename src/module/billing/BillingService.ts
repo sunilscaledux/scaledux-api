@@ -354,6 +354,9 @@ export class BillingService {
   }) {
     const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed', milestoneId } = params;
     const currencyId = 1;
+    // When fund loaded (pending): sender = funded, receiver = pending. When completed: both completed.
+    const senderStatus = status === 'pending' ? 'funded' : status;
+    const receiverStatus = status === 'pending' ? 'pending' : status;
 
     const row = await (prisma as any).billingTransaction.create({
       data: {
@@ -370,8 +373,8 @@ export class BillingService {
         currency_id: currencyId,
         type: 'payment',
         status,
-        sender_status: status,
-        receiver_status: status,
+        sender_status: senderStatus,
+        receiver_status: receiverStatus,
         description,
         meta: meta ? (meta as object) : undefined
       }
@@ -379,12 +382,14 @@ export class BillingService {
     if (status === 'completed') {
       await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
     } else if (status === 'pending' && toId > 0) {
-      // Founder funded milestone: add full amount to freelancer's pending (to be received)
       await prisma.user.update({
         where: { id: toId },
         data: { pending_amount: { increment: Number(amount) } },
       });
     }
+    
+    // Invoice as soon as payment is recorded (founder amount already deducted)
+    await this.createInvoicesForTransaction(row.id);
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
@@ -406,6 +411,7 @@ export class BillingService {
       where: { id: tx.id },
       data: { status: 'completed', sender_status: 'completed', receiver_status: 'completed' }
     });
+    await this.createInvoicesForTransaction(tx.id);
     const amount = Number(tx.amount);
     const feePercent = Math.min(100, Math.max(0, Number(process.env.SERVICE_FEE_PERCENT) || 10));
     const netAmount = Math.round(amount * (1 - feePercent / 100) * 100) / 100;
@@ -1040,15 +1046,14 @@ export class BillingService {
     }
   }
 
-  /** Ensure an Invoice row exists for this transaction + party (for client-side PDF). Creates if missing. */
-  static async ensureInvoiceForTransaction(transactionId: number, party: 'payer' | 'receiver') {
+  /** Create payer + receiver Invoice rows as soon as payment is recorded/released. No-op if both exist. */
+  static async createInvoicesForTransaction(transactionId: number) {
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { id: transactionId },
       include: { currency: true, payer_invoice: true, receiver_invoice: true }
     });
-    if (!transaction) throw new Error('Transaction not found');
-    const existing = party === 'payer' ? transaction.payer_invoice : transaction.receiver_invoice;
-    if (existing) return existing;
+    if (!transaction || transaction.type !== 'payment') return;
+    if (transaction.payer_invoice && transaction.receiver_invoice) return;
 
     const users = await (prisma as any).user.findMany({
       where: { id: { in: [transaction.from_id, transaction.to_id] } },
@@ -1060,30 +1065,58 @@ export class BillingService {
     const toUser = users.find((u: any) => u.id === transaction.to_id);
     const senderName = fromUser ? name(fromUser) : `User ${transaction.from_id}`;
     const receiverName = toUser ? name(toUser) : `User ${transaction.to_id}`;
-    const invoiceNumber = `INV-${transaction.unique_id}-${party}`;
+    const amount = parseFloat(transaction.amount.toString());
+    const currencyCode = transaction.currency?.code ?? 'INR';
+    const meta = transaction.meta ?? undefined;
 
-    const invoice = await (prisma as any).invoice.create({
-      data: {
-        billing_transaction_id: transactionId,
-        party,
-        sender_name: senderName,
-        receiver_name: receiverName,
-        amount: parseFloat(transaction.amount.toString()),
-        currency_code: transaction.currency?.code ?? 'INR',
-        description: transaction.description,
-        invoice_number: invoiceNumber,
-        meta: transaction.meta ?? undefined
-      }
-    });
+    let payerInvoiceId = transaction.payer_invoice?.id ?? null;
+    let receiverInvoiceId = transaction.receiver_invoice?.id ?? null;
 
-    await (prisma as any).billingTransaction.update({
-      where: { id: transactionId },
-      data: party === 'payer' ? { payer_invoice_id: invoice.id } : { receiver_invoice_id: invoice.id }
-    });
-    return invoice;
+    if (!payerInvoiceId) {
+      const payerInv = await (prisma as any).invoice.create({
+        data: {
+          billing_transaction_id: transactionId,
+          party: 'payer',
+          sender_name: senderName,
+          receiver_name: receiverName,
+          amount,
+          currency_code: currencyCode,
+          description: transaction.description,
+          invoice_number: `INV-${transaction.unique_id}-payer`,
+          meta
+        }
+      });
+      payerInvoiceId = payerInv.id;
+    }
+    if (!receiverInvoiceId) {
+      const receiverInv = await (prisma as any).invoice.create({
+        data: {
+          billing_transaction_id: transactionId,
+          party: 'receiver',
+          sender_name: senderName,
+          receiver_name: receiverName,
+          amount,
+          currency_code: currencyCode,
+          description: transaction.description,
+          invoice_number: `INV-${transaction.unique_id}-receiver`,
+          meta
+        }
+      });
+      receiverInvoiceId = receiverInv.id;
+    }
+
+    const updateData: Record<string, number> = {};
+    if (!transaction.payer_invoice_id && payerInvoiceId) updateData.payer_invoice_id = payerInvoiceId;
+    if (!transaction.receiver_invoice_id && receiverInvoiceId) updateData.receiver_invoice_id = receiverInvoiceId;
+    if (Object.keys(updateData).length > 0) {
+      await (prisma as any).billingTransaction.update({
+        where: { id: transactionId },
+        data: updateData
+      });
+    }
   }
 
-  /** Get invoice data for client-side PDF generation. Ensures Invoice exists, returns JSON (no file). */
+  /** Get invoice data for client-side PDF. Uses existing Invoice (created at payment time); fallback create for legacy. */
   static async getInvoiceData(uniqueId: string, userId: number) {
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: uniqueId },
@@ -1097,8 +1130,14 @@ export class BillingService {
     const party = isPayer ? 'payer' : 'receiver';
     let invoice = isPayer ? transaction.payer_invoice : transaction.receiver_invoice;
     if (!invoice) {
-      invoice = await this.ensureInvoiceForTransaction(transaction.id, party);
+      await this.createInvoicesForTransaction(transaction.id);
+      const refreshed = await (prisma as any).billingTransaction.findUnique({
+        where: { id: transaction.id },
+        include: { payer_invoice: true, receiver_invoice: true }
+      });
+      invoice = party === 'payer' ? refreshed?.payer_invoice : refreshed?.receiver_invoice;
     }
+    if (!invoice) return { success: false as const, message: 'Invoice not found' };
     return {
       success: true as const,
       data: {

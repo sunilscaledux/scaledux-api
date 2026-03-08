@@ -16,7 +16,7 @@ router.post(
 
 router.post(
   "/verify-payment",
-  BillingController.verifyAndSavePaymentMethod
+  BillingController.verifyPaymentSignature
 );
 
 // Payment Method Routes
