@@ -14,7 +14,7 @@ export type JobClass<T = any> = new () => JobHandler<T>;
 
 // Job metadata for queue processing (stores class name, not instance)
 export interface JobMetadata<T = any> {
-  jobClass: string;     // Class name (e.g., 'GenerateInvoiceJob')
+  jobClass: string;     // Class name (e.g., 'SendEmailJob')
   data: T;              // The actual job data
   jobId?: string;       // Optional unique job ID
   priority?: number;    // Job priority

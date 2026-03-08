@@ -647,31 +647,23 @@ export class BillingController {
     }
   }
 
-  // Download invoice PDF
-  static async downloadInvoice(req: Request, res: Response) {
+  /** Return invoice data as JSON for client-side PDF generation (realtime). */
+  static async getInvoiceData(req: Request, res: Response) {
     try {
       const { uniqueId } = req.params;
-
       if (!uniqueId || Array.isArray(uniqueId)) {
         return ApiResponse.error(res, "Transaction ID is required", 400);
       }
-
-      const result = await BillingService.getInvoicePath(uniqueId as string);
-
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+      const result = await BillingService.getInvoiceData(uniqueId as string, userId);
       if (!result.success) {
         return ApiResponse.error(res, result.message, 404);
       }
-
-      // Send PDF file
-      res.download(result.path!, `invoice-${uniqueId}.pdf`, (err) => {
-        if (err) {
-          console.error("Error downloading invoice:", err);
-          return ApiResponse.error(res, "Failed to download invoice");
-        }
-      });
+      return ApiResponse.success(res, result.data, "OK");
     } catch (error: any) {
-      console.error("Error downloading invoice:", error);
-      return ApiResponse.error(res, error.message || "Failed to download invoice");
+      console.error("Error getting invoice data:", error);
+      return ApiResponse.error(res, error.message || "Failed to get invoice data");
     }
   }
 }

@@ -1225,15 +1225,29 @@ model BillingTransaction {
   type            String   @db.VarChar(30) // payment, refund, withdrawal
   status          String   @db.VarChar(20) // pending, completed, failed
 
+  /** Payer (from_id) view status; UI shows this when current user is payer */
+  sender_status   String?  @db.VarChar(20) // pending, completed, failed
+  /** Receiver (to_id) view status; UI shows this when current user is receiver */
+  receiver_status String?  @db.VarChar(20)
+  /** Admin-only internal status: e.g. loaded, sent_to_freelancer, success */
+  admin_status    String?  @db.VarChar(30)
+
   description     String   @db.Text
-  invoice_url     String?  @db.VarChar(500)
-  meta            Json?    // e.g. { razorpay_payment_id, razorpay_order_id, ... }
+  invoice_url     String?  @db.VarChar(500) // deprecated: use Invoice table
+  meta            Json?    // deprecated: store in Invoice.meta; kept for backward compat
 
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
+  /** Payer's invoice (founder side); set when invoice is generated for payer */
+  payer_invoice_id   Int?    @unique
+  /** Receiver's invoice (freelancer side); set when invoice is generated for receiver */
+  receiver_invoice_id Int?   @unique
+
   currency Currency @relation(fields: [currency_id], references: [id], onDelete: Cascade)
   milestone Milestone? @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
+  payer_invoice   Invoice?  @relation("BillingPayerInvoice", fields: [payer_invoice_id], references: [id], onDelete: SetNull)
+  receiver_invoice Invoice? @relation("BillingReceiverInvoice", fields: [receiver_invoice_id], references: [id], onDelete: SetNull)
 
   @@index([actor_type, actor_id])
   @@index([from_type, from_id])
@@ -1244,6 +1258,34 @@ model BillingTransaction {
   @@index([created_at])
   @@index([unique_id])
   @@map("scd_billing_transactions")
+}
+
+model Invoice {
+  id                    Int      @id @default(autoincrement())
+  billing_transaction_id Int
+  /** payer | receiver - which party this invoice is for */
+  party                 String   @db.VarChar(20)
+
+  sender_name           String   @db.VarChar(255)
+  receiver_name         String   @db.VarChar(255)
+  amount                Decimal  @db.Decimal(10, 2)
+  currency_code         String   @db.VarChar(10)
+  description           String   @db.Text
+  invoice_number        String   @unique @db.VarChar(50)
+  gst_number            String?  @db.VarChar(50)
+  file_url              String?  @db.VarChar(500)
+  /** Razorpay payment/payout details; full metadata lives here */
+  meta                  Json?
+  issued_at             DateTime @default(now())
+
+  created_at            DateTime @default(now())
+
+  payer_billing_transaction   BillingTransaction? @relation("BillingPayerInvoice")
+  receiver_billing_transaction BillingTransaction? @relation("BillingReceiverInvoice")
+
+  @@index([billing_transaction_id])
+  @@index([invoice_number])
+  @@map("scd_invoices")
 }
 
 model LoginDevice {

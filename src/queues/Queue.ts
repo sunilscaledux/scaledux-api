@@ -17,7 +17,7 @@ export async function dispatch<T = any>(
   }
 ) {
   const jobMetadata: JobMetadata = {
-    jobClass: jobClass.name,  // Store class name (e.g., 'GenerateInvoiceJob')
+    jobClass: jobClass.name,  // Store class name (e.g., 'SendEmailJob')
     data,
     jobId: options?.jobId,
     priority: options?.priority,

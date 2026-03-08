@@ -1,7 +1,5 @@
 import { PrismaClient } from '@prisma/client'
 import { ulid } from 'ulid'
-import { dispatch } from '../../src/queues/Queue'
-import { GenerateInvoiceJob } from '../../src/jobs/GenerateInvoiceJob'
 
 
 const billingTransactionsData = [
@@ -127,34 +125,7 @@ export async function seedBillingData(prisma: PrismaClient) {
         invoice_url: null // Will be updated after invoice generation
       }
     })
-    
-    // Trigger invoice generation job (Laravel style - pass the class)
-    try {
-      await dispatch(GenerateInvoiceJob, {
-        transactionId: createdTransaction.id,
-        uniqueId: uniqueId,
-        amount: parseFloat(createdTransaction.amount.toString()),
-        currency: transaction.currencyCode,
-        type: createdTransaction.type,
-        status: createdTransaction.status,
-        description: createdTransaction.description,
-        createdAt: createdTransaction.created_at,
-        actorType: createdTransaction.actor_type,
-        actorId: createdTransaction.actor_id,
-        fromType: createdTransaction.from_type,
-        fromId: createdTransaction.from_id,
-        toType: createdTransaction.to_type,
-        toId: createdTransaction.to_id,
-        subjectType: createdTransaction.subject_type,
-        subjectId: createdTransaction.subject_id
-      }, {
-        jobId: `invoice-${uniqueId}`,
-        priority: 1
-      })
-      console.log(`    ✓ Transaction for user ${transaction.userId} + invoice job queued`)
-    } catch (error) {
-      console.log(`    ✓ Transaction for user ${transaction.userId} (invoice job skipped - queue not ready)`)
-    }
+    console.log(`    ✓ Transaction for user ${transaction.userId}`)
   }
 
   console.log('✅ Billing data seeding completed!')

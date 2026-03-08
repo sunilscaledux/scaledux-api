@@ -4,9 +4,6 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
 import { convertToUserCurrency } from "@utils/currencyConverter";
-import { dispatch } from "../../queues/Queue";
-import { InvoiceGenerator } from "../../services/InvoiceGenerator";
-import { GenerateInvoiceJob } from "../../jobs/GenerateInvoiceJob";
 
 // Initialize Razorpay (only if keys are provided)
 let razorpay: any = null;
@@ -373,6 +370,8 @@ export class BillingService {
         currency_id: currencyId,
         type: 'payment',
         status,
+        sender_status: status,
+        receiver_status: status,
         description,
         meta: meta ? (meta as object) : undefined
       }
@@ -403,9 +402,9 @@ export class BillingService {
     if (tx.status !== 'pending') return { success: false, message: 'Payment is already completed or not pending' };
     if (tx.from_id !== userId) return { success: false, message: 'Only the payer can release this payment' };
 
-    await prisma.billingTransaction.update({
+    await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { status: 'completed' }
+      data: { status: 'completed', sender_status: 'completed', receiver_status: 'completed' }
     });
     const amount = Number(tx.amount);
     const feePercent = Math.min(100, Math.max(0, Number(process.env.SERVICE_FEE_PERCENT) || 10));
@@ -441,6 +440,8 @@ export class BillingService {
           currency_id: tx.currency_id,
           type: 'service_fee',
           status: 'completed',
+          sender_status: 'completed',
+          receiver_status: 'completed',
           description: `Platform service fee (${feePercent}%)`,
           meta: { source_transaction_unique_id: tx.unique_id, fee_percent: feePercent }
         }
@@ -723,10 +724,12 @@ export class BillingService {
       : baseWhere;
 
     const [transactions, total] = await Promise.all([
-      prisma.billingTransaction.findMany({
+      (prisma as any).billingTransaction.findMany({
         where: whereClause,
         include: {
-          currency: true
+          currency: true,
+          payer_invoice: { select: { id: true, file_url: true } },
+          receiver_invoice: { select: { id: true, file_url: true } }
         },
         orderBy: { created_at: 'desc' },
         skip,
@@ -738,7 +741,7 @@ export class BillingService {
     ]);
 
     // Resolve client name: if to_id is me then client = from (payer), else client = to (recipient)
-    const counterpartyIds = [...new Set(transactions.map((t: any) => t.to_id === userIdNum ? t.from_id : t.to_id))];
+    const counterpartyIds = [...new Set(transactions.map((t: any) => t.to_id === userIdNum ? t.from_id : t.to_id))] as number[];
     const users = counterpartyIds.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: counterpartyIds } },
@@ -772,6 +775,10 @@ export class BillingService {
           const clientName = t.type === 'service_fee' && counterpartyId === 0
             ? 'Platform'
             : (nameByUserId[counterpartyId] ?? '—');
+          const payerInv = t.payer_invoice;
+          const receiverInv = t.receiver_invoice;
+          const invoiceUrlLegacy = t.invoice_url;
+          const invoiceUrl = isCredit ? (receiverInv?.file_url ?? invoiceUrlLegacy) : (payerInv?.file_url ?? invoiceUrlLegacy);
           return {
             id: t.id,
             uniqueId: t.unique_id,
@@ -780,8 +787,17 @@ export class BillingService {
             currencySymbol: t.currency?.symbol || '₹',
             type: t.type,
             status: t.status,
+            senderStatus: t.sender_status ?? t.status,
+            receiverStatus: t.receiver_status ?? t.status,
+            adminStatus: t.admin_status ?? null,
             description: t.description,
-            invoiceUrl: t.invoice_url,
+            invoiceUrl,
+            payerInvoiceId: payerInv?.id ?? null,
+            receiverInvoiceId: receiverInv?.id ?? null,
+            payerInvoiceUrl: payerInv?.file_url ?? null,
+            receiverInvoiceUrl: receiverInv?.file_url ?? null,
+            fromId: t.from_id,
+            toId: t.to_id,
             createdAt: t.created_at,
             direction: isCredit ? 'credit' : 'debit',
             clientName,
@@ -988,6 +1004,8 @@ export class BillingService {
         currency_id: currencyId,
         type: 'withdrawal',
         status: 'pending',
+        sender_status: 'pending',
+        receiver_status: 'pending',
         description: `Withdrawal to ${method.display_label}`,
         meta: { withdrawal_method_id: String(withdrawalMethodId) } as object
       } as any
@@ -1022,57 +1040,89 @@ export class BillingService {
     }
   }
 
-  // Trigger invoice generation for a transaction
-  static async triggerInvoiceGeneration(transactionId: number) {
-    try {
-      const transaction = await prisma.billingTransaction.findUnique({
-        where: { id: transactionId },
-        include: { currency: true }
-      });
+  /** Ensure an Invoice row exists for this transaction + party (for client-side PDF). Creates if missing. */
+  static async ensureInvoiceForTransaction(transactionId: number, party: 'payer' | 'receiver') {
+    const transaction = await (prisma as any).billingTransaction.findUnique({
+      where: { id: transactionId },
+      include: { currency: true, payer_invoice: true, receiver_invoice: true }
+    });
+    if (!transaction) throw new Error('Transaction not found');
+    const existing = party === 'payer' ? transaction.payer_invoice : transaction.receiver_invoice;
+    if (existing) return existing;
 
-      if (!transaction) {
-        throw new Error('Transaction not found');
-      }
+    const users = await (prisma as any).user.findMany({
+      where: { id: { in: [transaction.from_id, transaction.to_id] } },
+      select: { id: true, first_name: true, last_name: true }
+    });
+    const name = (u: { first_name: string | null; last_name: string | null }) =>
+      [u?.first_name, u?.last_name].filter(Boolean).join(' ').trim() || '—';
+    const fromUser = users.find((u: any) => u.id === transaction.from_id);
+    const toUser = users.find((u: any) => u.id === transaction.to_id);
+    const senderName = fromUser ? name(fromUser) : `User ${transaction.from_id}`;
+    const receiverName = toUser ? name(toUser) : `User ${transaction.to_id}`;
+    const invoiceNumber = `INV-${transaction.unique_id}-${party}`;
 
-      // Add job to queue (Laravel style - pass the class)
-      await dispatch(GenerateInvoiceJob, {
-        transactionId: transaction.id,
-        uniqueId: transaction.unique_id,
+    const invoice = await (prisma as any).invoice.create({
+      data: {
+        billing_transaction_id: transactionId,
+        party,
+        sender_name: senderName,
+        receiver_name: receiverName,
         amount: parseFloat(transaction.amount.toString()),
-        currency: transaction.currency.code,
+        currency_code: transaction.currency?.code ?? 'INR',
+        description: transaction.description,
+        invoice_number: invoiceNumber,
+        meta: transaction.meta ?? undefined
+      }
+    });
+
+    await (prisma as any).billingTransaction.update({
+      where: { id: transactionId },
+      data: party === 'payer' ? { payer_invoice_id: invoice.id } : { receiver_invoice_id: invoice.id }
+    });
+    return invoice;
+  }
+
+  /** Get invoice data for client-side PDF generation. Ensures Invoice exists, returns JSON (no file). */
+  static async getInvoiceData(uniqueId: string, userId: number) {
+    const transaction = await (prisma as any).billingTransaction.findUnique({
+      where: { unique_id: uniqueId },
+      include: { currency: true, payer_invoice: true, receiver_invoice: true }
+    });
+    if (!transaction) return { success: false as const, message: 'Transaction not found' };
+    if (transaction.from_id !== userId && transaction.to_id !== userId) {
+      return { success: false as const, message: 'Unauthorized' };
+    }
+    const isPayer = transaction.from_id === userId;
+    const party = isPayer ? 'payer' : 'receiver';
+    let invoice = isPayer ? transaction.payer_invoice : transaction.receiver_invoice;
+    if (!invoice) {
+      invoice = await this.ensureInvoiceForTransaction(transaction.id, party);
+    }
+    return {
+      success: true as const,
+      data: {
+        uniqueId: transaction.unique_id,
+        invoiceNumber: invoice.invoice_number,
+        senderName: invoice.sender_name,
+        receiverName: invoice.receiver_name,
+        amount: parseFloat(invoice.amount.toString()),
+        currencyCode: invoice.currency_code,
+        description: invoice.description,
         type: transaction.type,
         status: transaction.status,
-        description: transaction.description,
-        createdAt: transaction.created_at,
-        actorType: transaction.actor_type,
-        actorId: transaction.actor_id,
-        fromType: transaction.from_type,
-        fromId: transaction.from_id,
-        toType: transaction.to_type,
-        toId: transaction.to_id,
-        subjectType: transaction.subject_type,
-        subjectId: transaction.subject_id
-      }, {
-        jobId: `invoice-${transaction.unique_id}`,
-        priority: 1
-      });
-
-      return {
-        success: true,
-        message: 'Invoice generation job queued successfully'
-      };
-    } catch (error: any) {
-      console.error('Error triggering invoice generation:', error);
-      throw error;
-    }
+        issuedAt: invoice.issued_at,
+        meta: invoice.meta ?? undefined
+      }
+    };
   }
 
   // Get transaction detail by uniqueId; if Proposal, include milestone payments for this proposal
   static async getTransactionDetail(uniqueId: string, userId: string) {
     const userIdNum = parseInt(userId);
-    const transaction = await prisma.billingTransaction.findUnique({
+    const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: uniqueId },
-      include: { currency: true }
+      include: { currency: true, payer_invoice: { select: { id: true, file_url: true } }, receiver_invoice: { select: { id: true, file_url: true } } }
     });
     if (!transaction) {
       return { success: false, message: 'Transaction not found' };
@@ -1102,6 +1152,9 @@ export class BillingService {
     const transactionMilestoneId = (transaction as any).milestone_id as number | null | undefined;
     const milestoneIndexFallback = metaMap.milestone_index != null ? parseInt(metaMap.milestone_index, 10) : undefined;
 
+    const payerInv = transaction.payer_invoice;
+    const receiverInv = transaction.receiver_invoice;
+    const invoiceUrlForUser = isCredit ? (receiverInv?.file_url ?? transaction.invoice_url) : (payerInv?.file_url ?? transaction.invoice_url);
     const base: any = {
       id: transaction.id,
       uniqueId: transaction.unique_id,
@@ -1110,8 +1163,15 @@ export class BillingService {
       currencySymbol: transaction.currency?.symbol || '₹',
       type: transaction.type,
       status: transaction.status,
+      senderStatus: transaction.sender_status ?? transaction.status,
+      receiverStatus: transaction.receiver_status ?? transaction.status,
+      adminStatus: transaction.admin_status ?? null,
       description: transaction.description,
-      invoiceUrl: transaction.invoice_url,
+      invoiceUrl: invoiceUrlForUser,
+      payerInvoiceId: payerInv?.id ?? null,
+      receiverInvoiceId: receiverInv?.id ?? null,
+      fromId: transaction.from_id,
+      toId: transaction.to_id,
       createdAt: transaction.created_at,
       direction: isCredit ? 'credit' : 'debit',
       clientName,
@@ -1173,42 +1233,5 @@ export class BillingService {
     return { success: true, data: base };
   }
 
-  // Download invoice by transaction unique ID
-  static async getInvoicePath(uniqueId: string) {
-    try {
-      const transaction = await prisma.billingTransaction.findUnique({
-        where: { unique_id: uniqueId }
-      });
-
-      if (!transaction) {
-        return {
-          success: false,
-          message: 'Transaction not found'
-        };
-      }
-
-      // Check if invoice URL exists in database
-      if (!transaction.invoice_url) {
-        // If invoice doesn't exist, trigger generation
-        await this.triggerInvoiceGeneration(transaction.id);
-        
-        return {
-          success: false,
-          message: 'Invoice is being generated. Please try again in a few moments.'
-        };
-      }
-
-      // Convert URL to file system path
-      const invoicePath = path.join(__dirname, '../../..', transaction.invoice_url);
-      
-      return {
-        success: true,
-        path: invoicePath
-      };
-    } catch (error: any) {
-      console.error('Error getting invoice:', error);
-      throw error;
-    }
-  }
-
 }
+

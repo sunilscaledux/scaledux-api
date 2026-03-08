@@ -90,10 +90,10 @@ router.post(
   BillingController.requestWithdrawal
 );
 
-// Invoice Download Route
+// Invoice data for client-side PDF (JSON)
 router.get(
   "/invoice/:uniqueId",
-  BillingController.downloadInvoice
+  BillingController.getInvoiceData
 );
 
 export default router;
