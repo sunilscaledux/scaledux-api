@@ -7,7 +7,7 @@ import { mainQueue } from '../queues/Queue';
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath('/admin/queues');
 
-// Create Bull Board with all BullMQ queues (Laravel style - single queue)
+// Create Bull Board with all BullMQ queues
 createBullBoard({
   queues: [
     new BullMQAdapter(mainQueue) as any // Type assertion due to version compatibility

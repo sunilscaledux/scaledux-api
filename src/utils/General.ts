@@ -1,23 +1,32 @@
-// Utility function to get file URL
-export const getFileUrl = (path: string|null): string => {
-  if (!path) return "";
-  
-  // If path is already a full URL, return as is
+/**
+ * Get file URL. Uses fileConfig.default: "local" = assetUrl + path; "bunny" = Bunny CDN URL.
+ */
+export const getFileUrl = (path: string | null): string => {
+  if (!path) return '';
+
   if (path.startsWith('http://') || path.startsWith('https://')) {
     return path;
   }
-  
-  const baseUrl = process.env.ASSET_URL || 'http://127.0.0.1:4000';
-  
-  // Ensure proper URL construction without double slashes
+
+  const fileConfig = require('@config/file').default;
+  if (fileConfig.default === 'bunny') {
+    const { buildPublicUrl } = require('@config/file');
+    return buildPublicUrl(path);
+  }
+
+  const baseUrl = fileConfig.disks.local.url;
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  
   return `${cleanBaseUrl}${cleanPath}`;
 };
 
 export const getRelativePath = (path:string): string => {
  return path.replace(process.cwd() + '/', '').replace(/\\/g, '/');
+};
+
+/** Normalize path: no leading slash, forward slashes only (e.g. for storage paths) */
+export const normalizePath = (path: string): string => {
+  return path.replace(/^\/+/, '').replace(/\\/g, '/');
 };
 
 export const extractRelativePath = (urlOrPath: string): string => {

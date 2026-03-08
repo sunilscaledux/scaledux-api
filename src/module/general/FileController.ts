@@ -1,6 +1,8 @@
 import { Request, Response } from 'express'
 import { ApiResponse } from '@utils/ApiResponse'
 import { extractRelativePath, getRelativePath, getFileUrl } from '@utils/General'
+import { deletePublic } from '@services/bunnyStorageService'
+import fileConfig from '@config/file'
 import fs from 'fs'
 import path from 'path'
 
@@ -22,9 +24,9 @@ export async function uploadFile(req: Request, res: Response) {
       return ApiResponse.error(res, "No files uploaded", 400)
     }
 
-    // Process uploaded files
+    // Process uploaded files (file.path is set by multer: local path or Bunny storage path)
     const uploadedFiles = req.files.map((file: any) => {
-      const relativePath = getRelativePath(file.path)
+      const relativePath = file.path ? (fileConfig.isBunny ? file.path : getRelativePath(file.path)) : ''
       const url = getFileUrl(relativePath)
       return {
         path: relativePath,
@@ -79,21 +81,18 @@ export async function deleteFile(req: Request, res: Response) {
       return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
     }
 
-    // Construct full file system path
-    const fullPath = path.join(process.cwd(), relativePath)
-    
-    console.log("File deletion paths:", {
-      relativePath,
-      fullPath,
-      exists: fs.existsSync(fullPath)
-    })
-
-    // Check if file exists and delete it
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath)
-      console.log("File deleted successfully:", fullPath)
+    if (fileConfig.isBunny) {
+      const deleted = await deletePublic(relativePath)
+      if (!deleted) console.log("Bunny delete returned false for:", relativePath)
     } else {
-      console.log("File not found, but returning success:", fullPath)
+      const fullPath = path.join(process.cwd(), relativePath)
+      console.log("File deletion paths:", { relativePath, fullPath, exists: fs.existsSync(fullPath) })
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath)
+        console.log("File deleted successfully:", fullPath)
+      } else {
+        console.log("File not found, but returning success:", fullPath)
+      }
     }
 
     return ApiResponse.success(res, {
