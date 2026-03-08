@@ -76,6 +76,30 @@ export const updateAvailableHoursPerWeekSchema = Joi.object<AvailableHoursPerWee
   }),
 });
 
+export const updatePasswordSchema = Joi.object({
+  current_password: Joi.string().required().messages({ 'any.required': 'Current password is required' }),
+  new_password: Joi.string().min(8).required().messages({
+    'string.min': 'New password must be at least 8 characters',
+    'any.required': 'New password is required'
+  }),
+  confirm_password: Joi.string().valid(Joi.ref('new_password')).required().messages({
+    'any.only': 'Confirm password must match new password',
+    'any.required': 'Confirm password is required'
+  }),
+}).options({ stripUnknown: true });
+
+/** For Google/LinkedIn users with no password - set password without current. */
+export const setPasswordSchema = Joi.object({
+  new_password: Joi.string().min(8).required().messages({
+    'string.min': 'Password must be at least 8 characters',
+    'any.required': 'New password is required'
+  }),
+  confirm_password: Joi.string().valid(Joi.ref('new_password')).required().messages({
+    'any.only': 'Confirm password must match new password',
+    'any.required': 'Confirm password is required'
+  }),
+}).options({ stripUnknown: true });
+
 export const updateInvestorPreferencesSchema = Joi.object({
   investorTypes: Joi.array().items(Joi.string().trim()).min(1).required().messages({
     'array.min': 'Please select at least one investor type',

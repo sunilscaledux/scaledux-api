@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PersonalInfoService } from './ProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
-import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema } from './ProfileValidation';
+import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema, updatePasswordSchema, setPasswordSchema } from './ProfileValidation';
 import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
 
 export class ProfileController {
@@ -183,6 +183,69 @@ export class ProfileController {
       }
     } catch (error: any) {
       return ApiResponse.error(res, error.message || 'Failed to upload cover image');
+    }
+  }
+
+  /**
+   * Get password status (hasPassword, provider) for "Set password" vs "Change password" UI.
+   * GET /api/v1/profile/password-status
+   */
+  static async getPasswordStatus(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const result = await PersonalInfoService.getPasswordStatus(userId);
+      if (result.success && result.data) {
+        return ApiResponse.success(res, result.data, result.message);
+      }
+      return ApiResponse.error(res, result.message || 'Failed to get password status', 400);
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to get password status');
+    }
+  }
+
+  /**
+   * Set password for Google/LinkedIn users who have no password (no current password required).
+   * PATCH /api/v1/profile/set-password
+   */
+  static async setPassword(req: Request, res: Response) {
+    try {
+      const { value, error } = setPasswordSchema.validate(req.body, { abortEarly: false });
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+      const userId = req.user.id;
+      const result = await PersonalInfoService.setPassword(userId, value.new_password);
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      }
+      return ApiResponse.error(res, result.message, 400);
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to set password');
+    }
+  }
+
+  /**
+   * Update password (current password required). Use when user already has a password.
+   * PATCH /api/v1/profile/password
+   */
+  static async updatePassword(req: Request, res: Response) {
+    try {
+      const { value, error } = updatePasswordSchema.validate(req.body, { abortEarly: false });
+      if (error) {
+        return ApiResponse.joiValidationError(res, error);
+      }
+      const userId = req.user.id;
+      const result = await PersonalInfoService.updatePassword(
+        userId,
+        value.current_password,
+        value.new_password
+      );
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      }
+      return ApiResponse.error(res, result.message, 400);
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to update password');
     }
   }
 

@@ -41,6 +41,9 @@ router.post(
   ProfileController.uploadCoverImage,
   handleMulterError
 );
+router.get('/password-status', authenticateToken, ProfileController.getPasswordStatus);
+router.patch('/set-password', authenticateToken, ProfileController.setPassword);
+router.patch('/password', authenticateToken, ProfileController.updatePassword);
 router.patch('/privacy', authenticateToken, ProfileController.updatePrivacySettings);
 router.patch('/agency-settings', authenticateToken, ProfileController.updateAgencySettings);
 

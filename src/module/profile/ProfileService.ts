@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
@@ -477,6 +478,109 @@ export class PersonalInfoService {
       return {
         success: false,
         message: 'Failed to update privacy settings',
+      };
+    }
+  }
+
+  /**
+   * Get password status for current user (hasPassword, provider).
+   * Used by frontend to show "Set password" vs "Change password" form.
+   */
+  static async getPasswordStatus(userId: number): Promise<ServiceResponse & { data?: { hasPassword: boolean; provider?: string | null } }> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { password: true, provider: true },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+      const hasPassword = !!user.password;
+      return {
+        success: true,
+        message: 'OK',
+        data: { hasPassword, provider: user.provider ?? undefined },
+      };
+    } catch (error: any) {
+      console.error('Get Password Status Error:', error);
+      return { success: false, message: 'Failed to get password status' };
+    }
+  }
+
+  /**
+   * Set password for users who have none (e.g. signed up via Google/LinkedIn).
+   * Allowed only when provider is 'google' or 'linkedin' and password is null.
+   */
+  static async setPassword(userId: number, newPassword: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, password: true, provider: true },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+      if (user.password) {
+        return { success: false, message: 'You already have a password. Use change password instead.' };
+      }
+      const provider = (user.provider || '').toLowerCase();
+      if (provider !== 'google' && provider !== 'linkedin') {
+        return { success: false, message: 'Set password is only available for Google or LinkedIn sign-in accounts.' };
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
+      return {
+        success: true,
+        message: 'Password set successfully',
+        data: null,
+      };
+    } catch (error: any) {
+      console.error('Set Password Error:', error);
+      return { success: false, message: 'Failed to set password' };
+    }
+  }
+
+  /**
+   * Update user password (current password required).
+   */
+  static async updatePassword(
+    userId: number,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, password: true },
+      });
+      if (!user) {
+        return { success: false, message: 'User not found' };
+      }
+      if (!user.password) {
+        return { success: false, message: 'Password change not available for this account' };
+      }
+      const valid = await bcrypt.compare(currentPassword, user.password);
+      if (!valid) {
+        return { success: false, message: 'Current password is incorrect' };
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 12);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      });
+      return {
+        success: true,
+        message: 'Password updated successfully',
+        data: null,
+      };
+    } catch (error: any) {
+      console.error('Update Password Error:', error);
+      return {
+        success: false,
+        message: 'Failed to update password',
       };
     }
   }
