@@ -32,21 +32,35 @@ app.post('/emit', (req, res) => {
     res.status(401).json({ ok: false, error: 'Unauthorized' });
     return;
   }
-  const { type, conversationId, message, receiverId, userId1, userId2, userId, status } = req.body || {};
-  if (!type || !conversationId) {
-    res.status(400).json({ ok: false, error: 'Missing type or conversationId' });
+  const { type, conversationId, message, receiverId, userId1, userId2, userId, status, deviceId, deviceIds } = req.body || {};
+  if (!type) {
+    res.status(400).json({ ok: false, error: 'Missing type' });
     return;
   }
   try {
-    if (type === 'new_message') {
-      if (!message) {
-        res.status(400).json({ ok: false, error: 'message required for new_message' });
+    if (type === 'session_revoked') {
+      if (typeof userId !== 'number' || deviceId == null) {
+        res.status(400).json({ ok: false, error: 'userId and deviceId required for session_revoked' });
+        return;
+      }
+      io.to(`user:${userId}:device:${deviceId}`).emit('session_revoked');
+    } else if (type === 'session_revoked_many') {
+      if (typeof userId !== 'number' || !Array.isArray(deviceIds)) {
+        res.status(400).json({ ok: false, error: 'userId and deviceIds[] required for session_revoked_many' });
+        return;
+      }
+      deviceIds.forEach((id: number) => {
+        io.to(`user:${userId}:device:${id}`).emit('session_revoked');
+      });
+    } else if (type === 'new_message') {
+      if (!conversationId || !message) {
+        res.status(400).json({ ok: false, error: 'conversationId and message required for new_message' });
         return;
       }
       emitNewMessageWithIO(io, conversationId, message, receiverId);
     } else if (type === 'new_message_both') {
-      if (!message) {
-        res.status(400).json({ ok: false, error: 'message required for new_message_both' });
+      if (!conversationId || !message) {
+        res.status(400).json({ ok: false, error: 'conversationId and message required for new_message_both' });
         return;
       }
       if (typeof userId1 !== 'number' || typeof userId2 !== 'number') {
@@ -55,8 +69,8 @@ app.post('/emit', (req, res) => {
       }
       emitNewMessageToBothUsersWithIO(io, conversationId, message, userId1, userId2);
     } else if (type === 'conversation_status') {
-      if (typeof userId !== 'number' || !status) {
-        res.status(400).json({ ok: false, error: 'userId and status required for conversation_status' });
+      if (typeof userId !== 'number' || !conversationId || !status) {
+        res.status(400).json({ ok: false, error: 'userId, conversationId and status required for conversation_status' });
         return;
       }
       io.to(`user:${userId}`).emit('conversation:status_updated', { conversationId, status });
@@ -115,6 +129,13 @@ io.on('connection', (socket) => {
     socket.to(`conversation:${conversationId}`).emit('conversation:typing_stop', {
       userId: socket.data.userId
     });
+  });
+
+  socket.on('register_device', (deviceId: number) => {
+    const uid = socket.data.userId;
+    if (typeof deviceId === 'number' && uid != null) {
+      socket.join(`user:${uid}:device:${deviceId}`);
+    }
   });
 });
 

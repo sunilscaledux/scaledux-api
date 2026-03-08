@@ -46,20 +46,21 @@ export async function createLoginDevice(
 ): Promise<void> {
   const { browser, os, deviceType, deviceName } = parseUserAgent(userAgent);
 
-  // Mark all previous devices for this user as not current
+  // Mark all previous non-deleted devices for this user as not current
   await prisma.loginDevice.updateMany({
-    where: { user_id: userId },
+    where: { user_id: userId, deleted_at: null },
     data: { is_current: false },
   });
 
-  // Clean up expired devices (keep last 10 active)
+  // Soft delete expired devices (keep rows for admin)
   const expired = await prisma.loginDevice.findMany({
-    where: { user_id: userId, expires_at: { lt: new Date() } },
+    where: { user_id: userId, expires_at: { lt: new Date() }, deleted_at: null },
     select: { id: true },
   });
   if (expired.length > 0) {
-    await prisma.loginDevice.deleteMany({
+    await prisma.loginDevice.updateMany({
       where: { id: { in: expired.map((d) => d.id) } },
+      data: { deleted_at: new Date() },
     });
   }
 
@@ -85,14 +86,17 @@ export async function rotateRefreshToken(
   ipAddress?: string,
   userAgent?: string
 ): Promise<ServiceResponse> {
-  const device = await prisma.loginDevice.findUnique({
-    where: { refresh_token: oldToken },
+  const device = await prisma.loginDevice.findFirst({
+    where: { refresh_token: oldToken, deleted_at: null },
     include: { user: true },
   });
 
   if (!device || device.expires_at < new Date()) {
     if (device) {
-      await prisma.loginDevice.delete({ where: { id: device.id } });
+      await prisma.loginDevice.update({
+        where: { id: device.id },
+        data: { deleted_at: new Date() },
+      });
     }
     return { success: false, message: "Invalid or expired refresh token" };
   }
@@ -100,6 +104,10 @@ export async function rotateRefreshToken(
   const { token: newRefreshToken, expiresAt } = generateRefreshToken(rememberMe);
   const { browser, os, deviceType, deviceName } = parseUserAgent(userAgent);
 
+  await prisma.loginDevice.updateMany({
+    where: { user_id: device.user_id, deleted_at: null },
+    data: { is_current: false },
+  });
   await prisma.loginDevice.update({
     where: { id: device.id },
     data: {
@@ -111,6 +119,7 @@ export async function rotateRefreshToken(
       os,
       device_type: deviceType,
       device_name: deviceName,
+      is_current: true,
     },
   });
 
@@ -121,9 +130,12 @@ export async function rotateRefreshToken(
   };
 }
 
-export async function getLoginDevices(userId: number): Promise<ServiceResponse> {
+export async function getLoginDevices(
+  userId: number,
+  currentRefreshToken?: string
+): Promise<ServiceResponse> {
   const devices = await prisma.loginDevice.findMany({
-    where: { user_id: userId, expires_at: { gt: new Date() } },
+    where: { user_id: userId, expires_at: { gt: new Date() }, deleted_at: null },
     orderBy: { last_used_at: "desc" },
     select: {
       id: true,
@@ -135,9 +147,18 @@ export async function getLoginDevices(userId: number): Promise<ServiceResponse> 
       is_current: true,
       last_used_at: true,
       created_at: true,
+      refresh_token: true,
     },
   });
-  return { success: true, message: "Devices fetched", data: devices };
+  const token = currentRefreshToken?.trim();
+  const list = devices.map((dev) => {
+    const { refresh_token, ...rest } = dev;
+    return {
+      ...rest,
+      is_current: token ? refresh_token === token : dev.is_current,
+    };
+  });
+  return { success: true, message: "Devices fetched", data: list };
 }
 
 export async function revokeLoginDevice(
@@ -145,23 +166,32 @@ export async function revokeLoginDevice(
   deviceId: number
 ): Promise<ServiceResponse> {
   const device = await prisma.loginDevice.findFirst({
-    where: { id: deviceId, user_id: userId },
+    where: { id: deviceId, user_id: userId, deleted_at: null },
   });
   if (!device) {
     return { success: false, message: "Device not found" };
   }
-  await prisma.loginDevice.delete({ where: { id: deviceId } });
+  await prisma.loginDevice.update({
+    where: { id: deviceId },
+    data: { deleted_at: new Date() },
+  });
   return { success: true, message: "Device logged out successfully" };
 }
 
 export async function revokeAllOtherDevices(
   userId: number,
   currentRefreshToken: string
-): Promise<ServiceResponse> {
-  await prisma.loginDevice.deleteMany({
-    where: { user_id: userId, refresh_token: { not: currentRefreshToken } },
+): Promise<ServiceResponse & { deviceIds?: number[] }> {
+  const toRevoke = await prisma.loginDevice.findMany({
+    where: { user_id: userId, refresh_token: { not: currentRefreshToken }, deleted_at: null },
+    select: { id: true },
   });
-  return { success: true, message: "All other devices logged out" };
+  const deviceIds = toRevoke.map((d) => d.id);
+  await prisma.loginDevice.updateMany({
+    where: { id: { in: deviceIds } },
+    data: { deleted_at: new Date() },
+  });
+  return { success: true, message: "All other devices logged out", deviceIds };
 }
 
 export async function checkUserExists(input: string): Promise<boolean> {

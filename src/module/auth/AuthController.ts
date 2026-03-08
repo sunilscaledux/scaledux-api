@@ -595,7 +595,10 @@ export async function logout(req: Request, res: Response) {
     const refreshToken = req.cookies?.refresh_token;
     if (refreshToken) {
       res.clearCookie("refresh_token", clearOpts);
-      await prisma.loginDevice.deleteMany({ where: { refresh_token: refreshToken } });
+      await prisma.loginDevice.updateMany({
+        where: { refresh_token: refreshToken },
+        data: { deleted_at: new Date() },
+      });
     }
 
     return ApiResponse.success(
@@ -654,7 +657,8 @@ export async function listLoginDevices(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
 
-    const result = await getLoginDevices(userId);
+    const currentRefreshToken = req.cookies?.refresh_token ?? "";
+    const result = await getLoginDevices(userId, currentRefreshToken);
     return ApiResponse.success(res, result.data, result.message);
   } catch (error: any) {
     console.error("List devices error:", error);
@@ -673,6 +677,9 @@ export async function logoutDevice(req: Request, res: Response) {
     const result = await revokeLoginDevice(userId, deviceId);
     if (!result.success) return ApiResponse.error(res, result.message, 404);
 
+    const { emitSessionRevoked } = await import("./authSocket");
+    await emitSessionRevoked(userId, deviceId);
+
     return ApiResponse.success(res, null, result.message);
   } catch (error: any) {
     console.error("Logout device error:", error);
@@ -687,6 +694,10 @@ export async function logoutAllOtherDevices(req: Request, res: Response) {
 
     const currentRefreshToken = req.cookies?.refresh_token ?? "";
     const result = await revokeAllOtherDevices(userId, currentRefreshToken);
+    if (result.deviceIds?.length) {
+      const { emitSessionRevokedMany } = await import("./authSocket");
+      await emitSessionRevokedMany(userId, result.deviceIds);
+    }
     return ApiResponse.success(res, null, result.message);
   } catch (error: any) {
     console.error("Logout all devices error:", error);

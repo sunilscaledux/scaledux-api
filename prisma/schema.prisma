@@ -1233,23 +1233,25 @@ model BillingTransaction {
 }
 
 model LoginDevice {
-  id            Int      @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   user_id       Int
-  refresh_token String   @unique @db.VarChar(512)
-  device_name   String?  @db.VarChar(255)
-  device_type   String?  @db.VarChar(50)   // web, mobile, desktop
-  browser       String?  @db.VarChar(100)
-  os            String?  @db.VarChar(100)
-  ip_address    String?  @db.VarChar(45)
-  is_current    Boolean  @default(false)
-  last_used_at  DateTime @default(now())
+  refresh_token String    @unique @db.VarChar(512)
+  device_name   String?   @db.VarChar(255)
+  device_type   String?   @db.VarChar(50)   // web, mobile, desktop
+  browser       String?   @db.VarChar(100)
+  os            String?   @db.VarChar(100)
+  ip_address    String?   @db.VarChar(45)
+  is_current    Boolean   @default(false)
+  last_used_at  DateTime  @default(now())
   expires_at    DateTime
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
-  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  deleted_at    DateTime? // soft delete; when set, session is revoked (kept for admin)
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([refresh_token])
+  @@index([deleted_at])
   @@map("scd_login_devices")
 }
 
