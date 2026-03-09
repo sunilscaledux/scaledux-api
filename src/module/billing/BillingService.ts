@@ -16,6 +16,19 @@ if (razorpayConfig.key_id && razorpayConfig.key_secret) {
 }
 
 export class BillingService {
+  /** Payer amount (base + app fee + GST) and receiver amount (base - service fee - GST) for payment type. */
+  private static getPayerAndReceiverAmounts(baseAmount: number): { payerAmount: number; receiverAmount: number } {
+    const gstPercent = appConfig.gstPercent / 100;
+    const appFee = appConfig.appFeeFounder;
+    const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
+    const serviceFeePercent = appConfig.serviceFeePercent / 100;
+    const serviceCharge = Math.round(baseAmount * serviceFeePercent * 100) / 100;
+    const gstOnServiceCharge = Math.round(serviceCharge * gstPercent * 100) / 100;
+    const payerAmount = Math.round((baseAmount + appFee + gstOnAppFee) * 100) / 100;
+    const receiverAmount = Math.round((baseAmount - serviceCharge - gstOnServiceCharge) * 100) / 100;
+    return { payerAmount, receiverAmount };
+  }
+
   // Create Razorpay order for card verification (charge small amount)
   static async createVerificationOrder(userId: string, amount: number = 1) {
     console.log(razorpayConfig);
@@ -407,6 +420,7 @@ export class BillingService {
   }) {
     const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed', milestoneId } = params;
     const currencyId = 1;
+    const { payerAmount, receiverAmount } = this.getPayerAndReceiverAmounts(amount);
     // When fund loaded (pending): sender = funded, receiver = pending. When completed: both completed.
     const senderStatus = status === 'pending' ? 'funded' : status;
     const receiverStatus = status === 'pending' ? 'pending' : status;
@@ -423,6 +437,8 @@ export class BillingService {
         subject_id: subjectId,
         milestone_id: milestoneId ?? undefined,
         amount,
+        payer_amount: payerAmount,
+        receiver_amount: receiverAmount,
         currency_id: currencyId,
         type: 'payment',
         status,
@@ -436,14 +452,15 @@ export class BillingService {
       await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
     } else if (status === 'pending' && toId > 0) {
       await this.ensureUserWallet(toId);
+      // Pending amount = receiver amount only (from getPayerAndReceiverAmounts)
       await (prisma as any).userWallet.update({
         where: { user_id: toId },
-        data: { pending_amount: { increment: Number(amount) } },
+        data: { pending_amount: { increment: receiverAmount } },
       });
     }
-    
-    // Payer invoice only at payment time; receiver invoice when they withdraw and webhook sets released
-    await this.createInvoicesForTransaction(row.id, { receiver: false });
+
+    // Create both payer and receiver invoices at payment time; UI shows receiver download only when receiver status allows withdraw
+    await this.createInvoicesForTransaction(row.id);
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
@@ -465,7 +482,6 @@ export class BillingService {
       where: { id: tx.id },
       data: { status: 'completed', sender_status: 'released', receiver_status: 'completed' }
     });
-    await this.createInvoicesForTransaction(tx.id, { receiver: false });
     const amount = Number(tx.amount);
     const feePercent = appConfig.serviceFeePercent;
     const gstPercent = appConfig.gstPercent / 100;
@@ -474,55 +490,20 @@ export class BillingService {
     const totalDeduction = feeAmount + gstOnServiceCharge;
     const netAmount = Math.round((amount - totalDeduction) * 100) / 100;
 
-    // Remove full amount from freelancer's pending (was added when founder funded)
+    // Remove receiver amount from freelancer's pending (same as what was added when founder funded)
     if (tx.to_id > 0) {
       await (prisma as any).userWallet.update({
         where: { user_id: tx.to_id },
-        data: { pending_amount: { decrement: amount } },
+        data: { pending_amount: { decrement: netAmount } },
       });
     }
-    // Credit freelancer: total_earning += net, wallet += (amount - totalDeduction)
-    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount, netAmount, amount);
+    // Credit freelancer: total_earning += netAmount, wallet += netAmount (receiver amount only; fee never hits wallet)
+    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount, netAmount, netAmount);
+
+    // Create receiver invoice so freelancer has invoice with fee/GST breakdown
+    await this.createInvoicesForTransaction(tx.id, { payer: false, receiver: true });
 
     const milestoneId = (tx as any).milestone_id as number | null | undefined;
-
-    // Deduct service charge + GST on it from freelancer wallet; record service_fee transaction
-    if (totalDeduction > 0 && tx.to_id > 0) {
-      await (prisma as any).userWallet.update({
-        where: { user_id: tx.to_id },
-        data: { wallet_amount: { decrement: totalDeduction } },
-      });
-      if (feeAmount > 0) {
-        await (prisma as any).billingTransaction.create({
-          data: {
-            actor_type: 'User',
-            actor_id: userId,
-            from_type: 'User',
-            from_id: tx.to_id,
-            to_type: 'Platform',
-            to_id: 0,
-            subject_type: tx.subject_type,
-            subject_id: tx.subject_id,
-            milestone_id: milestoneId ?? undefined,
-            amount: feeAmount,
-            currency_id: tx.currency_id,
-            type: 'service_fee',
-            status: 'completed',
-            sender_status: 'completed',
-            receiver_status: 'completed',
-            description: `Platform service fee (${feePercent}%)`,
-            meta: { source_transaction_unique_id: tx.unique_id, fee_percent: feePercent, gst_on_fee: gstOnServiceCharge }
-          }
-        });
-      }
-      if (milestoneId != null) {
-        await (prisma as any).milestone.updateMany({
-          where: { id: milestoneId },
-          data: { service_fee_amount: feeAmount }
-        });
-      }
-    }
-
     // Sync release payment to chat (founder + freelancer); same for both milestone flow and direct billing release
     if (tx.subject_type === 'Proposal' && tx.subject_id != null && tx.from_id > 0 && tx.to_id > 0) {
       let proposal: any = null;
@@ -791,10 +772,10 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0. Otherwise show all.
+    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0. Otherwise show all. Exclude service_fee (no longer created; breakdown on invoice).
     const baseWhere: any = creditsOnly
-      ? { to_id: userIdNum, amount: { gte: 0 } }
-      : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }] };
+      ? { to_id: userIdNum, amount: { gte: 0 }, type: { not: 'service_fee' } }
+      : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }], type: { not: 'service_fee' } };
     if (fromDate || toDate) {
       baseWhere.created_at = {};
       if (fromDate) baseWhere.created_at.gte = new Date(fromDate);
@@ -874,10 +855,16 @@ export class BillingService {
           const receiverInv = t.receiver_invoice;
           const invoiceUrlLegacy = t.invoice_url;
           const invoiceUrl = isCredit ? (receiverInv?.file_url ?? invoiceUrlLegacy) : (payerInv?.file_url ?? invoiceUrlLegacy);
+          const baseAmt = parseFloat(t.amount?.toString() ?? '0');
+          const computed = t.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmt) : null;
+          const payerAmt = t.payer_amount != null ? parseFloat(t.payer_amount.toString()) : (computed?.payerAmount ?? baseAmt);
+          const receiverAmt = t.receiver_amount != null ? parseFloat(t.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmt);
           return {
             id: t.id,
             uniqueId: t.unique_id,
-            amount: t.amount,
+            amount: baseAmt,
+            payerAmount: payerAmt,
+            receiverAmount: receiverAmt,
             currency: t.currency?.code || 'INR',
             currencySymbol: t.currency?.symbol || '₹',
             type: t.type,
@@ -1346,10 +1333,17 @@ export class BillingService {
     const payerInv = transaction.payer_invoice;
     const receiverInv = transaction.receiver_invoice;
     const invoiceUrlForUser = isCredit ? (receiverInv?.file_url ?? transaction.invoice_url) : (payerInv?.file_url ?? transaction.invoice_url);
+    const baseAmount = parseFloat(transaction.amount.toString());
+    const tAny = transaction as any;
+    const computed = tAny.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmount) : null;
+    const payerAmt = tAny.payer_amount != null ? parseFloat(tAny.payer_amount.toString()) : (computed?.payerAmount ?? baseAmount);
+    const receiverAmt = tAny.receiver_amount != null ? parseFloat(tAny.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmount);
     const base: any = {
       id: transaction.id,
       uniqueId: transaction.unique_id,
-      amount: parseFloat(transaction.amount.toString()),
+      amount: baseAmount,
+      payerAmount: payerAmt,
+      receiverAmount: receiverAmt,
       currency: transaction.currency?.code || 'INR',
       currencySymbol: transaction.currency?.symbol || '₹',
       type: transaction.type,
@@ -1369,17 +1363,7 @@ export class BillingService {
       subjectType: transaction.subject_type,
       subjectId: transaction.subject_id,
       contractTitle: undefined as string | undefined,
-      milestonePayments: undefined as any[] | undefined,
-      razorpayPaymentId: metaMap.razorpay_payment_id ?? undefined,
-      razorpayOrderId: metaMap.razorpay_order_id ?? undefined,
-      razorpayMethod: metaMap.razorpay_method ?? undefined,
-      razorpayStatus: metaMap.razorpay_status ?? undefined,
-      razorpayBank: metaMap.razorpay_bank ?? undefined,
-      razorpayCardLast4: metaMap.razorpay_card_last4 ?? undefined,
-      razorpayCardNetwork: metaMap.razorpay_card_network ?? undefined,
-      razorpayVpa: metaMap.razorpay_vpa ?? undefined,
-      razorpayBankTransactionId: metaMap.razorpay_bank_transaction_id ?? undefined,
-      razorpayAuthCode: metaMap.razorpay_auth_code ?? undefined
+      milestonePayments: undefined as any[] | undefined
     };
 
     if (transaction.subject_type === 'Proposal' && transaction.subject_id) {
@@ -1406,15 +1390,13 @@ export class BillingService {
             row = milestones.find((m: any) => m.order_index === milestoneIndexFallback);
           }
           if (row) {
-            const serviceFeeAmount = row.service_fee_amount != null ? parseFloat(String(row.service_fee_amount)) : undefined;
             base.milestonePayments.push({
               milestoneIndex: (row.order_index ?? 0) + 1,
               title: row.title ?? row.description ?? `Milestone ${(row.order_index ?? 0) + 1}`,
               amount: parseFloat(String(row.amount)),
               paid: true,
               transactionUniqueId: transaction.unique_id,
-              date: transaction.created_at,
-              serviceFeeAmount: serviceFeeAmount != null && serviceFeeAmount > 0 ? serviceFeeAmount : undefined
+              date: transaction.created_at
             });
           }
         }

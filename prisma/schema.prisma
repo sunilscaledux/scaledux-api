@@ -1244,6 +1244,10 @@ model BillingTransaction {
   milestone_id    Int?
 
   amount          Decimal  @db.Decimal(10, 2)
+  /** What payer paid (base + app fee + GST). Set for payment type. */
+  payer_amount    Decimal? @db.Decimal(10, 2)
+  /** What receiver gets (base - service fee - GST). Set for payment type. */
+  receiver_amount Decimal? @db.Decimal(10, 2)
   currency_id     Int      @default(1)
 
   type            String   @db.VarChar(30) // payment, refund, withdrawal
