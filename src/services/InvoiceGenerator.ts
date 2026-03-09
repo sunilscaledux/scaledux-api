@@ -66,7 +66,6 @@ export class InvoiceGenerator {
             month: 'long', 
             day: 'numeric' 
           })}`, 50, 180)
-          .text(`Status: ${data.status.toUpperCase()}`, 50, 200)
           .moveDown();
 
         // Transaction Details
