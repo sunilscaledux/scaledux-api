@@ -8,6 +8,21 @@ import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { prisma } from "@services/prismaService";
 
 export class BillingController {
+  // Get payment breakdown (app fee, gst, service fee) for display and Razorpay total
+  static async getPaymentBreakdown(req: Request, res: Response) {
+    try {
+      const amountParam = req.query.amount ?? req.body?.amount;
+      const milestoneAmount = amountParam != null ? Number(amountParam) : undefined;
+      const data = BillingService.getPaymentBreakdown(
+        Number.isFinite(milestoneAmount) ? milestoneAmount : undefined
+      );
+      return ApiResponse.success(res, data);
+    } catch (error: any) {
+      console.error("Error getting payment breakdown:", error);
+      return ApiResponse.error(res, error.message || "Failed to get payment breakdown");
+    }
+  }
+
   // Create Razorpay order for card verification
   static async createVerificationOrder(req: Request, res: Response) {
     try {
@@ -64,42 +79,10 @@ export class BillingController {
         if (handled) return;
       }
 
-      // Card verification flow: fetch card details and save payment method
-      const cardDetails = await BillingService.fetchPaymentDetails(razorpayPaymentId);
-
-      if (!cardDetails) {
-        return ApiResponse.error(res, "Failed to fetch card details from Razorpay", 500);
-      }
-
-      let customerId = cardDetails.customerId;
-      if (!customerId && cardDetails.email && cardDetails.contact) {
-        customerId = await BillingService.createOrGetCustomer(
-          userId.toString(),
-          cardDetails.email,
-          cardDetails.contact,
-          cardDetails.cardHolderName
-        );
-      }
-
-      const paymentMethodData = {
-        paymentType: 'card' as const,
-        razorpayCustomerId: customerId || '',
-        razorpayPaymentId: razorpayPaymentId,
-        cardToken: cardDetails.cardToken,
-        cardBrand: cardDetails.cardBrand,
-        lastFourDigits: cardDetails.lastFourDigits,
-        cardHolderName: cardDetails.cardHolderName,
-        expiryMonth: cardDetails.expiryMonth,
-        expiryYear: cardDetails.expiryYear,
-        verificationAmount: 1,
-        isDefault: false
-      };
-
-      const result = await BillingService.savePaymentMethod(userId.toString(), paymentMethodData);
-      return ApiResponse.success(res, result.data, result.message);
+      return ApiResponse.error(res, "Invalid or unsupported payment. Provide milestoneId or subjectType and subjectId.", 400);
     } catch (error: any) {
-      console.error("Error verifying and saving payment method:", error);
-      return ApiResponse.error(res, error.message || "Failed to verify and save payment method");
+      console.error("Error verifying payment:", error);
+      return ApiResponse.error(res, error.message || "Failed to verify payment");
     }
   }
 
@@ -550,6 +533,42 @@ export class BillingController {
     } catch (error: any) {
       console.error("Error requesting withdrawal:", error);
       return ApiResponse.error(res, error.message || "Failed to request withdrawal");
+    }
+  }
+
+  /** Receiver requests withdraw for a payment (sets receiver_status to withdraw_in_process). */
+  static async requestWithdrawForPayment(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request withdraw for a payment", 403);
+      const uniqueId = getStringParam(req.params.uniqueId);
+      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+      const result = await BillingService.setReceiverWithdrawInProcess(uniqueId, userId);
+      if (!result.success) {
+        const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+        return ApiResponse.error(res, result.message ?? "Failed to request withdraw", code);
+      }
+      return ApiResponse.success(res, null, "Withdraw requested");
+    } catch (error: any) {
+      console.error("Error requesting withdraw for payment:", error);
+      return ApiResponse.error(res, error.message || "Failed to request withdraw");
+    }
+  }
+
+  /** Webhook: set receiver_status to released and create receiver invoice. */
+  static async webhookReceiverReleased(req: Request, res: Response) {
+    try {
+      const uniqueId = getStringParam(req.params.uniqueId);
+      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+      const result = await BillingService.setReceiverReleased(uniqueId);
+      if (!result.success) {
+        return ApiResponse.error(res, result.message ?? "Failed to set released", 400);
+      }
+      return ApiResponse.success(res, null, "Receiver released");
+    } catch (error: any) {
+      console.error("Error setting receiver released:", error);
+      return ApiResponse.error(res, error.message || "Failed to set receiver released");
     }
   }
 

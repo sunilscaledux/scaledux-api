@@ -84,6 +84,7 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
       const deliverables = buildDeliverablesFromRow(row);
       return {
         id: row.unique_id,
+        milestoneId: row.id,
         title: row.title ?? '',
         description: row.description ?? undefined,
         amount: Number(row.amount ?? 0),
@@ -137,6 +138,7 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
       const submittedFile = deliverables.flatMap((d: any) => (Array.isArray(d.submitted_file) ? d.submitted_file : []));
       return {
         id: row.unique_id,
+        milestoneId: row.id,
         title: row.title ?? '',
         description: row.description ?? undefined,
         amount: Number(row.amount ?? 0),

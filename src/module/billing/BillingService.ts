@@ -3,6 +3,7 @@ import { PaymentMethodInput, TaxInformationInput, RazorpayVerificationInput } fr
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
+import { appConfig } from "@config/app";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 
 // Initialize Razorpay (only if keys are provided)
@@ -64,6 +65,44 @@ export class BillingService {
       .digest('hex');
     
     return generatedSignature === razorpaySignature;
+  }
+
+  /**
+   * Get payment breakdown for display and Razorpay order amount.
+   * Founder pays: milestoneAmount + appFeeFounder + gstOnAppFee = totalFounderPays.
+   * Freelancer (at release): milestoneAmount - serviceCharge - gstOnServiceCharge = net.
+   */
+  static getPaymentBreakdown(milestoneAmount?: number) {
+    const appFee = appConfig.appFeeFounder;
+    const gstPercent = appConfig.gstPercent / 100;
+    const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
+    const totalFounderPays = milestoneAmount != null
+      ? Math.round((milestoneAmount + appFee + gstOnAppFee) * 100) / 100
+      : undefined;
+    const serviceFeePercent = appConfig.serviceFeePercent / 100;
+    const serviceCharge = milestoneAmount != null
+      ? Math.round(milestoneAmount * serviceFeePercent * 100) / 100
+      : undefined;
+    const gstOnServiceCharge = serviceCharge != null
+      ? Math.round(serviceCharge * gstPercent * 100) / 100
+      : undefined;
+    const netToFreelancer = (milestoneAmount != null && serviceCharge != null && gstOnServiceCharge != null)
+      ? Math.round((milestoneAmount - serviceCharge - gstOnServiceCharge) * 100) / 100
+      : undefined;
+    return {
+      appFeeFounder: appConfig.appFeeFounder,
+      gstPercent: appConfig.gstPercent,
+      serviceFeePercent: appConfig.serviceFeePercent,
+      ...(milestoneAmount != null && {
+        milestoneAmount,
+        appFee,
+        gstOnAppFee,
+        totalFounderPays,
+        serviceCharge: serviceCharge ?? 0,
+        gstOnServiceCharge: gstOnServiceCharge ?? 0,
+        netToFreelancer,
+      }),
+    };
   }
 
   // Create or get Razorpay customer
@@ -288,11 +327,24 @@ export class BillingService {
     }
   }
 
+  /** Ensure a UserWallet row exists for the user (for new users after migration). */
+  private static async ensureUserWallet(userId: number): Promise<void> {
+    await (prisma as any).userWallet.upsert({
+      where: { user_id: userId },
+      create: {
+        user_id: userId,
+        wallet_amount: 0,
+        total_earning: 0,
+        total_withdrawal: 0,
+        pending_amount: 0,
+      },
+      update: {},
+    });
+  }
+
   /**
    * Update user billing totals after a transaction. Call after every billing transaction create.
-   * Amount is in the same unit as BillingTransaction.amount (base currency).
-   * receiverAmount = credit to total_earning (and wallet if receiverWalletAmount not set).
-   * receiverWalletAmount = optional separate wallet credit (e.g. full amount before service_fee debit).
+   * Uses UserWallet table (separate from User).
    */
   private static async updateUserBillingTotalsAfterTransaction(
     type: 'payment' | 'refund' | 'withdrawal',
@@ -308,10 +360,10 @@ export class BillingService {
     const toWalletAmt = receiverWalletAmount !== undefined ? Number(receiverWalletAmount) : toAmt;
     if (type === 'payment' || type === 'refund') {
       if (status !== 'completed') return;
-      // Receiver (to_id) gains total_earning and wallet; sender (from_id) wallet is not changed on release (already debited when funding)
       if (toId > 0) {
-        await prisma.user.update({
-          where: { id: toId },
+        await this.ensureUserWallet(toId);
+        await (prisma as any).userWallet.update({
+          where: { user_id: toId },
           data: {
             total_earning: { increment: toAmt },
             wallet_amount: { increment: toWalletAmt },
@@ -320,14 +372,15 @@ export class BillingService {
       }
     } else if (type === 'withdrawal') {
       if (fromId > 0) {
+        await this.ensureUserWallet(fromId);
         if (status === 'pending') {
-          await prisma.user.update({
-            where: { id: fromId },
+          await (prisma as any).userWallet.update({
+            where: { user_id: fromId },
             data: { wallet_amount: { decrement: amt } },
           });
         } else if (status === 'completed') {
-          await prisma.user.update({
-            where: { id: fromId },
+          await (prisma as any).userWallet.update({
+            where: { user_id: fromId },
             data: { total_withdrawal: { increment: amt } },
           });
         }
@@ -382,14 +435,15 @@ export class BillingService {
     if (status === 'completed') {
       await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
     } else if (status === 'pending' && toId > 0) {
-      await prisma.user.update({
-        where: { id: toId },
+      await this.ensureUserWallet(toId);
+      await (prisma as any).userWallet.update({
+        where: { user_id: toId },
         data: { pending_amount: { increment: Number(amount) } },
       });
     }
     
-    // Invoice as soon as payment is recorded (founder amount already deducted)
-    await this.createInvoicesForTransaction(row.id);
+    // Payer invoice only at payment time; receiver invoice when they withdraw and webhook sets released
+    await this.createInvoicesForTransaction(row.id, { receiver: false });
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
@@ -409,53 +463,56 @@ export class BillingService {
 
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { status: 'completed', sender_status: 'completed', receiver_status: 'completed' }
+      data: { status: 'completed', sender_status: 'released', receiver_status: 'completed' }
     });
-    await this.createInvoicesForTransaction(tx.id);
+    await this.createInvoicesForTransaction(tx.id, { receiver: false });
     const amount = Number(tx.amount);
-    const feePercent = Math.min(100, Math.max(0, Number(process.env.SERVICE_FEE_PERCENT) || 10));
-    const netAmount = Math.round(amount * (1 - feePercent / 100) * 100) / 100;
-    const feeAmount = Math.round((amount - netAmount) * 100) / 100;
-    
+    const feePercent = appConfig.serviceFeePercent;
+    const gstPercent = appConfig.gstPercent / 100;
+    const feeAmount = Math.round(amount * (feePercent / 100) * 100) / 100;
+    const gstOnServiceCharge = Math.round(feeAmount * gstPercent * 100) / 100;
+    const totalDeduction = feeAmount + gstOnServiceCharge;
+    const netAmount = Math.round((amount - totalDeduction) * 100) / 100;
+
     // Remove full amount from freelancer's pending (was added when founder funded)
     if (tx.to_id > 0) {
-      await prisma.user.update({
-        where: { id: tx.to_id },
+      await (prisma as any).userWallet.update({
+        where: { user_id: tx.to_id },
         data: { pending_amount: { decrement: amount } },
       });
     }
-    // Credit freelancer: total_earning += net, wallet += full; service_fee row will debit wallet by fee
+    // Credit freelancer: total_earning += net, wallet += (amount - totalDeduction)
     await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount, netAmount, amount);
 
     const milestoneId = (tx as any).milestone_id as number | null | undefined;
 
-    // Record service charge: billing row + reduce freelancer wallet + update milestone.service_fee_amount
-    if (feeAmount > 0) {
-      await (prisma as any).billingTransaction.create({
-        data: {
-          actor_type: 'User',
-          actor_id: userId,
-          from_type: 'User',
-          from_id: tx.to_id,
-          to_type: 'Platform',
-          to_id: 0,
-          subject_type: tx.subject_type,
-          subject_id: tx.subject_id,
-          milestone_id: milestoneId ?? undefined,
-          amount: feeAmount,
-          currency_id: tx.currency_id,
-          type: 'service_fee',
-          status: 'completed',
-          sender_status: 'completed',
-          receiver_status: 'completed',
-          description: `Platform service fee (${feePercent}%)`,
-          meta: { source_transaction_unique_id: tx.unique_id, fee_percent: feePercent }
-        }
+    // Deduct service charge + GST on it from freelancer wallet; record service_fee transaction
+    if (totalDeduction > 0 && tx.to_id > 0) {
+      await (prisma as any).userWallet.update({
+        where: { user_id: tx.to_id },
+        data: { wallet_amount: { decrement: totalDeduction } },
       });
-      if (tx.to_id > 0) {
-        await prisma.user.update({
-          where: { id: tx.to_id },
-          data: { wallet_amount: { decrement: feeAmount } },
+      if (feeAmount > 0) {
+        await (prisma as any).billingTransaction.create({
+          data: {
+            actor_type: 'User',
+            actor_id: userId,
+            from_type: 'User',
+            from_id: tx.to_id,
+            to_type: 'Platform',
+            to_id: 0,
+            subject_type: tx.subject_type,
+            subject_id: tx.subject_id,
+            milestone_id: milestoneId ?? undefined,
+            amount: feeAmount,
+            currency_id: tx.currency_id,
+            type: 'service_fee',
+            status: 'completed',
+            sender_status: 'completed',
+            receiver_status: 'completed',
+            description: `Platform service fee (${feePercent}%)`,
+            meta: { source_transaction_unique_id: tx.unique_id, fee_percent: feePercent, gst_on_fee: gstOnServiceCharge }
+          }
         });
       }
       if (milestoneId != null) {
@@ -515,6 +572,38 @@ export class BillingService {
         );
       }
     }
+    return { success: true };
+  }
+
+  /** Receiver (freelancer) requests withdraw for this payment: set receiver_status to withdraw_in_process. */
+  static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
+    const tx = await prisma.billingTransaction.findUnique({
+      where: { unique_id: transactionUniqueId }
+    });
+    if (!tx) return { success: false, message: 'Transaction not found' };
+    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
+    if (tx.to_id !== userId) return { success: false, message: 'Only the receiver can request withdraw for this payment' };
+    const current = (tx as any).receiver_status ?? tx.status;
+    if (current !== 'completed') return { success: false, message: 'Withdraw can only be requested when receiver status is completed' };
+    await (prisma as any).billingTransaction.update({
+      where: { id: tx.id },
+      data: { receiver_status: 'withdraw_in_process' }
+    });
+    return { success: true };
+  }
+
+  /** Webhook: set receiver_status to released and create receiver invoice. */
+  static async setReceiverReleased(transactionUniqueId: string): Promise<{ success: boolean; message?: string }> {
+    const tx = await prisma.billingTransaction.findUnique({
+      where: { unique_id: transactionUniqueId }
+    });
+    if (!tx) return { success: false, message: 'Transaction not found' };
+    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
+    await (prisma as any).billingTransaction.update({
+      where: { id: tx.id },
+      data: { receiver_status: 'released' }
+    });
+    await this.createInvoicesForTransaction(tx.id, { payer: false, receiver: true });
     return { success: true };
   }
 
@@ -822,11 +911,11 @@ export class BillingService {
     };
   }
 
-  // Get user's balance and billing totals (uses User cache when set, else aggregates from transactions)
+  // Get user's balance and billing totals (from UserWallet; fallback aggregate for users without row)
   static async getUserBalance(userId: string) {
     const userIdNum = parseInt(userId);
-    const user = await (prisma as any).user.findUnique({
-      where: { id: userIdNum },
+    const wallet = await (prisma as any).userWallet.findUnique({
+      where: { user_id: userIdNum },
       select: { total_earning: true, total_withdrawal: true, wallet_amount: true, pending_amount: true }
     }) as { total_earning?: unknown; total_withdrawal?: unknown; wallet_amount?: unknown; pending_amount?: unknown } | null;
 
@@ -835,11 +924,11 @@ export class BillingService {
     let walletAmount = 0;
     let pendingAmount = 0;
 
-    if (user?.total_earning != null || user?.wallet_amount != null) {
-      totalEarning = Number(user?.total_earning ?? 0);
-      totalWithdrawal = Number(user?.total_withdrawal ?? 0);
-      walletAmount = Number(user?.wallet_amount ?? 0);
-      pendingAmount = Number(user?.pending_amount ?? 0);
+    if (wallet) {
+      totalEarning = Number(wallet.total_earning ?? 0);
+      totalWithdrawal = Number(wallet.total_withdrawal ?? 0);
+      walletAmount = Number(wallet.wallet_amount ?? 0);
+      pendingAmount = Number(wallet.pending_amount ?? 0);
     } else {
       const [credits, debits, withdrawals, pendingCredits] = await Promise.all([
         prisma.billingTransaction.aggregate({
@@ -863,6 +952,17 @@ export class BillingService {
       totalWithdrawal = Number(withdrawals._sum?.amount || 0);
       walletAmount = Number(credits._sum?.amount || 0) - Number(debits._sum?.amount || 0);
       pendingAmount = Number(pendingCredits._sum?.amount || 0);
+      // Backfill wallet row for next time
+      await this.ensureUserWallet(userIdNum);
+      await (prisma as any).userWallet.update({
+        where: { user_id: userIdNum },
+        data: {
+          wallet_amount: walletAmount,
+          total_earning: totalEarning,
+          total_withdrawal: totalWithdrawal,
+          pending_amount: pendingAmount,
+        },
+      });
     }
 
     const { amount: convertedBalance, currency, currencySymbol } = await convertToUserCurrency(userIdNum, walletAmount);
@@ -1046,14 +1146,19 @@ export class BillingService {
     }
   }
 
-  /** Create payer + receiver Invoice rows as soon as payment is recorded/released. No-op if both exist. */
-  static async createInvoicesForTransaction(transactionId: number) {
+  /** Create payer and/or receiver Invoice rows. Receiver invoice only when receiver withdraws and is released (e.g. via webhook). */
+  static async createInvoicesForTransaction(
+    transactionId: number,
+    options?: { payer?: boolean; receiver?: boolean }
+  ) {
+    const { payer: createPayer = true, receiver: createReceiver = true } = options ?? {};
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { id: transactionId },
       include: { currency: true, payer_invoice: true, receiver_invoice: true }
     });
     if (!transaction || transaction.type !== 'payment') return;
-    if (transaction.payer_invoice && transaction.receiver_invoice) return;
+    if (!createPayer && !createReceiver) return;
+    if (createPayer && transaction.payer_invoice && createReceiver && transaction.receiver_invoice) return;
 
     const users = await (prisma as any).user.findMany({
       where: { id: { in: [transaction.from_id, transaction.to_id] } },
@@ -1069,10 +1174,28 @@ export class BillingService {
     const currencyCode = transaction.currency?.code ?? 'INR';
     const meta = transaction.meta ?? undefined;
 
+    const platformGst = appConfig.platformGstNumber;
+    const gstPercent = appConfig.gstPercent / 100;
+    const appFeeFounder = appConfig.appFeeFounder;
+    const gstOnAppFee = Math.round(appFeeFounder * gstPercent * 100) / 100;
+    const serviceFeePercent = appConfig.serviceFeePercent / 100;
+    const serviceCharge = Math.round(amount * serviceFeePercent * 100) / 100;
+    const gstOnServiceCharge = Math.round(serviceCharge * gstPercent * 100) / 100;
+
+    const taxInfos = await (prisma as any).taxInformation.findMany({
+      where: { user_id: { in: [transaction.from_id, transaction.to_id] } },
+      select: { user_id: true, has_gstin: true, gstin: true }
+    });
+    const senderGst = taxInfos.find((t: any) => t.user_id === transaction.from_id && t.has_gstin && t.gstin)?.gstin ?? null;
+    const receiverGst = taxInfos.find((t: any) => t.user_id === transaction.to_id && t.has_gstin && t.gstin)?.gstin ?? null;
+
+    const invoiceNumberFor = (billingId: number, invoiceId: number) =>
+      `INV-${billingId}-${invoiceId}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;
+
     let payerInvoiceId = transaction.payer_invoice?.id ?? null;
     let receiverInvoiceId = transaction.receiver_invoice?.id ?? null;
-
-    if (!payerInvoiceId) {
+ 
+    if (createPayer && !payerInvoiceId) {
       const payerInv = await (prisma as any).invoice.create({
         data: {
           billing_transaction_id: transactionId,
@@ -1082,13 +1205,23 @@ export class BillingService {
           amount,
           currency_code: currencyCode,
           description: transaction.description,
-          invoice_number: `INV-${transaction.unique_id}-payer`,
+          invoice_number: `INV-${transactionId}-P-${Date.now()}`,
+          gst_number: platformGst,
+          sender_gst: senderGst,
+          receiver_gst: receiverGst,
+          fee: appFeeFounder,
+          gst_amount: gstOnAppFee,
           meta
         }
       });
+      const finalPayerNumber = invoiceNumberFor(transactionId, payerInv.id);
+      await (prisma as any).invoice.update({
+        where: { id: payerInv.id },
+        data: { invoice_number: finalPayerNumber }
+      });
       payerInvoiceId = payerInv.id;
     }
-    if (!receiverInvoiceId) {
+    if (createReceiver && !receiverInvoiceId) {
       const receiverInv = await (prisma as any).invoice.create({
         data: {
           billing_transaction_id: transactionId,
@@ -1098,9 +1231,19 @@ export class BillingService {
           amount,
           currency_code: currencyCode,
           description: transaction.description,
-          invoice_number: `INV-${transaction.unique_id}-receiver`,
+          invoice_number: `INV-${transactionId}-R-${Date.now()}`,
+          gst_number: platformGst,
+          sender_gst: senderGst,
+          receiver_gst: receiverGst,
+          fee: serviceCharge,
+          gst_amount: gstOnServiceCharge,
           meta
         }
+      });
+      const finalReceiverNumber = invoiceNumberFor(transactionId, receiverInv.id);
+      await (prisma as any).invoice.update({
+        where: { id: receiverInv.id },
+        data: { invoice_number: finalReceiverNumber }
       });
       receiverInvoiceId = receiverInv.id;
     }
@@ -1129,20 +1272,29 @@ export class BillingService {
     const isPayer = transaction.from_id === userId;
     const party = isPayer ? 'payer' : 'receiver';
     let invoice = isPayer ? transaction.payer_invoice : transaction.receiver_invoice;
-    if (!invoice) {
-      await this.createInvoicesForTransaction(transaction.id);
+    if (!invoice && isPayer) {
+      await this.createInvoicesForTransaction(transaction.id, { receiver: false });
       const refreshed = await (prisma as any).billingTransaction.findUnique({
         where: { id: transaction.id },
         include: { payer_invoice: true, receiver_invoice: true }
       });
-      invoice = party === 'payer' ? refreshed?.payer_invoice : refreshed?.receiver_invoice;
+      invoice = refreshed?.payer_invoice ?? null;
     }
     if (!invoice) return { success: false as const, message: 'Invoice not found' };
+    const inv = invoice as any;
+    const platformGstForResponse = inv.gst_number ?? inv.platform_gst ?? (appConfig.platformGstNumber ?? undefined);
     return {
       success: true as const,
       data: {
         uniqueId: transaction.unique_id,
         invoiceNumber: invoice.invoice_number,
+        party,
+        gstNumber: platformGstForResponse,
+        platformGst: inv.platform_gst ?? undefined,
+        senderGst: inv.sender_gst ?? undefined,
+        receiverGst: inv.receiver_gst ?? undefined,
+        fee: inv.fee != null ? parseFloat(inv.fee.toString()) : undefined,
+        gstAmount: inv.gst_amount != null ? parseFloat(inv.gst_amount.toString()) : undefined,
         senderName: invoice.sender_name,
         receiverName: invoice.receiver_name,
         amount: parseFloat(invoice.amount.toString()),

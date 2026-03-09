@@ -7,6 +7,12 @@ const router = Router();
 
 router.use(authenticateToken)
 
+// Payment breakdown (fee, gst, total) – optional query ?amount=<milestoneAmount>
+router.get(
+  "/payment-breakdown",
+  BillingController.getPaymentBreakdown
+);
+
 // Razorpay Order Creation (for testing)
 router.post(
   "/initiate-verification-order",
@@ -60,6 +66,14 @@ router.get(
 router.post(
   "/transaction/:uniqueId/release",
   BillingController.releasePayment
+);
+router.post(
+  "/transaction/:uniqueId/request-withdraw",
+  BillingController.requestWithdrawForPayment
+);
+router.post(
+  "/transaction/:uniqueId/receiver-released",
+  BillingController.webhookReceiverReleased
 );
 
 // Balance Route

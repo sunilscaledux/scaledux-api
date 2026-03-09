@@ -30,11 +30,11 @@ function normalizeRole(role: string | null | undefined): UserRole {
  * Ensure user has profile_sections initialized (all false for their role's keys). Used when sections are null (e.g. first time completion API is called).
  */
 export async function ensureSectionsInitialized(userId: number, role: UserRole | string | null): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
+  const pref = await prisma.userPreference.findUnique({
+    where: { user_id: userId },
     select: { profile_sections: true },
   });
-  if (!user || user.profile_sections != null) return;
+  if (pref?.profile_sections != null) return;
   await setProfileSectionsForRole(userId, role);
 }
 
@@ -47,12 +47,14 @@ export async function setProfileSectionsForRole(userId: number, role: UserRole |
   for (const s of roleSections) {
     initial[s.key] = false;
   }
+  await prisma.userPreference.upsert({
+    where: { user_id: userId },
+    create: { user_id: userId, profile_sections: initial as object },
+    update: { profile_sections: initial as object },
+  });
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      profile_sections: initial as object,
-      profile_completion_percentage: 0,
-    },
+    data: { profile_completion_percentage: 0 },
   });
 }
 
@@ -64,46 +66,48 @@ export async function updateCompletionSection(
   sectionKey: ProfileCompletionSectionKey,
   completed: boolean
 ): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { profile_sections: true, role: true },
-  });
+  const [user, pref] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
+    prisma.userPreference.findUnique({ where: { user_id: userId }, select: { profile_sections: true } }),
+  ]);
   if (!user) return;
-  const current = (user.profile_sections as ProfileCompletionSectionsMap) || {};
+  const current = (pref?.profile_sections as ProfileCompletionSectionsMap) || {};
   const next = { ...current, [sectionKey]: completed };
   const role = normalizeRole(user.role);
   const percentage = computeCompletionPercentage(next, role);
+  await prisma.userPreference.upsert({
+    where: { user_id: userId },
+    create: { user_id: userId, profile_sections: next as object },
+    update: { profile_sections: next as object },
+  });
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      profile_sections: next as object,
-      profile_completion_percentage: percentage,
-    },
+    data: { profile_completion_percentage: percentage },
   });
 }
 
 /**
- * Get profile completion for the user. Uses stored profile_sections and role; returns role-based % and section list.
+ * Get profile completion for the user. Uses stored profile_sections (UserPreference) and role; returns role-based % and section list.
  */
 export async function calculateProfileCompletion(userId: number): Promise<ProfileCompletionResult> {
-  let user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { profile_sections: true, profile_completion_percentage: true, role: true },
-  });
+  const [user, pref] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { profile_completion_percentage: true, role: true },
+    }),
+    prisma.userPreference.findUnique({
+      where: { user_id: userId },
+      select: { profile_sections: true },
+    }),
+  ]);
   if (!user) throw new Error('User not found');
   const role = normalizeRole(user.role);
   await ensureSectionsInitialized(userId, role);
-  if (user.profile_sections == null) {
-    user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { profile_sections: true, profile_completion_percentage: true, role: true },
-    }) as typeof user;
-  }
-  const sections = (user!.profile_sections as ProfileCompletionSectionsMap) || {};
+  const sections = (pref?.profile_sections as ProfileCompletionSectionsMap) || {};
   const roleSections = getSectionsForRole(role);
   const totalPercentage =
-    user!.profile_completion_percentage != null
-      ? user!.profile_completion_percentage
+    user.profile_completion_percentage != null
+      ? user.profile_completion_percentage
       : computeCompletionPercentage(sections, role);
   const completedFields: Record<string, boolean> = {};
   const fieldPercentages: Record<string, number> = {};

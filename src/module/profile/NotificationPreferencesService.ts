@@ -14,12 +14,16 @@ export class NotificationPreferencesService {
   static async getPreferences(userId: number): Promise<ServiceResponse<EmailPreferencesRecord>> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { email_notification_preferences: true }
+      select: { id: true }
     });
     if (!user) {
       return { success: false, message: 'User not found' };
     }
-    const raw = user.email_notification_preferences;
+    const pref = await prisma.userPreference.findUnique({
+      where: { user_id: userId },
+      select: { email_notification_preferences: true }
+    });
+    const raw = pref?.email_notification_preferences;
     const preferences: EmailPreferencesRecord = typeof raw === 'object' && raw !== null ? { ...(raw as Record<string, boolean>) } : {};
     return { success: true, message: 'OK', data: preferences };
   }
@@ -31,9 +35,10 @@ export class NotificationPreferencesService {
       if (typeof value !== 'boolean') continue;
       preferences[key as NotificationEmailType] = value;
     }
-    await prisma.user.update({
-      where: { id: userId },
-      data: { email_notification_preferences: preferences as object }
+    await prisma.userPreference.upsert({
+      where: { user_id: userId },
+      create: { user_id: userId, email_notification_preferences: preferences as object },
+      update: { email_notification_preferences: preferences as object }
     });
     return { success: true, message: 'Preferences updated', data: preferences };
   }

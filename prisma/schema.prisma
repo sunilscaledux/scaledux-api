@@ -51,15 +51,9 @@ model User {
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
-  profile_sections              Json?     // role-based: { sectionKey: boolean } - init on first login/register with role's sections only
-  profile_completion_percentage Int?    // 0-100, cached from profile_sections + role weights
-  /** Per-type email preference: { [NotificationEmailType]: boolean }. Missing or true = send email; false = do not send. Default = send all. */
-  email_notification_preferences Json?
-  // Billing totals (updated on every billing transaction)
-  total_earning    Decimal?  @db.Decimal(15, 2) @default(0)  // sum of all completed credits (received)
-  total_withdrawal Decimal?  @db.Decimal(15, 2) @default(0)  // sum of all completed withdrawals
-  wallet_amount    Decimal?  @db.Decimal(15, 2) @default(0)  // current balance (total_earning - debits)
-  pending_amount   Decimal?  @db.Decimal(15, 2) @default(0)  // sum of pending credits (to be received)
+  profile_completion_percentage Int?    // 0-100, cached from preference.profile_sections + role weights
+  preference                    UserPreference?
+  wallet                        UserWallet?
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
   proposals                    Proposal[] @relation("UserProposals")
@@ -77,6 +71,36 @@ model User {
   @@index([googleId])
   @@index([linkedinId])
   @@map("scd_users")
+}
+
+/** Section completion + email notification preferences (moved off User). */
+model UserPreference {
+  id                            Int      @id @default(autoincrement())
+  user_id                       Int      @unique
+  /** Role-based profile section completion: { [sectionKey]: boolean }. */
+  profile_sections               Json?
+  /** Per-type email preference: { [NotificationEmailType]: boolean }. false = do not send. */
+  email_notification_preferences Json?
+  created_at                    DateTime @default(now())
+  updated_at                    DateTime @updatedAt
+
+  user                          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  @@map("scd_user_preferences")
+}
+
+/** Wallet and billing totals (moved off User). One row per user. */
+model UserWallet {
+  id                Int      @id @default(autoincrement())
+  user_id           Int      @unique
+  wallet_amount     Decimal  @db.Decimal(15, 2) @default(0)  // current balance
+  total_earning     Decimal  @db.Decimal(15, 2) @default(0)  // sum of completed credits received
+  total_withdrawal  Decimal  @db.Decimal(15, 2) @default(0)  // sum of completed withdrawals
+  pending_amount    Decimal  @db.Decimal(15, 2) @default(0)  // sum of pending credits to be received
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  @@map("scd_user_wallets")
 }
 
 // Personal Info - Common for all user types
@@ -1272,7 +1296,18 @@ model Invoice {
   currency_code         String   @db.VarChar(10)
   description           String   @db.Text
   invoice_number        String   @unique @db.VarChar(50)
+  /** Platform GSTIN (issuer) */
   gst_number            String?  @db.VarChar(50)
+  /** Platform GST number (same as gst_number; explicit column for clarity) */
+  platform_gst          String?  @db.VarChar(50)
+  /** Sender (from_id) GST if they have one */
+  sender_gst            String?  @db.VarChar(50)
+  /** Receiver (to_id) GST if they have one */
+  receiver_gst          String?  @db.VarChar(50)
+  /** Platform/service fee amount for this transaction (e.g. receiver invoice shows fee) */
+  fee                    Decimal? @db.Decimal(10, 2)
+  /** GST/tax amount if applicable */
+  gst_amount            Decimal? @db.Decimal(10, 2)
   file_url              String?  @db.VarChar(500)
   /** Razorpay payment/payout details; full metadata lives here */
   meta                  Json?

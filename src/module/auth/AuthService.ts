@@ -274,6 +274,9 @@ export async function createUserAfterOtpVerification(
     const user = await prisma.user.create({
       data: userData,
     });
+    await prisma.personalInfo.create({
+      data: { user_id: user.id },
+    });
     const { password, ...safeUser } = user;
     return {
       success: true,

@@ -767,6 +767,11 @@ export async function updateUserRole(req: Request, res: Response) {
     });
 
     await setProfileSectionsForRole(userId, role);
+    await prisma.personalInfo.upsert({
+      where: { user_id: userId },
+      create: { user_id: userId },
+      update: {},
+    });
 
     return ApiResponse.success(
       res,

@@ -5,8 +5,6 @@ import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { ulid } from 'ulid';
 import { updateCompletionSection } from './ProfileCompletionService';
-import { getSectionsForRole } from '../../constants/profileCompletion';
-import type { ProfileCompletionSectionsMap } from '../../constants/profileCompletion';
 
 /**
  * PersonalInfoService
@@ -97,32 +95,17 @@ export class PersonalInfoService {
       let profile = await prisma.personalInfo.findUnique({
         where: { user_id: userId },
         include: {
-          user: {
-            include: {
-              currency: true,
-            },
-          },
+          user: { include: { currency: true } },
           country: true,
           state: true,
         },
       });
 
-      // Auto-create profile if it doesn't exist
       if (!profile) {
-        profile = await prisma.personalInfo.create({
-          data: {
-            user_id: userId,
-          },
-          include: {
-            user: {
-              include: {
-                currency: true,
-              },
-            },
-            country: true,
-            state: true,
-          },
-        });
+        return {
+          success: false,
+          message: 'Profile not found. Please set your role (PATCH /auth/role) or complete registration.',
+        };
       }
 
       // Combine user account data with profile data (UserDetail = UserProfile + User)
@@ -162,19 +145,6 @@ export class PersonalInfoService {
         agency_verification_status: profile.user.agency_verification_status,
         agency_verified_at: profile.user.agency_verified_at?.toISOString(),
         show_as_agency: profile.user.show_as_agency,
-        profile_completion_percentage: profile.user.profile_completion_percentage ?? null,
-        min_profile_completion_percent: Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50,
-        can_submit_proposal: (profile.user.profile_completion_percentage ?? 0) >= (Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50),
-        sections: (() => {
-          const role = profile.user.role;
-          const sectionsMap = (profile.user as { profile_sections?: ProfileCompletionSectionsMap | null }).profile_sections ?? null;
-          return getSectionsForRole(role).map((s) => ({
-            key: s.key,
-            label: s.label,
-            route: s.route,
-            isCompleted: !!(sectionsMap && sectionsMap[s.key] === true),
-          }));
-        })(),
       };
 
       // Include agency name only when agency is verified

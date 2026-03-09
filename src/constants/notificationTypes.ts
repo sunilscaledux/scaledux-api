@@ -1,9 +1,5 @@
-/**
- * Notification/email event types. Single source of truth for backend and frontend.
- * Used when creating in-app notifications and when checking email preferences.
- * Default: send email for all types unless user opts out (email_notification_preferences[type] === false).
- * Categories: Recruiting, Proposals, Connections, Subscriptions, System.
- */
+
+
 export const NOTIFICATION_EMAIL_TYPES = [
   // Recruiting
   { type: 'INTERVIEW_ACCEPTED_OR_OFFER_MODIFIED', label: 'An interview is accepted or offer terms are modified', category: 'Recruiting' },
