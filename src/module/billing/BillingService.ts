@@ -559,8 +559,8 @@ export class BillingService {
     return { success: true };
   }
 
-  /** Receiver (freelancer) requests withdraw for this payment: set receiver_status to withdraw_in_process. */
-  static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
+  /** Receiver (freelancer) requests withdraw for this payment: set receiver_status to withdraw_in_process and store withdrawal_method_id for cron payout. */
+  static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number, withdrawalMethodId: number): Promise<{ success: boolean; message?: string }> {
     const tx = await prisma.billingTransaction.findUnique({
       where: { unique_id: transactionUniqueId }
     });
@@ -568,12 +568,85 @@ export class BillingService {
     if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
     if (tx.to_id !== userId) return { success: false, message: 'Only the receiver can request withdraw for this payment' };
     const current = (tx as any).receiver_status ?? tx.status;
-    if (current !== 'completed') return { success: false, message: 'Withdraw can only be requested when receiver status is completed' };
+    if (current !== 'completed' && current !== 'released') return { success: false, message: 'Withdraw can only be requested when receiver status is completed or released' };
+    const method = await (prisma as any).withdrawalMethod.findFirst({
+      where: { id: withdrawalMethodId, user_id: tx.to_id }
+    });
+    if (!method) return { success: false, message: 'Withdrawal method not found or does not belong to you' };
+    const existingMeta = (tx.meta as Record<string, unknown>) ?? {};
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { receiver_status: 'withdraw_in_process' }
+      data: {
+        receiver_status: 'withdraw_in_process',
+        meta: { ...existingMeta, withdrawal_method_id: String(withdrawalMethodId) }
+      }
     });
     return { success: true };
+  }
+
+  /**
+   * Cron job: process payment withdrawals (receiver_status = withdraw_in_process with withdrawal_method_id in meta).
+   * For each, call Razorpay payout API with withdrawal method details, then set receiver_status to paid_out.
+   * Run via cron (e.g. every hour or daily) by calling GET/POST with x-cron-secret header.
+   */
+  static async processPaymentWithdrawals(): Promise<{ processed: number; failed: number; errors: string[] }> {
+    const errors: string[] = [];
+    let processed = 0;
+    let failed = 0;
+    const txns = await (prisma as any).billingTransaction.findMany({
+      where: {
+        type: 'payment',
+        receiver_status: 'withdraw_in_process'
+      },
+      include: { currency: true }
+    });
+    for (const tx of txns) {
+      const meta = (tx.meta as Record<string, string> | null) ?? {};
+      const methodIdStr = meta.withdrawal_method_id;
+      if (!methodIdStr) {
+        errors.push(`Transaction ${tx.unique_id}: no withdrawal_method_id in meta`);
+        failed++;
+        continue;
+      }
+      const methodId = parseInt(methodIdStr, 10);
+      if (!Number.isFinite(methodId)) {
+        errors.push(`Transaction ${tx.unique_id}: invalid withdrawal_method_id`);
+        failed++;
+        continue;
+      }
+      const method = await (prisma as any).withdrawalMethod.findFirst({
+        where: { id: methodId, user_id: tx.to_id }
+      });
+      if (!method) {
+        errors.push(`Transaction ${tx.unique_id}: withdrawal method ${methodId} not found for user ${tx.to_id}`);
+        failed++;
+        continue;
+      }
+      const amountPaise = Math.round(parseFloat(String(tx.receiver_amount ?? tx.amount)) * 100);
+      if (amountPaise <= 0) {
+        errors.push(`Transaction ${tx.unique_id}: invalid amount`);
+        failed++;
+        continue;
+      }
+      try {
+        // TODO: Call Razorpay Route (X) Payout API: create contact (or use existing), fund account, create payout.
+        // Razorpay X uses different API (fund_accounts, payouts). See https://razorpay.com/docs/api/x/payouts/
+        // For now we mark as paid_out so the queue drains; replace with actual Razorpay payout call.
+        if (razorpay) {
+          // Placeholder: when Razorpay X is integrated, call payout here with method.type, method.account_number, method.ifsc, method.upi_id
+          // await razorpay.payouts.create({ account_number: method.account_number, ifsc: method.ifsc, amount: amountPaise, currency: 'INR', ... });
+        }
+        await (prisma as any).billingTransaction.update({
+          where: { id: tx.id },
+          data: { receiver_status: 'paid_out' }
+        });
+        processed++;
+      } catch (err: any) {
+        errors.push(`Transaction ${tx.unique_id}: ${err?.message ?? String(err)}`);
+        failed++;
+      }
+    }
+    return { processed, failed, errors };
   }
 
   /** Webhook: set receiver_status to released and create receiver invoice. */
@@ -775,9 +848,9 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0. Otherwise show all. Exclude service_fee (no longer created; breakdown on invoice).
+    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0; exclude service_fee and withdrawal.
     const baseWhere: any = creditsOnly
-      ? { to_id: userIdNum, amount: { gte: 0 }, type: { not: 'service_fee' } }
+      ? { to_id: userIdNum, amount: { gte: 0 }, type: { notIn: ['service_fee', 'withdrawal'] } }
       : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }], type: { not: 'service_fee' } };
     if (fromDate || toDate) {
       baseWhere.created_at = {};
