@@ -16,10 +16,10 @@ if (razorpayConfig.key_id && razorpayConfig.key_secret) {
 }
 
 export class BillingService {
-  /** Payer amount (base + app fee + GST) and receiver amount (base - service fee - GST) for payment type. */
-  private static getPayerAndReceiverAmounts(baseAmount: number): { payerAmount: number; receiverAmount: number } {
+  /** Payer amount (base + platform fee + GST only on first milestone) and receiver amount (base - service fee - GST). */
+  private static getPayerAndReceiverAmounts(baseAmount: number, isFirstMilestone: boolean = true): { payerAmount: number; receiverAmount: number } {
     const gstPercent = appConfig.gstPercent / 100;
-    const appFee = appConfig.appFeeFounder;
+    const appFee = isFirstMilestone ? appConfig.appFeeFounder : 0;
     const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
     const serviceFeePercent = appConfig.serviceFeePercent / 100;
     const serviceCharge = Math.round(baseAmount * serviceFeePercent * 100) / 100;
@@ -82,12 +82,13 @@ export class BillingService {
 
   /**
    * Get payment breakdown for display and Razorpay order amount.
-   * Founder pays: milestoneAmount + appFeeFounder + gstOnAppFee = totalFounderPays.
+   * Platform fee (founder charge) is for the whole project: only first milestone gets appFee + gstOnAppFee; rest get 0, 0.
+   * Founder pays: milestoneAmount + (appFee + gstOnAppFee only if first milestone) = totalFounderPays.
    * Freelancer (at release): milestoneAmount - serviceCharge - gstOnServiceCharge = net.
    */
-  static getPaymentBreakdown(milestoneAmount?: number) {
-    const appFee = appConfig.appFeeFounder;
+  static getPaymentBreakdown(milestoneAmount?: number, isFirstMilestone: boolean = true) {
     const gstPercent = appConfig.gstPercent / 100;
+    const appFee = isFirstMilestone ? appConfig.appFeeFounder : 0;
     const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
     const totalFounderPays = milestoneAmount != null
       ? Math.round((milestoneAmount + appFee + gstOnAppFee) * 100) / 100
@@ -420,7 +421,9 @@ export class BillingService {
   }) {
     const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed', milestoneId } = params;
     const currencyId = 1;
-    const { payerAmount, receiverAmount } = this.getPayerAndReceiverAmounts(amount);
+    // Platform fee (founder charge) only on first milestone of project; rest get 0
+    const isFirstMilestone = meta?.milestone_index !== undefined ? meta.milestone_index === '0' : true;
+    const { payerAmount, receiverAmount } = this.getPayerAndReceiverAmounts(amount, isFirstMilestone);
     // When fund loaded (pending): sender = funded, receiver = pending. When completed: both completed.
     const senderStatus = status === 'pending' ? 'funded' : status;
     const receiverStatus = status === 'pending' ? 'pending' : status;
@@ -856,7 +859,10 @@ export class BillingService {
           const invoiceUrlLegacy = t.invoice_url;
           const invoiceUrl = isCredit ? (receiverInv?.file_url ?? invoiceUrlLegacy) : (payerInv?.file_url ?? invoiceUrlLegacy);
           const baseAmt = parseFloat(t.amount?.toString() ?? '0');
-          const computed = t.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmt) : null;
+          const isFirstMilestone = (t.meta as Record<string, string> | null)?.milestone_index !== undefined
+            ? (t.meta as Record<string, string>).milestone_index === '0'
+            : true;
+          const computed = t.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmt, isFirstMilestone) : null;
           const payerAmt = t.payer_amount != null ? parseFloat(t.payer_amount.toString()) : (computed?.payerAmount ?? baseAmt);
           const receiverAmt = t.receiver_amount != null ? parseFloat(t.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmt);
           return {
@@ -1163,7 +1169,10 @@ export class BillingService {
 
     const platformGst = appConfig.platformGstNumber;
     const gstPercent = appConfig.gstPercent / 100;
-    const appFeeFounder = appConfig.appFeeFounder;
+    const isFirstMilestone = (transaction.meta as Record<string, string> | null)?.milestone_index !== undefined
+      ? (transaction.meta as Record<string, string>).milestone_index === '0'
+      : true;
+    const appFeeFounder = isFirstMilestone ? appConfig.appFeeFounder : 0;
     const gstOnAppFee = Math.round(appFeeFounder * gstPercent * 100) / 100;
     const serviceFeePercent = appConfig.serviceFeePercent / 100;
     const serviceCharge = Math.round(amount * serviceFeePercent * 100) / 100;
@@ -1335,7 +1344,8 @@ export class BillingService {
     const invoiceUrlForUser = isCredit ? (receiverInv?.file_url ?? transaction.invoice_url) : (payerInv?.file_url ?? transaction.invoice_url);
     const baseAmount = parseFloat(transaction.amount.toString());
     const tAny = transaction as any;
-    const computed = tAny.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmount) : null;
+    const isFirstMilestone = metaMap.milestone_index !== undefined ? metaMap.milestone_index === '0' : true;
+    const computed = tAny.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmount, isFirstMilestone) : null;
     const payerAmt = tAny.payer_amount != null ? parseFloat(tAny.payer_amount.toString()) : (computed?.payerAmount ?? baseAmount);
     const receiverAmt = tAny.receiver_amount != null ? parseFloat(tAny.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmount);
     const base: any = {

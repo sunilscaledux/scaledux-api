@@ -8,13 +8,16 @@ import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { prisma } from "@services/prismaService";
 
 export class BillingController {
-  // Get payment breakdown (app fee, gst, service fee) for display and Razorpay total
+  // Get payment breakdown (platform fee only on first milestone, gst, service fee) for display and Razorpay total
   static async getPaymentBreakdown(req: Request, res: Response) {
     try {
       const amountParam = req.query.amount ?? req.body?.amount;
+      const firstMilestoneParam = req.query.firstMilestone;
       const milestoneAmount = amountParam != null ? Number(amountParam) : undefined;
+      const isFirstMilestone = firstMilestoneParam === undefined || firstMilestoneParam === 'true' || firstMilestoneParam === '';
       const data = BillingService.getPaymentBreakdown(
-        Number.isFinite(milestoneAmount) ? milestoneAmount : undefined
+        Number.isFinite(milestoneAmount) ? milestoneAmount : undefined,
+        isFirstMilestone
       );
       return ApiResponse.success(res, data);
     } catch (error: any) {
@@ -54,7 +57,7 @@ export class BillingController {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, milestoneId, subjectType, subjectId } = req.body;
+      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, milestoneId, milestoneIndex: milestoneIndexBody, subjectType, subjectId } = req.body;
 
       // Verify Razorpay signature
       const isValid = BillingService.verifyPaymentSignature({
@@ -67,10 +70,11 @@ export class BillingController {
         return ApiResponse.error(res, "Invalid payment signature", 400);
       }
 
-      // Proposal payment: pass milestoneId from frontend
+      // Proposal payment: pass milestoneId and milestoneIndex from frontend (same index used for breakdown)
       const mid = milestoneId != null ? parseInt(milestoneId, 10) : NaN;
+      const milestoneIndexParam = milestoneIndexBody != null ? parseInt(milestoneIndexBody, 10) : undefined;
       if (Number.isFinite(mid) && mid > 0) {
-        const handled = await BillingController.handleMilestonePayment(res, userId, mid, razorpayPaymentId, razorpayOrderId);
+        const handled = await BillingController.handleMilestonePayment(res, userId, mid, razorpayPaymentId, razorpayOrderId, Number.isFinite(milestoneIndexParam) ? milestoneIndexParam : undefined);
         if (handled) return;
       }
       const subjType = (subjectType ?? null) as string | null;
@@ -89,13 +93,15 @@ export class BillingController {
   /**
    * Handle milestone payment: pay one milestone by id; set HIRED on first milestone pay.
    * Second milestone Pay is only allowed after first is completed.
+   * milestoneIndexFromFrontend: optional index from frontend (same as used for breakdown); if provided and valid, used instead of computing.
    */
   private static async handleMilestonePayment(
     res: Response,
     userId: number,
     milestoneId: number,
     razorpayPaymentId?: string,
-    razorpayOrderId?: string
+    razorpayOrderId?: string,
+    milestoneIndexFromFrontend?: number
   ): Promise<boolean> {
     const milestoneRow = await (prisma as any).milestone.findUnique({
       where: { id: milestoneId },
@@ -114,7 +120,12 @@ export class BillingController {
     }
     const proposal = milestoneRow.proposal;
     const rows = proposal.milestonesRows ?? [];
-    const milestoneIndex = rows.findIndex((r: any) => r.id === milestoneId);
+    let milestoneIndex: number;
+    if (milestoneIndexFromFrontend !== undefined && Number.isFinite(milestoneIndexFromFrontend) && rows[milestoneIndexFromFrontend]?.id === milestoneId) {
+      milestoneIndex = milestoneIndexFromFrontend;
+    } else {
+      milestoneIndex = rows.findIndex((r: any) => r.id === milestoneId);
+    }
     if (milestoneIndex < 0) {
       ApiResponse.error(res, "Milestone not found for this proposal", 400);
       return true;
