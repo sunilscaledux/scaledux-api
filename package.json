@@ -62,6 +62,8 @@
     "start": "node dist/server.js",
     "start:socket": "node dist/socket-server.js",
     "start:worker": "node dist/workerServer.js",
+    "start:schedule": "node dist/scheduleServer.js",
+    "dev:schedule": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/scheduleServer.ts",
     "worker": "ts-node -r tsconfig-paths/register src/workerServer.ts",
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   },
