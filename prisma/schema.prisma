@@ -48,6 +48,7 @@ model User {
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
   withdrawalMethods            WithdrawalMethod[]
+  withdrawal_requests          WithdrawalRequest[]
   taxInformation               TaxInformation?
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
@@ -1198,11 +1199,34 @@ model WithdrawalMethod {
   created_at            DateTime @default(now())
   updated_at            DateTime @updatedAt
 
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user                  User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  withdrawal_requests    WithdrawalRequest[]
 
   @@index([user_id])
   @@index([is_default])
   @@map("scd_withdrawal_methods")
+}
+
+// Withdrawal request: one row per "request withdraw" for a payment; cron processes these (status: pending → completed/failed)
+model WithdrawalRequest {
+  id                     Int       @id @default(autoincrement())
+  user_id                Int
+  withdrawal_method_id   Int
+  billing_transaction_id Int       @unique
+  status                 String    @db.VarChar(20)  // pending | processing | completed | failed
+  withdrawal_trigger_at  DateTime  @default(now())
+  processed_at           DateTime?
+  error_message          String?   @db.VarChar(500)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  user                  User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  withdrawal_method     WithdrawalMethod      @relation(fields: [withdrawal_method_id], references: [id], onDelete: Restrict)
+  billing_transaction   BillingTransaction   @relation(fields: [billing_transaction_id], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([withdrawal_trigger_at])
+  @@map("scd_withdrawal_requests")
 }
 
 model TaxInformation {
@@ -1276,6 +1300,7 @@ model BillingTransaction {
   milestone Milestone? @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
   payer_invoice   Invoice?  @relation("BillingPayerInvoice", fields: [payer_invoice_id], references: [id], onDelete: SetNull)
   receiver_invoice Invoice? @relation("BillingReceiverInvoice", fields: [receiver_invoice_id], references: [id], onDelete: SetNull)
+  withdrawal_request WithdrawalRequest?
 
   @@index([actor_type, actor_id])
   @@index([from_type, from_id])

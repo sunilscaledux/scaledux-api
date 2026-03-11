@@ -527,27 +527,7 @@ export class BillingController {
     }
   }
 
-  static async requestWithdrawal(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request withdrawals", 403);
-      const { amount, withdrawalMethodId } = req.body;
-      const amountNum = amount != null ? Number(amount) : NaN;
-      const methodIdNum = withdrawalMethodId != null ? parseInt(String(withdrawalMethodId), 10) : NaN;
-      if (!Number.isFinite(amountNum) || !Number.isFinite(methodIdNum)) {
-        return ApiResponse.error(res, "Amount and withdrawal method ID are required", 400);
-      }
-      const result = await BillingService.requestWithdrawal(userId.toString(), amountNum, methodIdNum);
-      if (!result.success) return ApiResponse.error(res, result.message, 400);
-      return ApiResponse.success(res, result.data, result.message);
-    } catch (error: any) {
-      console.error("Error requesting withdrawal:", error);
-      return ApiResponse.error(res, error.message || "Failed to request withdrawal");
-    }
-  }
-
-  /** Receiver requests withdraw for a payment (sets receiver_status to withdraw_in_process, stores withdrawal method for cron payout). */
+  /** Withdraw a specific payment (this transaction’s amount) to bank: used from transaction detail (POST /transaction/:uniqueId/request-withdraw). */
   static async requestWithdrawForPayment(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
@@ -568,22 +548,6 @@ export class BillingController {
     } catch (error: any) {
       console.error("Error requesting withdraw for payment:", error);
       return ApiResponse.error(res, error.message || "Failed to request withdraw");
-    }
-  }
-
-  /** Cron: process payment withdrawals (call Razorpay payout for each withdraw_in_process with withdrawal method). Protect with x-cron-secret. */
-  static async processPaymentWithdrawalsCron(req: Request, res: Response) {
-    try {
-      const secret = process.env.CRON_SECRET || process.env.API_CRON_SECRET;
-      const headerSecret = req.headers['x-cron-secret'] || req.headers['authorization']?.replace(/^Bearer\s+/i, '');
-      if (secret && headerSecret !== secret) {
-        return ApiResponse.error(res, 'Unauthorized', 401);
-      }
-      const result = await BillingService.processPaymentWithdrawals();
-      return ApiResponse.success(res, result, `Processed ${result.processed}, failed ${result.failed}`);
-    } catch (error: any) {
-      console.error('Error processing payment withdrawals:', error);
-      return ApiResponse.error(res, error.message || 'Failed to process withdrawals');
     }
   }
 

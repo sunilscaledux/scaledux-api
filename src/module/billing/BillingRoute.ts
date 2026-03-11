@@ -5,16 +5,6 @@ import { savePaymentMethodSchema, saveTaxInformationSchema } from "./BillingVali
 
 const router = Router();
 
-// Cron job: process payment withdrawals (no auth; use x-cron-secret header). Call from cron e.g. every hour.
-router.get(
-  "/cron/process-payment-withdrawals",
-  BillingController.processPaymentWithdrawalsCron
-);
-router.post(
-  "/cron/process-payment-withdrawals",
-  BillingController.processPaymentWithdrawalsCron
-);
-
 router.use(authenticateToken)
 
 // Payment breakdown (fee, gst, total) – optional query ?amount=<milestoneAmount>
@@ -108,10 +98,6 @@ router.put(
 router.delete(
   "/withdrawal-method/:withdrawalMethodId",
   BillingController.deleteWithdrawalMethod
-);
-router.post(
-  "/withdraw",
-  BillingController.requestWithdrawal
 );
 
 // Invoice data for client-side PDF (JSON)

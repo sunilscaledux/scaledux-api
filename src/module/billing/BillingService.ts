@@ -559,10 +559,11 @@ export class BillingService {
     return { success: true };
   }
 
-  /** Receiver (freelancer) requests withdraw for this payment: set receiver_status to withdraw_in_process and store withdrawal_method_id for cron payout. */
+  /** Receiver (freelancer) requests withdraw: create WithdrawalRequest (status pending) and set transaction to withdraw_in_process. Cron will process. */
   static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number, withdrawalMethodId: number): Promise<{ success: boolean; message?: string }> {
-    const tx = await prisma.billingTransaction.findUnique({
-      where: { unique_id: transactionUniqueId }
+    const tx = await (prisma as any).billingTransaction.findUnique({
+      where: { unique_id: transactionUniqueId },
+      include: { withdrawal_request: true }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
     if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
@@ -573,76 +574,77 @@ export class BillingService {
       where: { id: withdrawalMethodId, user_id: tx.to_id }
     });
     if (!method) return { success: false, message: 'Withdrawal method not found or does not belong to you' };
-    const existingMeta = (tx.meta as Record<string, unknown>) ?? {};
+    if ((tx as any).withdrawal_request) return { success: false, message: 'Withdrawal already requested for this payment' };
+    await (prisma as any).withdrawalRequest.create({
+      data: {
+        user_id: tx.to_id,
+        withdrawal_method_id: withdrawalMethodId,
+        billing_transaction_id: tx.id,
+        status: 'pending'
+      }
+    });
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: {
-        receiver_status: 'withdraw_in_process',
-        meta: { ...existingMeta, withdrawal_method_id: String(withdrawalMethodId) }
-      }
+      data: { receiver_status: 'withdraw_in_process' }
     });
     return { success: true };
   }
 
   /**
-   * Cron job: process payment withdrawals (receiver_status = withdraw_in_process with withdrawal_method_id in meta).
-   * For each, call Razorpay payout API with withdrawal method details, then set receiver_status to paid_out.
-   * Run via cron (e.g. every hour or daily) by calling GET/POST with x-cron-secret header.
+   * Cron: process WithdrawalRequest rows with status = pending. Call Razorpay payout, then set status to completed (success) or failed.
    */
-  static async processPaymentWithdrawals(): Promise<{ processed: number; failed: number; errors: string[] }> {
+  static async processWithdrawalRequests(): Promise<{ processed: number; failed: number; errors: string[] }> {
     const errors: string[] = [];
     let processed = 0;
     let failed = 0;
-    const txns = await (prisma as any).billingTransaction.findMany({
-      where: {
-        type: 'payment',
-        receiver_status: 'withdraw_in_process'
+    const requests = await (prisma as any).withdrawalRequest.findMany({
+      where: { status: 'pending' },
+      include: {
+        billing_transaction: { include: { currency: true } },
+        withdrawal_method: true
       },
-      include: { currency: true }
+      orderBy: { withdrawal_trigger_at: 'asc' }
     });
-    for (const tx of txns) {
-      const meta = (tx.meta as Record<string, string> | null) ?? {};
-      const methodIdStr = meta.withdrawal_method_id;
-      if (!methodIdStr) {
-        errors.push(`Transaction ${tx.unique_id}: no withdrawal_method_id in meta`);
-        failed++;
-        continue;
-      }
-      const methodId = parseInt(methodIdStr, 10);
-      if (!Number.isFinite(methodId)) {
-        errors.push(`Transaction ${tx.unique_id}: invalid withdrawal_method_id`);
-        failed++;
-        continue;
-      }
-      const method = await (prisma as any).withdrawalMethod.findFirst({
-        where: { id: methodId, user_id: tx.to_id }
-      });
-      if (!method) {
-        errors.push(`Transaction ${tx.unique_id}: withdrawal method ${methodId} not found for user ${tx.to_id}`);
+    for (const req of requests) {
+      const tx = req.billing_transaction;
+      const method = req.withdrawal_method;
+      if (!tx || !method) {
+        errors.push(`WithdrawalRequest ${req.id}: missing transaction or method`);
         failed++;
         continue;
       }
       const amountPaise = Math.round(parseFloat(String(tx.receiver_amount ?? tx.amount)) * 100);
       if (amountPaise <= 0) {
-        errors.push(`Transaction ${tx.unique_id}: invalid amount`);
+        errors.push(`WithdrawalRequest ${req.id}: invalid amount`);
         failed++;
         continue;
       }
       try {
-        // TODO: Call Razorpay Route (X) Payout API: create contact (or use existing), fund account, create payout.
-        // Razorpay X uses different API (fund_accounts, payouts). See https://razorpay.com/docs/api/x/payouts/
-        // For now we mark as paid_out so the queue drains; replace with actual Razorpay payout call.
+        await (prisma as any).withdrawalRequest.update({
+          where: { id: req.id },
+          data: { status: 'processing' }
+        });
+        // TODO: Call Razorpay Route (X) Payout API with method.account_number, method.ifsc, method.upi_id
         if (razorpay) {
-          // Placeholder: when Razorpay X is integrated, call payout here with method.type, method.account_number, method.ifsc, method.upi_id
-          // await razorpay.payouts.create({ account_number: method.account_number, ifsc: method.ifsc, amount: amountPaise, currency: 'INR', ... });
+          // Placeholder for Razorpay payout
         }
+        const now = new Date();
+        await (prisma as any).withdrawalRequest.update({
+          where: { id: req.id },
+          data: { status: 'completed', processed_at: now }
+        });
         await (prisma as any).billingTransaction.update({
           where: { id: tx.id },
           data: { receiver_status: 'paid_out' }
         });
         processed++;
       } catch (err: any) {
-        errors.push(`Transaction ${tx.unique_id}: ${err?.message ?? String(err)}`);
+        const msg = err?.message ?? String(err);
+        await (prisma as any).withdrawalRequest.update({
+          where: { id: req.id },
+          data: { status: 'failed', processed_at: new Date(), error_message: msg.slice(0, 500) }
+        });
+        errors.push(`WithdrawalRequest ${req.id}: ${msg}`);
         failed++;
       }
     }
@@ -1144,52 +1146,6 @@ export class BillingService {
     return { success: true, message: 'Withdrawal method removed' };
   }
 
-  /** Request withdrawal (freelancer only). Creates a withdrawal billing transaction. */
-  static async requestWithdrawal(userId: string, amount: number, withdrawalMethodId: number) {
-    const userIdNum = parseInt(userId);
-    if (!amount || amount <= 0) {
-      return { success: false, message: 'Invalid amount' };
-    }
-    const method = await (prisma as any).withdrawalMethod.findFirst({
-      where: { id: withdrawalMethodId, user_id: userIdNum }
-    });
-    if (!method) {
-      return { success: false, message: 'Withdrawal method not found' };
-    }
-    const balanceResult = await this.getUserBalance(userId);
-    const balance = (balanceResult as any).data?.balance ?? 0;
-    if (amount > balance) {
-      return { success: false, message: 'Insufficient balance' };
-    }
-    const currencyId = 1;
-    const row = await prisma.billingTransaction.create({
-      data: {
-        actor_type: 'User',
-        actor_id: userIdNum,
-        from_type: 'User',
-        from_id: userIdNum,
-        to_type: 'Platform',
-        to_id: 0,
-        subject_type: 'Withdrawal',
-        subject_id: withdrawalMethodId,
-        amount,
-        currency_id: currencyId,
-        type: 'withdrawal',
-        status: 'pending',
-        sender_status: 'pending',
-        receiver_status: 'pending',
-        description: `Withdrawal to ${method.display_label}`,
-        meta: { withdrawal_method_id: String(withdrawalMethodId) } as object
-      } as any
-    });
-    await this.updateUserBillingTotalsAfterTransaction('withdrawal', 'pending', userIdNum, 0, amount);
-    return {
-      success: true,
-      data: { transactionId: row.id, transactionUniqueId: row.unique_id },
-      message: 'Withdrawal requested'
-    };
-  }
-
   // Refund verification amount if needed
   static async refundVerificationAmount(paymentId: string) {
     try {
@@ -1382,7 +1338,12 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: uniqueId },
-      include: { currency: true, payer_invoice: { select: { id: true, file_url: true } }, receiver_invoice: { select: { id: true, file_url: true } } }
+      include: {
+        currency: true,
+        payer_invoice: { select: { id: true, file_url: true } },
+        receiver_invoice: { select: { id: true, file_url: true } },
+        withdrawal_request: { select: { status: true } }
+      }
     });
     if (!transaction) {
       return { success: false, message: 'Transaction not found' };
@@ -1421,6 +1382,9 @@ export class BillingService {
     const computed = tAny.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmount, isFirstMilestone) : null;
     const payerAmt = tAny.payer_amount != null ? parseFloat(tAny.payer_amount.toString()) : (computed?.payerAmount ?? baseAmount);
     const receiverAmt = tAny.receiver_amount != null ? parseFloat(tAny.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmount);
+    const wr = (transaction as any).withdrawal_request;
+    const withdrawalStatusRaw = wr?.status ?? null;
+    const withdrawalStatus = withdrawalStatusRaw === 'completed' ? 'success' : withdrawalStatusRaw;
     const base: any = {
       id: transaction.id,
       uniqueId: transaction.unique_id,
@@ -1433,6 +1397,7 @@ export class BillingService {
       status: transaction.status,
       senderStatus: transaction.sender_status ?? transaction.status,
       receiverStatus: transaction.receiver_status ?? transaction.status,
+      withdrawalStatus: withdrawalStatus ?? null,
       adminStatus: transaction.admin_status ?? null,
       description: transaction.description,
       invoiceUrl: invoiceUrlForUser,
