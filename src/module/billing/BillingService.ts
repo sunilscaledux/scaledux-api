@@ -5,6 +5,7 @@ import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
 import { appConfig } from "@config/app";
 import { convertToUserCurrency } from "@utils/currencyConverter";
+import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
 
 // Initialize Razorpay (only if keys are provided)
 let razorpay: any = null;
@@ -613,6 +614,12 @@ export class BillingService {
         failed++;
         continue;
       }
+      const fundAccountId = (method as any).razorpay_fund_account_id;
+      if (!fundAccountId) {
+        errors.push(`WithdrawalRequest ${req.id}: bank not verified (no razorpay_fund_account_id)`);
+        failed++;
+        continue;
+      }
       const amountPaise = Math.round(parseFloat(String(tx.receiver_amount ?? tx.amount)) * 100);
       if (amountPaise <= 0) {
         errors.push(`WithdrawalRequest ${req.id}: invalid amount`);
@@ -624,9 +631,9 @@ export class BillingService {
           where: { id: req.id },
           data: { status: 'processing' }
         });
-        // TODO: Call Razorpay Route (X) Payout API with method.account_number, method.ifsc, method.upi_id
-        if (razorpay) {
-          // Placeholder for Razorpay payout
+        // TODO: Call razorpayService.createPayout(fundAccountId, amountPaise, ...) when implemented
+        if (isRazorpayConfigured()) {
+          // Payout logic will live in @services/razorpayService
         }
         const now = new Date();
         await (prisma as any).withdrawalRequest.update({
@@ -1051,25 +1058,26 @@ export class BillingService {
     };
   }
 
-  // ----- Withdrawal methods (freelancer only) -----
+  // ----- Withdrawal methods (freelancer only): single bank account per user -----
 
   static async getWithdrawalMethods(userId: string) {
     const userIdNum = parseInt(userId);
     const methods = await (prisma as any).withdrawalMethod.findMany({
       where: { user_id: userIdNum },
-      orderBy: [{ is_default: 'desc' }, { created_at: 'desc' }]
+      orderBy: { created_at: 'desc' }
     });
     return {
       success: true,
       data: methods.map((m: any) => ({
         id: m.id,
+        uniqueId: m.unique_id,
         type: m.type,
         displayLabel: m.display_label,
         bankName: m.bank_name,
         accountNumberLast4: m.account_number_last4,
         ifsc: m.ifsc,
-        upiId: m.upi_id,
-        isDefault: m.is_default,
+        verificationStatus: m.verification_status ?? 'pending',
+        verificationFailureReason: m.verification_failure_reason ?? null,
         createdAt: m.created_at
       }))
     };
@@ -1077,73 +1085,238 @@ export class BillingService {
 
   static async createWithdrawalMethod(
     userId: string,
-    data: { type: string; displayLabel: string; bankName?: string; accountNumber?: string; accountNumberLast4?: string; ifsc?: string; upiId?: string; isDefault?: boolean }
+    data: { type?: string; displayLabel: string; bankName?: string; accountNumber?: string; accountNumberLast4?: string; ifsc?: string; isDefault?: boolean }
   ) {
     const userIdNum = parseInt(userId);
-    if (data.type === 'bank_account' && !data.accountNumber?.trim()) {
+    if (data.type && data.type !== 'bank_account') {
+      return { success: false, message: 'Only bank account is supported. UPI is not available.' };
+    }
+    if (!data.accountNumber?.trim()) {
       return { success: false, message: 'Bank account number is required' };
     }
-    const accountNumber = data.accountNumber?.replace(/\D/g, '').trim() || null;
-    const accountNumberLast4 = accountNumber
-      ? accountNumber.slice(-4)
-      : (data.accountNumberLast4?.replace(/\D/g, '').slice(-4) || null);
-    if (data.isDefault) {
-      await (prisma as any).withdrawalMethod.updateMany({
-        where: { user_id: userIdNum },
-        data: { is_default: false }
-      });
+    const ifsc = (data.ifsc || '').trim().toUpperCase();
+    if (!ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
     }
+    const existing = await (prisma as any).withdrawalMethod.findFirst({
+      where: { user_id: userIdNum }
+    });
+    if (existing) {
+      return { success: false, message: 'You already have bank information. Remove it first to add new details.' };
+    }
+    const accountNumber = data.accountNumber.replace(/\D/g, '').trim() || null;
+    const accountNumberLast4 = accountNumber ? accountNumber.slice(-4) : (data.accountNumberLast4?.replace(/\D/g, '').slice(-4) || null);
     const method = await (prisma as any).withdrawalMethod.create({
       data: {
         user_id: userIdNum,
-        type: data.type,
+        type: 'bank_account',
         display_label: data.displayLabel,
         bank_name: data.bankName ?? null,
-        account_number: data.type === 'bank_account' ? accountNumber : null,
-        account_number_last4: data.type === 'bank_account' ? accountNumberLast4 : null,
-        ifsc: data.ifsc ?? null,
-        upi_id: data.upiId ?? null,
-        is_default: data.isDefault ?? false
+        account_number: accountNumber,
+        account_number_last4: accountNumberLast4,
+        ifsc,
+        verification_status: 'pending'
       }
     });
     return {
       success: true,
-      message: 'Withdrawal method added',
+      message: 'Bank details submitted. Verification is in process.',
       data: {
         id: method.id,
+        uniqueId: method.unique_id,
         type: method.type,
         displayLabel: method.display_label,
         bankName: method.bank_name,
         accountNumberLast4: method.account_number_last4,
         ifsc: method.ifsc,
-        upiId: method.upi_id,
-        isDefault: method.is_default,
+        verificationStatus: 'pending',
         createdAt: method.created_at
       }
     };
   }
 
-  static async setDefaultWithdrawalMethod(userId: string, methodId: string) {
-    const userIdNum = parseInt(userId);
-    const methodIdNum = parseInt(methodId);
-    await (prisma as any).withdrawalMethod.updateMany({
-      where: { user_id: userIdNum },
-      data: { is_default: false }
-    });
-    await (prisma as any).withdrawalMethod.update({
-      where: { id: methodIdNum, user_id: userIdNum },
-      data: { is_default: true }
-    });
-    return { success: true, message: 'Default withdrawal method updated' };
-  }
-
   static async deleteWithdrawalMethod(userId: string, methodId: string) {
     const userIdNum = parseInt(userId);
     const methodIdNum = parseInt(methodId);
+    const method = await (prisma as any).withdrawalMethod.findFirst({
+      where: { id: methodIdNum, user_id: userIdNum }
+    });
+    if (method) {
+      await (prisma as any).user.update({
+        where: { id: userIdNum },
+        data: { razorpay_account_id: null }
+      });
+    }
     await (prisma as any).withdrawalMethod.deleteMany({
       where: { id: methodIdNum, user_id: userIdNum }
     });
     return { success: true, message: 'Withdrawal method removed' };
+  }
+
+  /** Resubmit bank for verification after a failed attempt. Clears failure reason and sets status to pending. */
+  static async resubmitForVerification(userId: string): Promise<{ success: boolean; message: string; data?: any }> {
+    const userIdNum = parseInt(userId);
+    const method = await (prisma as any).withdrawalMethod.findFirst({
+      where: { user_id: userIdNum }
+    });
+    if (!method) {
+      return { success: false, message: 'No bank account found. Add bank details first.' };
+    }
+    if (method.verification_status !== 'failed') {
+      return { success: false, message: 'Only failed verification can be resubmitted.' };
+    }
+    await prisma.$executeRaw`
+      UPDATE scd_withdrawal_methods
+      SET verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
+      WHERE id = ${method.id} AND user_id = ${userIdNum}
+    `;
+    return {
+      success: true,
+      message: 'Resubmitted for verification. We will verify your bank account shortly.',
+      data: {
+        id: method.id,
+        verificationStatus: 'pending',
+        verificationFailureReason: null,
+      }
+    };
+  }
+
+  /** Update bank details when verification failed; sets status back to pending so cron can re-verify. */
+  static async updateWithdrawalMethod(
+    userId: string,
+    methodId: string,
+    data: { displayLabel?: string; bankName?: string; accountNumber?: string; ifsc?: string }
+  ): Promise<{ success: boolean; message: string; data?: any }> {
+    const userIdNum = parseInt(userId);
+    const methodIdNum = parseInt(methodId);
+    const method = await (prisma as any).withdrawalMethod.findFirst({
+      where: { id: methodIdNum, user_id: userIdNum }
+    });
+    if (!method) {
+      return { success: false, message: 'Withdrawal method not found.' };
+    }
+    if (method.verification_status !== 'failed') {
+      return { success: false, message: 'Only failed bank details can be edited. Remove and add again to change verified method.' };
+    }
+    const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : method.ifsc;
+    if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
+    }
+    const accountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : method.account_number;
+    if (!accountNumber || accountNumber.length < 9) {
+      return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
+    }
+    const accountNumberLast4 = accountNumber.slice(-4);
+    const displayLabel = data.displayLabel?.trim() ?? method.display_label;
+    const bankName = data.bankName?.trim() ?? method.bank_name;
+    await prisma.$executeRaw`
+      UPDATE scd_withdrawal_methods
+      SET display_label = ${displayLabel}, bank_name = ${bankName}, account_number = ${accountNumber},
+          account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
+          verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
+      WHERE id = ${methodIdNum} AND user_id = ${userIdNum}
+    `;
+    const updated = await (prisma as any).withdrawalMethod.findUnique({
+      where: { id: methodIdNum }
+    });
+    return {
+      success: true,
+      message: 'Bank details updated. Verification is in process.',
+      data: updated ? {
+        id: updated.id,
+        type: updated.type,
+        displayLabel: updated.display_label,
+        bankName: updated.bank_name,
+        accountNumberLast4: updated.account_number_last4,
+        ifsc: updated.ifsc,
+        verificationStatus: 'pending',
+        verificationFailureReason: null,
+        createdAt: updated.created_at
+      } : undefined
+    };
+  }
+
+  /**
+   * Cron: verify pending bank accounts via Razorpay X (contact + fund account).
+   * Updates WithdrawalMethod.razorpay_fund_account_id and verification_status; User.razorpay_account_id.
+   */
+  static async verifyPendingBankAccounts(): Promise<{ verified: number; failed: number; errors: string[] }> {
+    const result = { verified: 0, failed: 0, errors: [] as string[] };
+    if (!isRazorpayConfigured()) {
+      result.errors.push("Razorpay not configured");
+      return result;
+    }
+    const pending = await (prisma as any).withdrawalMethod.findMany({
+      where: { verification_status: "pending", type: "bank_account" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            phone: true,
+            razorpay_contact_id: true,
+          },
+        },
+      }
+    });
+    for (const method of pending) {
+      const accountNumber = (method.account_number || "").trim();
+      const ifsc = (method.ifsc || "").trim().toUpperCase();
+      if (!accountNumber || accountNumber.length < 9 || !ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        const reason = "Missing or invalid account number or IFSC. Please check and resubmit.";
+        await (prisma as any).withdrawalMethod.update({
+          where: { id: method.id },
+          data: { verification_status: "failed", verification_failure_reason: reason }
+        });
+        result.failed++;
+        result.errors.push(`WithdrawalMethod ${method.id}: missing or invalid account_number/ifsc`);
+        continue;
+      }
+      const u = method.user;
+      const name = [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() || method.display_label || "Account Holder";
+      const email = (u?.email || "").trim() || `user-${method.user_id}@scaledux.placeholder`;
+      const contact = (u?.phone || "").replace(/\D/g, "").slice(-10) || "0000000000";
+      try {
+        const existingContactId = (u as any).razorpay_contact_id ?? null;
+        const { contactId, fundAccountId } = await createContactAndFundAccount({
+          name,
+          email,
+          contact,
+          ifsc,
+          accountNumber,
+          existingContactId: existingContactId || undefined,
+          validateBeneficiaryName: true,
+        });
+        await (prisma as any).withdrawalMethod.update({
+          where: { id: method.id },
+          data: {
+            razorpay_fund_account_id: fundAccountId,
+            verification_status: "verified",
+            verification_failure_reason: null,
+          }
+        });
+        await (prisma as any).user.update({
+          where: { id: method.user_id },
+          data: {
+            razorpay_account_id: fundAccountId,
+            ...(contactId && !existingContactId ? { razorpay_contact_id: contactId } : {}),
+          }
+        });
+        result.verified++;
+      } catch (err: any) {
+        const msg = err?.response?.data?.error?.description || err?.message || "Unknown error";
+        const reason = String(msg).slice(0, 500);
+        await (prisma as any).withdrawalMethod.update({
+          where: { id: method.id },
+          data: { verification_status: "failed", verification_failure_reason: reason }
+        }).catch(() => {});
+        result.failed++;
+        result.errors.push(`WithdrawalMethod ${method.id}: ${msg}`);
+      }
+    }
+    return result;
   }
 
   // Refund verification amount if needed

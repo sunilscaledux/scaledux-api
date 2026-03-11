@@ -91,13 +91,18 @@ router.post(
   "/withdrawal-methods",
   BillingController.createWithdrawalMethod
 );
-router.put(
-  "/withdrawal-method/:withdrawalMethodId/set-default",
-  BillingController.setDefaultWithdrawalMethod
-);
 router.delete(
   "/withdrawal-method/:withdrawalMethodId",
   BillingController.deleteWithdrawalMethod
+);
+/** Retry verification without editing: sets status to pending and clears failure reason (e.g. after temporary Razorpay failure). */
+router.post(
+  "/withdrawal-methods/resubmit-verification",
+  BillingController.resubmitForVerification
+);
+router.patch(
+  "/withdrawal-method/:withdrawalMethodId",
+  BillingController.updateWithdrawalMethod
 );
 
 // Invoice data for client-side PDF (JSON)

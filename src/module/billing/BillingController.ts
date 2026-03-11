@@ -497,21 +497,6 @@ export class BillingController {
     }
   }
 
-  static async setDefaultWithdrawalMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can update withdrawal methods", 403);
-      const methodId = getStringParam(req.params.withdrawalMethodId);
-      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
-      await BillingService.setDefaultWithdrawalMethod(userId.toString(), methodId);
-      return ApiResponse.success(res, null, "Default withdrawal method updated");
-    } catch (error: any) {
-      console.error("Error setting default withdrawal method:", error);
-      return ApiResponse.error(res, error.message || "Failed to update withdrawal method");
-    }
-  }
-
   static async deleteWithdrawalMethod(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
@@ -524,6 +509,36 @@ export class BillingController {
     } catch (error: any) {
       console.error("Error deleting withdrawal method:", error);
       return ApiResponse.error(res, error.message || "Failed to delete withdrawal method");
+    }
+  }
+
+  static async resubmitForVerification(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can resubmit bank verification", 403);
+      const result = await BillingService.resubmitForVerification(userId.toString());
+      if (!result.success) return ApiResponse.error(res, result.message, 400);
+      return ApiResponse.success(res, result.data, result.message);
+    } catch (error: any) {
+      console.error("Error resubmitting for verification:", error);
+      return ApiResponse.error(res, error.message || "Failed to resubmit for verification");
+    }
+  }
+
+  static async updateWithdrawalMethod(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can edit bank details", 403);
+      const methodId = getStringParam(req.params.withdrawalMethodId);
+      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
+      const result = await BillingService.updateWithdrawalMethod(userId.toString(), methodId, req.body);
+      if (!result.success) return ApiResponse.error(res, result.message, 400);
+      return ApiResponse.success(res, result.data, result.message);
+    } catch (error: any) {
+      console.error("Error updating withdrawal method:", error);
+      return ApiResponse.error(res, error.message || "Failed to update bank details");
     }
   }
 

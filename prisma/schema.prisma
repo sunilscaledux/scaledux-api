@@ -67,6 +67,10 @@ model User {
   notifications                Notification[]
   is_deactivated               Boolean   @default(false)
   scheduleTermination          ScheduleTermination?
+  /** Razorpay X contact id (cont_xxx); reused when user updates bank so we don't create duplicate contacts. */
+  razorpay_contact_id          String?   @db.VarChar(64)
+  /** Razorpay X fund account id (fa_xxx) for freelancer payouts (set after bank verification). */
+  razorpay_account_id          String?   @db.VarChar(64)
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -1184,18 +1188,22 @@ model PaymentMethod {
   @@map("scd_payment_methods")
 }
 
-// Withdrawal methods for freelancers (bank account, UPI) – selected at withdrawal time
+// Bank information for freelancer payouts (one per user). Verified by cron → razorpay_fund_account_id.
 model WithdrawalMethod {
   id                    Int      @id @default(autoincrement())
-  user_id               Int
-  type                  String   @db.VarChar(20)   // 'bank_account' | 'upi'
-  display_label         String   @db.VarChar(255)  // e.g. "HDFC ****1234" or "UPI: user@paytm"
+  unique_id             String   @unique @default(cuid())
+  user_id               Int      @unique
+  type                  String   @db.VarChar(20)   @default("bank_account")
+  display_label         String   @db.VarChar(255)
   bank_name             String?  @db.VarChar(100)
-  account_number        String?  @db.VarChar(34)  // full account number for payouts (bank only)
-  account_number_last4  String?  @db.VarChar(4)   // last 4 digits for display only
+  account_number        String?  @db.VarChar(34)
+  account_number_last4  String?  @db.VarChar(4)
   ifsc                  String?  @db.VarChar(11)
-  upi_id                String?  @db.VarChar(255)
-  is_default            Boolean  @default(false)
+  razorpay_fund_account_id String? @db.VarChar(64)
+  /** pending = verification in process; verified = razorpay_fund_account_id set; failed = verification failed */
+  verification_status   String   @db.VarChar(20)   @default("pending")
+  /** Reason for failure when verification_status = failed; shown to user so they can fix and resubmit. */
+  verification_failure_reason String? @db.VarChar(500)
   created_at            DateTime @default(now())
   updated_at            DateTime @updatedAt
 
@@ -1203,7 +1211,8 @@ model WithdrawalMethod {
   withdrawal_requests    WithdrawalRequest[]
 
   @@index([user_id])
-  @@index([is_default])
+  @@index([unique_id])
+  @@index([verification_status])
   @@map("scd_withdrawal_methods")
 }
 
