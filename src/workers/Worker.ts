@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { JobMetadata, JobClass as JobClassType } from '../jobs/BaseJob';
 import { mainQueue } from '../queues/Queue';
-import { defaultWorkerConfig, redisConnection } from '../config/queue';
+import { defaultWorkerConfig, redisConnection, mainQueueName } from '../config/queue';
 import { Log } from '@services/loggerService';
 
 // Auto-discover all job classes from src/jobs (or dist/jobs in production)
@@ -64,9 +64,18 @@ function normalizeJobPath(rawPath: string): string {
 Log.info(`Worker Redis: ${redisConnection.host}:${redisConnection.port} db=${redisConnection.db}`);
 
 const mainWorker = new Worker<JobMetadata>(
-  'main-queue',
+  mainQueueName,
   async (job: Job<JobMetadata>) => {
-    const { jobClass: jobPath, data } = job.data;
+    const payload = (job.data as any)?.jobData ?? job.data;
+    const jobPath = payload?.jobClass as string;
+    const data = payload?.data;
+
+    if (!jobPath) {
+      throw new Error(
+        `Invalid job payload for ${job.id}: missing jobClass (keys: ${Object.keys((job.data as any) || {}).join(', ')})`
+      );
+    }
+
     const normalizedJobPath = normalizeJobPath(jobPath);
     Log.info(`Processing job: ${jobPath} -> ${normalizedJobPath} (${job.id})`);
     Log.info(`Registered jobs: ${[...jobMap.keys()].join(', ')}`);
@@ -122,7 +131,7 @@ mainWorker.on('ready', () => {
   Log.info(`Main worker connected to Redis | registered: ${[...jobMap.keys()].join(', ')}`);
 });
 
-Log.info('Main worker started (queue: main-queue)');
+Log.info(`Main worker started (queue: ${mainQueueName})`);
 
 mainQueue.getJobCounts().then((counts) => {
   Log.info('Queue status', { counts });

@@ -1,9 +1,9 @@
 import { Queue } from 'bullmq';
-import defaultQueueConfig from '../config/queue';
+import defaultQueueConfig, { mainQueueName } from '../config/queue';
 import { JobMetadata, JobClass, getJobName } from '../jobs/BaseJob';
 import { Log } from '@services/loggerService';
 
-export const mainQueue = new Queue<JobMetadata>('main-queue', defaultQueueConfig);
+export const mainQueue = new Queue<JobMetadata>(mainQueueName, defaultQueueConfig);
 
 export async function dispatch<T = any>(
   jobClass: JobClass<T>,
@@ -35,7 +35,7 @@ export async function dispatch<T = any>(
         attempts: options?.attempts || 3,
       }
     );
-    Log.info(`Job dispatched: ${jobPath} (${job.id})`);
+    Log.info(`Job dispatched: ${jobPath} (${job.id}) [queue=${mainQueueName}]`);
     return job;
   } catch (error: any) {
     if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
