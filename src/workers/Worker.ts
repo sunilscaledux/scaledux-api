@@ -1,20 +1,64 @@
 import { Worker, Job } from 'bullmq';
+import fs from 'fs';
+import path from 'path';
 import { JobMetadata, JobClass as JobClassType } from '../jobs/BaseJob';
-import { NotificationJob, NotificationEmailJob, ActivityJob } from '../jobs';
 import { mainQueue } from '../queues/Queue';
 import { defaultWorkerConfig, redisConnection } from '../config/queue';
 import { Log } from '@services/loggerService';
 
-// Explicit Laravel-style path => handler map (stable in prod builds)
-const jobMap = new Map<string, JobClassType<any>>([
-  ['src/jobs/NotificationJob', NotificationJob],
-  ['src/jobs/NotificationEmailJob', NotificationEmailJob],
-  ['src/jobs/ActivityJob', ActivityJob],
-]);
+// Auto-discover all job classes from src/jobs (or dist/jobs in production)
+const jobMap = new Map<string, JobClassType<any>>();
+const jobsDir = path.resolve(__dirname, '../jobs');
+const ignoredFiles = new Set(['BaseJob', 'index', 'types']);
+
+for (const fileName of fs.readdirSync(jobsDir)) {
+  const match = fileName.match(/^(.+)\.(ts|js)$/i);
+  if (!match) continue;
+
+  const baseName = match[1];
+  if (ignoredFiles.has(baseName)) continue;
+
+  const modulePath = path.join(jobsDir, fileName);
+  const moduleExports = require(modulePath) as Record<string, unknown>;
+
+  for (const [exportName, jobExport] of Object.entries(moduleExports)) {
+    if (typeof jobExport === 'function' && typeof (jobExport as any).prototype?.handle === 'function') {
+      const key = `src/jobs/${exportName}`;
+      jobMap.set(key, jobExport as unknown as JobClassType<any>);
+    }
+  }
+}
 
 for (const key of jobMap.keys()) {
   console.log(`[Worker] Registered job: ${key}`);
   Log.info(`Registered job: ${key}`);
+}
+
+function normalizeJobPath(rawPath: string): string {
+  let normalized = (rawPath || '').trim().replace(/\\/g, '/');
+
+  // If only class name was stored, convert to canonical path.
+  if (!normalized.includes('/')) {
+    normalized = `src/jobs/${normalized}`;
+  }
+
+  // Accept dist paths and convert to canonical src path.
+  normalized = normalized.replace(/^dist\/jobs\//, 'src/jobs/');
+
+  // Accept "jobs/Foo" format and convert to canonical path.
+  normalized = normalized.replace(/^jobs\//, 'src/jobs/');
+
+  // Remove optional file extension.
+  normalized = normalized.replace(/\.(ts|js)$/i, '');
+
+  // If path still contains "/jobs/", normalize by last segment.
+  const jobsSegmentIndex = normalized.lastIndexOf('/jobs/');
+  if (jobsSegmentIndex !== -1) {
+    const className = normalized.slice(jobsSegmentIndex + '/jobs/'.length);
+    normalized = `src/jobs/${className}`;
+  }
+
+  return normalized;
 }
 
 Log.info(`Worker Redis: ${redisConnection.host}:${redisConnection.port} db=${redisConnection.db}`);
@@ -23,20 +67,22 @@ const mainWorker = new Worker<JobMetadata>(
   'main-queue',
   async (job: Job<JobMetadata>) => {
     const { jobClass: jobPath, data } = job.data;
-    Log.info(`Processing job: ${jobPath} (${job.id})`);
+    const normalizedJobPath = normalizeJobPath(jobPath);
+    Log.info(`Processing job: ${jobPath} -> ${normalizedJobPath} (${job.id})`);
+    Log.info(`Registered jobs: ${[...jobMap.keys()].join(', ')}`);
 
-    const JobClass = jobMap.get(jobPath);
+    const JobClass = jobMap.get(normalizedJobPath);
     if (!JobClass) {
-      throw new Error(`No handler found for job class: ${jobPath} (registered: ${[...jobMap.keys()].join(', ')})`);
+      throw new Error(`No handler found for job class: ${jobPath} (normalized: ${normalizedJobPath}, registered: ${[...jobMap.keys()].join(', ')})`);
     }
     const handler = new JobClass();
 
     try {
       const result = await handler.handle(data);
-      Log.info(`Job completed: ${jobPath} (${job.id})`);
+      Log.info(`Job completed: ${normalizedJobPath} (${job.id})`);
       return result;
     } catch (error: any) {
-      Log.error(`Job failed: ${jobPath} (${job.id})`, { message: error.message });
+      Log.error(`Job failed: ${normalizedJobPath} (${job.id})`, { message: error.message });
       
       // Call the failed() method if it exists
       if (handler.failed) {
