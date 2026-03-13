@@ -138,6 +138,8 @@ router.get("/notifications/unread-count", authenticateToken, InAppNotificationCo
 router.patch("/notifications/read-all", authenticateToken, InAppNotificationController.markAllAsRead);
 router.get("/notifications", authenticateToken, InAppNotificationController.list);
 router.patch("/notifications/:id/read", authenticateToken, InAppNotificationController.markAsRead);
+router.patch("/notifications/:id/unread", authenticateToken, InAppNotificationController.markAsUnread);
+router.patch("/notifications/:id/hide", authenticateToken, InAppNotificationController.hide);
 router.delete("/notifications/:id", authenticateToken, InAppNotificationController.remove);
 
 /**

@@ -59,6 +59,27 @@ export class NotificationService {
     return { success: true, message: 'OK', data: updated };
   }
 
+  static async markAsUnread(userId: number, id: number): Promise<ServiceResponse<NotificationItem | null>> {
+    const n = await prisma.notification.findFirst({
+      where: { id, user_id: userId }
+    });
+    if (!n) return { success: false, message: 'Notification not found' };
+    const updated = await prisma.notification.update({
+      where: { id },
+      data: { read_at: null },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        body: true,
+        link: true,
+        read_at: true,
+        created_at: true
+      }
+    });
+    return { success: true, message: 'OK', data: updated };
+  }
+
   static async markAllAsRead(userId: number): Promise<ServiceResponse<{ count: number }>> {
     const result = await prisma.notification.updateMany({
       where: { user_id: userId, read_at: null },
@@ -74,6 +95,11 @@ export class NotificationService {
     if (!n) return { success: false, message: 'Notification not found' };
     await prisma.notification.delete({ where: { id } });
     return { success: true, message: 'OK', data: { id } };
+  }
+
+  static async hide(userId: number, id: number): Promise<ServiceResponse<{ id: number }>> {
+    // Currently hide behaves like remove for single-notification actions.
+    return this.remove(userId, id);
   }
 
   static async getUnreadCount(userId: number): Promise<ServiceResponse<number>> {

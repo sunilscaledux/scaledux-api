@@ -2,8 +2,7 @@ import { Worker, Job } from 'bullmq';
 import fs from 'fs';
 import path from 'path';
 import { JobMetadata, JobClass as JobClassType } from '../jobs/BaseJob';
-import { mainQueue } from '../queues/Queue';
-import { defaultWorkerConfig, redisConnection, mainQueueName } from '../config/queue';
+import { defaultWorkerConfig, mainQueueName } from '../config/queue';
 import { Log } from '@services/loggerService';
 
 // Auto-discover all job classes from src/jobs (or dist/jobs in production)
@@ -27,11 +26,6 @@ for (const fileName of fs.readdirSync(jobsDir)) {
       jobMap.set(key, jobExport as unknown as JobClassType<any>);
     }
   }
-}
-
-for (const key of jobMap.keys()) {
-  console.log(`[Worker] Registered job: ${key}`);
-  Log.info(`Registered job: ${key}`);
 }
 
 function normalizeJobPath(rawPath: string): string {
@@ -61,8 +55,6 @@ function normalizeJobPath(rawPath: string): string {
   return normalized;
 }
 
-Log.info(`Worker Redis: ${redisConnection.host}:${redisConnection.port} db=${redisConnection.db}`);
-
 const mainWorker = new Worker<JobMetadata>(
   mainQueueName,
   async (job: Job<JobMetadata>) => {
@@ -77,9 +69,6 @@ const mainWorker = new Worker<JobMetadata>(
     }
 
     const normalizedJobPath = normalizeJobPath(jobPath);
-    Log.info(`Processing job: ${jobPath} -> ${normalizedJobPath} (${job.id})`);
-    Log.info(`Registered jobs: ${[...jobMap.keys()].join(', ')}`);
-
     const JobClass = jobMap.get(normalizedJobPath);
     if (!JobClass) {
       throw new Error(`No handler found for job class: ${jobPath} (normalized: ${normalizedJobPath}, registered: ${[...jobMap.keys()].join(', ')})`);
@@ -88,11 +77,8 @@ const mainWorker = new Worker<JobMetadata>(
 
     try {
       const result = await handler.handle(data);
-      Log.info(`Job completed: ${normalizedJobPath} (${job.id})`);
       return result;
     } catch (error: any) {
-      Log.error(`Job failed: ${normalizedJobPath} (${job.id})`, { message: error.message });
-      
       // Call the failed() method if it exists
       if (handler.failed) {
         await handler.failed(error, data);
@@ -106,37 +92,15 @@ const mainWorker = new Worker<JobMetadata>(
 
 // Event listeners
 mainWorker.on('completed', (job) => {
-  Log.info(`Job ${job.id} completed successfully`);
+  const payload = (job.data as any)?.jobData ?? job.data;
+  const jobPath = payload?.jobClass ?? 'UnknownJob';
+  Log.info(`Job completed: ${jobPath} (${job.id})`);
 });
 
 mainWorker.on('failed', (job, err) => {
-  Log.error(`Job ${job?.id} failed`, { message: err?.message });
-});
-
-mainWorker.on('error', (error) => {
-  Log.error('Worker error', { error });
-});
-
-mainWorker.on('active', (job) => {
-  Log.info(`Job ${job.id} is now active`);
-});
-
-mainWorker.on('stalled', (jobId) => {
-  Log.warn(`Job ${jobId} has stalled`);
-});
-
-// When BullMQ connects to Redis it may warn: "Eviction policy is volatile-lru. It should be noeviction".
-// If jobs (e.g. notifications) are not processed, set Redis maxmemory-policy to noeviction so job keys are not evicted.
-mainWorker.on('ready', () => {
-  Log.info(`Main worker connected to Redis | registered: ${[...jobMap.keys()].join(', ')}`);
-});
-
-Log.info(`Main worker started (queue: ${mainQueueName})`);
-
-mainQueue.getJobCounts().then((counts) => {
-  Log.info('Queue status', { counts });
-}).catch((err) => {
-  Log.warn('Could not get queue counts (ensure API and worker use same Redis host/port/db)', { err });
+  const payload = (job?.data as any)?.jobData ?? job?.data;
+  const jobPath = payload?.jobClass ?? 'UnknownJob';
+  Log.error(`Job failed: ${jobPath} (${job?.id})`, { message: err?.message });
 });
 
 export default mainWorker;

@@ -33,6 +33,21 @@ export class NotificationController {
     }
   }
 
+  static async markAsUnread(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const result = await NotificationService.markAsUnread(userId, id);
+      if (result.success) return ApiResponse.success(res, result.data, result.message);
+      return ApiResponse.error(res, result.message, 404);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to mark as unread';
+      return ApiResponse.error(res, message);
+    }
+  }
+
   static async markAllAsRead(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id;
@@ -57,6 +72,21 @@ export class NotificationController {
       return ApiResponse.error(res, result.message, 404);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to delete notification';
+      return ApiResponse.error(res, message);
+    }
+  }
+
+  static async hide(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const result = await NotificationService.hide(userId, id);
+      if (result.success) return ApiResponse.success(res, result.data, result.message);
+      return ApiResponse.error(res, result.message, 404);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to hide notification';
       return ApiResponse.error(res, message);
     }
   }

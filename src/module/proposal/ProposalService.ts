@@ -1468,7 +1468,7 @@ export class ProposalService {
 
       return {
         success: false,
-        message: "Hire is completed when you complete the first payment. Please use the payment screen to hire and proceed to pay."
+        message: "Hire is completed when you complete the first payment. Please use the payment screen to hire."
       };
     } catch (error: any) {
       Log.error("Set hire Error", { error });
