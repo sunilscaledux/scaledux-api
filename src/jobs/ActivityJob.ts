@@ -1,4 +1,4 @@
-import { BaseJob, Job } from './BaseJob';
+import { BaseJob } from './BaseJob';
 import { prisma } from '../services/prismaService';
 
 export interface ActivityJobData {
@@ -13,7 +13,6 @@ export interface ActivityJobData {
   createdByUserId: number;
 }
 
-@Job()
 export class ActivityJob extends BaseJob<ActivityJobData> {
   async handle(data: ActivityJobData): Promise<void> {
     await prisma.activity.create({

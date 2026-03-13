@@ -1,12 +1,10 @@
 import { Queue } from 'bullmq';
 import defaultQueueConfig from '../config/queue';
-import { JobMetadata, JobClass } from '../jobs/BaseJob';
+import { JobMetadata, JobClass, getJobName } from '../jobs/BaseJob';
 import { Log } from '@services/loggerService';
 
-// Main queue for all job types
 export const mainQueue = new Queue<JobMetadata>('main-queue', defaultQueueConfig);
 
-// Dispatch a job to the queue 
 export async function dispatch<T = any>(
   jobClass: JobClass<T>,
   data: T,
@@ -17,8 +15,9 @@ export async function dispatch<T = any>(
     attempts?: number;
   }
 ) {
+  const jobPath = getJobName(jobClass);
   const jobMetadata: JobMetadata = {
-    jobClass: jobClass.name,  // Store class name (e.g., 'SendEmailJob')
+    jobClass: jobPath,
     data,
     jobId: options?.jobId,
     priority: options?.priority,
@@ -36,15 +35,14 @@ export async function dispatch<T = any>(
         attempts: options?.attempts || 3,
       }
     );
-
-    Log.info(`Job dispatched: ${jobClass.name} (${job.id})`);
+    Log.info(`Job dispatched: ${jobPath} (${job.id})`);
     return job;
   } catch (error: any) {
     if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
-      Log.info(`Job already queued: ${jobClass.name} (${options?.jobId})`);
+      Log.info(`Job already queued: ${jobPath} (${options?.jobId})`);
       return null;
     }
-    Log.error(`Error dispatching job ${jobClass.name}`, { error });
+    Log.error(`Error dispatching job ${jobPath}`, { error });
     throw error;
   }
 }

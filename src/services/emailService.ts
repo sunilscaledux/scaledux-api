@@ -1,6 +1,6 @@
 import mailConfig from "@config/mail";
 import { Log } from "@services/loggerService";
-import { templateService } from "../../services/templateService";
+import { templateService } from "./templateService";
 
 const { SendMailClient } = require("zeptomail");
 

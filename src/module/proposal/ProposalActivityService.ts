@@ -1,5 +1,6 @@
 import { prisma } from '@services/prismaService';
-import { queueActivity } from   '@queues/init/activityQueue';
+import { dispatch } from '@queues/Queue';
+import { ActivityJob } from '../../jobs/ActivityJob';
 import type { ProposalActivityType, IProposalActivityPayload } from './ProposalActivityModel';
 
 const PROPOSAL_SUBJECT_TYPE = 'Proposal';
@@ -13,13 +14,13 @@ export async function createProposalActivity(
   payload: IProposalActivityPayload,
   createdByUserId: number
 ): Promise<void> {
-  await queueActivity(
-    PROPOSAL_SUBJECT_TYPE,
-    proposalUniqueId,
+  await dispatch(ActivityJob, {
+    subjectType: PROPOSAL_SUBJECT_TYPE,
+    subjectUniqueId: proposalUniqueId,
     type,
-    payload as Record<string, unknown>,
-    createdByUserId
-  );
+    payload: payload as Record<string, unknown>,
+    createdByUserId,
+  });
 }
 
 /**

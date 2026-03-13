@@ -7,12 +7,16 @@ import './moduleAlias';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Set worker log channel before logger is imported so it writes to storage/logs/worker-YYYY-MM-DD.log
+process.env.LOG_CHANNEL = process.env.WORKER_LOG_CHANNEL || 'worker';
+
 import http from 'http';
 import { Log } from '@services/loggerService';
 
 const WORKER_PORT = parseInt(process.env.WORKER_PORT || '8000', 10);
 
 async function start() {
+  Log.info('Worker process starting...');
   await import('./workers/Worker');
 
   const server = http.createServer((req, res) => {

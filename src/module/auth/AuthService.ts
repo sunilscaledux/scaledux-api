@@ -3,7 +3,7 @@ import bcrypt from "bcrypt";
 import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { ulid } from "ulid";
-import { emailService } from "@queues/init/emailQueue";
+import { emailService } from "@services/emailService";
 import { generateOtpCode, normalizeContact } from "@utils/General";
 import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";

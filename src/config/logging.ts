@@ -61,6 +61,14 @@ export const loggingConfig = {
     console: {
       driver: 'console' as const,
       level: LOG_LEVEL as LogLevel
+    },
+
+    /** Worker daily log (separate from app). */
+    worker: {
+      driver: 'daily' as const,
+      path: path.join(LOG_PATH+'/worker'),
+      level: LOG_LEVEL as LogLevel,
+      days: LOG_DAYS
     }
   } as Record<string, LogChannelConfig>
 };

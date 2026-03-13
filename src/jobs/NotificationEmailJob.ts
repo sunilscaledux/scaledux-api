@@ -1,13 +1,12 @@
-import { BaseJob, Job } from './BaseJob';
+import { BaseJob } from './BaseJob';
 import { prisma } from '../services/prismaService';
-import { emailService } from '@queues/init/emailQueue';
+import { emailService } from '@services/emailService';
 import { Log } from '@services/loggerService';
 import { NotificationPreferencesService } from '../module/profile/NotificationPreferencesService';
 import { templateService } from '../services/templateService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
 import type { NotificationJobPayload } from './types';
 
-@Job()
 export class NotificationEmailJob extends BaseJob<NotificationJobPayload> {
   async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;

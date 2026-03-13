@@ -1,10 +1,9 @@
-import { BaseJob, Job } from './BaseJob';
+import { BaseJob } from './BaseJob';
 import { prisma } from '../services/prismaService';
 import { Log } from '@services/loggerService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
 import type { NotificationJobPayload } from './types';
 
-@Job()
 export class NotificationJob extends BaseJob<NotificationJobPayload> {
   async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;

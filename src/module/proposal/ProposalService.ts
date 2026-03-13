@@ -3,7 +3,9 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from '@utils/General';
 import { Log } from '@services/loggerService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
-import { queueNotification } from '@queues/init/notificationQueue';
+import { dispatch } from '@queues/Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
@@ -295,16 +297,9 @@ export class ProposalService {
       const notificationBody = `A new proposal was submitted for "${projectTitle}".`;
       const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
 
-      await queueNotification({
-        userId: project.user_id,
-        type: 'PROPOSAL_RECEIVED',
-        notificationTitle,
-        notificationBody,
-        notificationLink,
-        actorId: userId,
-        subjectType: 'Proposal',
-        subjectId: proposal.id
-      });
+      const notifData = { userId: project.user_id, type: 'PROPOSAL_RECEIVED' as const, notificationTitle, notificationBody: notificationBody ?? null, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return {
         success: true,
@@ -1250,29 +1245,13 @@ export class ProposalService {
         const projectTitle = proposal.project.project_title || 'Project';
         const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${proposal.project.unique_id}`;
         if (status === ProposalStatus.SHORTLISTED) {
-          await queueNotification({
-            userId: proposal.provider_id,
-            type: 'PROPOSAL_ACCEPTED',
-            notificationTitle: 'Proposal shortlisted',
-            notificationBody: `Your proposal for "${projectTitle}" was shortlisted.`,
-            notificationLink,
-            actorId: userId,
-            subjectType: 'Proposal',
-            subjectId: proposal.id
-          });
+          const notifData = { userId: proposal.provider_id, type: 'PROPOSAL_ACCEPTED' as const, notificationTitle: 'Proposal shortlisted', notificationBody: `Your proposal for "${projectTitle}" was shortlisted.`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+          await dispatch(NotificationJob, notifData);
+          await dispatch(NotificationEmailJob, notifData);
         } else {
-        await queueNotification({
-          userId: proposal.provider_id,
-          type: 'PROPOSAL_REJECTED',
-          notificationTitle: 'Proposal rejected',
-          notificationBody: rejectionRemark
-            ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionRemark}`
-            : `Your proposal for "${projectTitle}" was rejected.`,
-            notificationLink,
-            actorId: userId,
-            subjectType: 'Proposal',
-            subjectId: proposal.id
-          });
+        const notifData = { userId: proposal.provider_id, type: 'PROPOSAL_REJECTED' as const, notificationTitle: 'Proposal rejected', notificationBody: rejectionRemark ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionRemark}` : `Your proposal for "${projectTitle}" was rejected.`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
         }
       }
 
@@ -1365,16 +1344,9 @@ export class ProposalService {
       );
 
       const withdrawOfferLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      await queueNotification({
-        userId: proposal.provider_id,
-        type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN',
-        notificationTitle: 'Offer withdrawn',
-        notificationBody: `The offer for "${projectTitle}" was withdrawn by the project owner.`,
-        notificationLink: withdrawOfferLink,
-        actorId: userId,
-        subjectType: 'Proposal',
-        subjectId: proposal.id
-      });
+      const notifData = { userId: proposal.provider_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: 'Offer withdrawn', notificationBody: `The offer for "${projectTitle}" was withdrawn by the project owner.`, notificationLink: withdrawOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return {
         success: true,
@@ -1457,16 +1429,9 @@ export class ProposalService {
       );
 
       const declineOfferLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      await queueNotification({
-        userId: proposal.project.user_id,
-        type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN',
-        notificationTitle: 'Offer declined',
-        notificationBody: `A freelancer declined your offer for "${projectTitle}".`,
-        notificationLink: declineOfferLink,
-        actorId: userId,
-        subjectType: 'Proposal',
-        subjectId: proposal.id
-      });
+      const notifData = { userId: proposal.project.user_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: 'Offer declined', notificationBody: `A freelancer declined your offer for "${projectTitle}".`, notificationLink: declineOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return { success: true, message: "Offer declined successfully" };
     } catch (error: any) {
@@ -1644,16 +1609,9 @@ export class ProposalService {
         );
         const projectTitle = proposal.project?.project_title || "Project";
         const offerSentLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        await queueNotification({
-          userId: proposal.provider_id,
-          type: 'OFFER_SENT',
-          notificationTitle: 'Offer sent',
-          notificationBody: `You received an offer for "${projectTitle}".`,
-          notificationLink: offerSentLink,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer sent', notificationBody: `You received an offer for "${projectTitle}".`, notificationLink: offerSentLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
         return { success: true, message: "Offer sent" };
       }
 
@@ -1680,16 +1638,9 @@ export class ProposalService {
         );
         const projectTitleAccept = proposal.project?.project_title || "Project";
         const offerAcceptedLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        await queueNotification({
-          userId: proposal.project.user_id,
-          type: 'OFFER_ACCEPTED',
-          notificationTitle: 'Offer accepted',
-          notificationBody: `A freelancer accepted your offer for "${projectTitleAccept}".`,
-          notificationLink: offerAcceptedLink,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: 'Offer accepted', notificationBody: `A freelancer accepted your offer for "${projectTitleAccept}".`, notificationLink: offerAcceptedLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
         return { success: true, message: "Offer accepted" };
       }
 
@@ -1780,16 +1731,9 @@ export class ProposalService {
         );
         const projectTitleNda = proposal.project?.project_title || "Project";
         const offerSentLinkNda = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        await queueNotification({
-          userId: proposal.provider_id,
-          type: 'OFFER_SENT',
-          notificationTitle: 'Offer sent',
-          notificationBody: `You received an offer for "${projectTitleNda}".`,
-          notificationLink: offerSentLinkNda,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer sent', notificationBody: `You received an offer for "${projectTitleNda}".`, notificationLink: offerSentLinkNda ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
       }
 
       // When freelancer signs NDA, move status from OFFER_SENT to OFFER_ACCEPTED (so founder can proceed to payment)
@@ -1801,16 +1745,9 @@ export class ProposalService {
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         const projectTitleSign = proposal.project?.project_title || "Project";
         const offerAcceptedLinkSign = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        await queueNotification({
-          userId: proposal.project.user_id,
-          type: 'OFFER_ACCEPTED',
-          notificationTitle: 'Offer accepted',
-          notificationBody: `A freelancer accepted your offer for "${projectTitleSign}".`,
-          notificationLink: offerAcceptedLinkSign,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: 'Offer accepted', notificationBody: `A freelancer accepted your offer for "${projectTitleSign}".`, notificationLink: offerAcceptedLinkSign ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
       }
 
       // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
@@ -1950,16 +1887,9 @@ export class ProposalService {
         );
 
         const proposalWithdrawnLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-        await queueNotification({
-          userId: project.user_id,
-          type: 'PROPOSAL_WITHDRAWN',
-          notificationTitle: 'Proposal withdrawn',
-          notificationBody: `A freelancer withdrew their proposal for "${projectTitle}".`,
-          notificationLink: proposalWithdrawnLink,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+        const notifData = { userId: project.user_id, type: 'PROPOSAL_WITHDRAWN' as const, notificationTitle: 'Proposal withdrawn', notificationBody: `A freelancer withdrew their proposal for "${projectTitle}".`, notificationLink: proposalWithdrawnLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
       }
 
       return {

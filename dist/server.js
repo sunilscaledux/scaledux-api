@@ -28,11 +28,10 @@ const ChatRoute_1 = __importDefault(require("./module/chat/ChatRoute"));
 const ServicePackageRoute_1 = __importDefault(require("./module/service-package/ServicePackageRoute"));
 const ServiceCategoryRoute_1 = __importDefault(require("./module/service-category/ServiceCategoryRoute"));
 const BillingRoute_1 = __importDefault(require("./module/billing/BillingRoute"));
+const ReviewRoute_1 = __importDefault(require("./module/review/ReviewRoute"));
 const path_1 = __importDefault(require("path"));
 const cors_1 = require("@middleware/cors");
-const mongoService_1 = require("@services/mongoService");
-// Start main worker for background job processing (Laravel style)
-require("./workers/Worker");
+const loggerService_1 = require("@services/loggerService");
 // Bull Board for queue monitoring
 const bullBoard_1 = require("./config/bullBoard");
 const app = (0, express_1.default)();
@@ -59,22 +58,17 @@ app.use("/api/v1", ChatRoute_1.default);
 app.use("/api/v1/service-packages", ServicePackageRoute_1.default);
 app.use("/api/v1/service-categories", ServiceCategoryRoute_1.default);
 app.use("/api/v1/billing", BillingRoute_1.default);
+app.use("/api/v1/reviews", ReviewRoute_1.default);
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {
     app.use('/admin/queues', bullBoard_1.serverAdapter.getRouter());
-    console.log('📊 Bull Board available at: http://localhost:4000/admin/queues');
+    loggerService_1.Log.info('Bull Board available at: http://localhost:4000/admin/queues');
 }
 const PORT = process.env.PORT || 4000;
 const httpServer = http_1.default.createServer(app);
 async function start() {
-    try {
-        await (0, mongoService_1.connectMongo)();
-    }
-    catch (_) {
-        // Continue without MongoDB; proposal activities will be no-op
-    }
     httpServer.listen(PORT, () => {
-        console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
+        loggerService_1.Log.info(`API Base URL: http://localhost:${PORT}/api/v1`);
     });
 }
 start();

@@ -5,7 +5,9 @@ import { Log } from "@services/loggerService";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
-import { queueNotification } from '@queues/init/notificationQueue';
+import { dispatch } from '@queues/Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
 
 // Force server restart to pick up database changes
@@ -1114,16 +1116,9 @@ export class FounderProjectService {
       const notificationBody = `A project owner invited you to submit a proposal for "${projectTitle}".`;
       const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
 
-      await queueNotification({
-        userId: providerId,
-        type: 'PROJECT_INVITATION',
-        notificationTitle,
-        notificationBody,
-        notificationLink,
-        actorId: userId,
-        subjectType: 'FounderProject',
-        subjectId: project.id
-      });
+      const notifData = { userId: providerId, type: 'PROJECT_INVITATION' as const, notificationTitle, notificationBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return {
         success: true,
@@ -1211,16 +1206,9 @@ export class FounderProjectService {
       );
 
       const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-      await queueNotification({
-        userId: project.user_id,
-        type: 'INVITATION_REJECTED',
-        notificationTitle: 'Invitation declined',
-        notificationBody: `A freelancer declined your invitation for "${projectTitle}".`,
-        notificationLink,
-        actorId: userId,
-        subjectType: 'FounderProject',
-        subjectId: project.id
-      });
+      const notifData = { userId: project.user_id, type: 'INVITATION_REJECTED' as const, notificationTitle: 'Invitation declined', notificationBody: `A freelancer declined your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return {
         success: true,
@@ -1282,16 +1270,9 @@ export class FounderProjectService {
       await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
 
       const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-      await queueNotification({
-        userId: project.user_id,
-        type: 'INVITATION_ACCEPTED',
-        notificationTitle: 'Invitation accepted',
-        notificationBody: `A freelancer accepted your invitation for "${projectTitle}".`,
-        notificationLink,
-        actorId: userId,
-        subjectType: 'FounderProject',
-        subjectId: project.id
-      });
+      const notifData = { userId: project.user_id, type: 'INVITATION_ACCEPTED' as const, notificationTitle: 'Invitation accepted', notificationBody: `A freelancer accepted your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       return { success: true, message: "Invitation accepted successfully" };
     } catch (error: any) {

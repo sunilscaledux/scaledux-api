@@ -2,7 +2,9 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { extractRelativePath } from "@utils/General";
 import { ConversationService } from "@module/chat/ConversationService";
-import { queueNotification } from "@queues/init/notificationQueue";
+import { dispatch } from '@queues/Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { MilestoneStatus } from "@constants/status";
 
@@ -101,16 +103,9 @@ export async function submitDeliverable(
       userId
     );
     const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
-    await queueNotification({
-      userId: projectOwnerId,
-      type: "DELIVERABLE_SUBMITTED",
-      notificationTitle: "Deliverable submitted",
-      notificationBody: `A freelancer submitted a deliverable for "${projectTitle}".`,
-      notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
-      actorId: userId,
-      subjectType: "Proposal",
-      subjectId: proposalId
-    });
+    const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: 'Deliverable submitted', notificationBody: `A freelancer submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    await dispatch(NotificationJob, notifData);
+    await dispatch(NotificationEmailJob, notifData);
   }
 
   return { success: true, message: "Deliverable submitted successfully" };
@@ -301,16 +296,9 @@ export async function approveDeliverable(
       userId
     );
     const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
-    await queueNotification({
-      userId: providerId,
-      type: "DELIVERABLE_APPROVED",
-      notificationTitle: "Deliverable approved",
-      notificationBody: `Your deliverable for "${projectTitle}" was approved.`,
-      notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
-      actorId: userId,
-      subjectType: "Proposal",
-      subjectId: proposalId
-    });
+    const notifData = { userId: providerId, type: 'DELIVERABLE_APPROVED' as const, notificationTitle: 'Deliverable approved', notificationBody: `Your deliverable for "${projectTitle}" was approved.`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    await dispatch(NotificationJob, notifData);
+    await dispatch(NotificationEmailJob, notifData);
   }
 
   return { success: true, message: "Deliverable approved successfully" };
