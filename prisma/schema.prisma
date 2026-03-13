@@ -850,7 +850,7 @@ model Proposal {
   unique_id             String    @unique @default(cuid())
   project_id            Int
   provider_id           Int       // Service provider user id
-  status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED, TERMINATING, TERMINATED
+  status                String    @default("PENDING") @db.VarChar(20) // PENDING, SHORTLISTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED, TERMINATING, TERMINATED
   
   // Proposal content
   cover_letter          String    @db.Text
@@ -860,7 +860,8 @@ model Proposal {
   hours_required        Int?
   screening_answers     Json      @default("[]") // Answers to screening questions
   attachments           Json      @default("[]") // File URLs
-  remark                String?   @db.Text       // Last "request changes" message from client (freelancer sees this at top)
+  remark                String?   @db.Text       // Optional message or full display text (reason label + message)
+  main_reason           String?   @db.VarChar(50) // Predefined reason key (e.g. BUDGET_MISMATCH, OTHER) from proposal reasons
 
   // NDA + offer: all NDA and offer-expiry fields in one JSON column
   // Shape: { offer_expires_at?, is_nda_signed?, nda_file_link?, nda_sent_at?, nda_signed_at?, nda_signed_file_link?, nda_downloaded_at? }

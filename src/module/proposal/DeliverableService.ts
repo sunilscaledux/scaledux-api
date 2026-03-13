@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { extractRelativePath } from "@utils/General";
 import { ConversationService } from "@module/chat/ConversationService";
+import { queueNotification } from "@services/notificationQueueService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { MilestoneStatus } from "@constants/status";
 
@@ -77,6 +78,8 @@ export async function submitDeliverable(
   );
 
   const project = deliverable.milestone.proposal.project;
+  const proposalUniqueId = deliverable.milestone.proposal.unique_id;
+  const proposalId = deliverable.milestone.proposal.id;
   if (project?.id != null && project?.user_id != null) {
     const projectOwnerId = project.user_id;
     const providerId = deliverable.milestone.proposal.provider_id;
@@ -87,7 +90,7 @@ export async function submitDeliverable(
       "",
       {
         activityType: "deliverable_submitted",
-        activityId: deliverable.milestone.proposal.unique_id,
+        activityId: proposalUniqueId,
         projectTitle,
         milestoneTitle: deliverable.milestone.title,
         deliverableDescription: deliverable.description,
@@ -97,6 +100,17 @@ export async function submitDeliverable(
       project.id,
       userId
     );
+    const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
+    await queueNotification({
+      userId: projectOwnerId,
+      type: "DELIVERABLE_SUBMITTED",
+      notificationTitle: "Deliverable submitted",
+      notificationBody: `A freelancer submitted a deliverable for "${projectTitle}".`,
+      notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+      actorId: userId,
+      subjectType: "Proposal",
+      subjectId: proposalId
+    });
   }
 
   return { success: true, message: "Deliverable submitted successfully" };
@@ -264,6 +278,8 @@ export async function approveDeliverable(
   );
 
   const project = deliverable.milestone.proposal.project;
+  const proposalUniqueId = deliverable.milestone.proposal.unique_id;
+  const proposalId = deliverable.milestone.proposal.id;
   if (project?.id != null && project?.user_id != null) {
     const projectOwnerId = project.user_id;
     const providerId = deliverable.milestone.proposal.provider_id;
@@ -274,7 +290,7 @@ export async function approveDeliverable(
       "",
       {
         activityType: "deliverable_approved",
-        activityId: deliverable.milestone.proposal.unique_id,
+        activityId: proposalUniqueId,
         projectTitle,
         milestoneTitle: deliverable.milestone.title,
         deliverableDescription: deliverable.description,
@@ -284,6 +300,17 @@ export async function approveDeliverable(
       project.id,
       userId
     );
+    const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
+    await queueNotification({
+      userId: providerId,
+      type: "DELIVERABLE_APPROVED",
+      notificationTitle: "Deliverable approved",
+      notificationBody: `Your deliverable for "${projectTitle}" was approved.`,
+      notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+      actorId: userId,
+      subjectType: "Proposal",
+      subjectId: proposalId
+    });
   }
 
   return { success: true, message: "Deliverable approved successfully" };

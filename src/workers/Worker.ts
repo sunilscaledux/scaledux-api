@@ -1,11 +1,15 @@
 import { Worker, Job } from 'bullmq';
 import { JobMetadata, getJobHandler, getRegisteredJobTypes, registerJobHandler } from '../jobs/BaseJob';
-import { SendNotificationJob } from '../jobs/SendNotificationJob';
+import { CreateNotificationJob } from '../jobs/NotificationJob';
+import { SendNotificationEmailJob } from '../jobs/EmailNotificationJob';
+import { ActivityJob } from '../jobs/ActivityJob';
 import { mainQueue } from '../queues/Queue';
 import { defaultWorkerConfig } from '../config/queue';
 
 // Explicit registration so handlers are always available
-registerJobHandler(SendNotificationJob);
+registerJobHandler(CreateNotificationJob);
+registerJobHandler(SendNotificationEmailJob);
+registerJobHandler(ActivityJob);
 
 
 const mainWorker = new Worker<JobMetadata>(

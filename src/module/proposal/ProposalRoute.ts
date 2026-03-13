@@ -5,6 +5,7 @@ import {
   getProposalsByProject,
   getFounderContracts,
   getProposalById,
+  getProposalReasons,
   updateProposal,
   updateProposalStatus,
   setHire,
@@ -78,6 +79,9 @@ router.get("/check/:projectId", checkProposalStatus); // Check if already submit
 // Founder routes
 router.get("/project/:projectId", getProposalsByProject); // Get proposals for a project
 router.get("/founder/contracts", getFounderContracts); // Get founder contracts by status (OFFER_SENT, OFFER_ACCEPTED, HIRED)
+
+// Predefined reasons for decline/withdraw/terminate (must be before /:id)
+router.get("/reasons", getProposalReasons);
 
 // Milestone submit (freelancer: submit with remark + submitted_file; no separate documents table)
 router.post("/milestones/:milestoneId/submit", submitMilestone);

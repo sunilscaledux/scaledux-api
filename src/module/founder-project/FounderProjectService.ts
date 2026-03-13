@@ -5,7 +5,7 @@ import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePat
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { queueNotification } from '@services/notificationQueueService';
-import { ProposalStatus } from '@constants/status';
+import { ProposalStatus, InviteStatus } from '@constants/status';
 
 // Force server restart to pick up database changes
 
@@ -1260,7 +1260,7 @@ export class FounderProjectService {
       }
       await (prisma as any).projectInvite.update({
         where: { project_id_provider_id: { project_id: project.id, provider_id: userId } },
-        data: { status: ProposalStatus.ACCEPTED }
+        data: { status: InviteStatus.ACCEPTED }
       });
 
       const projectTitle = project.project_title || "Project";

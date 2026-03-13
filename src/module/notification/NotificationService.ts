@@ -1,14 +1,26 @@
-import { prisma } from '@services/prismaService';
+import { Notification } from './NotificationModel';
 import { ServiceResponse } from '@utils/ApiResponse';
 
 export interface NotificationItem {
-  id: number;
+  id: string;
   type: string;
   title: string;
   body: string | null;
   link: string | null;
   read_at: Date | null;
   created_at: Date;
+}
+
+function toItem(doc: { _id: any; type: string; title: string; body: string | null; link: string | null; readAt: Date | null; createdAt: Date }): NotificationItem {
+  return {
+    id: String(doc._id),
+    type: doc.type,
+    title: doc.title,
+    body: doc.body ?? null,
+    link: doc.link ?? null,
+    read_at: doc.readAt ?? null,
+    created_at: doc.createdAt
+  };
 }
 
 export class NotificationService {
@@ -18,68 +30,41 @@ export class NotificationService {
     offset: number = 0
   ): Promise<ServiceResponse<{ list: NotificationItem[]; hasMore: boolean }>> {
     const take = limit + 1;
-    const rows = await prisma.notification.findMany({
-      where: { user_id: userId },
-      orderBy: { created_at: 'desc' },
-      skip: offset,
-      take,
-      select: {
-        id: true,
-        type: true,
-        title: true,
-        body: true,
-        link: true,
-        read_at: true,
-        created_at: true
-      }
-    });
+    const rows = await Notification.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(offset)
+      .limit(take)
+      .lean();
     const hasMore = rows.length > limit;
-    const list = rows.slice(0, limit);
+    const list = rows.slice(0, limit).map((r: any) => toItem(r));
     return { success: true, message: 'OK', data: { list, hasMore } };
   }
 
-  static async markAsRead(userId: number, id: number): Promise<ServiceResponse<NotificationItem | null>> {
-    const n = await prisma.notification.findFirst({
-      where: { id, user_id: userId }
-    });
+  static async markAsRead(userId: number, id: string): Promise<ServiceResponse<NotificationItem | null>> {
+    const n = await Notification.findOne({ _id: id, userId });
     if (!n) return { success: false, message: 'Notification not found' };
-    const updated = await prisma.notification.update({
-      where: { id },
-      data: { read_at: new Date() },
-      select: {
-        id: true,
-        type: true,
-        title: true,
-        body: true,
-        link: true,
-        read_at: true,
-        created_at: true
-      }
-    });
-    return { success: true, message: 'OK', data: updated };
+    n.readAt = new Date();
+    await n.save();
+    return { success: true, message: 'OK', data: toItem(n) };
   }
 
   static async markAllAsRead(userId: number): Promise<ServiceResponse<{ count: number }>> {
-    const result = await prisma.notification.updateMany({
-      where: { user_id: userId, read_at: null },
-      data: { read_at: new Date() }
-    });
-    return { success: true, message: 'OK', data: { count: result.count } };
+    const result = await Notification.updateMany(
+      { userId, readAt: null },
+      { $set: { readAt: new Date() } }
+    );
+    return { success: true, message: 'OK', data: { count: result.modifiedCount } };
   }
 
-  static async remove(userId: number, id: number): Promise<ServiceResponse<{ id: number }>> {
-    const n = await prisma.notification.findFirst({
-      where: { id, user_id: userId }
-    });
+  static async remove(userId: number, id: string): Promise<ServiceResponse<{ id: string }>> {
+    const n = await Notification.findOne({ _id: id, userId });
     if (!n) return { success: false, message: 'Notification not found' };
-    await prisma.notification.delete({ where: { id } });
+    await Notification.deleteOne({ _id: id });
     return { success: true, message: 'OK', data: { id } };
   }
 
   static async getUnreadCount(userId: number): Promise<ServiceResponse<number>> {
-    const count = await prisma.notification.count({
-      where: { user_id: userId, read_at: null }
-    });
+    const count = await Notification.countDocuments({ userId, readAt: null });
     return { success: true, message: 'OK', data: count };
   }
 }

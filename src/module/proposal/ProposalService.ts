@@ -6,12 +6,15 @@ import { queueNotification } from '@services/notificationQueueService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
-import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus } from '@constants/status';
+import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
 
-/** Human-readable labels for proposal status (single source of truth for API and activities). */
+/**
+ * Human-readable labels for proposal status.
+ * Used when returning proposals (e.g. status_label) so the UI shows "Proposal Rejected" instead of "REJECTED".
+ */
 export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
-  ACCEPTED: 'Proposal Accepted',
+  SHORTLISTED: 'Shortlisted',
   OFFER_SENT: 'Offer sent',
   OFFER_ACCEPTED: 'Offer accepted',
   HIRED: 'Hired',
@@ -25,6 +28,14 @@ export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
 export function getProposalStatusLabel(status: string | undefined | null): string {
   if (status == null || status === '') return '';
   return PROPOSAL_STATUS_LABELS[String(status).toUpperCase()] ?? status;
+}
+
+/** Build display remark from optional reason label + optional message (for UI and chat). */
+function buildRemark(reasonLabel: string, reasonMessage?: string | null): string {
+  const a = reasonLabel?.trim() ?? '';
+  const b = reasonMessage?.trim() ?? '';
+  if (a && b) return `${a}. ${b}`;
+  return a || b;
 }
 
 /** NDA + offer data stored in proposal.nda (single JSON column) */
@@ -240,7 +251,7 @@ export class ProposalService {
 
       await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, data.milestones ?? []);
 
-      // Check if user was invited to this project and update status to ACCEPTED
+      // Check if user was invited to this project and update invite status to ACCEPTED
       const invite = await (prisma as any).projectInvite.findFirst({
         where: {
           project_id: project.id,
@@ -252,7 +263,7 @@ export class ProposalService {
       if (invite) {
         await (prisma as any).projectInvite.update({
           where: { id: invite.id },
-          data: { status: ProposalStatus.ACCEPTED }
+          data: { status: InviteStatus.ACCEPTED }
         });
       }
 
@@ -759,11 +770,11 @@ export class ProposalService {
   }
 
   /**
-   * Get founder's proposals by contract status (ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, REJECTED, TERMINATED, WITHDRAWN).
+   * Get founder's proposals by contract status (SHORTLISTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, REJECTED, TERMINATED, WITHDRAWN).
    */
   static async getFounderContracts(
     userId: number,
-    status: 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'TERMINATING' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
+    status: 'SHORTLISTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'TERMINATING' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
     page: number = 1,
     limit: number = 20
   ): Promise<ServiceResponse> {
@@ -1011,7 +1022,7 @@ export class ProposalService {
         const lastAccepted = await (prisma as any).proposal.findFirst({
           where: {
             project: { user_id: userId },
-            status: ProposalStatus.ACCEPTED,
+            status: ProposalStatus.SHORTLISTED,
             id: { not: proposal.id }
           },
           orderBy: { updated_at: 'desc' },
@@ -1096,7 +1107,8 @@ export class ProposalService {
               ? data.attachments.map((url: string) => extractRelativePath(url)).filter(Boolean)
               : []
           }),
-          remark: null // Clear "message from client" when freelancer updates proposal
+          remark: null,
+          main_reason: null // Clear when freelancer updates proposal
         }
       });
       await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones ?? []);
@@ -1128,19 +1140,23 @@ export class ProposalService {
 
   /**
    * Update proposal status (founder only).
-   * ACCEPTED = proposal accepted; REJECTED = rejected.
+   * SHORTLISTED = proposal shortlisted (accepted); REJECTED = rejected; ARCHIVED = ignored (no notification).
    * OFFER_SENT is set when founder sends the NDA (in updateProposalNda), not here.
-   * When rejecting, reason is required and stored in remark + synced to chat.
+   * When rejecting, reason_key (from constants) and/or reason_message required; stored in remark (label + message).
    */
   static async updateProposalStatus(
     userId: number,
     proposalId: string,
-    status: 'ACCEPTED' | 'REJECTED',
-    rejectionReason?: string
+    status: 'SHORTLISTED' | 'REJECTED' | 'ARCHIVED',
+    rejection?: { reason_key?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
-      if (status === 'REJECTED' && (!rejectionReason || !rejectionReason.trim())) {
-        return { success: false, message: "Reason for rejection is required" };
+      if (status === 'REJECTED') {
+        const key = rejection?.reason_key?.trim();
+        const msg = rejection?.reason_message?.trim();
+        if (!key && !msg) {
+          return { success: false, message: "Reason or reason message for rejection is required" };
+        }
       }
 
       // Find the proposal
@@ -1175,16 +1191,29 @@ export class ProposalService {
         };
       }
 
+      const rejectionReason = status === 'REJECTED' ? (rejection?.reason_key?.trim() || null) : null;
+      const rejectionMsg = status === 'REJECTED' ? (rejection?.reason_message?.trim() || null) : null;
+      const rejectionRemark = status === 'REJECTED' && (rejectionReason || rejectionMsg)
+        ? buildRemark(rejectionReason ?? '', rejectionMsg ?? null)
+        : undefined;
+      const mainReason = rejectionReason;
+
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: proposal.status,
         newStatus: status,
-        ...(status === 'REJECTED' && rejectionReason ? { message: rejectionReason } : {})
+        ...(status === 'REJECTED' && rejectionRemark ? { message: rejectionRemark } : {}),
+        ...(mainReason ? { main_reason: mainReason } : {})
       }, userId);
 
-      if (status === 'REJECTED' && rejectionReason?.trim()) {
-        await prisma.$executeRaw`
-          UPDATE scd_proposals SET status = 'REJECTED', remark = ${rejectionReason.trim()}, updated_at = NOW() WHERE id = ${proposal.id}
-        `;
+      if (status === 'REJECTED' && (rejectionRemark || mainReason)) {
+        await (prisma as any).proposal.update({
+          where: { id: proposal.id },
+          data: {
+            status: ProposalStatus.REJECTED,
+            remark: rejectionRemark ?? null,
+            main_reason: mainReason
+          }
+        });
       } else {
         const updateData: any = { status };
         await (prisma as any).proposal.update({
@@ -1193,54 +1222,57 @@ export class ProposalService {
         });
       }
 
-      // Sync to chat: notify provider (initiator = founder)
-      const sentText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
-      const receivedText = status === 'ACCEPTED' ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
-      const metadata: Record<string, unknown> = {
-        activityType: "proposal_status",
-        activityId: proposal.unique_id,
-        newStatus: status,
-        messageSent: sentText,
-        messageReceived: receivedText
-      };
-      if (status === 'REJECTED' && rejectionReason?.trim()) {
-        metadata.message = rejectionReason.trim();
-      }
-      await ConversationService.syncSystemMessage(
-        proposal.project.user_id,
-        proposal.provider_id,
-        "",
-        metadata,
-        proposal.project.id,
-        proposal.project.user_id
-      );
+      // ARCHIVED = ignore: no chat sync, no notification
+      if (status !== ProposalStatus.ARCHIVED) {
+        // Sync to chat: notify provider (initiator = founder)
+        const sentText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
+        const receivedText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
+        const metadata: Record<string, unknown> = {
+          activityType: "proposal_status",
+          activityId: proposal.unique_id,
+          newStatus: status,
+          messageSent: sentText,
+          messageReceived: receivedText
+        };
+        if (status === 'REJECTED' && rejectionRemark) {
+          metadata.message = rejectionRemark;
+        }
+        await ConversationService.syncSystemMessage(
+          proposal.project.user_id,
+          proposal.provider_id,
+          "",
+          metadata,
+          proposal.project.id,
+          proposal.project.user_id
+        );
 
-      const projectTitle = proposal.project.project_title || 'Project';
-      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${proposal.project.unique_id}`;
-      if (status === 'ACCEPTED') {
-        await queueNotification({
-          userId: proposal.provider_id,
-          type: 'PROPOSAL_ACCEPTED',
-          notificationTitle: 'Proposal accepted',
-          notificationBody: `Your proposal for "${projectTitle}" was accepted.`,
-          notificationLink,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
-      } else {
+        const projectTitle = proposal.project.project_title || 'Project';
+        const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${proposal.project.unique_id}`;
+        if (status === ProposalStatus.SHORTLISTED) {
+          await queueNotification({
+            userId: proposal.provider_id,
+            type: 'PROPOSAL_ACCEPTED',
+            notificationTitle: 'Proposal shortlisted',
+            notificationBody: `Your proposal for "${projectTitle}" was shortlisted.`,
+            notificationLink,
+            actorId: userId,
+            subjectType: 'Proposal',
+            subjectId: proposal.id
+          });
+        } else {
         await queueNotification({
           userId: proposal.provider_id,
           type: 'PROPOSAL_REJECTED',
           notificationTitle: 'Proposal rejected',
-          notificationBody: rejectionReason?.trim()
-            ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionReason.trim()}`
+          notificationBody: rejectionRemark
+            ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionRemark}`
             : `Your proposal for "${projectTitle}" was rejected.`,
-          notificationLink,
-          actorId: userId,
-          subjectType: 'Proposal',
-          subjectId: proposal.id
-        });
+            notificationLink,
+            actorId: userId,
+            subjectType: 'Proposal',
+            subjectId: proposal.id
+          });
+        }
       }
 
       return {
@@ -1257,12 +1289,12 @@ export class ProposalService {
   }
 
   /**
-   * Cancel hire (withdraw offer). Allowed only when status is ACCEPTED and NDA is not signed.
+   * Cancel hire (withdraw offer). Allowed only when status is SHORTLISTED and NDA is not signed.
    */
   static async cancelHire(
     userId: number,
     proposalId: string,
-    body: { reason?: string }
+    body: { reason?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
@@ -1287,16 +1319,28 @@ export class ProposalService {
         return { success: false, message: "Cannot withdraw offer after the freelancer has signed the NDA" };
       }
 
+      const reason = body.reason?.trim();
+      const reasonMsg = body.reason_message?.trim() || null;
+      const remark = buildRemark(reason ?? '', reasonMsg) || null;
+      const mainReason = reason || null;
+
       const nextNda = { ...(nda || {}), offer_expires_at: null };
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
           status: ProposalStatus.WITHDRAWN,
-          nda: nextNda
+          nda: nextNda,
+          remark: remark ?? null,
+          main_reason: mainReason
         }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.WITHDRAWN }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: ProposalStatus.OFFER_SENT,
+        newStatus: ProposalStatus.WITHDRAWN,
+        message: remark ?? undefined,
+        ...(mainReason ? { main_reason: mainReason } : {})
+      }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
@@ -1307,8 +1351,8 @@ export class ProposalService {
         messageSent: sentText,
         messageReceived: receivedText
       };
-      if (body.reason?.trim()) {
-        metadata.message = body.reason.trim();
+      if (remark) {
+        metadata.message = remark;
       }
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
@@ -1318,6 +1362,18 @@ export class ProposalService {
         proposal.project.id,
         proposal.project.user_id
       );
+
+      const withdrawOfferLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+      await queueNotification({
+        userId: proposal.provider_id,
+        type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN',
+        notificationTitle: 'Offer withdrawn',
+        notificationBody: `The offer for "${projectTitle}" was withdrawn by the project owner.`,
+        notificationLink: withdrawOfferLink,
+        actorId: userId,
+        subjectType: 'Proposal',
+        subjectId: proposal.id
+      });
 
       return {
         success: true,
@@ -1333,12 +1389,12 @@ export class ProposalService {
   }
 
   /**
-   * Decline offer (freelancer only). Allowed only when status is OFFER_SENT. Sets status to REJECTED, stores reason in remark, syncs to chat.
+   * Decline offer (freelancer only). Allowed only when status is OFFER_SENT. Sets status to REJECTED, stores reason_key + remark, syncs to chat.
    */
   static async declineOffer(
     userId: number,
     proposalId: string,
-    body: { reason?: string }
+    body: { reason?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
@@ -1359,19 +1415,25 @@ export class ProposalService {
         return { success: false, message: "Only an offer that has been sent can be declined" };
       }
 
-      const remark = body.reason?.trim() || null;
+      const reason = body.reason?.trim();
+      const reasonMsg = body.reason_message?.trim() || null;
+      const remark = buildRemark(reason ?? '', reasonMsg) || null;
+      const mainReason = reason || null;
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
           status: ProposalStatus.REJECTED,
-          ...(remark ? { remark } : {})
+          remark: remark ?? null,
+          main_reason: mainReason
         }
       });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: ProposalStatus.OFFER_SENT,
         newStatus: ProposalStatus.REJECTED,
-        ...(remark ? { message: remark } : {})
+        message: remark ?? undefined,
+        ...(mainReason ? { main_reason: mainReason } : {})
       }, userId);
 
       const projectTitle = proposal.project?.project_title || "Project";
@@ -1392,6 +1454,18 @@ export class ProposalService {
         proposal.project.id,
         userId
       );
+
+      const declineOfferLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+      await queueNotification({
+        userId: proposal.project.user_id,
+        type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN',
+        notificationTitle: 'Offer declined',
+        notificationBody: `A freelancer declined your offer for "${projectTitle}".`,
+        notificationLink: declineOfferLink,
+        actorId: userId,
+        subjectType: 'Proposal',
+        subjectId: proposal.id
+      });
 
       return { success: true, message: "Offer declined successfully" };
     } catch (error: any) {
@@ -1502,7 +1576,7 @@ export class ProposalService {
       nda_signed_at?: string | Date | null;
       nda_signed_file_link?: string | null;
       nda_downloaded_at?: string | Date | null;
-      /** When true and project has no NDA: founder sends offer (ACCEPTED -> OFFER_SENT). */
+      /** When true and project has no NDA: founder sends offer (SHORTLISTED -> OFFER_SENT). */
       send_offer?: boolean;
       /** When true and project has no NDA: freelancer accepts offer (OFFER_SENT -> OFFER_ACCEPTED). */
       accept_offer?: boolean;
@@ -1528,8 +1602,8 @@ export class ProposalService {
 
       const isNdaRequired = proposal.project.is_nda_required === true;
 
-      // Founder: send offer when NDA not required (ACCEPTED/PENDING -> OFFER_SENT)
-      if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === ProposalStatus.ACCEPTED || proposal.status === ProposalStatus.PENDING)) {
+      // Founder: send offer when NDA not required (SHORTLISTED/PENDING -> OFFER_SENT)
+      if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === ProposalStatus.SHORTLISTED || proposal.status === ProposalStatus.PENDING)) {
         const otherActive = await (prisma as any).proposal.count({
           where: {
             project_id: proposal.project_id,
@@ -1567,6 +1641,18 @@ export class ProposalService {
           proposal.project.id,
           proposal.project.user_id
         );
+        const projectTitle = proposal.project?.project_title || "Project";
+        const offerSentLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+        await queueNotification({
+          userId: proposal.provider_id,
+          type: 'OFFER_SENT',
+          notificationTitle: 'Offer sent',
+          notificationBody: `You received an offer for "${projectTitle}".`,
+          notificationLink: offerSentLink,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
         return { success: true, message: "Offer sent" };
       }
 
@@ -1591,6 +1677,18 @@ export class ProposalService {
           proposal.project.id,
           proposal.provider_id
         );
+        const projectTitleAccept = proposal.project?.project_title || "Project";
+        const offerAcceptedLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+        await queueNotification({
+          userId: proposal.project.user_id,
+          type: 'OFFER_ACCEPTED',
+          notificationTitle: 'Offer accepted',
+          notificationBody: `A freelancer accepted your offer for "${projectTitleAccept}".`,
+          notificationLink: offerAcceptedLink,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
         return { success: true, message: "Offer accepted" };
       }
 
@@ -1633,7 +1731,7 @@ export class ProposalService {
       }
 
       // When founder sends the NDA: one-active-offer check before saving (so we don't save NDA then reject)
-      if (isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.ACCEPTED)) {
+      if (isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.SHORTLISTED)) {
         const otherActive = await (prisma as any).proposal.count({
           where: {
             project_id: proposal.project_id,
@@ -1655,7 +1753,7 @@ export class ProposalService {
       });
 
       // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT
-      const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.ACCEPTED);
+      const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.SHORTLISTED);
       if (didJustSendOffer) {
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
           oldStatus: proposal.status,
@@ -1679,6 +1777,18 @@ export class ProposalService {
           proposal.project.id,
           proposal.project.user_id
         );
+        const projectTitleNda = proposal.project?.project_title || "Project";
+        const offerSentLinkNda = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+        await queueNotification({
+          userId: proposal.provider_id,
+          type: 'OFFER_SENT',
+          notificationTitle: 'Offer sent',
+          notificationBody: `You received an offer for "${projectTitleNda}".`,
+          notificationLink: offerSentLinkNda,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
       }
 
       // When freelancer signs NDA, move status from OFFER_SENT to OFFER_ACCEPTED (so founder can proceed to payment)
@@ -1688,6 +1798,18 @@ export class ProposalService {
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
+        const projectTitleSign = proposal.project?.project_title || "Project";
+        const offerAcceptedLinkSign = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
+        await queueNotification({
+          userId: proposal.project.user_id,
+          type: 'OFFER_ACCEPTED',
+          notificationTitle: 'Offer accepted',
+          notificationBody: `A freelancer accepted your offer for "${projectTitleSign}".`,
+          notificationLink: offerAcceptedLinkSign,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
       }
 
       // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
@@ -1744,7 +1866,8 @@ export class ProposalService {
    */
   static async withdrawProposal(
     userId: number,
-    proposalId: string
+    proposalId: string,
+    body: { reason?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
       // Find the proposal
@@ -1774,13 +1897,26 @@ export class ProposalService {
         };
       }
 
-      // Update status to WITHDRAWN
+      const reason = body.reason?.trim();
+      const reasonMsg = body.reason_message?.trim() || null;
+      const remark = buildRemark(reason ?? '', reasonMsg) || null;
+      const mainReason = reason || null;
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: ProposalStatus.WITHDRAWN }
+        data: {
+          status: ProposalStatus.WITHDRAWN,
+          remark: remark ?? null,
+          main_reason: mainReason
+        }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.PENDING, newStatus: ProposalStatus.WITHDRAWN }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: ProposalStatus.PENDING,
+        newStatus: ProposalStatus.WITHDRAWN,
+        message: remark ?? undefined,
+        ...(mainReason ? { main_reason: mainReason } : {})
+      }, userId);
 
       // Decrement proposals_count on the project
       await prisma.founderProject.update({
@@ -1795,20 +1931,34 @@ export class ProposalService {
       });
       if (project) {
         const projectTitle = project.project_title || "Project";
+        const metadata: Record<string, unknown> = {
+          activityType: "proposal_withdrawn",
+          activityId: proposal.unique_id,
+          projectTitle: project.project_title,
+          messageSent: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_SENT,
+          messageReceived: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_RECEIVED
+        };
+        if (remark) metadata.message = remark;
         await ConversationService.syncSystemMessage(
           project.user_id,
           userId,
           "",
-          {
-            activityType: "proposal_withdrawn",
-            activityId: proposal.unique_id,
-            projectTitle: project.project_title,
-            messageSent: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_SENT,
-            messageReceived: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_RECEIVED
-          },
+          metadata,
           proposal.project.id,
           userId
         );
+
+        const proposalWithdrawnLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+        await queueNotification({
+          userId: project.user_id,
+          type: 'PROPOSAL_WITHDRAWN',
+          notificationTitle: 'Proposal withdrawn',
+          notificationBody: `A freelancer withdrew their proposal for "${projectTitle}".`,
+          notificationLink: proposalWithdrawnLink,
+          actorId: userId,
+          subjectType: 'Proposal',
+          subjectId: proposal.id
+        });
       }
 
       return {
@@ -1825,12 +1975,12 @@ export class ProposalService {
   }
 
   /**
-   * Terminate contract (founder or freelancer). Only when status is HIRED. Requires reason; syncs to chat.
+   * Terminate contract (founder or freelancer). Only when status is HIRED. Requires reason_key and/or reason_message; syncs to chat.
    */
   static async terminateContract(
     userId: number,
     proposalId: string,
-    reason: string
+    payload: { reason_key?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
       const proposal = await (prisma as any).proposal.findFirst({
@@ -1853,25 +2003,40 @@ export class ProposalService {
       if (!isFounder && !isProvider) {
         return { success: false, message: "You don't have permission to terminate this contract" };
       }
-      const trimmed = (reason || "").trim();
-      if (!trimmed) {
-        return { success: false, message: "Reason is required" };
+      const reason = payload.reason_key?.trim();
+      const reasonMsg = payload.reason_message?.trim();
+      if (!reason && !reasonMsg) {
+        return { success: false, message: "Reason or reason message is required" };
       }
 
-      // Schedule termination 1 week from now; set status to TERMINATING so hire/fund are blocked
+      const remark = buildRemark(reason ?? '', reasonMsg) || null;
+      const mainReason = reason || null;
+
       const terminateAt = new Date();
       terminateAt.setDate(terminateAt.getDate() + 7);
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: ProposalStatus.TERMINATING, terminate_at: terminateAt, terminate_by: userId }
+        data: {
+          status: ProposalStatus.TERMINATING,
+          terminate_at: terminateAt,
+          terminate_by: userId,
+          remark: remark ?? null,
+          main_reason: mainReason
+        }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.HIRED, newStatus: ProposalStatus.TERMINATING, message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: ProposalStatus.HIRED,
+        newStatus: ProposalStatus.TERMINATING,
+        message: remark ?? undefined,
+        ...(mainReason ? { main_reason: mainReason } : {})
+      }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
-      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${trimmed}. You can restore before the date.`;
-      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_RECEIVED} ${projectTitle}. Reason: ${trimmed}.`;
+      const displayReason = remark ?? '';
+      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${displayReason}. You can restore before the date.`;
+      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_RECEIVED} ${projectTitle}. Reason: ${displayReason}.`;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
@@ -1880,7 +2045,7 @@ export class ProposalService {
           activityType: "contract_terminate_scheduled",
           activityId: proposal.unique_id,
           projectTitle: proposal.project.project_title,
-          reason: trimmed,
+          reason: displayReason,
           terminateAt: terminateAt.toISOString(),
           messageSent,
           messageReceived

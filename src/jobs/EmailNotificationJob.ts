@@ -4,26 +4,14 @@ import { emailService } from '../services/emailService';
 import { NotificationPreferencesService } from '../module/profile/NotificationPreferencesService';
 import { templateService } from '../services/templateService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
-
-export interface SendNotificationJobData {
-  userId: number;
-  type: string; // NotificationEmailType
-  /** Same title for in-app notification and email subject */
-  notificationTitle: string;
-  /** Same body for in-app notification and email content */
-  notificationBody?: string | null;
-  notificationLink?: string | null;
-  actorId?: number | null;
-  subjectType?: string | null;
-  subjectId?: number | null;
-}
+import type { NotificationJobPayload } from './types';
 
 @Job()
-export class SendNotificationJob extends BaseJob<SendNotificationJobData> {
-  async handle(data: SendNotificationJobData): Promise<void> {
+export class SendNotificationEmailJob extends BaseJob<NotificationJobPayload> {
+  async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;
     if (!isNotificationEmailType(type)) {
-      console.warn(`SendNotificationJob: unknown type "${data.type}", skipping`);
+      console.warn(`SendNotificationEmailJob: unknown type "${data.type}", skipping`);
       return;
     }
 
@@ -32,28 +20,13 @@ export class SendNotificationJob extends BaseJob<SendNotificationJobData> {
       select: { id: true, email: true, first_name: true }
     });
     if (!user) {
-      console.warn(`SendNotificationJob: user ${data.userId} not found, skipping`);
+      console.warn(`SendNotificationEmailJob: user ${data.userId} not found, skipping`);
       return;
     }
 
-    // 1) Create in-app notification (same title/body as email)
-    await prisma.notification.create({
-      data: {
-        user_id: data.userId,
-        type: data.type,
-        title: data.notificationTitle,
-        body: data.notificationBody ?? null,
-        link: data.notificationLink ?? null,
-        actor_id: data.actorId ?? null,
-        subject_type: data.subjectType ?? null,
-        subject_id: data.subjectId ?? null
-      }
-    });
-
-    // 2) Send email only if user has not opted out (same title = subject, same body = content)
     const shouldSend = await NotificationPreferencesService.shouldSendNotificationEmail(data.userId, type);
     if (!shouldSend || !user.email) {
-      if (!shouldSend) console.log(`SendNotificationJob: user ${data.userId} opted out of email for ${type}`);
+      if (!shouldSend) console.log(`SendNotificationEmailJob: user ${data.userId} opted out of email for ${type}`);
       return;
     }
 

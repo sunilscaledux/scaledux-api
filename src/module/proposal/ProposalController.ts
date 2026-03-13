@@ -2,12 +2,25 @@ import { Request, Response } from "express";
 import { ProposalService } from "./ProposalService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { calculateProfileCompletion } from "../profile/ProfileCompletionService";
+import { getReasonsByKey } from "@constants/proposalReasons";
 
 /**
  * Get helper for safe string params
  */
 function getStringParam(param: any): string {
   return typeof param === 'string' ? param : '';
+}
+
+/**
+ * Get predefined reason options by key (single route). Query: ?key=proposalDecline | offerDecline | withdrawOffer | withdrawProposal | terminate
+ */
+export async function getProposalReasons(req: Request, res: Response) {
+  const key = typeof req.query?.key === 'string' ? req.query.key.trim() : undefined;
+  const reasons = getReasonsByKey(key);
+  if (!reasons) {
+    return ApiResponse.error(res, "Valid key is required (proposalDecline, offerDecline, withdrawOffer, withdrawProposal, terminate)", 400);
+  }
+  return ApiResponse.success(res, reasons);
 }
 
 const DEFAULT_PROPOSAL_PAGE_LIMIT = Number(process.env.PROPOSAL_PAGE_LIMIT) || 50;
@@ -129,13 +142,13 @@ export async function getProposalsByProject(req: Request, res: Response) {
 }
 
 /**
- * Get founder's contracts by status (ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, TERMINATING, REJECTED, TERMINATED, WITHDRAWN).
+ * Get founder's contracts by status (SHORTLISTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, TERMINATING, REJECTED, TERMINATED, WITHDRAWN).
  */
 export async function getFounderContracts(req: Request, res: Response) {
   const userId = req.user?.id;
   const { status, page, limit } = req.query;
   const { ProposalStatus } = await import('@constants/status');
-  const validStatuses = [ProposalStatus.ACCEPTED, ProposalStatus.OFFER_SENT, ProposalStatus.OFFER_ACCEPTED, ProposalStatus.HIRED, ProposalStatus.TERMINATING, ProposalStatus.REJECTED, ProposalStatus.TERMINATED, ProposalStatus.WITHDRAWN];
+  const validStatuses: readonly string[] = [ProposalStatus.SHORTLISTED, ProposalStatus.OFFER_SENT, ProposalStatus.OFFER_ACCEPTED, ProposalStatus.HIRED, ProposalStatus.TERMINATING, ProposalStatus.REJECTED, ProposalStatus.TERMINATED, ProposalStatus.WITHDRAWN];
   const statusParam = typeof status === 'string' ? status : '';
 
   if (!userId) {
@@ -143,12 +156,12 @@ export async function getFounderContracts(req: Request, res: Response) {
   }
 
   if (!validStatuses.includes(statusParam)) {
-    return ApiResponse.error(res, "status must be one of ACCEPTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, TERMINATING, REJECTED, TERMINATED, WITHDRAWN", 400);
+    return ApiResponse.error(res, "status must be one of SHORTLISTED, OFFER_SENT, OFFER_ACCEPTED, HIRED, TERMINATING, REJECTED, TERMINATED, WITHDRAWN", 400);
   }
 
   const result = await ProposalService.getFounderContracts(
     userId,
-    statusParam as 'ACCEPTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'TERMINATING' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
+    statusParam as 'SHORTLISTED' | 'OFFER_SENT' | 'OFFER_ACCEPTED' | 'HIRED' | 'TERMINATING' | 'REJECTED' | 'TERMINATED' | 'WITHDRAWN',
     parseInt(page as string) || 1,
     parseInt(limit as string) || DEFAULT_PROPOSAL_PAGE_LIMIT
   );
@@ -295,7 +308,7 @@ export async function addMilestone(req: Request, res: Response) {
 export async function updateProposalStatus(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { status, reason } = req.body;
+  const { status, reason, reason_message } = req.body as { status?: string; reason?: string; reason_message?: string };
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -305,16 +318,21 @@ export async function updateProposalStatus(req: Request, res: Response) {
     return ApiResponse.error(res, "Proposal ID is required", 400);
   }
 
-  if (!status || !['ACCEPTED', 'REJECTED'].includes(status)) {
-    return ApiResponse.error(res, "Valid status (ACCEPTED or REJECTED) is required", 400);
+  if (!status || !['SHORTLISTED', 'REJECTED', 'ARCHIVED'].includes(status)) {
+    return ApiResponse.error(res, "Valid status (SHORTLISTED, REJECTED, or ARCHIVED) is required", 400);
+  }
+  const statusValue = status as 'SHORTLISTED' | 'REJECTED' | 'ARCHIVED';
+
+  const rejectionReasonKey = statusValue === 'REJECTED' ? (typeof reason === 'string' ? reason.trim() : '') || undefined : undefined;
+  const rejectionReasonMessage = statusValue === 'REJECTED' ? (typeof reason_message === 'string' ? reason_message.trim() : '') || undefined : undefined;
+  if (statusValue === 'REJECTED' && !rejectionReasonKey && !rejectionReasonMessage) {
+    return ApiResponse.error(res, "Reason or reason message for rejection is required", 400);
   }
 
-  const rejectionReason = status === 'REJECTED' ? (typeof reason === 'string' ? reason.trim() : '') : undefined;
-  if (status === 'REJECTED' && !rejectionReason) {
-    return ApiResponse.error(res, "Reason for rejection is required", 400);
-  }
-
-  const result = await ProposalService.updateProposalStatus(userId, proposalId, status, rejectionReason);
+  const result = await ProposalService.updateProposalStatus(userId, proposalId, statusValue, {
+    reason_key: rejectionReasonKey,
+    reason_message: rejectionReasonMessage
+  });
 
   if (result.success) {
     return ApiResponse.success(res, null, result.message);
@@ -352,12 +370,12 @@ export async function setHire(req: Request, res: Response) {
 }
 
 /**
- * Cancel hire / withdraw offer (founder). Allowed only when ACCEPTED and NDA not signed.
+ * Cancel hire / withdraw offer (founder). Allowed only when SHORTLISTED and NDA not signed.
  */
 export async function cancelHire(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const body = req.body as { reason?: string };
+  const body = req.body as { reason?: string; reason_message?: string };
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -386,7 +404,7 @@ export async function cancelHire(req: Request, res: Response) {
 export async function declineOffer(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const body = (req.body || {}) as { reason?: string };
+  const body = (req.body || {}) as { reason?: string; reason_message?: string };
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -412,7 +430,7 @@ export async function declineOffer(req: Request, res: Response) {
 export async function terminateContract(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
-  const { reason } = req.body as { reason?: string };
+  const { reason, reason_message } = req.body as { reason?: string; reason_message?: string };
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -422,7 +440,10 @@ export async function terminateContract(req: Request, res: Response) {
     return ApiResponse.error(res, "Proposal ID is required", 400);
   }
 
-  const result = await ProposalService.terminateContract(userId, proposalId, reason ?? "");
+  const result = await ProposalService.terminateContract(userId, proposalId, {
+    reason_key: reason?.trim() || undefined,
+    reason_message: reason_message?.trim() || undefined
+  });
 
   if (result.success) {
     return ApiResponse.success(res, null, result.message);
@@ -486,6 +507,7 @@ export async function markProjectCompleted(req: Request, res: Response) {
 export async function withdrawProposal(req: Request, res: Response) {
   const userId = req.user?.id;
   const proposalId = getStringParam(req.params.id);
+  const body = (req.body || {}) as { reason?: string; reason_message?: string };
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -495,7 +517,7 @@ export async function withdrawProposal(req: Request, res: Response) {
     return ApiResponse.error(res, "Proposal ID is required", 400);
   }
 
-  const result = await ProposalService.withdrawProposal(userId, proposalId);
+  const result = await ProposalService.withdrawProposal(userId, proposalId, body);
 
   if (result.success) {
     return ApiResponse.success(res, null, result.message);

@@ -78,12 +78,18 @@ export const ProposalStatus = {
   HIRED: 'HIRED',
   TERMINATED: 'TERMINATED',
   OFFER_REJECTED: 'OFFER_REJECTED',
-  // Schema also uses:
   TERMINATING: 'TERMINATING',
   REJECTED: 'REJECTED',
   WITHDRAWN: 'WITHDRAWN',
-  ACCEPTED: 'ACCEPTED',
   PROJECT_COMPLETED: 'PROJECT_COMPLETED',
+} as const;
+
+/** ProjectInvite / conversation invite status (PENDING, ACCEPTED, REJECTED). Not proposal status. */
+export const InviteStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  IGNORED: 'IGNORED',
 } as const;
 
 export type ProposalStatusValue = (typeof ProposalStatus)[keyof typeof ProposalStatus];

@@ -8,22 +8,32 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import http from 'http';
+import { connectMongo } from '@services/mongoService';
 
 const WORKER_PORT = parseInt(process.env.WORKER_PORT || '8000', 10);
 
-// Start BullMQ worker (registers and processes jobs)
-import './workers/Worker';
-
-const server = http.createServer((req, res) => {
-  if (req.url === '/health' || req.url === '/') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', service: 'worker' }));
-    return;
+async function start() {
+  try {
+    await connectMongo();
+  } catch (_) {
+    // Continue without MongoDB (notification job will fail if Mongo required)
   }
-  res.writeHead(404);
-  res.end();
-});
+  // Start BullMQ worker (registers and processes jobs)
+  await import('./workers/Worker');
 
-server.listen(WORKER_PORT, () => {
-  console.log(`Worker listening on http://localhost:${WORKER_PORT} (health: /health)`);
-});
+  const server = http.createServer((req, res) => {
+    if (req.url === '/health' || req.url === '/') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', service: 'worker' }));
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+
+  server.listen(WORKER_PORT, () => {
+    console.log(`Worker listening on http://localhost:${WORKER_PORT} (health: /health)`);
+  });
+}
+
+start();

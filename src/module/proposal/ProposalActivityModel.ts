@@ -6,6 +6,8 @@ export interface IProposalActivityPayload {
   oldStatus?: string;
   newStatus?: string;
   message?: string;
+  /** Predefined reason key (e.g. BUDGET_MISMATCH) for decline/withdraw/terminate */
+  main_reason?: string;
   oldSnapshot?: Record<string, unknown>;
   /** Payment activities */
   milestoneIndex?: number;

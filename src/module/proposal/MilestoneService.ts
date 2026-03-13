@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { BillingService } from "../billing/BillingService";
+import { queueNotification } from "@services/notificationQueueService";
 import { MilestoneStatus, MilestonePaymentStatus, BillingTransactionType, BillingTransactionStatus } from "@constants/status";
 
 /**
@@ -221,6 +222,19 @@ export async function releaseMilestonePayment(
     },
     userId
   );
+
+  const projectTitle = milestone.project?.project_title ?? "Project";
+  const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
+  await queueNotification({
+    userId: milestone.proposal.provider_id,
+    type: "PAYMENT_RELEASED",
+    notificationTitle: "Payment released",
+    notificationBody: `Payment for "${projectTitle}" (milestone: ${milestone.title}) was released.`,
+    notificationLink: `${baseUrl}/proposals-and-offers/${milestone.proposal.unique_id}`,
+    actorId: userId,
+    subjectType: "Proposal",
+    subjectId: milestone.proposal.id
+  });
 
   // Chat sync is done in BillingService.releasePaymentTransaction so both milestone flow and direct billing release get it
   return { success: true, message: "Payment released successfully" };
