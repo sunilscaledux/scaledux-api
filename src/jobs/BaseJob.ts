@@ -40,6 +40,11 @@ export function registerJobHandler(JobClass: JobClass<any>): void {
   jobHandlers.set(JobClass.name, JobClass);
 }
 
+/** Register a job class under an explicit queue name (for consistent lookup after build). */
+export function registerJobHandlerWithName(className: string, JobClass: JobClass<any>): void {
+  jobHandlers.set(className, JobClass);
+}
+
 // Get handler instance by class name
 export function getJobHandler(className: string): JobHandler<any> | null {
   const HandlerClass = jobHandlers.get(className);

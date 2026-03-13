@@ -8,18 +8,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import http from 'http';
-import { connectMongo } from '@services/mongoService';
 import { Log } from '@services/loggerService';
 
 const WORKER_PORT = parseInt(process.env.WORKER_PORT || '8000', 10);
 
 async function start() {
-  try {
-    await connectMongo();
-  } catch (_) {
-    // Continue without MongoDB (notification job will fail if Mongo required)
-  }
-  // Start BullMQ worker (registers and processes jobs)
   await import('./workers/Worker');
 
   const server = http.createServer((req, res) => {

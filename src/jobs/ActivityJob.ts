@@ -1,5 +1,5 @@
 import { BaseJob, Job } from './BaseJob';
-import { Activity } from '../module/activity/ActivityModel';
+import { prisma } from '../services/prismaService';
 
 export interface ActivityJobData {
   /** e.g. 'Proposal', 'FounderProject' */
@@ -16,12 +16,14 @@ export interface ActivityJobData {
 @Job()
 export class ActivityJob extends BaseJob<ActivityJobData> {
   async handle(data: ActivityJobData): Promise<void> {
-    await Activity.create({
-      subjectType: data.subjectType,
-      subjectUniqueId: data.subjectUniqueId,
-      type: data.type,
-      payload: data.payload,
-      createdByUserId: data.createdByUserId
+    await prisma.activity.create({
+      data: {
+        subject_type: data.subjectType,
+        subject_unique_id: data.subjectUniqueId,
+        type: data.type,
+        payload: data.payload as object,
+        created_by_user_id: data.createdByUserId
+      }
     });
   }
 }

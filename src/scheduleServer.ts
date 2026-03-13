@@ -8,7 +8,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import http from "http";
-import { connectMongo } from "@services/mongoService";
 import { Log } from "@services/loggerService";
 import { startSchedule } from "./schedule/schedule";
 
@@ -25,11 +24,6 @@ const server = http.createServer((req, res) => {
 });
 
 async function start() {
-  try {
-    await connectMongo();
-  } catch (_) {
-    // Continue without MongoDB
-  }
   startSchedule();
   server.listen(SCHEDULE_PORT, () => {
     Log.info(`[schedule] Cron server: http://localhost:${SCHEDULE_PORT} (health: /health)`);

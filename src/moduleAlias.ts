@@ -9,4 +9,5 @@ moduleAlias.addAliases({
   '@utils': path.join(__dirname, 'utils'),
   '@middleware': path.join(__dirname, 'middleware'),
   '@services': path.join(__dirname, 'services'),
+  '@queues': path.join(__dirname, 'queues'),
 });

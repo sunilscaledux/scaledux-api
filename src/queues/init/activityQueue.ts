@@ -1,7 +1,7 @@
-import { dispatch } from '../queues/Queue';
-import { ActivityJob } from '../jobs/ActivityJob';
+import { dispatch } from '../Queue';
+import { ActivityJob } from '../../jobs/ActivityJob';
 import { Log } from '@services/loggerService';
-import type { ActivityJobData } from '../jobs/ActivityJob';
+import type { ActivityJobData } from '../../jobs/ActivityJob';
 
 /**
  * Queue an activity to be stored in MongoDB by the worker.

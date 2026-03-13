@@ -22,8 +22,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = req.params.id;
-      if (!id) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.markAsRead(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);
@@ -50,8 +50,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = req.params.id;
-      if (!id) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = parseInt(req.params.id, 10);
+      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.remove(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);

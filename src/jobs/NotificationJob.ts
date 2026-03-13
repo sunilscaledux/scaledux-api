@@ -3,14 +3,13 @@ import { prisma } from '../services/prismaService';
 import { Log } from '@services/loggerService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
 import type { NotificationJobPayload } from './types';
-import { Notification } from '../module/notification/NotificationModel';
 
 @Job()
-export class CreateNotificationJob extends BaseJob<NotificationJobPayload> {
+export class NotificationJob extends BaseJob<NotificationJobPayload> {
   async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;
     if (!isNotificationEmailType(type)) {
-      Log.warn(`CreateNotificationJob: unknown type "${data.type}", skipping`);
+      Log.warn(`NotificationJob: unknown type "${data.type}", skipping`);
       return;
     }
 
@@ -19,19 +18,21 @@ export class CreateNotificationJob extends BaseJob<NotificationJobPayload> {
       select: { id: true }
     });
     if (!user) {
-      Log.warn(`CreateNotificationJob: user ${data.userId} not found, skipping`);
+      Log.warn(`NotificationJob: user ${data.userId} not found, skipping`);
       return;
     }
 
-    await Notification.create({
-      userId: data.userId,
-      type: data.type,
-      title: data.notificationTitle,
-      body: data.notificationBody ?? null,
-      link: data.notificationLink ?? null,
-      actorId: data.actorId ?? null,
-      subjectType: data.subjectType ?? null,
-      subjectId: data.subjectId ?? null
+    await prisma.notification.create({
+      data: {
+        user_id: data.userId,
+        type: data.type,
+        title: data.notificationTitle,
+        body: data.notificationBody ?? null,
+        link: data.notificationLink ?? null,
+        actor_id: data.actorId ?? null,
+        subject_type: data.subjectType ?? null,
+        subject_id: data.subjectId ?? null
+      }
     });
   }
 }

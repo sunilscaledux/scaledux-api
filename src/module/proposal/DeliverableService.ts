@@ -2,7 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { extractRelativePath } from "@utils/General";
 import { ConversationService } from "@module/chat/ConversationService";
-import { queueNotification } from "@services/notificationQueueService";
+import { queueNotification } from "@queues/init/notificationQueue";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { MilestoneStatus } from "@constants/status";
 

@@ -29,7 +29,6 @@ import reviewRoutes from './module/review/ReviewRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
-import { connectMongo } from '@services/mongoService';
 import { Log } from '@services/loggerService';
 
 // Bull Board for queue monitoring
@@ -74,11 +73,6 @@ const PORT = process.env.PORT || 4000;
 const httpServer = http.createServer(app);
 
 async function start() {
-  try {
-    await connectMongo();
-  } catch (_) {
-    // Continue without MongoDB; proposal activities will be no-op
-  }
   httpServer.listen(PORT, () => {
     Log.info(`API Base URL: http://localhost:${PORT}/api/v1`);
   });

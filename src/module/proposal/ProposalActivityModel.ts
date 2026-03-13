@@ -1,5 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
-
+/** Types for proposal activity (storage is in Postgres Activity table). */
 export type ProposalActivityType = 'STATUS_CHANGE' | 'REQUEST_MODIFY' | 'CONTENT_UPDATE' | 'MILESTONE_PAYMENT' | 'HIRE_PAYMENT' | 'MILESTONE_SUBMITTED';
 
 export interface IProposalActivityPayload {
@@ -21,27 +20,10 @@ export interface IProposalActivityPayload {
   submittedFileUrls?: { url: string; name?: string }[];
 }
 
-export interface IProposalActivity extends Document {
+export interface IProposalActivity {
   proposalUniqueId: string;
   type: ProposalActivityType;
   payload: IProposalActivityPayload;
   createdByUserId: number;
   createdAt: Date;
 }
-
-const ProposalActivitySchema = new Schema<IProposalActivity>(
-  {
-    proposalUniqueId: { type: String, required: true, index: true },
-    type: { type: String, required: true, enum: ['STATUS_CHANGE', 'REQUEST_MODIFY', 'CONTENT_UPDATE', 'MILESTONE_PAYMENT', 'HIRE_PAYMENT', 'MILESTONE_SUBMITTED'] },
-    payload: { type: Schema.Types.Mixed, required: true },
-    createdByUserId: { type: Number, required: true },
-    createdAt: { type: Date, default: Date.now }
-  },
-  { collection: 'proposal_activities' }
-);
-
-ProposalActivitySchema.index({ proposalUniqueId: 1, createdAt: -1 });
-
-export const ProposalActivity: Model<IProposalActivity> =
-  mongoose.models.ProposalActivity ??
-  mongoose.model<IProposalActivity>('ProposalActivity', ProposalActivitySchema);

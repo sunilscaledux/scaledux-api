@@ -1,9 +1,9 @@
-import { dispatch } from '../queues/Queue';
-import { CreateNotificationJob } from '../jobs/NotificationJob';
-import { SendNotificationEmailJob } from '../jobs/EmailNotificationJob';
+import { dispatch } from '../Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/EmailNotificationJob';
 import { Log } from '@services/loggerService';
-import type { NotificationJobPayload } from '../jobs/types';
-import type { NotificationEmailType } from '../constants/notificationTypes';
+import type { NotificationJobPayload } from '../../jobs/types';
+import type { NotificationEmailType } from '../../constants/notificationTypes';
 
 export interface QueueNotificationInput {
   userId: number;
@@ -21,7 +21,7 @@ export interface QueueNotificationInput {
 
 /**
  * Central entry: enqueue notification and email jobs. The in-app notification is always created
- * (CreateNotificationJob). Email is sent only when the user has not opted out (SendNotificationEmailJob).
+ * (NotificationJob). Email is sent only when the user has not opted out (NotificationEmailJob).
  * Same notificationTitle and notificationBody are used for both.
  */
 export async function queueNotification(input: QueueNotificationInput): Promise<void> {
@@ -36,8 +36,8 @@ export async function queueNotification(input: QueueNotificationInput): Promise<
     subjectId: input.subjectId ?? null
   };
   try {
-    await dispatch(CreateNotificationJob, data, { jobId: undefined });
-    await dispatch(SendNotificationEmailJob, data, { jobId: undefined });
+    await dispatch(NotificationJob, data, { jobId: undefined });
+    await dispatch(NotificationEmailJob, data, { jobId: undefined });
   } catch (err) {
     Log.error('notificationQueueService.queueNotification failed', { err });
     throw err;

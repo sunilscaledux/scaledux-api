@@ -1,17 +1,20 @@
 import { Worker, Job } from 'bullmq';
-import { JobMetadata, getJobHandler, getRegisteredJobTypes, registerJobHandler } from '../jobs/BaseJob';
-import { CreateNotificationJob } from '../jobs/NotificationJob';
-import { SendNotificationEmailJob } from '../jobs/EmailNotificationJob';
+import { JobMetadata, getJobHandler, getRegisteredJobTypes, registerJobHandler, registerJobHandlerWithName } from '../jobs/BaseJob';
+import { NotificationJob } from '../jobs/NotificationJob';
+import { NotificationEmailJob } from '../jobs/EmailNotificationJob';
 import { ActivityJob } from '../jobs/ActivityJob';
 import { mainQueue } from '../queues/Queue';
-import { defaultWorkerConfig } from '../config/queue';
+import { defaultWorkerConfig, redisConnection } from '../config/queue';
 import { Log } from '@services/loggerService';
 
-// Explicit registration so handlers are always available
-registerJobHandler(CreateNotificationJob);
-registerJobHandler(SendNotificationEmailJob);
-registerJobHandler(ActivityJob);
+// Register by explicit queue names so handlers are found after build (class.name can change in dist)
+registerJobHandlerWithName('NotificationJob', NotificationJob);
+registerJobHandlerWithName('NotificationEmailJob', NotificationEmailJob);
+registerJobHandlerWithName('SendNotificationEmailJob', NotificationEmailJob);
+registerJobHandlerWithName('ActivityJob', ActivityJob);
 
+// Log Redis connection so you can confirm API and worker use the same instance (host:port/db)
+Log.info(`Worker Redis: ${redisConnection.host}:${redisConnection.port} db=${redisConnection.db}`);
 
 const mainWorker = new Worker<JobMetadata>(
   'main-queue',
@@ -67,11 +70,19 @@ mainWorker.on('stalled', (jobId) => {
   Log.warn(`Job ${jobId} has stalled`);
 });
 
-Log.info('Main worker started and listening for jobs');
-Log.info(`Registered job types: ${getRegisteredJobTypes().join(', ')}`);
+// When BullMQ connects to Redis it may warn: "Eviction policy is volatile-lru. It should be noeviction".
+// If jobs (e.g. notifications) are not processed, set Redis maxmemory-policy to noeviction so job keys are not evicted.
+mainWorker.on('ready', () => {
+  Log.info('Main worker connected to Redis and listening for jobs');
+  Log.info(`Registered job types: ${getRegisteredJobTypes().join(', ')}`);
+});
+
+Log.info('Main worker started (queue: main-queue)');
 
 mainQueue.getJobCounts().then((counts) => {
   Log.info('Queue status', { counts });
+}).catch((err) => {
+  Log.warn('Could not get queue counts (ensure API and worker use same Redis host/port/db)', { err });
 });
 
 export default mainWorker;

@@ -7,12 +7,16 @@ import { tasks } from "./init";
  */
 export function startSchedule(): void {
   for (const task of tasks) {
-    cron.schedule(task.schedule, async () => {
-      try {
-        await task.handle();
-      } catch (err) {
-        Log.error(`[${task.name}] Job error`, { err });
-      }
+    cron.schedule(task.schedule, () => {
+      // Run in setImmediate so the cron callback returns immediately and doesn't block
+      // the next scheduled tick (avoids "missed execution" when a task runs long).
+      setImmediate(async () => {
+        try {
+          await task.handle();
+        } catch (err) {
+          Log.error(`[${task.name}] Job error`, { err });
+        }
+      });
     });
     Log.info(`[schedule] Registered: ${task.name} (${task.schedule})`);
   }

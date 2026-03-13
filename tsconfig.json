@@ -16,7 +16,8 @@
       "@types/*": ["src/types/*"],
       "@utils/*": ["src/utils/*"],
       "@middleware/*": ["src/middleware/*"],
-      "@services/*": ["src/services/*"]
+      "@services/*": ["src/services/*"],
+      "@queues/*": ["src/queues/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "*.d.ts", "src/services/redisService.ts"],

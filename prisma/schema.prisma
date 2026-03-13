@@ -1446,3 +1446,17 @@ model Notification {
   @@index([created_at])
   @@map("scd_notifications")
 }
+
+// Generic activity log (proposal, project, etc.) – replaces MongoDB activities
+model Activity {
+  id                Int      @id @default(autoincrement())
+  subject_type      String   @db.VarChar(80)   // Proposal, FounderProject, etc.
+  subject_unique_id String   @map("subject_unique_id") @db.VarChar(64)
+  type              String   @db.VarChar(80)   // STATUS_CHANGE, REQUEST_MODIFY, etc.
+  payload           Json     // message, oldStatus, newStatus, etc.
+  created_by_user_id Int     @map("created_by_user_id")
+  created_at        DateTime @default(now())
+
+  @@index([subject_type, subject_unique_id, created_at(sort: Desc)])
+  @@map("scd_activities")
+}

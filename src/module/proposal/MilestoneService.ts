@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { BillingService } from "../billing/BillingService";
-import { queueNotification } from "@services/notificationQueueService";
+import { queueNotification } from "@queues/init/notificationQueue";
 import { MilestoneStatus, MilestonePaymentStatus, BillingTransactionType, BillingTransactionStatus } from "@constants/status";
 
 /**

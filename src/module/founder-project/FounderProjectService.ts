@@ -5,7 +5,7 @@ import { Log } from "@services/loggerService";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
-import { queueNotification } from '@services/notificationQueueService';
+import { queueNotification } from '@queues/init/notificationQueue';
 import { ProposalStatus, InviteStatus } from '@constants/status';
 
 // Force server restart to pick up database changes

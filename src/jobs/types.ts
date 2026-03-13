@@ -1,6 +1,6 @@
 /**
  * Shared payload for notification-related jobs (in-app notification and email).
- * Used by CreateNotificationJob and SendNotificationEmailJob.
+ * Used by NotificationJob and NotificationEmailJob.
  */
 export interface NotificationJobPayload {
   userId: number;

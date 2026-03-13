@@ -3,7 +3,7 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from '@utils/General';
 import { Log } from '@services/loggerService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
-import { queueNotification } from '@services/notificationQueueService';
+import { queueNotification } from '@queues/init/notificationQueue';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
@@ -1199,13 +1199,6 @@ export class ProposalService {
         : undefined;
       const mainReason = rejectionReason;
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
-        oldStatus: proposal.status,
-        newStatus: status,
-        ...(status === 'REJECTED' && rejectionRemark ? { message: rejectionRemark } : {}),
-        ...(mainReason ? { main_reason: mainReason } : {})
-      }, userId);
-
       if (status === 'REJECTED' && (rejectionRemark || mainReason)) {
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
@@ -1223,8 +1216,15 @@ export class ProposalService {
         });
       }
 
-      // ARCHIVED = ignore: no chat sync, no notification
+      // ARCHIVED = ignore: no activity, no chat sync, no notification
       if (status !== ProposalStatus.ARCHIVED) {
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+          oldStatus: proposal.status,
+          newStatus: status,
+          ...(status === 'REJECTED' && rejectionRemark ? { message: rejectionRemark } : {}),
+          ...(mainReason ? { main_reason: mainReason } : {})
+        }, userId);
+
         // Sync to chat: notify provider (initiator = founder)
         const sentText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
         const receivedText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
