@@ -1222,7 +1222,7 @@ model WithdrawalRequest {
   user_id                Int
   withdrawal_method_id   Int
   billing_transaction_id Int       @unique
-  status                 String    @db.VarChar(20)  // pending | processing | completed | failed
+  status                 WithdrawalRequestStatus
   withdrawal_trigger_at  DateTime  @default(now())
   processed_at           DateTime?
   error_message          String?   @db.VarChar(500)
@@ -1251,6 +1251,47 @@ model TaxInformation {
 
   @@index([user_id])
   @@map("scd_tax_information")
+}
+
+// Billing transaction type and status enums (use constants from @constants/status in app code)
+enum BillingTransactionType {
+  payment
+  refund
+  withdrawal
+}
+
+enum BillingTransactionStatus {
+  pending
+  completed
+  failed
+}
+
+/** Payer (from_id) view status; receiver (to_id) view status; admin internal status. */
+enum BillingTransactionSenderStatus {
+  funded
+  completed
+  released
+}
+
+enum BillingTransactionReceiverStatus {
+  pending
+  completed
+  released
+  withdraw_in_process
+  paid_out
+}
+
+enum BillingTransactionAdminStatus {
+  loaded
+  sent_to_freelancer
+  success
+}
+
+enum WithdrawalRequestStatus {
+  pending
+  processing
+  completed
+  failed
 }
 
 model BillingTransaction {
@@ -1283,15 +1324,15 @@ model BillingTransaction {
   receiver_amount Decimal? @db.Decimal(10, 2)
   currency_id     Int      @default(1)
 
-  type            String   @db.VarChar(30) // payment, refund, withdrawal
-  status          String   @db.VarChar(20) // pending, completed, failed
+  type            BillingTransactionType
+  status          BillingTransactionStatus
 
   /** Payer (from_id) view status; UI shows this when current user is payer */
-  sender_status   String?  @db.VarChar(20) // pending, completed, failed
+  sender_status   BillingTransactionSenderStatus?
   /** Receiver (to_id) view status; UI shows this when current user is receiver */
-  receiver_status String?  @db.VarChar(20)
-  /** Admin-only internal status: e.g. loaded, sent_to_freelancer, success */
-  admin_status    String?  @db.VarChar(30)
+  receiver_status BillingTransactionReceiverStatus?
+  /** Admin-only internal status */
+  admin_status    BillingTransactionAdminStatus?
 
   description     String   @db.Text
   invoice_url     String?  @db.VarChar(500) // deprecated: use Invoice table

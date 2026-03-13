@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
+import { BillingTransactionType } from '../constants/status';
 
 interface InvoiceData {
   transactionId: string;
@@ -92,7 +93,7 @@ export class InvoiceGenerator {
           .fontSize(14)
           .text('Amount Details', 50, 430);
 
-        const isDebit = data.type === 'payment';
+        const isDebit = data.type === BillingTransactionType.PAYMENT;
         const sign = isDebit ? '-' : '+';
         const currencySymbol = data.currency === 'INR' ? '₹' : '$';
 

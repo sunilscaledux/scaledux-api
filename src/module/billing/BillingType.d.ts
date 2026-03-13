@@ -44,13 +44,15 @@ export interface TaxInformationInput {
   gstin?: string;
 }
 
+import type { BillingTransactionTypeValue, BillingTransactionStatusValue } from "../../constants/status";
+
 export interface BillingTransaction {
   id: string;
   userId: string;
   amount: number;
   currency: string;
-  type: 'payment' | 'refund' | 'withdrawal';
-  status: 'pending' | 'completed' | 'failed';
+  type: BillingTransactionTypeValue;
+  status: BillingTransactionStatusValue;
   description: string;
   invoiceUrl?: string;
   createdAt: Date;

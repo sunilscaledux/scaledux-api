@@ -3,6 +3,7 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { extractRelativePath } from "@utils/General";
 import { ConversationService } from "@module/chat/ConversationService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
+import { MilestoneStatus } from "@constants/status";
 
 /**
  * Submit one deliverable (freelancer only). Sets status SUBMITTED, stores remark + files; clears feedback.
@@ -150,7 +151,7 @@ export async function requestChangesDeliverable(
 
   await (prisma as any).milestone.update({
     where: { id: deliverable.milestone_id },
-    data: { status: "PENDING" }
+    data: { status: MilestoneStatus.PENDING }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");
@@ -246,7 +247,7 @@ export async function approveDeliverable(
   if (allApproved) {
     await (prisma as any).milestone.update({
       where: { id: deliverable.milestone_id },
-      data: { status: "COMPLETED" }
+      data: { status: MilestoneStatus.COMPLETED }
     });
   }
 

@@ -5,6 +5,7 @@ import { getStringParam } from "@utils/requestHelpers";
 import { ConversationService } from "@module/chat/ConversationService";
 import { createProposalActivity } from "@module/proposal/ProposalActivityService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
+import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
 
 export class BillingController {
@@ -26,26 +27,50 @@ export class BillingController {
     }
   }
 
-  // Create Razorpay order for card verification
+  // Create Razorpay order. For payment: send milestoneId (and optional milestoneIndex); amount is computed on server. For card verification: no body or { amount: 1 }.
   static async createVerificationOrder(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
-      console.log('👤 User ID:', userId);
       if (!userId) {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const { amount } = req.body;
-      const result = await BillingService.createVerificationOrder(userId.toString(), amount || 1);
-      
-      if (!result.success) {
-        return ApiResponse.error(res, result.message);
+      const { milestoneId, milestoneIndex } = req.body;
+      const milestoneIdNum = milestoneId != null ? parseInt(String(milestoneId), 10) : NaN;
+
+      if (Number.isFinite(milestoneIdNum) && milestoneIdNum > 0) {
+        const orderAmounts = await BillingService.getMilestoneOrderAmount(
+          userId,
+          milestoneIdNum,
+          milestoneIndex != null ? parseInt(String(milestoneIndex), 10) : undefined
+        );
+        if (!orderAmounts.success || orderAmounts.totalFounderPays == null) {
+          return ApiResponse.error(res, orderAmounts.message ?? "Invalid milestone", 400);
+        }
+        const platformTransferPaise =
+          orderAmounts.platformTransferAmountInr != null && orderAmounts.platformTransferAmountInr > 0
+            ? Math.round(orderAmounts.platformTransferAmountInr * 100)
+            : undefined;
+        const result = await BillingService.createVerificationOrder(userId.toString(), orderAmounts.totalFounderPays, {
+          platformTransferAmountPaise: platformTransferPaise,
+          receiptPrefix: "pay",
+          notes: { purpose: "milestone_payment", milestone_id: String(milestoneIdNum), user_id: userId.toString() }
+        });
+        if (!result.success) return ApiResponse.error(res, result.message);
+        return ApiResponse.success(res, result.data, "Order created successfully");
       }
 
-      return ApiResponse.success(res, result.data, "Verification order created successfully");
+      const { amount } = req.body;
+      const amountNum = amount != null ? Number(amount) : 1;
+      if (amountNum !== 1) {
+        return ApiResponse.error(res, "For card verification only amount 1 is allowed. For payment send milestoneId.", 400);
+      }
+      const result = await BillingService.createVerificationOrder(userId.toString(), 1);
+      if (!result.success) return ApiResponse.error(res, result.message);
+      return ApiResponse.success(res, result.data, "Order created successfully");
     } catch (error: any) {
-      console.error("Error creating verification order:", error);
-      return ApiResponse.error(res, error.message || "Failed to create verification order");
+      console.error("Error creating order:", error);
+      return ApiResponse.error(res, error.message || "Failed to create order");
     }
   }
 
@@ -134,11 +159,11 @@ export class BillingController {
       ApiResponse.error(res, "You are not the project owner for this proposal", 403);
       return true;
     }
-    if (proposal.status === "TERMINATING") {
+    if (proposal.status === ProposalStatus.TERMINATING) {
       ApiResponse.error(res, "Cannot fund a contract that is scheduled to terminate. Restore the contract first if you want to continue.", 400);
       return true;
     }
-    if (proposal.status !== "OFFER_ACCEPTED" && proposal.status !== "HIRED") {
+    if (proposal.status !== ProposalStatus.OFFER_ACCEPTED && proposal.status !== ProposalStatus.HIRED) {
       ApiResponse.error(res, "Payment is only available after the freelancer has signed the NDA (OFFER_ACCEPTED) or already hired (HIRED).", 400);
       return true;
     }
@@ -147,7 +172,7 @@ export class BillingController {
         where: {
           project_id: proposal.project.id,
           id: { not: proposal.id },
-          status: { in: ['HIRED', 'TERMINATING'] }
+          status: { in: [ProposalStatus.HIRED, ProposalStatus.TERMINATING] }
         }
       });
       if (existingHiredOrTerminating) {
@@ -179,7 +204,7 @@ export class BillingController {
       amount,
       description: `Payment for ${projectTitle}: ${milestoneTitle}`,
       meta,
-      status: 'pending',
+      status: BillingTransactionStatus.PENDING,
       milestoneId: milestoneRow.id
     });
     const transactionUniqueId = (payResult as any)?.data?.transactionUniqueId ?? undefined;
@@ -207,7 +232,7 @@ export class BillingController {
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "HIRED", milestones_approved: true }
+        data: { status: ProposalStatus.HIRED, milestones_approved: true }
       });
       await (prisma as any).milestone.updateMany({
         where: { proposal_id: proposal.id },
@@ -231,7 +256,7 @@ export class BillingController {
 
     await (prisma as any).milestone.update({
       where: { id: milestoneRow.id },
-      data: { payment_status: "FUNDED" }
+      data: { payment_status: MilestonePaymentStatus.FUNDED }
     });
 
     await createProposalActivity(proposal.unique_id, 'MILESTONE_PAYMENT', {

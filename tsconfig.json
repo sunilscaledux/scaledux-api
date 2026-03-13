@@ -11,6 +11,7 @@
     "baseUrl": "./",
     "paths": {
       "@config/*": ["src/config/*"],
+      "@constants/*": ["src/constants/*"],
       "@module/*": ["src/module/*"],
       "@types/*": ["src/types/*"],
       "@utils/*": ["src/utils/*"],

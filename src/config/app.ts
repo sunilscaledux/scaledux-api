@@ -1,11 +1,12 @@
 /**
  * App / billing config from env.
- * PLATFORM_GST_NUMBER, SERVICE_FEE_PERCENT, APP_FEE_FOUNDER, GST_PERCENT.
+ * PLATFORM_GST_NUMBER, SERVICE_FEE_PERCENT, APP_FEE_FOUNDER, GST_PERCENT, RAZORPAY_PLATFORM_ACCOUNT_ID.
  */
 const platformGstRaw = (process.env.PLATFORM_GST_NUMBER ?? process.env.GST_NUMBER ?? '').trim();
 const serviceFeePercentRaw = process.env.SERVICE_FEE_PERCENT;
 const appFeeFounderRaw = process.env.APP_FEE_FOUNDER;
 const gstPercentRaw = process.env.GST_PERCENT;
+const razorpayPlatformAccountRaw = (process.env.RAZORPAY_PLATFORM_ACCOUNT_ID ?? '').trim();
 
 export const appConfig = {
   /** Platform GSTIN (for invoices). */
@@ -19,4 +20,7 @@ export const appConfig = {
 
   /** GST percent (0–100) applied on app fee (founder) and on service charge (freelancer). Default 0. */
   gstPercent: Math.min(100, Math.max(0, Number(gstPercentRaw) || 18)),
+
+  /** Razorpay platform linked account id (e.g. acc_scaledux123). When set, payment orders include a transfer to this account. */
+  razorpayPlatformAccountId: razorpayPlatformAccountRaw || null as string | null,
 };

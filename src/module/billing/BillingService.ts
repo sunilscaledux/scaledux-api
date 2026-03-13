@@ -6,6 +6,14 @@ import razorpayConfig from "@config/razorpay";
 import { appConfig } from "@config/app";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
+import {
+  BillingTransactionType,
+  BillingTransactionStatus,
+  BillingTransactionSenderStatus,
+  BillingTransactionReceiverStatus,
+  WithdrawalRequestStatus,
+  ProposalStatus,
+} from "@constants/status";
 
 // Initialize Razorpay (only if keys are provided)
 let razorpay: any = null;
@@ -30,9 +38,66 @@ export class BillingService {
     return { payerAmount, receiverAmount };
   }
 
-  // Create Razorpay order for card verification (charge small amount)
-  static async createVerificationOrder(userId: string, amount: number = 1) {
-    console.log(razorpayConfig);
+  /**
+   * Resolve order amount from milestone (server-side only). Validates user is project owner and payment is allowed.
+   * Returns totalFounderPays and platformTransferAmount so frontend cannot modify amount.
+   */
+  static async getMilestoneOrderAmount(
+    userId: number,
+    milestoneId: number,
+    milestoneIndexFromFrontend?: number
+  ): Promise<{ success: boolean; message?: string; totalFounderPays?: number; platformTransferAmountInr?: number }> {
+    const milestoneRow = await (prisma as any).milestone.findUnique({
+      where: { id: milestoneId },
+      include: {
+        proposal: {
+          include: {
+            project: { select: { id: true, user_id: true } },
+            milestonesRows: { orderBy: { order_index: 'asc' } }
+          }
+        }
+      }
+    });
+    if (!milestoneRow?.proposal) {
+      return { success: false, message: 'Milestone not found' };
+    }
+    const proposal = milestoneRow.proposal;
+    const rows = proposal.milestonesRows ?? [];
+    let milestoneIndex: number;
+    if (milestoneIndexFromFrontend !== undefined && Number.isFinite(milestoneIndexFromFrontend) && rows[milestoneIndexFromFrontend]?.id === milestoneId) {
+      milestoneIndex = milestoneIndexFromFrontend;
+    } else {
+      milestoneIndex = rows.findIndex((r: any) => r.id === milestoneId);
+    }
+    if (milestoneIndex < 0) {
+      return { success: false, message: 'Milestone not found for this proposal' };
+    }
+    if (proposal.project.user_id !== userId) {
+      return { success: false, message: 'You are not the project owner' };
+    }
+    if (proposal.status !== ProposalStatus.OFFER_ACCEPTED && proposal.status !== ProposalStatus.HIRED) {
+      return { success: false, message: 'Payment is only available after the freelancer has signed the NDA or already hired' };
+    }
+    const amount = Number(milestoneRow?.amount ?? 0) || 0;
+    if (amount <= 0) {
+      return { success: false, message: 'Invalid milestone amount' };
+    }
+    const isFirstMilestone = milestoneIndex === 0;
+    const breakdown = this.getPaymentBreakdown(amount, isFirstMilestone);
+    const totalFounderPays = breakdown.totalFounderPays ?? amount;
+    const platformTransferAmountInr = (breakdown.appFee ?? 0) + (breakdown.gstOnAppFee ?? 0);
+    return { success: true, totalFounderPays, platformTransferAmountInr };
+  }
+
+  /**
+   * Create Razorpay order. Amount is only accepted from client for card verification (amount 1).
+   * For payment, use getMilestoneOrderAmount + this with server-computed amount so user cannot modify amount.
+   */
+  static async createVerificationOrder(
+    userId: string,
+    amount: number = 1,
+    options?: { platformTransferAmountPaise?: number; receiptPrefix?: string; notes?: Record<string, string> }
+  ) {
     if (!razorpay) {
       return {
         success: false,
@@ -40,16 +105,33 @@ export class BillingService {
       };
     }
 
+    const amountPaise = Math.round(amount * 100);
+    const receiptPrefix = options?.receiptPrefix ?? 'verify';
+    const notes = options?.notes ?? { purpose: 'card_verification', user_id: userId };
+    const platformAccountId = appConfig.razorpayPlatformAccountId;
+    const platformTransferPaise = options?.platformTransferAmountPaise ?? 0;
+
+    const orderPayload: {
+      amount: number;
+      currency: string;
+      receipt: string;
+      notes: Record<string, string>;
+      transfers?: Array<{ account: string; amount: number; currency: string }>;
+    } = {
+      amount: amountPaise,
+      currency: 'INR',
+      receipt: `${receiptPrefix}_${userId}_${Date.now()}`,
+      notes
+    };
+
+    if (platformAccountId && platformTransferPaise > 0) {
+      orderPayload.transfers = [
+        { account: platformAccountId, amount: platformTransferPaise, currency: 'INR' }
+      ];
+    }
+
     try {
-      const order = await razorpay.orders.create({
-        amount: amount * 100, // Amount in paise (1 INR = 100 paise)
-        currency: 'INR',
-        receipt: `verify_${userId}_${Date.now()}`,
-        notes: {
-          purpose: 'card_verification',
-          user_id: userId
-        }
-      });
+      const order = await razorpay.orders.create(orderPayload);
 
       return {
         success: true,
@@ -63,7 +145,7 @@ export class BillingService {
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || 'Failed to create verification order'
+        message: error.message || 'Failed to create order'
       };
     }
   }
@@ -363,7 +445,7 @@ export class BillingService {
    */
   private static async updateUserBillingTotalsAfterTransaction(
     type: 'payment' | 'refund' | 'withdrawal',
-    status: string,
+    status: string, // BillingTransactionStatus value
     fromId: number,
     toId: number,
     amount: number,
@@ -373,8 +455,8 @@ export class BillingService {
     const amt = Number(amount);
     const toAmt = receiverAmount !== undefined ? Number(receiverAmount) : amt;
     const toWalletAmt = receiverWalletAmount !== undefined ? Number(receiverWalletAmount) : toAmt;
-    if (type === 'payment' || type === 'refund') {
-      if (status !== 'completed') return;
+    if (type === BillingTransactionType.PAYMENT || type === BillingTransactionType.REFUND) {
+      if (status !== BillingTransactionStatus.COMPLETED) return;
       if (toId > 0) {
         await this.ensureUserWallet(toId);
         await (prisma as any).userWallet.update({
@@ -385,15 +467,15 @@ export class BillingService {
           },
         });
       }
-    } else if (type === 'withdrawal') {
+    } else if (type === BillingTransactionType.WITHDRAWAL) {
       if (fromId > 0) {
         await this.ensureUserWallet(fromId);
-        if (status === 'pending') {
+        if (status === BillingTransactionStatus.PENDING) {
           await (prisma as any).userWallet.update({
             where: { user_id: fromId },
             data: { wallet_amount: { decrement: amt } },
           });
-        } else if (status === 'completed') {
+        } else if (status === BillingTransactionStatus.COMPLETED) {
           await (prisma as any).userWallet.update({
             where: { user_id: fromId },
             data: { total_withdrawal: { increment: amt } },
@@ -420,14 +502,14 @@ export class BillingService {
     status?: 'pending' | 'completed';
     milestoneId?: number | null;
   }) {
-    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = 'completed', milestoneId } = params;
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = BillingTransactionStatus.COMPLETED, milestoneId } = params;
     const currencyId = 1;
     // Platform fee (founder charge) only on first milestone of project; rest get 0
     const isFirstMilestone = meta?.milestone_index !== undefined ? meta.milestone_index === '0' : true;
     const { payerAmount, receiverAmount } = this.getPayerAndReceiverAmounts(amount, isFirstMilestone);
     // When fund loaded (pending): sender = funded, receiver = pending. When completed: both completed.
-    const senderStatus = status === 'pending' ? 'funded' : status;
-    const receiverStatus = status === 'pending' ? 'pending' : status;
+    const senderStatus = status === BillingTransactionStatus.PENDING ? BillingTransactionSenderStatus.FUNDED : status;
+    const receiverStatus = status === BillingTransactionStatus.PENDING ? BillingTransactionReceiverStatus.PENDING : status;
 
     const row = await (prisma as any).billingTransaction.create({
       data: {
@@ -444,7 +526,7 @@ export class BillingService {
         payer_amount: payerAmount,
         receiver_amount: receiverAmount,
         currency_id: currencyId,
-        type: 'payment',
+        type: BillingTransactionType.PAYMENT,
         status,
         sender_status: senderStatus,
         receiver_status: receiverStatus,
@@ -452,9 +534,9 @@ export class BillingService {
         meta: meta ? (meta as object) : undefined
       }
     });
-    if (status === 'completed') {
-      await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', fromId, toId, amount);
-    } else if (status === 'pending' && toId > 0) {
+    if (status === BillingTransactionStatus.COMPLETED) {
+      await this.updateUserBillingTotalsAfterTransaction(BillingTransactionType.PAYMENT, BillingTransactionStatus.COMPLETED, fromId, toId, amount);
+    } else if (status === BillingTransactionStatus.PENDING && toId > 0) {
       await this.ensureUserWallet(toId);
       // Pending amount = receiver amount only (from getPayerAndReceiverAmounts)
       await (prisma as any).userWallet.update({
@@ -478,13 +560,17 @@ export class BillingService {
       where: { unique_id: transactionUniqueId }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
-    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
-    if (tx.status !== 'pending') return { success: false, message: 'Payment is already completed or not pending' };
+    if (tx.type !== BillingTransactionType.PAYMENT) return { success: false, message: 'Not a payment transaction' };
+    if (tx.status !== BillingTransactionStatus.PENDING) return { success: false, message: 'Payment is already completed or not pending' };
     if (tx.from_id !== userId) return { success: false, message: 'Only the payer can release this payment' };
 
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { status: 'completed', sender_status: 'released', receiver_status: 'completed' }
+      data: {
+        status: BillingTransactionStatus.COMPLETED,
+        sender_status: BillingTransactionSenderStatus.RELEASED,
+        receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+      }
     });
     const amount = Number(tx.amount);
     const feePercent = appConfig.serviceFeePercent;
@@ -502,7 +588,7 @@ export class BillingService {
       });
     }
     // Credit freelancer: total_earning += netAmount, wallet += netAmount (receiver amount only; fee never hits wallet)
-    await this.updateUserBillingTotalsAfterTransaction('payment', 'completed', tx.from_id, tx.to_id, amount, netAmount, netAmount);
+    await this.updateUserBillingTotalsAfterTransaction(BillingTransactionType.PAYMENT, BillingTransactionStatus.COMPLETED, tx.from_id, tx.to_id, amount, netAmount, netAmount);
 
     // Create receiver invoice so freelancer has invoice with fee/GST breakdown
     await this.createInvoicesForTransaction(tx.id, { payer: false, receiver: true });
@@ -567,10 +653,12 @@ export class BillingService {
       include: { withdrawal_request: true }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
-    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
+    if (tx.type !== BillingTransactionType.PAYMENT) return { success: false, message: 'Not a payment transaction' };
     if (tx.to_id !== userId) return { success: false, message: 'Only the receiver can request withdraw for this payment' };
     const current = (tx as any).receiver_status ?? tx.status;
-    if (current !== 'completed' && current !== 'released') return { success: false, message: 'Withdraw can only be requested when receiver status is completed or released' };
+    if (current !== BillingTransactionReceiverStatus.COMPLETED && current !== BillingTransactionReceiverStatus.RELEASED) {
+      return { success: false, message: 'Withdraw can only be requested when receiver status is completed or released' };
+    }
     const method = await (prisma as any).withdrawalMethod.findFirst({
       where: { id: withdrawalMethodId, user_id: tx.to_id }
     });
@@ -581,12 +669,12 @@ export class BillingService {
         user_id: tx.to_id,
         withdrawal_method_id: withdrawalMethodId,
         billing_transaction_id: tx.id,
-        status: 'pending'
+        status: WithdrawalRequestStatus.PENDING
       }
     });
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { receiver_status: 'withdraw_in_process' }
+      data: { receiver_status: BillingTransactionReceiverStatus.WITHDRAW_IN_PROCESS }
     });
     return { success: true };
   }
@@ -599,7 +687,7 @@ export class BillingService {
     let processed = 0;
     let failed = 0;
     const requests = await (prisma as any).withdrawalRequest.findMany({
-      where: { status: 'pending' },
+      where: { status: WithdrawalRequestStatus.PENDING },
       include: {
         billing_transaction: { include: { currency: true } },
         withdrawal_method: true
@@ -629,7 +717,7 @@ export class BillingService {
       try {
         await (prisma as any).withdrawalRequest.update({
           where: { id: req.id },
-          data: { status: 'processing' }
+          data: { status: WithdrawalRequestStatus.PROCESSING }
         });
         // TODO: Call razorpayService.createPayout(fundAccountId, amountPaise, ...) when implemented
         if (isRazorpayConfigured()) {
@@ -638,18 +726,18 @@ export class BillingService {
         const now = new Date();
         await (prisma as any).withdrawalRequest.update({
           where: { id: req.id },
-          data: { status: 'completed', processed_at: now }
+          data: { status: WithdrawalRequestStatus.COMPLETED, processed_at: now }
         });
         await (prisma as any).billingTransaction.update({
           where: { id: tx.id },
-          data: { receiver_status: 'paid_out' }
+          data: { receiver_status: BillingTransactionReceiverStatus.PAID_OUT }
         });
         processed++;
       } catch (err: any) {
         const msg = err?.message ?? String(err);
         await (prisma as any).withdrawalRequest.update({
           where: { id: req.id },
-          data: { status: 'failed', processed_at: new Date(), error_message: msg.slice(0, 500) }
+          data: { status: WithdrawalRequestStatus.FAILED, processed_at: new Date(), error_message: msg.slice(0, 500) }
         });
         errors.push(`WithdrawalRequest ${req.id}: ${msg}`);
         failed++;
@@ -664,10 +752,10 @@ export class BillingService {
       where: { unique_id: transactionUniqueId }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
-    if (tx.type !== 'payment') return { success: false, message: 'Not a payment transaction' };
+    if (tx.type !== BillingTransactionType.PAYMENT) return { success: false, message: 'Not a payment transaction' };
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { receiver_status: 'released' }
+      data: { receiver_status: BillingTransactionReceiverStatus.RELEASED }
     });
     await this.createInvoicesForTransaction(tx.id, { payer: false, receiver: true });
     return { success: true };
@@ -857,10 +945,10 @@ export class BillingService {
     const userIdNum = parseInt(userId);
     const skip = (page - 1) * limit;
 
-    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0; exclude service_fee and withdrawal.
+    // creditsOnly (My Earning): only where user is receiver (to_id) and amount >= 0; exclude withdrawal.
     const baseWhere: any = creditsOnly
-      ? { to_id: userIdNum, amount: { gte: 0 }, type: { notIn: ['service_fee', 'withdrawal'] } }
-      : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }], type: { not: 'service_fee' } };
+      ? { to_id: userIdNum, amount: { gte: 0 }, type: { notIn: [BillingTransactionType.WITHDRAWAL] } }
+      : { OR: [{ from_id: userIdNum }, { to_id: userIdNum }] };
     if (fromDate || toDate) {
       baseWhere.created_at = {};
       if (fromDate) baseWhere.created_at.gte = new Date(fromDate);
@@ -933,9 +1021,7 @@ export class BillingService {
         transactions: transactions.map((t: any) => {
           const isCredit = t.to_id === userIdNum;
           const counterpartyId = isCredit ? t.from_id : t.to_id;
-          const clientName = t.type === 'service_fee' && counterpartyId === 0
-            ? 'Platform'
-            : (nameByUserId[counterpartyId] ?? '—');
+          const clientName = counterpartyId === 0 ? 'Platform' : (nameByUserId[counterpartyId] ?? '—');
           const payerInv = t.payer_invoice;
           const receiverInv = t.receiver_invoice;
           const invoiceUrlLegacy = t.invoice_url;
@@ -944,7 +1030,7 @@ export class BillingService {
           const isFirstMilestone = (t.meta as Record<string, string> | null)?.milestone_index !== undefined
             ? (t.meta as Record<string, string>).milestone_index === '0'
             : true;
-          const computed = t.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmt, isFirstMilestone) : null;
+          const computed = t.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmt, isFirstMilestone) : null;
           const payerAmt = t.payer_amount != null ? parseFloat(t.payer_amount.toString()) : (computed?.payerAmount ?? baseAmt);
           const receiverAmt = t.receiver_amount != null ? parseFloat(t.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmt);
           return {
@@ -1007,19 +1093,19 @@ export class BillingService {
     } else {
       const [credits, debits, withdrawals, pendingCredits] = await Promise.all([
         prisma.billingTransaction.aggregate({
-          where: { to_id: userIdNum, status: 'completed' },
+          where: { to_id: userIdNum, status: BillingTransactionStatus.COMPLETED },
           _sum: { amount: true }
         }),
         prisma.billingTransaction.aggregate({
-          where: { from_id: userIdNum, status: 'completed' },
+          where: { from_id: userIdNum, status: BillingTransactionStatus.COMPLETED },
           _sum: { amount: true }
         }),
         prisma.billingTransaction.aggregate({
-          where: { from_id: userIdNum, type: 'withdrawal', status: 'completed' },
+          where: { from_id: userIdNum, type: BillingTransactionType.WITHDRAWAL, status: BillingTransactionStatus.COMPLETED },
           _sum: { amount: true }
         }),
         prisma.billingTransaction.aggregate({
-          where: { to_id: userIdNum, status: 'pending' },
+          where: { to_id: userIdNum, status: BillingTransactionStatus.PENDING },
           _sum: { amount: true }
         })
       ]);
@@ -1351,7 +1437,7 @@ export class BillingService {
       where: { id: transactionId },
       include: { currency: true, payer_invoice: true, receiver_invoice: true }
     });
-    if (!transaction || transaction.type !== 'payment') return;
+    if (!transaction || transaction.type !== BillingTransactionType.PAYMENT) return;
     if (!createPayer && !createReceiver) return;
     if (createPayer && transaction.payer_invoice && createReceiver && transaction.receiver_invoice) return;
 
@@ -1552,12 +1638,12 @@ export class BillingService {
     const baseAmount = parseFloat(transaction.amount.toString());
     const tAny = transaction as any;
     const isFirstMilestone = metaMap.milestone_index !== undefined ? metaMap.milestone_index === '0' : true;
-    const computed = tAny.type === 'payment' ? this.getPayerAndReceiverAmounts(baseAmount, isFirstMilestone) : null;
+    const computed = tAny.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmount, isFirstMilestone) : null;
     const payerAmt = tAny.payer_amount != null ? parseFloat(tAny.payer_amount.toString()) : (computed?.payerAmount ?? baseAmount);
     const receiverAmt = tAny.receiver_amount != null ? parseFloat(tAny.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmount);
     const wr = (transaction as any).withdrawal_request;
     const withdrawalStatusRaw = wr?.status ?? null;
-    const withdrawalStatus = withdrawalStatusRaw === 'completed' ? 'success' : withdrawalStatusRaw;
+    const withdrawalStatus = withdrawalStatusRaw === WithdrawalRequestStatus.COMPLETED ? 'success' : withdrawalStatusRaw;
     const base: any = {
       id: transaction.id,
       uniqueId: transaction.unique_id,
@@ -1596,7 +1682,7 @@ export class BillingService {
         base.contractTitle = proposal.project?.project_title ?? '';
         base.milestonePayments = [];
         // For payment tx: show only the one milestone this transaction paid for (use milestone_id when set)
-        if ((transaction as any).type === 'payment') {
+        if ((transaction as any).type === BillingTransactionType.PAYMENT) {
           let row: any = null;
           if (transactionMilestoneId != null) {
             row = await (prisma as any).milestone.findUnique({

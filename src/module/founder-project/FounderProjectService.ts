@@ -5,6 +5,7 @@ import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePat
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { queueNotification } from '@services/notificationQueueService';
+import { ProposalStatus } from '@constants/status';
 
 // Force server restart to pick up database changes
 
@@ -312,7 +313,7 @@ export class FounderProjectService {
       const include = userId ? {
         ...baseInclude,
         invites: {
-          where: { provider_id: userId, status: 'PENDING' },
+          where: { provider_id: userId, status: ProposalStatus.PENDING },
           select: { id: true, status: true }
         },
         savedByUsers: {
@@ -489,7 +490,7 @@ export class FounderProjectService {
             where: {
               project_id: project.id,
               provider_id: userId,
-              status: 'HIRED'
+              status: ProposalStatus.HIRED
             }
           });
           if (!hiredProposal) {
@@ -511,9 +512,9 @@ export class FounderProjectService {
       const inviteData = (project as any).invites?.[0] || null;
       const inviteStatus = inviteData?.status || null;
       // is_invited = had a PENDING invite (for showing Accept/Reject). We also return invite_status so UI can show "Invitation rejected"
-      const isInvitedUser = !isOwner && inviteStatus === 'PENDING';
+      const isInvitedUser = !isOwner && inviteStatus === ProposalStatus.PENDING;
       // Freelancer side: only show invitation message when PENDING (when REJECTED, message holds rejection reason — do not show to freelancer)
-      const invitationMessageForViewer = !isOwner && inviteStatus === 'REJECTED' ? null : (inviteData?.message || null);
+      const invitationMessageForViewer = !isOwner && inviteStatus === ProposalStatus.REJECTED ? null : (inviteData?.message || null);
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, ...projectData } = project as any;
@@ -839,7 +840,7 @@ export class FounderProjectService {
       // All provider IDs that have any invite (for the 'invited' filter)
       const allInvitedProviderIds = invites.map((i: any) => i.provider_id);
       // Only PENDING invites are considered "invited" for the is_invited flag
-      const pendingInvites = invites.filter((i: any) => i.status === 'PENDING');
+      const pendingInvites = invites.filter((i: any) => i.status === ProposalStatus.PENDING);
       const pendingInvitedProviderIds = pendingInvites.map((i: any) => i.provider_id);
 
       // Build where clause based on filter
@@ -948,7 +949,7 @@ export class FounderProjectService {
           invite_status: (invite as any)?.status || null,
           invited_at: (invite as any)?.created_at || null,
           is_saved: isSaved,
-          invite_rejection_reason: (invite as any)?.status === 'REJECTED' ? (invite as any)?.message || null : null
+          invite_rejection_reason: (invite as any)?.status === ProposalStatus.REJECTED ? (invite as any)?.message || null : null
         };
       });
 
@@ -1065,7 +1066,7 @@ export class FounderProjectService {
         where: {
           project_id: project.id,
           provider_id: providerId,
-          status: "WITHDRAWN"
+          status: ProposalStatus.WITHDRAWN
         }
       });
 
@@ -1167,7 +1168,7 @@ export class FounderProjectService {
         where: {
           project_id: project.id,
           provider_id: userId,
-          status: 'PENDING'
+          status: ProposalStatus.PENDING
         }
       });
 
@@ -1187,7 +1188,7 @@ export class FounderProjectService {
           }
         },
         data: {
-          status: 'REJECTED',
+          status: ProposalStatus.REJECTED,
           message: (reason && reason.trim()) ? reason.trim() : null
         }
       });
@@ -1251,7 +1252,7 @@ export class FounderProjectService {
         where: {
           project_id: project.id,
           provider_id: userId,
-          status: "PENDING"
+          status: ProposalStatus.PENDING
         }
       });
       if (!invite) {
@@ -1259,7 +1260,7 @@ export class FounderProjectService {
       }
       await (prisma as any).projectInvite.update({
         where: { project_id_provider_id: { project_id: project.id, provider_id: userId } },
-        data: { status: "ACCEPTED" }
+        data: { status: ProposalStatus.ACCEPTED }
       });
 
       const projectTitle = project.project_title || "Project";

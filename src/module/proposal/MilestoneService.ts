@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { BillingService } from "../billing/BillingService";
+import { MilestoneStatus, MilestonePaymentStatus, BillingTransactionType, BillingTransactionStatus } from "@constants/status";
 
 /**
  * Submit milestone as complete (freelancer only). Sets status COMPLETED.
@@ -24,13 +25,13 @@ export async function submitMilestone(
   if (milestone.proposal.provider_id !== userId) {
     return { success: false, message: "Only the freelancer (proposal provider) can submit this milestone" };
   }
-  if (milestone.status === "COMPLETED" || milestone.status === "PAID") {
+  if (milestone.status === MilestoneStatus.COMPLETED || milestone.status === MilestoneStatus.PAID) {
     return { success: false, message: "Milestone is already submitted or paid" };
   }
 
   await (prisma as any).milestone.update({
     where: { id: milestone.id },
-    data: { status: "COMPLETED" }
+    data: { status: MilestoneStatus.COMPLETED }
   });
 
   return { success: true, message: "Milestone submitted successfully" };
@@ -58,13 +59,13 @@ export async function requestChangesMilestone(
   if (milestone.project.user_id !== userId) {
     return { success: false, message: "Only the project owner can request changes on this milestone" };
   }
-  if (milestone.status !== "COMPLETED") {
+  if (milestone.status !== MilestoneStatus.COMPLETED) {
     return { success: false, message: "Milestone is not submitted for review" };
   }
 
   await (prisma as any).milestone.update({
     where: { id: milestone.id },
-    data: { status: "PENDING" }
+    data: { status: MilestoneStatus.PENDING }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");
@@ -162,7 +163,7 @@ export async function releaseMilestonePayment(
   if (milestone.project.user_id !== userId) {
     return { success: false, message: "Only the project owner can release payment for this milestone" };
   }
-  if (milestone.payment_status === "RELEASED") {
+  if (milestone.payment_status === MilestonePaymentStatus.RELEASED) {
     return { success: false, message: "Payment for this milestone is already released" };
   }
 
@@ -178,8 +179,8 @@ export async function releaseMilestonePayment(
   let txn = await (prisma as any).billingTransaction.findFirst({
     where: {
       milestone_id: milestone.id,
-      type: "payment",
-      status: "pending"
+      type: BillingTransactionType.PAYMENT,
+      status: BillingTransactionStatus.PENDING
     }
   });
   if (!txn) {
@@ -187,8 +188,8 @@ export async function releaseMilestonePayment(
       where: {
         subject_type: "Proposal",
         subject_id: milestone.proposal.id,
-        type: "payment",
-        status: "pending"
+        type: BillingTransactionType.PAYMENT,
+        status: BillingTransactionStatus.PENDING
       }
     });
     const milestoneIndex = milestone.order_index;
@@ -206,7 +207,7 @@ export async function releaseMilestonePayment(
 
   await (prisma as any).milestone.update({
     where: { id: milestone.id },
-    data: { payment_status: "RELEASED", status: "PAID" }
+    data: { payment_status: MilestonePaymentStatus.RELEASED, status: MilestoneStatus.PAID }
   });
 
   const { createProposalActivity } = await import("./ProposalActivityService");

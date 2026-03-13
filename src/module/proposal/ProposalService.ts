@@ -6,6 +6,7 @@ import { queueNotification } from '@services/notificationQueueService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
+import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus } from '@constants/status';
 
 /** Human-readable labels for proposal status (single source of truth for API and activities). */
 export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
@@ -90,8 +91,8 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
         amount: Number(row.amount ?? 0),
         dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
         deliverables,
-        payment_status: row.payment_status ?? 'PENDING',
-        milestone_status: row.status ?? 'PENDING',
+        payment_status: row.payment_status ?? MilestonePaymentStatus.PENDING,
+        milestone_status: row.status ?? MilestoneStatus.PENDING,
         submitted_file: [],
         is_approved: row.is_approved === true,
         remark: row.remark ?? undefined
@@ -144,8 +145,8 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
         amount: Number(row.amount ?? 0),
         dueDate: row.due_date ? new Date(row.due_date).toISOString()?.slice(0, 10) : undefined,
         deliverables,
-        payment_status: row.payment_status ?? 'PENDING',
-        milestone_status: row.status ?? 'PENDING',
+        payment_status: row.payment_status ?? MilestonePaymentStatus.PENDING,
+        milestone_status: row.status ?? MilestoneStatus.PENDING,
         submitted_file: submittedFile,
         is_approved: row.is_approved === true,
         remark: row.remark ?? undefined
@@ -251,7 +252,7 @@ export class ProposalService {
       if (invite) {
         await (prisma as any).projectInvite.update({
           where: { id: invite.id },
-          data: { status: 'ACCEPTED' }
+          data: { status: ProposalStatus.ACCEPTED }
         });
       }
 
@@ -352,7 +353,7 @@ export class ProposalService {
         let milestone: any;
         if (!existing) {
           milestone = await prismaAny.milestone.create({
-            data: { ...row, status: 'PENDING' }
+            data: { ...row, status: MilestoneStatus.PENDING }
           });
         } else if (existing.is_approved === true) {
           milestone = existing;
@@ -436,10 +437,10 @@ export class ProposalService {
         return { success: false, message: "Proposal not found or you don't have permission" };
       }
       const status = (proposal as any).status;
-      if (status === "PROJECT_COMPLETED") {
+      if (status === ProposalStatus.PROJECT_COMPLETED) {
         return { success: false, message: "You cannot add milestones after the project is completed" };
       }
-      if (status !== "OFFER_ACCEPTED" && status !== "HIRED") {
+      if (status !== ProposalStatus.OFFER_ACCEPTED && status !== ProposalStatus.HIRED) {
         return { success: false, message: "You can only add milestones after the offer is accepted or you are hired" };
       }
 
@@ -464,7 +465,7 @@ export class ProposalService {
           description,
           amount,
           due_date: dueDate,
-          status: "PENDING",
+          status: MilestoneStatus.PENDING,
           is_approved: false,
           remark
         }
@@ -768,8 +769,8 @@ export class ProposalService {
   ): Promise<ServiceResponse> {
     try {
       // Hired tab includes HIRED, TERMINATING, and PROJECT_COMPLETED so all can view offer and project overview
-      const statusFilter = status === 'HIRED'
-        ? { in: ['HIRED', 'TERMINATING', 'PROJECT_COMPLETED'] as const }
+      const statusFilter = status === ProposalStatus.HIRED
+        ? { in: [ProposalStatus.HIRED, ProposalStatus.TERMINATING, ProposalStatus.PROJECT_COMPLETED] as const }
         : status;
       const whereClause = {
         status: statusFilter,
@@ -952,12 +953,12 @@ export class ProposalService {
 
       // If status is TERMINATING and the date has passed, apply termination now
       const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
-      if (proposal.status === "TERMINATING" && terminateAt && terminateAt <= new Date()) {
+      if (proposal.status === ProposalStatus.TERMINATING && terminateAt && terminateAt <= new Date()) {
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: "TERMINATED", terminate_at: null, terminate_by: null }
+          data: { status: ProposalStatus.TERMINATED, terminate_at: null, terminate_by: null }
         });
-        (proposal as any).status = "TERMINATED";
+        (proposal as any).status = ProposalStatus.TERMINATED;
         (proposal as any).terminate_at = null;
         (proposal as any).terminate_by = null;
       }
@@ -1010,7 +1011,7 @@ export class ProposalService {
         const lastAccepted = await (prisma as any).proposal.findFirst({
           where: {
             project: { user_id: userId },
-            status: 'ACCEPTED',
+            status: ProposalStatus.ACCEPTED,
             id: { not: proposal.id }
           },
           orderBy: { updated_at: 'desc' },
@@ -1061,7 +1062,7 @@ export class ProposalService {
       if (!proposal) {
         return { success: false, message: "Proposal not found or you don't have permission" };
       }
-      if (proposal.status !== 'PENDING') {
+      if (proposal.status !== ProposalStatus.PENDING) {
         return { success: false, message: "Only pending proposals can be edited" };
       }
       if ((proposal as any).milestones_approved === true) {
@@ -1278,7 +1279,7 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can withdraw the offer" };
       }
-      if (proposal.status !== 'OFFER_SENT') {
+      if (proposal.status !== ProposalStatus.OFFER_SENT) {
         return { success: false, message: "Only an offer that has been sent (and not yet accepted via NDA) can be withdrawn" };
       }
       const nda = getNda(proposal);
@@ -1290,12 +1291,12 @@ export class ProposalService {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
-          status: 'WITHDRAWN',
+          status: ProposalStatus.WITHDRAWN,
           nda: nextNda
         }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'WITHDRAWN' }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.WITHDRAWN }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
@@ -1354,7 +1355,7 @@ export class ProposalService {
       if (proposal.provider_id !== userId) {
         return { success: false, message: "Only the freelancer can decline this offer" };
       }
-      if (proposal.status !== 'OFFER_SENT') {
+      if (proposal.status !== ProposalStatus.OFFER_SENT) {
         return { success: false, message: "Only an offer that has been sent can be declined" };
       }
 
@@ -1362,14 +1363,14 @@ export class ProposalService {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
-          status: 'REJECTED',
+          status: ProposalStatus.REJECTED,
           ...(remark ? { remark } : {})
         }
       });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
-        oldStatus: 'OFFER_SENT',
-        newStatus: 'REJECTED',
+        oldStatus: ProposalStatus.OFFER_SENT,
+        newStatus: ProposalStatus.REJECTED,
         ...(remark ? { message: remark } : {})
       }, userId);
 
@@ -1421,7 +1422,7 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can hire" };
       }
-      if (proposal.status !== "OFFER_ACCEPTED") {
+      if (proposal.status !== ProposalStatus.OFFER_ACCEPTED) {
         return { success: false, message: "You can only hire after the freelancer has signed the NDA (offer accepted)" };
       }
 
@@ -1454,19 +1455,19 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can mark the project as completed" };
       }
-      if (proposal.status === "PROJECT_COMPLETED") {
+      if (proposal.status === ProposalStatus.PROJECT_COMPLETED) {
         return { success: true, message: "Project is already marked as completed" };
       }
-      if (proposal.status === "TERMINATING") {
+      if (proposal.status === ProposalStatus.TERMINATING) {
         return { success: false, message: "Cannot mark project completed while contract is scheduled to terminate. Restore the contract first." };
       }
-      if (proposal.status !== "HIRED") {
+      if (proposal.status !== ProposalStatus.HIRED) {
         return { success: false, message: "Project can only be marked completed when the contract is hired" };
       }
       const rows = proposal.milestonesRows ?? [];
       const allDone = rows.length > 0 && rows.every((m: any) => {
         const s = String(m.status ?? "").toUpperCase();
-        return s === "PAID" || s === "COMPLETED";
+        return s === MilestoneStatus.PAID || s === MilestoneStatus.COMPLETED;
       });
       if (!allDone) {
         return { success: false, message: "Complete and pay all milestones before marking the project as completed" };
@@ -1474,12 +1475,12 @@ export class ProposalService {
 
       await createProposalActivity(proposal.unique_id, "STATUS_CHANGE", {
         oldStatus: proposal.status,
-        newStatus: "PROJECT_COMPLETED"
+        newStatus: ProposalStatus.PROJECT_COMPLETED
       }, userId);
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "PROJECT_COMPLETED" }
+        data: { status: ProposalStatus.PROJECT_COMPLETED }
       });
 
       return { success: true, message: "Project marked as completed" };
@@ -1528,11 +1529,11 @@ export class ProposalService {
       const isNdaRequired = proposal.project.is_nda_required === true;
 
       // Founder: send offer when NDA not required (ACCEPTED/PENDING -> OFFER_SENT)
-      if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === 'ACCEPTED' || proposal.status === 'PENDING')) {
+      if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === ProposalStatus.ACCEPTED || proposal.status === ProposalStatus.PENDING)) {
         const otherActive = await (prisma as any).proposal.count({
           where: {
             project_id: proposal.project_id,
-            status: { in: ['OFFER_SENT', 'OFFER_ACCEPTED'] },
+            status: { in: [ProposalStatus.OFFER_SENT, ProposalStatus.OFFER_ACCEPTED] },
             id: { not: proposal.id }
           }
         });
@@ -1549,9 +1550,9 @@ export class ProposalService {
         const ndaUpdate = { ...nda, offer_expires_at: expiresAt.toISOString() };
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: 'OFFER_SENT', nda: ndaUpdate }
+          data: { status: ProposalStatus.OFFER_SENT, nda: ndaUpdate }
         });
-        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: proposal.status, newStatus: 'OFFER_SENT' }, userId);
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: proposal.status, newStatus: ProposalStatus.OFFER_SENT }, userId);
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
           proposal.provider_id,
@@ -1570,12 +1571,12 @@ export class ProposalService {
       }
 
       // Freelancer: accept offer when NDA not required (OFFER_SENT -> OFFER_ACCEPTED)
-      if (isProvider && !isNdaRequired && data.accept_offer === true && proposal.status === 'OFFER_SENT') {
+      if (isProvider && !isNdaRequired && data.accept_offer === true && proposal.status === ProposalStatus.OFFER_SENT) {
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: 'OFFER_ACCEPTED' }
+          data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'OFFER_ACCEPTED' }, userId);
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
           proposal.provider_id,
@@ -1632,11 +1633,11 @@ export class ProposalService {
       }
 
       // When founder sends the NDA: one-active-offer check before saving (so we don't save NDA then reject)
-      if (isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED')) {
+      if (isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.ACCEPTED)) {
         const otherActive = await (prisma as any).proposal.count({
           where: {
             project_id: proposal.project_id,
-            status: { in: ['OFFER_SENT', 'OFFER_ACCEPTED'] },
+            status: { in: [ProposalStatus.OFFER_SENT, ProposalStatus.OFFER_ACCEPTED] },
             id: { not: proposal.id }
           }
         });
@@ -1654,15 +1655,15 @@ export class ProposalService {
       });
 
       // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT
-      const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === 'PENDING' || proposal.status === 'ACCEPTED');
+      const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.ACCEPTED);
       if (didJustSendOffer) {
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
           oldStatus: proposal.status,
-          newStatus: 'OFFER_SENT'
+          newStatus: ProposalStatus.OFFER_SENT
         }, userId);
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: 'OFFER_SENT' }
+          data: { status: ProposalStatus.OFFER_SENT }
         });
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
@@ -1681,12 +1682,12 @@ export class ProposalService {
       }
 
       // When freelancer signs NDA, move status from OFFER_SENT to OFFER_ACCEPTED (so founder can proceed to payment)
-      if (isProvider && (data.is_nda_signed === true || data.nda_signed_file_link) && proposal.status === 'OFFER_SENT') {
+      if (isProvider && (data.is_nda_signed === true || data.nda_signed_file_link) && proposal.status === ProposalStatus.OFFER_SENT) {
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: 'OFFER_ACCEPTED' }
+          data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'OFFER_SENT', newStatus: 'OFFER_ACCEPTED' }, userId);
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
       }
 
       // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
@@ -1766,7 +1767,7 @@ export class ProposalService {
         };
       }
 
-      if (proposal.status !== 'PENDING') {
+      if (proposal.status !== ProposalStatus.PENDING) {
         return {
           success: false,
           message: "Only pending proposals can be withdrawn"
@@ -1776,10 +1777,10 @@ export class ProposalService {
       // Update status to WITHDRAWN
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: 'WITHDRAWN' }
+        data: { status: ProposalStatus.WITHDRAWN }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'PENDING', newStatus: 'WITHDRAWN' }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.PENDING, newStatus: ProposalStatus.WITHDRAWN }, userId);
 
       // Decrement proposals_count on the project
       await prisma.founderProject.update({
@@ -1841,10 +1842,10 @@ export class ProposalService {
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
       }
-      if (proposal.status !== "HIRED") {
+      if (proposal.status !== ProposalStatus.HIRED) {
         return { success: false, message: "Only a hired contract can be terminated" };
       }
-      if (proposal.status === "TERMINATING" || (proposal as any).terminate_at) {
+      if (proposal.status === ProposalStatus.TERMINATING || (proposal as any).terminate_at) {
         return { success: false, message: "Termination is already scheduled. Restore first if you want to cancel it." };
       }
       const isFounder = proposal.project.user_id === userId;
@@ -1863,10 +1864,10 @@ export class ProposalService {
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "TERMINATING", terminate_at: terminateAt, terminate_by: userId }
+        data: { status: ProposalStatus.TERMINATING, terminate_at: terminateAt, terminate_by: userId }
       });
 
-      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: 'HIRED', newStatus: 'TERMINATING', message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.HIRED, newStatus: ProposalStatus.TERMINATING, message: `Termination scheduled in 7 days. Reason: ${trimmed}` }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
       const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${trimmed}. You can restore before the date.`;
@@ -1907,7 +1908,7 @@ export class ProposalService {
       if (!proposal) {
         return { success: false, message: "Proposal not found" };
       }
-      if (proposal.status !== "TERMINATING" && proposal.status !== "HIRED") {
+      if (proposal.status !== ProposalStatus.TERMINATING && proposal.status !== ProposalStatus.HIRED) {
         return { success: false, message: "Only a contract with scheduled termination can be restored" };
       }
       if (proposal.terminate_by != null && proposal.terminate_by !== userId) {
@@ -1920,7 +1921,7 @@ export class ProposalService {
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: "HIRED", terminate_at: null, terminate_by: null }
+        data: { status: ProposalStatus.HIRED, terminate_at: null, terminate_by: null }
       });
 
       const projectTitle = proposal.project?.project_title ?? "Project";

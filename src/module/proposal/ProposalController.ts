@@ -134,7 +134,8 @@ export async function getProposalsByProject(req: Request, res: Response) {
 export async function getFounderContracts(req: Request, res: Response) {
   const userId = req.user?.id;
   const { status, page, limit } = req.query;
-  const validStatuses = ['ACCEPTED', 'OFFER_SENT', 'OFFER_ACCEPTED', 'HIRED', 'REJECTED', 'TERMINATED', 'WITHDRAWN'];
+  const { ProposalStatus } = await import('@constants/status');
+  const validStatuses = [ProposalStatus.ACCEPTED, ProposalStatus.OFFER_SENT, ProposalStatus.OFFER_ACCEPTED, ProposalStatus.HIRED, ProposalStatus.TERMINATING, ProposalStatus.REJECTED, ProposalStatus.TERMINATED, ProposalStatus.WITHDRAWN];
   const statusParam = typeof status === 'string' ? status : '';
 
   if (!userId) {
