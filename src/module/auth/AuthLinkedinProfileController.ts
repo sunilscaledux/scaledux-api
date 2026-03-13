@@ -3,6 +3,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { prisma } from '../../services/prismaService';
 import axios from 'axios';
 import { ulid } from 'ulid';
+import { Log } from '@services/loggerService';
 
 interface LinkedInProfileData {
   id: string;
@@ -73,7 +74,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
 
     // If we have a code instead of access_token, exchange it
     if (code && !access_token) {
-      console.log("🔄 Exchanging LinkedIn authorization code for access token");
+      Log.info("🔄 Exchanging LinkedIn authorization code for access token");
       
       const tokenParams = {
         grant_type: "authorization_code",
@@ -94,9 +95,9 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           }
         );
         finalAccessToken = tokenResponse.data.access_token;
-        console.log("✅ Access token obtained from code exchange");
+        Log.info("✅ Access token obtained from code exchange");
       } catch (tokenError: any) {
-        console.error("❌ Token exchange failed:", tokenError.response?.data);
+        Log.error("❌ Token exchange failed:", tokenError.response?.data);
         return ApiResponse.error(res, "Failed to exchange LinkedIn authorization code");
       }
     }
@@ -105,7 +106,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       return ApiResponse.error(res, "LinkedIn access token or authorization code is required");
     }
 
-    console.log("🔄 Importing LinkedIn profile data for user:", userId);
+    Log.info("🔄 Importing LinkedIn profile data for user:", userId);
 
     // Fetch basic profile information (only what's available with basic scopes)
     let profileData: any = {};
@@ -124,9 +125,9 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
         }
       );
       profileData = profileResponse.data;
-      console.log("✅ LinkedIn basic profile data fetched");
+      Log.info("✅ LinkedIn basic profile data fetched");
     } catch (error: any) {
-      console.log("⚠️ Could not fetch basic LinkedIn profile:", error.response?.data);
+      Log.info("⚠️ Could not fetch basic LinkedIn profile:", error.response?.data);
     }
 
     // Try to get email (separate endpoint)
@@ -141,14 +142,14 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
       );
       if (emailResponse.data?.elements?.[0]?.['handle~']?.emailAddress) {
         profileData.email = emailResponse.data.elements[0]['handle~'].emailAddress;
-        console.log("✅ LinkedIn email fetched");
+        Log.info("✅ LinkedIn email fetched");
       }
     } catch (error: any) {
-      console.log("⚠️ Could not fetch LinkedIn email:", error.response?.data);
+      Log.info("⚠️ Could not fetch LinkedIn email:", error.response?.data);
     }
 
     // Note: Experience, Education, and Skills are no longer available for most apps
-    console.log("ℹ️ LinkedIn API restrictions: Experience, Education, and Skills data not available for third-party apps");
+    Log.info("ℹ️ LinkedIn API restrictions: Experience, Education, and Skills data not available for third-party apps");
 
     // Extract names
     const firstName = Object.values(profileData.firstName?.localized || {})[0] as string || '';
@@ -196,7 +197,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           },
         });
       } catch (error) {
-        console.log("⚠️ Error importing education entry:", error);
+        Log.info("⚠️ Error importing education entry:", error);
       }
     }
 
@@ -217,7 +218,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           },
         });
       } catch (error) {
-        console.log("⚠️ Error importing experience entry:", error);
+        Log.info("⚠️ Error importing experience entry:", error);
       }
     }
 
@@ -263,11 +264,11 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           },
         });
       } catch (error) {
-        console.log("⚠️ Error importing skills:", error);
+        Log.info("⚠️ Error importing skills:", error);
       }
     }
 
-    console.log("✅ LinkedIn profile import completed successfully");
+    Log.info("✅ LinkedIn profile import completed successfully");
 
     return ApiResponse.success(
       res,
@@ -289,7 +290,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
     );
 
   } catch (error: any) {
-    console.error('❌ LinkedIn profile import error:', error);
+    Log.error("Error", { error });
     
     let errorMessage = "Failed to import LinkedIn profile. ";
     if (error.response?.status === 401) {

@@ -9,6 +9,7 @@ dotenv.config();
 
 import http from 'http';
 import { connectMongo } from '@services/mongoService';
+import { Log } from '@services/loggerService';
 
 const WORKER_PORT = parseInt(process.env.WORKER_PORT || '8000', 10);
 
@@ -32,7 +33,7 @@ async function start() {
   });
 
   server.listen(WORKER_PORT, () => {
-    console.log(`Worker listening on http://localhost:${WORKER_PORT} (health: /health)`);
+    Log.info(`Worker listening on http://localhost:${WORKER_PORT} (health: /health)`);
   });
 }
 

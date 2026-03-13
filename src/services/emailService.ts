@@ -1,4 +1,5 @@
 import mailConfig from "@config/mail";
+import { Log } from "@services/loggerService";
 import { templateService } from "./templateService";
 
 const { SendMailClient } = require("zeptomail");
@@ -24,7 +25,7 @@ class EmailService {
     const token = mailConfig.ZEPTO_TOKEN;
 
     if (!token) {
-      console.warn("⚠️  ZEPTO_TOKEN not configured - Email service will be disabled");
+      Log.warn("ZEPTO_TOKEN not configured - Email service will be disabled");
       this.isConfigured = false;
       return;
     }
@@ -32,16 +33,16 @@ class EmailService {
     try {
       this.client = new SendMailClient({ url, token });
       this.isConfigured = true;
-      console.log("✅ Email service initialized successfully");
+      Log.info("Email service initialized successfully");
     } catch (error) {
-      console.error("❌ Failed to initialize email service:", error);
+      Log.error("Failed to initialize email service", { error });
       this.isConfigured = false;
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
     if (!this.isConfigured) {
-      console.warn("⚠️  Email service not configured - Skipping email to:", options.to);
+      Log.warn("Email service not configured - Skipping email to", { to: options.to });
       return false;
     }
 
@@ -67,10 +68,10 @@ class EmailService {
       };
 
       const response = await this.client.sendMail(mailData);
-      console.log("✅ Email sent successfully via ZeptoMail:", response);
+      Log.info("Email sent successfully via ZeptoMail", { response });
       return true;
     } catch (error) {
-      console.error("❌ Failed to send email via ZeptoMail:", error);
+      Log.error("Failed to send email via ZeptoMail", { error });
       return false;
     }
   }
@@ -97,7 +98,7 @@ class EmailService {
         html: template.html,
       });
     } catch (error) {
-      console.error("Failed to generate OTP email template:", error);
+      Log.error("Failed to generate OTP email template", { error });
       return false;
     }
   }
@@ -118,7 +119,7 @@ class EmailService {
         html: template.html,
       });
     } catch (error) {
-      console.error("Failed to generate welcome email template:", error);
+      Log.error("Failed to generate welcome email template", { error });
       return false;
     }
   }
@@ -143,7 +144,7 @@ class EmailService {
         html: template.html,
       });
     } catch (error) {
-      console.error("Failed to generate password reset email template:", error);
+      Log.error("Failed to generate password reset email template", { error });
       return false;
     }
   }
@@ -170,7 +171,7 @@ class EmailService {
         html: template.html,
       });
     } catch (error) {
-      console.error("Failed to generate custom email template:", error);
+      Log.error("Failed to generate custom email template", { error });
       return false;
     }
   }
@@ -188,14 +189,14 @@ class EmailService {
       });
 
       if (testResult) {
-        console.log("ZeptoMail service is ready");
+        Log.info("ZeptoMail service is ready");
         return true;
       } else {
-        console.error("ZeptoMail test failed");
+        Log.error("ZeptoMail test failed");
         return false;
       }
     } catch (error) {
-      console.error("ZeptoMail service configuration error:", error);
+      Log.error("ZeptoMail service configuration error", { error });
       return false;
     }
   }

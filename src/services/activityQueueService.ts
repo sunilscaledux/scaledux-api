@@ -1,5 +1,6 @@
 import { dispatch } from '../queues/Queue';
 import { ActivityJob } from '../jobs/ActivityJob';
+import { Log } from '@services/loggerService';
 import type { ActivityJobData } from '../jobs/ActivityJob';
 
 /**
@@ -23,7 +24,7 @@ export async function queueActivity(
   try {
     await dispatch(ActivityJob, data, { jobId: undefined });
   } catch (err) {
-    console.error('activityQueueService.queueActivity failed:', err);
+    Log.error('activityQueueService.queueActivity failed', { err });
     throw err;
   }
 }

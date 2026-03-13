@@ -29,6 +29,7 @@
     "twilio": "^5.10.6",
     "ulid": "^3.0.1",
     "winston": "^3.17.0",
+    "winston-daily-rotate-file": "^5.0.0",
     "zeptomail": "^6.2.1"
   },
   "devDependencies": {

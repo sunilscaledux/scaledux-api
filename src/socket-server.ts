@@ -12,6 +12,7 @@ import express from 'express';
 import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import socketConfig from '@config/socketConfig';
+import { Log } from '@services/loggerService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { emitNewMessageWithIO, emitNewMessageToBothUsersWithIO } from '@module/chat/chatSocket';
 
@@ -80,7 +81,7 @@ app.post('/emit', (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error('Emit error:', err);
+    Log.error('Emit error', { err });
     res.status(500).json({ ok: false, error: 'Emit failed' });
   }
 });
@@ -88,7 +89,7 @@ app.post('/emit', (req, res) => {
 io.on('connection', (socket) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.cookie?.match(/auth_token=([^;]+)/)?.[1];
   if (!token) {
-    if (process.env.NODE_ENV !== 'production') console.log('[socket] connection rejected: no token');
+    if (process.env.NODE_ENV !== 'production') Log.debug('[socket] connection rejected: no token');
     socket.disconnect(true);
     return;
   }
@@ -98,7 +99,7 @@ io.on('connection', (socket) => {
     socket.data.userId = userId;
     socket.join(`user:${userId}`);
   } catch {
-    if (process.env.NODE_ENV !== 'production') console.log('[socket] connection rejected: invalid token');
+    if (process.env.NODE_ENV !== 'production') Log.debug('[socket] connection rejected: invalid token');
     socket.disconnect(true);
     return;
   }
@@ -140,8 +141,8 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(socketConfig.port, () => {
-  console.log(`🔌 Socket server: http://localhost:${socketConfig.port}/socket.io`);
-  console.log(`   Ensure frontend uses this URL (NEXT_PUBLIC_SOCKET_URL or default :4001) and both API + socket processes are running.`);
+  Log.info(`Socket server: http://localhost:${socketConfig.port}/socket.io`);
+  Log.info('Ensure frontend uses this URL (NEXT_PUBLIC_SOCKET_URL or default :4001) and both API + socket processes are running.');
 });
 
 export default httpServer;

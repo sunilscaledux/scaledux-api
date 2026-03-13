@@ -1,4 +1,5 @@
 import { prisma } from "./prismaService";
+import { Log } from '@services/loggerService';
 
 interface OTPResponse {
   success: boolean;
@@ -42,7 +43,7 @@ class PhoneOTPService {
         },
       });
     } catch (error) {
-      console.error("Error cleaning up expired OTPs:", error);
+      Log.error("Error", { error });
     }
   }
 
@@ -68,7 +69,7 @@ class PhoneOTPService {
         },
       });
 
-      console.log(`📱 SMS OTP for ${formattedPhone}: ${otpCode}`);
+      Log.info(`📱 SMS OTP for ${formattedPhone}: ${otpCode}`);
 
       return {
         success: true,
@@ -76,7 +77,7 @@ class PhoneOTPService {
         otp: process.env.NODE_ENV === "development" ? otpCode : otpCode, // Only in dev
       };
     } catch (error: any) {
-      console.error("Send OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: error.message || "Failed to send OTP",
@@ -128,7 +129,7 @@ class PhoneOTPService {
         isValid: true,
       };
     } catch (error: any) {
-      console.error("Verify OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: error.message || "Failed to verify OTP",

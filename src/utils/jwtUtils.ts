@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import { Log } from '@services/loggerService';
 
 export function generateTokenAndSetCookie(
   user: any,
@@ -33,7 +34,7 @@ export function generateTokenAndSetCookie(
     domain: undefined,
   };
 
-  console.log(
+  Log.info(
     `🍪 Token generated with ${rememberMe ? "7 days" : "24 hours"} expiry`
   );
 

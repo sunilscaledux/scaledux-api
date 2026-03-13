@@ -1,5 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { Log } from '@services/loggerService';
 
 export class ServiceCategoryService {
   /**
@@ -26,7 +27,7 @@ export class ServiceCategoryService {
         data: categories
       };
     } catch (error: any) {
-      console.error("Get Service Categories Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get service categories"
@@ -60,7 +61,7 @@ export class ServiceCategoryService {
         data: subCategories
       };
     } catch (error: any) {
-      console.error("Get SubCategories Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get subcategories"
@@ -146,7 +147,7 @@ export class ServiceCategoryService {
         data: response
       };
     } catch (error: any) {
-      console.error("Get Keywords Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get keywords"
@@ -219,7 +220,7 @@ export class ServiceCategoryService {
         data: keywords
       };
     } catch (error: any) {
-      console.error("Search Keywords Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to search keywords"
@@ -255,7 +256,7 @@ export class ServiceCategoryService {
         data: keywords
       };
     } catch (error: any) {
-      console.error("Get Popular Keywords Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get popular keywords"
@@ -290,7 +291,7 @@ export class ServiceCategoryService {
         data: categories
       };
     } catch (error: any) {
-      console.error("Get Categories with SubCategories Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get categories with subcategories"

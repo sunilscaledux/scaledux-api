@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { isValidContractEndReason } from "../../constants/contractEndReasons";
+import { Log } from '@services/loggerService';
 
 const ACTION_TYPE_PROPOSAL_CONTRACT = 'PROPOSAL_CONTRACT';
 
@@ -119,7 +120,7 @@ export async function createReview(
       data: { review: { id: review.id, unique_id: review.unique_id, review_type: review.review_type } }
     };
   } catch (error: any) {
-    console.error('ReviewService.createReview error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to create review' };
   }
 }
@@ -210,7 +211,7 @@ export async function getReviewsForProposal(
       message: 'OK'
     };
   } catch (error: any) {
-    console.error('ReviewService.getReviewsForProposal error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to get reviews' };
   }
 }
@@ -272,7 +273,7 @@ export async function getMyReviews(
       message: 'OK'
     };
   } catch (error: any) {
-    console.error('ReviewService.getMyReviews error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to get reviews' };
   }
 }
@@ -303,7 +304,7 @@ export async function updateReview(
 
     return { success: true, message: 'Review updated', data: { review: { unique_id: review.unique_id } } };
   } catch (error: any) {
-    console.error('ReviewService.updateReview error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to update review' };
   }
 }
@@ -413,7 +414,7 @@ export async function getPublicReviewsByProfileUniqueId(
       message: 'OK'
     };
   } catch (error: any) {
-    console.error('ReviewService.getPublicReviewsByProfileUniqueId error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to get reviews' };
   }
 }
@@ -430,7 +431,7 @@ export async function deleteReview(userId: number, reviewUniqueId: string): Prom
     await (prisma as any).review.delete({ where: { id: review.id } });
     return { success: true, message: 'Review deleted' };
   } catch (error: any) {
-    console.error('ReviewService.deleteReview error:', error);
+    Log.error("Error", { error });
     return { success: false, message: error.message || 'Failed to delete review' };
   }
 }

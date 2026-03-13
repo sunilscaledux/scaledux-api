@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 export class EducationService {
   /**
@@ -31,7 +32,7 @@ export class EducationService {
         data: education
       };
     } catch (error: any) {
-      console.error("Create Education Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to add education"
@@ -59,7 +60,7 @@ export class EducationService {
         data: educations
       };
     } catch (error: any) {
-      console.error("Get Educations Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to retrieve educations"
@@ -111,7 +112,7 @@ export class EducationService {
         data: education
       };
     } catch (error: any) {
-      console.error("Update Education Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to update education"
@@ -152,7 +153,7 @@ export class EducationService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Education Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to delete education"

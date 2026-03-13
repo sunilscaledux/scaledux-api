@@ -5,6 +5,7 @@ import TwilioService from "@services/TwilioService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import fs from 'fs';
 import path from 'path';
+import { Log } from '@services/loggerService';
 
 export class VerificationService {
   // ============ AGENCY VERIFICATION ============
@@ -43,7 +44,7 @@ export class VerificationService {
         }
       };
     } catch (error: any) {
-      console.error("Get Agency Verification Status Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get agency verification status"
@@ -87,7 +88,7 @@ export class VerificationService {
         data: agencyVerification
       };
     } catch (error: any) {
-      console.error("Submit Agency Verification Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to submit agency verification"
@@ -123,7 +124,7 @@ export class VerificationService {
         data: uploadedFiles
       };
     } catch (error: any) {
-      console.error("Upload Agency Documents Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to upload agency documents"
@@ -163,7 +164,7 @@ export class VerificationService {
         }
       };
     } catch (error: any) {
-      console.error("Get Email Verification Status Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get email verification status"
@@ -196,7 +197,7 @@ export class VerificationService {
       // For now, we'll assume there's an OTP service or table
       
       // TODO: Send email with OTP using email service
-      console.log(`Email OTP for ${email}: ${otp}`);
+      Log.info(`Email OTP for ${email}: ${otp}`);
 
       return {
         success: true,
@@ -204,7 +205,7 @@ export class VerificationService {
         data: { email }
       };
     } catch (error: any) {
-      console.error("Send Email OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to send email OTP"
@@ -238,7 +239,7 @@ export class VerificationService {
         }
       };
     } catch (error: any) {
-      console.error("Verify Email OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to verify email OTP"
@@ -282,7 +283,7 @@ export class VerificationService {
         };
       }
     } catch (error: any) {
-      console.error("Send Phone OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to send phone OTP"
@@ -335,7 +336,7 @@ export class VerificationService {
         };
       }
     } catch (error: any) {
-      console.error("Verify Phone OTP Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to verify phone OTP"
@@ -378,7 +379,7 @@ export class VerificationService {
         }
       };
     } catch (error: any) {
-      console.error("Get Identity Verification Status Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get identity verification status"
@@ -443,7 +444,7 @@ export class VerificationService {
         data: identityVerification
       };
     } catch (error: any) {
-      console.error("Submit Identity Verification Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to submit identity verification"
@@ -480,7 +481,7 @@ export class VerificationService {
         data: uploadedFiles
       };
     } catch (error: any) {
-      console.error("Upload Verification Documents Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to upload verification documents"
@@ -515,7 +516,7 @@ export class VerificationService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Verification Document Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to delete document"

@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateWorkExperienceInput, UpdateWorkExperienceInput } from "./WorkExperienceType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 export class WorkExperienceService {
   /**
@@ -24,7 +25,7 @@ export class WorkExperienceService {
         data: workExperiences
       };
     } catch (error) {
-      console.error('Error fetching work experiences:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -64,7 +65,7 @@ export class WorkExperienceService {
         data: workExperience
       };
     } catch (error) {
-      console.error('Error creating work experience:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -121,7 +122,7 @@ export class WorkExperienceService {
         data: updatedWorkExperience
       };
     } catch (error) {
-      console.error('Error updating work experience:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -162,7 +163,7 @@ export class WorkExperienceService {
         data: null
       };
     } catch (error) {
-      console.error('Error deleting work experience:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'

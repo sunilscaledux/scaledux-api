@@ -7,6 +7,7 @@ import { emailService } from "../../services/emailService";
 import { generateOtpCode, normalizeContact } from "@utils/General";
 import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
+import { Log } from '@services/loggerService';
 
 // ─── Device / refresh token helpers ─────────────────────────────────────────
 
@@ -284,8 +285,8 @@ export async function createUserAfterOtpVerification(
       data: safeUser,
     };
   } catch (error: any) {
-    console.error("Create user error:", error);
-    console.error("Error details:", {
+    Log.error("Error", { error });
+    Log.error("Error details:", {
       message: error?.message,
       code: error?.code,
       meta: error?.meta
@@ -363,7 +364,7 @@ export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
       data: safeUser,
     };
   } catch (error) {
-    console.error("Login error:", error);
+    Log.error("Error", { error });
     return {
       success: false,
       message: "Login failed. Please try again.",
@@ -429,7 +430,7 @@ export async function userOtpLogin(
       data: safeUser,
     };
   } catch (error) {
-    console.error("OTP Login error:", error);
+    Log.error("Error", { error });
     return {
       success: false,
       message: "Login failed. Please try again.",
@@ -462,7 +463,7 @@ async function cleanupExpiredOtps(
       where: whereCondition,
     });
   } catch (error) {
-    console.error("Error cleaning up expired OTPs:", error);
+    Log.error("Error", { error });
   }
 }
 
@@ -474,10 +475,10 @@ async function sendSmsOtp(phone: string, otpCode: string): Promise<boolean> {
   try {
     // TODO: Implement SMS service when available
     // return await smsService.sendOtpSms(phone, otpCode, firstName);
-    console.log(`SMS OTP ${otpCode} would be sent to ${phone}`);
+    Log.info(`SMS OTP ${otpCode} would be sent to ${phone}`);
     return true; // Temporary - assume success for phone
   } catch (error) {
-    console.error("Error sending SMS OTP:", error);
+    Log.error("Error", { error });
     return false;
   }
 }
@@ -570,7 +571,7 @@ export async function generateAndSendOtp(data: {
       },
     };
   } catch (error) {
-    console.error("Error generating and sending OTP:", error);
+    Log.error("Error", { error });
     return {
       success: false,
       message: "Failed to generate OTP. Please try again.",
@@ -671,7 +672,7 @@ export async function verifyOtpByType(
       data: otp,
     };
   } catch (error) {
-    console.error("Error verifying OTP:", error);
+    Log.error("Error", { error });
     return {
       success: false,
       message: "Failed to verify OTP. Please try again.",
@@ -721,7 +722,7 @@ export async function resendOtpByType(
       message: result.message,
     };
   } catch (error) {
-    console.error("Error resending OTP:", error);
+    Log.error("Error", { error });
     return {
       success: false,
       message: "Failed to resend OTP. Please try again.",
@@ -768,7 +769,7 @@ export async function getRegistrationData(identifier: string): Promise<any | nul
       verified: otp.verified,
     };
   } catch (error) {
-    console.error("Error getting registration data:", error);
+    Log.error("Error", { error });
     return null;
   }
 }

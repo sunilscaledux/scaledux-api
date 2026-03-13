@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import * as AuthService from '../auth/AuthService'
+import { Log } from '@services/loggerService';
 
 /**
  * Get email verification status
@@ -51,7 +52,7 @@ export async function getEmailVerificationStatus(req: Request, res: Response) {
     }, "Email verification status retrieved successfully")
 
   } catch (error: any) {
-    console.error("Get Email Verification Status Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get email verification status")
   }
 }
@@ -127,7 +128,7 @@ export async function sendEmailOTP(req: Request, res: Response) {
     }, "OTP sent to your email address")
 
   } catch (error: any) {
-    console.error("Send Email OTP Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to send OTP")
   }
 }
@@ -201,7 +202,7 @@ export async function verifyEmailOTP(req: Request, res: Response) {
     }, "Email verification completed")
 
   } catch (error: any) {
-    console.error("Verify Email OTP Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to verify OTP")
   }
 }
@@ -269,7 +270,7 @@ export async function updateEmailAddress(req: Request, res: Response) {
     }, "Email updated successfully")
 
   } catch (error: any) {
-    console.error("Update Email Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to update email")
   }
 }

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { Log } from '@services/loggerService';
 
 let isConnected = false;
 
@@ -6,15 +7,15 @@ export async function connectMongo(): Promise<void> {
   if (isConnected) return;
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    console.warn('MONGODB_URI not set; database will be disabled.');
+    Log.warn('MONGODB_URI not set; database will be disabled.');
     return;
   }
   try {
     await mongoose.connect(uri);
     isConnected = true;
-    console.log('MongoDB connected');
+    Log.info('MongoDB connected');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    Log.error('MongoDB connection error', { error });
     throw error;
   }
 }

@@ -1,4 +1,5 @@
 import { Job as BullMQJob } from 'bullmq';
+import { Log } from '@services/loggerService';
 
 // Base interface for all job handlers (Laravel style)
 export interface JobHandler<T = any> {
@@ -29,7 +30,7 @@ const jobHandlers = new Map<string, JobClass<any>>();
 export function Job() {
   return function <T extends JobClass<any>>(constructor: T) {
     jobHandlers.set(constructor.name, constructor);
-    console.log(`📋 Registered job handler: ${constructor.name}`);
+    Log.info(`Registered job handler: ${constructor.name}`);
     return constructor;
   };
 }
@@ -43,7 +44,7 @@ export function registerJobHandler(JobClass: JobClass<any>): void {
 export function getJobHandler(className: string): JobHandler<any> | null {
   const HandlerClass = jobHandlers.get(className);
   if (!HandlerClass) {
-    console.error(`❌ No handler registered for class: ${className}`);
+    Log.error(`No handler registered for class: ${className}`);
     return null;
   }
   return new HandlerClass();
@@ -61,6 +62,6 @@ export abstract class BaseJob<T = any> implements JobHandler<T> {
   
   // Optional failed handler
   async failed(error: Error, data: T): Promise<void> {
-    console.error(`❌ Job failed:`, error.message);
+    Log.error('Job failed', { message: error.message });
   }
 }

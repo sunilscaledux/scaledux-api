@@ -5,6 +5,7 @@ import { SendNotificationEmailJob } from '../jobs/EmailNotificationJob';
 import { ActivityJob } from '../jobs/ActivityJob';
 import { mainQueue } from '../queues/Queue';
 import { defaultWorkerConfig } from '../config/queue';
+import { Log } from '@services/loggerService';
 
 // Explicit registration so handlers are always available
 registerJobHandler(CreateNotificationJob);
@@ -17,7 +18,7 @@ const mainWorker = new Worker<JobMetadata>(
   async (job: Job<JobMetadata>) => {
     const { jobClass, data } = job.data;
      
-    console.log(`⚙️ Processing job: ${jobClass} (${job.id})`);
+    Log.info(`Processing job: ${jobClass} (${job.id})`);
 
     // Get the handler instance by class name
     const handler = getJobHandler(jobClass);
@@ -29,10 +30,10 @@ const mainWorker = new Worker<JobMetadata>(
     try {
       // Call the handle()
       const result = await handler.handle(data);
-      console.log(`✅ Job completed: ${jobClass} (${job.id})`);
+      Log.info(`Job completed: ${jobClass} (${job.id})`);
       return result;
     } catch (error: any) {
-      console.error(`❌ Job failed: ${jobClass} (${job.id})`, error.message);
+      Log.error(`Job failed: ${jobClass} (${job.id})`, { message: error.message });
       
       // Call the failed() method if it exists
       if (handler.failed) {
@@ -47,31 +48,30 @@ const mainWorker = new Worker<JobMetadata>(
 
 // Event listeners
 mainWorker.on('completed', (job) => {
-  console.log(`✅ Job ${job.id} completed successfully`);
+  Log.info(`Job ${job.id} completed successfully`);
 });
 
 mainWorker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed:`, err.message);
+  Log.error(`Job ${job?.id} failed`, { message: err?.message });
 });
 
 mainWorker.on('error', (error) => {
-  console.error('❌ Worker error:', error);
+  Log.error('Worker error', { error });
 });
 
 mainWorker.on('active', (job) => {
-  console.log(`⚙️ Job ${job.id} is now active`);
+  Log.info(`Job ${job.id} is now active`);
 });
 
 mainWorker.on('stalled', (jobId) => {
-  console.log(`⚠️ Job ${jobId} has stalled`);
+  Log.warn(`Job ${jobId} has stalled`);
 });
 
-console.log('🚀 Main worker started and listening for jobs...');
-console.log(`📋 Registered job types: ${getRegisteredJobTypes().join(', ')}`);
+Log.info('Main worker started and listening for jobs');
+Log.info(`Registered job types: ${getRegisteredJobTypes().join(', ')}`);
 
-// Log queue status
 mainQueue.getJobCounts().then((counts) => {
-  console.log('📊 Queue status:', counts);
+  Log.info('Queue status', { counts });
 });
 
 export default mainWorker;

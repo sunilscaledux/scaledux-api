@@ -34,6 +34,7 @@ import { ApiResponse } from "@utils/ApiResponse";
 import * as AuthService from "@module/auth/AuthService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { getFileUrl, normalizeContact } from '@utils/General';
+import { Log } from '@services/loggerService';
 
 export async function initiateRegistration(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -373,7 +374,7 @@ export async function requestOtp(req: Request, res: Response) {
       successMessages[type]
     );
   } catch (error: any) {
-    console.error("Request OTP Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to send OTP. Please try again.");
   }
 }
@@ -463,7 +464,7 @@ export async function verifyOtp(req: Request, res: Response) {
 
     return ApiResponse.success(res, responseData, responseData.message);
   } catch (error: any) {
-    console.error("Verify OTP Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to verify OTP. Please try again.");
   }
 }
@@ -516,7 +517,7 @@ export async function resendOtpUnified(req: Request, res: Response) {
       `OTP resent successfully. Please check your ${contactMethod}.`
     );
   } catch (error: any) {
-    console.error("Resend OTP Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to resend OTP. Please try again.");
   }
 }
@@ -586,7 +587,7 @@ export async function resetPassword(req: Request, res: Response) {
       "Your password has been reset successfully. You can now login with your new password."
     );
   } catch (error: any) {
-    console.error("Reset Password Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(
       res,
       "Failed to reset password. Please try again."
@@ -614,7 +615,7 @@ export async function logout(req: Request, res: Response) {
       "You have been logged out successfully"
     );
   } catch (error: any) {
-    console.error("Logout Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to logout. Please try again.");
   }
 }
@@ -658,7 +659,7 @@ export async function refreshAccessToken(req: Request, res: Response) {
 
     return ApiResponse.success(res, { token, expiresIn }, "Token refreshed");
   } catch (error: any) {
-    console.error("Refresh token error:", error);
+    Log.error("Error", { error });
     return ApiResponse.unauthorized(res, "Invalid refresh token");
   }
 }
@@ -672,7 +673,7 @@ export async function listLoginDevices(req: Request, res: Response) {
     const result = await getLoginDevices(userId, currentRefreshToken);
     return ApiResponse.success(res, result.data, result.message);
   } catch (error: any) {
-    console.error("List devices error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to fetch devices");
   }
 }
@@ -693,7 +694,7 @@ export async function logoutDevice(req: Request, res: Response) {
 
     return ApiResponse.success(res, null, result.message);
   } catch (error: any) {
-    console.error("Logout device error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to logout device");
   }
 }
@@ -711,7 +712,7 @@ export async function logoutAllOtherDevices(req: Request, res: Response) {
     }
     return ApiResponse.success(res, null, result.message);
   } catch (error: any) {
-    console.error("Logout all devices error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to logout other devices");
   }
 }
@@ -737,7 +738,7 @@ export async function testCookies(req: Request, res: Response) {
       "Cookie test successful"
     );
   } catch (error: any) {
-    console.error("Test Cookies Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to test cookies");
   }
 }
@@ -781,7 +782,7 @@ export async function updateUserRole(req: Request, res: Response) {
       "User role updated successfully"
     );
   } catch (error: any) {
-    console.error("Update User Role Error:", error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, "Failed to update user role");
   }
 }

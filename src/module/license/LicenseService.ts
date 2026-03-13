@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateLicenseInput, UpdateLicenseInput } from "./LicenseType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 export class LicenseService {
   /**
@@ -24,7 +25,7 @@ export class LicenseService {
         data: licenses
       };
     } catch (error) {
-      console.error('Error fetching licenses:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -55,7 +56,7 @@ export class LicenseService {
         data: newLicense
       };
     } catch (error) {
-      console.error('Error creating license:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -103,7 +104,7 @@ export class LicenseService {
         data: updatedLicense
       };
     } catch (error) {
-      console.error('Error updating license:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -144,7 +145,7 @@ export class LicenseService {
         data: null
       };
     } catch (error) {
-      console.error('Error deleting license:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'

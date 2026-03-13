@@ -1,4 +1,5 @@
 import { prisma } from "../../services/prismaService";
+import { Log } from '@services/loggerService';
 
 interface ServiceResponse {
   success: boolean;
@@ -38,7 +39,7 @@ export class FundingRoundService {
         data: fundingRounds
       };
     } catch (error: any) {
-      console.error('Get Funding Rounds Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to retrieve funding rounds'
@@ -86,7 +87,7 @@ export class FundingRoundService {
         data: fundingRound
       };
     } catch (error: any) {
-      console.error('Create Funding Round Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to create funding round'
@@ -144,7 +145,7 @@ export class FundingRoundService {
         data: fundingRound
       };
     } catch (error: any) {
-      console.error('Update Funding Round Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update funding round'
@@ -196,7 +197,7 @@ export class FundingRoundService {
         message: 'Funding round deleted successfully'
       };
     } catch (error: any) {
-      console.error('Delete Funding Round Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to delete funding round'

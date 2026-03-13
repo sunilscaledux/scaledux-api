@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { TeamMemberService } from './TeamMemberService';
 import { ApiResponse } from '@utils/ApiResponse';
 import { createTeamMemberSchema, updateTeamMemberSchema } from './CompanyProfileValidation';
+import { Log } from '@services/loggerService';
 
 export class TeamMemberController {
   /**
@@ -19,7 +20,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message);
       }
     } catch (error: any) {
-      console.error('Get Team Members Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to retrieve team members');
     }
   }
@@ -46,7 +47,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message, 404);
       }
     } catch (error: any) {
-      console.error('Get Team Member Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to retrieve team member');
     }
   }
@@ -72,7 +73,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message);
       }
     } catch (error: any) {
-      console.error('Create Team Member Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to create team member');
     }
   }
@@ -105,7 +106,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message, 404);
       }
     } catch (error: any) {
-      console.error('Update Team Member Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to update team member');
     }
   }
@@ -136,7 +137,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message, 404);
       }
     } catch (error: any) {
-      console.error('Upload Profile Image Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to upload profile image');
     }
   }
@@ -163,7 +164,7 @@ export class TeamMemberController {
         return ApiResponse.error(res, result.message, 404);
       }
     } catch (error: any) {
-      console.error('Delete Team Member Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, error.message || 'Failed to delete team member');
     }
   }

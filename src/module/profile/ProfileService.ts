@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '@services/prismaService';
+import { Log } from '@services/loggerService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
@@ -79,7 +80,7 @@ export class PersonalInfoService {
         data: publicProfile,
       };
     } catch (error: any) {
-      console.error('Get Public Profile Error:', error);
+      Log.error('Get Public Profile Error', { error });
       return {
         success: false,
         message: 'Failed to retrieve public profile',
@@ -164,7 +165,7 @@ export class PersonalInfoService {
         data: userDetail,
       };
     } catch (error: any) {
-      console.error('Get Freelancer Profile Error:', error);
+      Log.error('Get Freelancer Profile Error', { error });
       return {
         success: false,
         message: 'Failed to retrieve user profile',
@@ -200,7 +201,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Profile Summary Error:', error);
+      Log.error('Update Profile Summary Error', { error });
       return {
         success: false,
         message: 'Failed to update profile summary',
@@ -249,7 +250,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Personal Info Error:', error);
+      Log.error('Update Personal Info Error', { error });
       return {
         success: false,
         message: 'Failed to update personal information',
@@ -288,7 +289,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Hourly Rate Error:', error);
+      Log.error('Update Hourly Rate Error', { error });
       return {
         success: false,
         message: 'Failed to update hourly rate',
@@ -318,7 +319,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Available Hours Per Week Error:', error);
+      Log.error('Update Available Hours Per Week Error', { error });
       return {
         success: false,
         message: 'Failed to update available hours per week',
@@ -349,7 +350,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Languages Error:', error);
+      Log.error('Update Languages Error', { error });
       return {
         success: false,
         message: 'Failed to update languages',
@@ -382,7 +383,7 @@ export class PersonalInfoService {
         },
       };
     } catch (error: any) {
-      console.error('Upload Profile Image Error:', error);
+      Log.error('Upload Profile Image Error', { error });
       return {
         success: false,
         message: 'Failed to upload profile image',
@@ -415,7 +416,7 @@ export class PersonalInfoService {
         },
       };
     } catch (error: any) {
-      console.error('Upload Cover Image Error:', error);
+      Log.error('Upload Cover Image Error', { error });
       return {
         success: false,
         message: 'Failed to upload cover image',
@@ -451,7 +452,7 @@ export class PersonalInfoService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Privacy Settings Error:', error);
+      Log.error('Update Privacy Settings Error', { error });
       return {
         success: false,
         message: 'Failed to update privacy settings',
@@ -479,7 +480,7 @@ export class PersonalInfoService {
         data: { hasPassword, provider: user.provider ?? undefined },
       };
     } catch (error: any) {
-      console.error('Get Password Status Error:', error);
+      Log.error('Get Password Status Error', { error });
       return { success: false, message: 'Failed to get password status' };
     }
   }
@@ -515,7 +516,7 @@ export class PersonalInfoService {
         data: null,
       };
     } catch (error: any) {
-      console.error('Set Password Error:', error);
+      Log.error('Set Password Error', { error });
       return { success: false, message: 'Failed to set password' };
     }
   }
@@ -538,7 +539,7 @@ export class PersonalInfoService {
       if (!valid) return { success: false, message: 'Incorrect password' };
       return { success: true, message: 'OK', data: null };
     } catch (error: any) {
-      console.error('Verify Password Error:', error);
+      Log.error('Verify Password Error', { error });
       return { success: false, message: 'Failed to verify password' };
     }
   }
@@ -577,7 +578,7 @@ export class PersonalInfoService {
         data: null,
       };
     } catch (error: any) {
-      console.error('Update Password Error:', error);
+      Log.error('Update Password Error', { error });
       return {
         success: false,
         message: 'Failed to update password',
@@ -605,7 +606,7 @@ export class PersonalInfoService {
         data: user,
       };
     } catch (error: any) {
-      console.error('Update Agency Settings Error:', error);
+      Log.error('Update Agency Settings Error', { error });
       return {
         success: false,
         message: 'Failed to update agency settings',

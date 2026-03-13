@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
+import { Log } from '@services/loggerService';
 import { ApiResponse } from "@utils/ApiResponse"
 import TwilioService from "@services/TwilioService"
 
@@ -68,7 +69,7 @@ export async function sendPhoneOTP(req: Request, res: Response) {
     }, "OTP sent to your phone number")
 
   } catch (error: any) {
-    console.error("Send Phone OTP Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to send OTP")
   }
 }
@@ -159,7 +160,7 @@ export async function verifyPhoneOTP(req: Request, res: Response) {
     }, "Phone verification completed")
 
   } catch (error: any) {
-    console.error("Verify Phone OTP Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to verify OTP")
   }
 }
@@ -207,7 +208,7 @@ export async function getPhoneVerificationStatus(req: Request, res: Response) {
     }, "Phone verification status retrieved")
 
   } catch (error: any) {
-    console.error("Get Phone Verification Status Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get verification status")
   }
 }
@@ -282,7 +283,7 @@ export async function updatePhoneNumber(req: Request, res: Response) {
     }, "Phone number updated successfully")
 
   } catch (error: any) {
-    console.error("Update Phone Number Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to update phone number")
   }
 }

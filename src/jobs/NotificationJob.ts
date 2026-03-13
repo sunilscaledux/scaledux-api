@@ -1,5 +1,6 @@
 import { BaseJob, Job } from './BaseJob';
 import { prisma } from '../services/prismaService';
+import { Log } from '@services/loggerService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
 import type { NotificationJobPayload } from './types';
 import { Notification } from '../module/notification/NotificationModel';
@@ -9,7 +10,7 @@ export class CreateNotificationJob extends BaseJob<NotificationJobPayload> {
   async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;
     if (!isNotificationEmailType(type)) {
-      console.warn(`CreateNotificationJob: unknown type "${data.type}", skipping`);
+      Log.warn(`CreateNotificationJob: unknown type "${data.type}", skipping`);
       return;
     }
 
@@ -18,7 +19,7 @@ export class CreateNotificationJob extends BaseJob<NotificationJobPayload> {
       select: { id: true }
     });
     if (!user) {
-      console.warn(`CreateNotificationJob: user ${data.userId} not found, skipping`);
+      Log.warn(`CreateNotificationJob: user ${data.userId} not found, skipping`);
       return;
     }
 

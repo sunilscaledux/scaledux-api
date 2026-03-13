@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { ProposalService } from "./ProposalService";
 import { ApiResponse } from "@utils/ApiResponse";
+import { Log } from "@services/loggerService";
 import { calculateProfileCompletion } from "../profile/ProfileCompletionService";
 import { getReasonsByKey } from "@constants/proposalReasons";
 
@@ -63,7 +64,7 @@ export async function createProposal(req: Request, res: Response) {
       );
     }
   } catch (err) {
-    console.error("Profile completion check failed:", err);
+    Log.error("Profile completion check failed", { err });
     return ApiResponse.error(res, "Unable to verify profile completion", 500);
   }
 
@@ -238,7 +239,7 @@ export async function updateProposal(req: Request, res: Response) {
       );
     }
   } catch (err) {
-    console.error("Profile completion check failed:", err);
+    Log.error("Profile completion check failed", { err });
     return ApiResponse.error(res, "Unable to verify profile completion", 500);
   }
 

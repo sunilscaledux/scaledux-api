@@ -6,6 +6,7 @@ import { createLoginDevice } from './AuthService';
 import { reactivateOnLogin } from '../profile/DeactivationService';
 import axios from 'axios';
 import { ulid } from 'ulid';
+import { Log } from '@services/loggerService';
 
 interface LinkedInCallbackRequest {
   code: string;
@@ -52,29 +53,28 @@ const linkedinCallback = async (req: Request, res: Response) => {
       return ApiResponse.error(res, "Authorization code is required");
     }
 
-    console.log("🔐 LinkedIn OAuth callback received");
-    console.log("📋 Request data:", {
+    Log.info("🔐 LinkedIn OAuth callback received");
+    Log.info("📋 Request data:", {
       code: code.substring(0, 10) + "...",
       redirectUri,
     });
-    console.log("🔧 Environment check:", {
+    Log.info("🔧 Environment check:", {
       clientId: process.env.LINKEDIN_CLIENT_ID,
       hasSecret: !!process.env.LINKEDIN_CLIENT_SECRET
     });
-    console.log("⏱️ Processing time so far:", Date.now() - startTime, "ms");
 
     // Validate environment variables
     if (
       !process.env.LINKEDIN_CLIENT_ID ||
       !process.env.LINKEDIN_CLIENT_SECRET
     ) {
-      console.error("❌ Missing LinkedIn credentials in environment variables");
+      Log.error("❌ Missing LinkedIn credentials in environment variables");
       return ApiResponse.error(res, "LinkedIn configuration error");
     }
 
     // Step 1: Exchange code for access token
     // Use the exact redirect URI that was sent (it must match the one used in authorization)
-    console.log("🔧 Using redirect URI exactly as received:", redirectUri);
+    Log.info("🔧 Using redirect URI exactly as received:", redirectUri);
 
     const tokenParams = {
       grant_type: "authorization_code",
@@ -84,7 +84,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
       client_secret: process.env.LINKEDIN_CLIENT_SECRET,
     };
 
-    console.log("🔄 Token exchange params:", {
+    Log.info("🔄 Token exchange params:", {
       ...tokenParams,
       client_secret: "***hidden***",
       code: code.substring(0, 10) + "...",
@@ -102,9 +102,9 @@ const linkedinCallback = async (req: Request, res: Response) => {
         }
       );
     } catch (tokenError: any) {
-      console.error("❌ Token exchange failed!");
-      console.error("📋 LinkedIn error response:", tokenError.response?.data);
-      console.error("📋 Status:", tokenError.response?.status);
+      Log.error("❌ Token exchange failed!");
+      Log.error("📋 LinkedIn error response:", tokenError.response?.data);
+      Log.error("📋 Status:", tokenError.response?.status);
 
       // Return the actual LinkedIn error message
       const errorMsg =
@@ -114,15 +114,15 @@ const linkedinCallback = async (req: Request, res: Response) => {
       return ApiResponse.error(res, `LinkedIn OAuth Error: ${errorMsg}`);
     }
 
-    console.log("✅ Token exchange successful");
+    Log.info("✅ Token exchange successful");
     const { access_token } = tokenResponse.data;
-    console.log(
+    Log.info(
       "🔑 Access token received:",
       access_token.substring(0, 20) + "..."
     );
 
     // Step 2: Try OpenID Connect userinfo first, fallback to basic profile
-    console.log("🔄 Trying LinkedIn OpenID Connect userinfo...");
+    Log.info("🔄 Trying LinkedIn OpenID Connect userinfo...");
     let linkedinUser: any;
     let userEmail: string;
     let firstName: string;
@@ -139,7 +139,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
         }
       );
 
-      console.log("✅ OpenID Connect userinfo successful!");
+      Log.info("✅ OpenID Connect userinfo successful!");
       const userData = userResponse.data;
 
       linkedinUser = { id: userData.sub };
@@ -147,14 +147,14 @@ const linkedinCallback = async (req: Request, res: Response) => {
       firstName = userData.given_name || "";
       lastName = userData.family_name || "";
 
-      console.log("📋 OpenID Connect user data:", {
+      Log.info("📋 OpenID Connect user data:", {
         sub: userData.sub,
         email: userData.email,
         given_name: userData.given_name,
         family_name: userData.family_name,
       });
     } catch (oidcError: any) {
-      console.log(
+      Log.info(
         "⚠️  OpenID Connect failed, trying basic profile endpoints..."
       );
 
@@ -167,10 +167,10 @@ const linkedinCallback = async (req: Request, res: Response) => {
           },
         }
       );
-      console.log("✅ User profile fetched successfully");
+      Log.info("✅ User profile fetched successfully");
 
       // Get user email from LinkedIn
-      console.log("🔄 Fetching user email from LinkedIn...");
+      Log.info("🔄 Fetching user email from LinkedIn...");
       const emailResponse = await axios.get<LinkedInEmailInfo>(
         "https://api.linkedin.com/v2/emailAddresses?q=members&projection=(elements*(handle~))",
         {
@@ -179,7 +179,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
           },
         }
       );
-      console.log("✅ User email fetched successfully");
+      Log.info("✅ User email fetched successfully");
 
       linkedinUser = userResponse.data;
       userEmail =
@@ -194,7 +194,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
         "";
     }
 
-    console.log("📋 Final LinkedIn user data:", {
+    Log.info("📋 Final LinkedIn user data:", {
       id: linkedinUser.id,
       email: userEmail,
       firstName,
@@ -202,14 +202,14 @@ const linkedinCallback = async (req: Request, res: Response) => {
     });
 
     if (!userEmail) {
-      console.error("❌ No email found in LinkedIn response");
+      Log.error("❌ No email found in LinkedIn response");
       return ApiResponse.error(
         res,
         "Unable to retrieve email from LinkedIn. Please ensure email scope is granted."
       );
     }
 
-    console.log("👤 Processed user info:", {
+    Log.info("👤 Processed user info:", {
       firstName,
       lastName,
       email: userEmail,
@@ -258,7 +258,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
         },
       });
 
-      console.log("✅ New user created via LinkedIn OAuth:", userEmail);
+      Log.info("✅ New user created via LinkedIn OAuth:", userEmail);
     }
 
     // Auto-reactivate if they were deactivated (login = become active again)
@@ -301,12 +301,12 @@ const linkedinCallback = async (req: Request, res: Response) => {
     );
 
   } catch (error: any) {
-    console.error('❌ LinkedIn OAuth error:', error);
-    console.error("❌ Error stack:", error.stack);
+    Log.error("Error", { error });
+    Log.error("❌ Error stack:", error.stack);
 
     // Log detailed error information
     if (error.response) {
-      console.error("📋 Error response:", {
+      Log.error("📋 Error response:", {
         status: error.response.status,
         statusText: error.response.statusText,
         data: error.response.data,
@@ -314,9 +314,9 @@ const linkedinCallback = async (req: Request, res: Response) => {
         method: error.response.config?.method,
       });
     } else if (error.request) {
-      console.error("📋 Request error (no response):", error.request);
+      Log.error("📋 Request error (no response):", error.request);
     } else {
-      console.error("📋 General error:", error.message);
+      Log.error("📋 General error:", error.message);
     }
 
     // Return detailed error message for debugging

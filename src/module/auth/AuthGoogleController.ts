@@ -6,6 +6,7 @@ import { createLoginDevice } from './AuthService';
 import { reactivateOnLogin } from '../profile/DeactivationService';
 import axios from 'axios';
 import { ulid } from 'ulid';
+import { Log } from '@services/loggerService';
 
 interface GoogleCallbackRequest {
   code: string;
@@ -37,7 +38,7 @@ const googleCallback = async (req: Request, res: Response) => {
       return ApiResponse.error(res, 'Authorization code is required');
     }
 
-    console.log('🔐 Google OAuth callback received');
+    Log.info('🔐 Google OAuth callback received');
 
     // Step 1: Exchange code for access token
     const tokenResponse = await axios.post<GoogleTokenResponse>('https://oauth2.googleapis.com/token', {
@@ -103,7 +104,7 @@ const googleCallback = async (req: Request, res: Response) => {
         },
       });
 
-      console.log('✅ New user created via Google OAuth:', user.email);
+      Log.info('✅ New user created via Google OAuth:', user.email);
     }
 
     // Auto-reactivate if they were deactivated (login = become active again)
@@ -143,7 +144,7 @@ const googleCallback = async (req: Request, res: Response) => {
     );
 
   } catch (error: any) {
-    console.error('❌ Google OAuth error:', error);
+    Log.error("Error", { error });
     return ApiResponse.error(res, 'Google authentication failed');
   }
 }

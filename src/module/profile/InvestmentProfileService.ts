@@ -1,5 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { Log } from '@services/loggerService';
 
 /**
  * Investment profile (one per user): single-value fields + related tables.
@@ -51,7 +52,7 @@ export class InvestmentProfileService {
       };
       return { success: true, message: "Investment profile retrieved", data };
     } catch (error: any) {
-      console.error("InvestmentProfileService.getOrCreate Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to get investment profile" };
     }
   }
@@ -151,7 +152,7 @@ export class InvestmentProfileService {
       };
       return { success: true, message: "Investment profile updated", data: out };
     } catch (error: any) {
-      console.error("InvestmentProfileService.update Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to update investment profile" };
     }
   }

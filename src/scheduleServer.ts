@@ -9,6 +9,7 @@ dotenv.config();
 
 import http from "http";
 import { connectMongo } from "@services/mongoService";
+import { Log } from "@services/loggerService";
 import { startSchedule } from "./schedule/schedule";
 
 const SCHEDULE_PORT = Number(process.env.SCHEDULE_PORT) || 4002;
@@ -31,7 +32,7 @@ async function start() {
   }
   startSchedule();
   server.listen(SCHEDULE_PORT, () => {
-    console.log(`[schedule] Cron server: http://localhost:${SCHEDULE_PORT} (health: /health)`);
+    Log.info(`[schedule] Cron server: http://localhost:${SCHEDULE_PORT} (health: /health)`);
   });
 }
 

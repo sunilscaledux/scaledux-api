@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from '@utils/General';
+import { Log } from '@services/loggerService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { queueNotification } from '@services/notificationQueueService';
 import { ConversationService } from '@module/chat/ConversationService';
@@ -314,7 +315,7 @@ export class ProposalService {
         }
       };
     } catch (error: any) {
-      console.error("Create Proposal Error:", error);
+      Log.error("Create Proposal Error", { error });
       return {
         success: false,
         message: error.message || "Failed to submit proposal"
@@ -399,7 +400,7 @@ export class ProposalService {
                 update: { description: desc.slice(0, 500) }
               });
             } catch (err) {
-              console.error('Deliverable upsert error:', err);
+              Log.error('Deliverable upsert error', { err });
             }
           }
           // Remove any deliverables beyond the new list (e.g. user removed some in the form)
@@ -411,11 +412,11 @@ export class ProposalService {
               }
             });
           } catch (err) {
-            console.error('Deliverable deleteMany error:', err);
+            Log.error('Deliverable deleteMany error', { err });
           }
         }
       } catch (err) {
-        console.error(`Milestone sync failed for proposal_id=${proposalId} order_index=${i}:`, err);
+        Log.error(`Milestone sync failed for proposal_id=${proposalId} order_index=${i}`, { err });
       }
     }
   }
@@ -527,7 +528,7 @@ export class ProposalService {
 
       return { success: true, message: "Milestone added successfully" };
     } catch (error: any) {
-      console.error("Add Milestone Error:", error);
+      Log.error("Add Milestone Error", { error });
       return { success: false, message: error.message || "Failed to add milestone" };
     }
   }
@@ -627,7 +628,7 @@ export class ProposalService {
         }
       };
     } catch (error: any) {
-      console.error("Get My Proposals Error:", error);
+      Log.error("Get My Proposals Error", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve proposals"
@@ -761,7 +762,7 @@ export class ProposalService {
         }
       };
     } catch (error: any) {
-      console.error("Get Proposals By Project Error:", error);
+      Log.error("Get Proposals By Project Error", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve proposals"
@@ -867,7 +868,7 @@ export class ProposalService {
         }
       };
     } catch (error: any) {
-      console.error("Get Founder Contracts Error:", error);
+      Log.error("Get Founder Contracts Error", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve contracts"
@@ -1041,7 +1042,7 @@ export class ProposalService {
         data: flattenNdaToProposal(transformedProposal)
       };
     } catch (error: any) {
-      console.error("Get Proposal By ID Error:", error);
+      Log.error("Get Proposal By ID Error", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve proposal"
@@ -1133,7 +1134,7 @@ export class ProposalService {
 
       return { success: true, message: "Proposal updated successfully" };
     } catch (error: any) {
-      console.error("Update Proposal Error:", error);
+      Log.error("Update Proposal Error", { error });
       return { success: false, message: error.message || "Failed to update proposal" };
     }
   }
@@ -1280,7 +1281,7 @@ export class ProposalService {
         message: `Proposal ${status.toLowerCase()} successfully`
       };
     } catch (error: any) {
-      console.error("Update Proposal Status Error:", error);
+      Log.error("Update Proposal Status Error", { error });
       return {
         success: false,
         message: error.message || "Failed to update proposal status"
@@ -1380,7 +1381,7 @@ export class ProposalService {
         message: "Offer withdrawn successfully"
       };
     } catch (error: any) {
-      console.error("Cancel hire Error:", error);
+      Log.error("Cancel hire Error", { error });
       return {
         success: false,
         message: error.message || "Failed to withdraw offer"
@@ -1469,7 +1470,7 @@ export class ProposalService {
 
       return { success: true, message: "Offer declined successfully" };
     } catch (error: any) {
-      console.error("Decline offer Error:", error);
+      Log.error("Decline offer Error", { error });
       return {
         success: false,
         message: error.message || "Failed to decline offer"
@@ -1505,7 +1506,7 @@ export class ProposalService {
         message: "Hire is completed when you complete the first payment. Please use the payment screen to hire and proceed to pay."
       };
     } catch (error: any) {
-      console.error("Set hire Error:", error);
+      Log.error("Set hire Error", { error });
       return { success: false, message: error.message || "Failed to hire" };
     }
   }
@@ -1559,7 +1560,7 @@ export class ProposalService {
 
       return { success: true, message: "Project marked as completed" };
     } catch (error: any) {
-      console.error("Mark project completed Error:", error);
+      Log.error("Mark project completed Error", { error });
       return { success: false, message: error.message || "Failed to mark project as completed" };
     }
   }
@@ -1853,7 +1854,7 @@ export class ProposalService {
 
       return { success: true, message: "NDA details updated successfully" };
     } catch (error: any) {
-      console.error("Update Proposal NDA Error:", error);
+      Log.error("Update Proposal NDA Error", { error });
       return {
         success: false,
         message: error.message || "Failed to update NDA details"
@@ -1966,7 +1967,7 @@ export class ProposalService {
         message: "Proposal withdrawn successfully"
       };
     } catch (error: any) {
-      console.error("Withdraw Proposal Error:", error);
+      Log.error("Withdraw Proposal Error", { error });
       return {
         success: false,
         message: error.message || "Failed to withdraw proposal"
@@ -2056,7 +2057,7 @@ export class ProposalService {
 
       return { success: true, message: "Contract will terminate in 7 days. You can restore it before then." };
     } catch (error: any) {
-      console.error("Terminate contract Error:", error);
+      Log.error("Terminate contract Error", { error });
       return { success: false, message: error.message || "Failed to terminate contract" };
     }
   }
@@ -2109,7 +2110,7 @@ export class ProposalService {
 
       return { success: true, message: "Contract restored successfully" };
     } catch (error: any) {
-      console.error("Restore contract Error:", error);
+      Log.error("Restore contract Error", { error });
       return { success: false, message: error.message || "Failed to restore contract" };
     }
   }
@@ -2157,7 +2158,7 @@ export class ProposalService {
         }
       };
     } catch (error: any) {
-      console.error("Check Proposal Error:", error);
+      Log.error("Check Proposal Error", { error });
       return {
         success: false,
         message: error.message || "Failed to check proposal status"
@@ -2214,7 +2215,7 @@ export class ProposalService {
 
       return { success: true, message: "Request sent to the service provider" };
     } catch (error: any) {
-      console.error("Request Modify Error:", error);
+      Log.error("Request Modify Error", { error });
       return { success: false, message: error.message || "Failed to send request" };
     }
   }
@@ -2239,7 +2240,7 @@ export class ProposalService {
       const activities = await fetchProposalActivities(proposal.unique_id);
       return { success: true, data: activities, message: "Activities retrieved" };
     } catch (error: any) {
-      console.error("Get Proposal Activities Error:", error);
+      Log.error("Get Proposal Activities Error", { error });
       return { success: false, message: error.message || "Failed to get activities" };
     }
   }

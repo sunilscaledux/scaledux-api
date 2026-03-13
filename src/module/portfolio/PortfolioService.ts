@@ -3,6 +3,7 @@ import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 
 export class PortfolioService {
@@ -51,7 +52,7 @@ export class PortfolioService {
         data: transformedPortfolios
       };
     } catch (error: any) {
-      console.error("Get User Portfolios Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get portfolios"
@@ -105,7 +106,7 @@ export class PortfolioService {
         data: transformedPortfolio
       };
     } catch (error: any) {
-      console.error("Get Portfolio By ID Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get portfolio"
@@ -178,7 +179,7 @@ export class PortfolioService {
         data: transformedPortfolio
       };
     } catch (error: any) {
-      console.error("Create Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: error?.message || "Failed to create portfolio"
@@ -261,7 +262,7 @@ export class PortfolioService {
         data: transformedPortfolio
       };
     } catch (error: any) {
-      console.error("Update Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to update portfolio"
@@ -303,7 +304,7 @@ export class PortfolioService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to delete portfolio"
@@ -381,7 +382,7 @@ export class PortfolioService {
         data: transformedPortfolio
       };
     } catch (error: any) {
-      console.error("Duplicate Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to duplicate portfolio"

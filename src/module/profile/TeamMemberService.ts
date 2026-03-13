@@ -1,6 +1,7 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getFileUrl, getRelativePath } from '@utils/General';
+import { Log } from '@services/loggerService';
 
 /**
  * TeamMemberService
@@ -47,7 +48,7 @@ export class TeamMemberService {
         data: transformedMembers
       };
     } catch (error: any) {
-      console.error('Get Team Members Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to retrieve team members'
@@ -99,7 +100,7 @@ export class TeamMemberService {
         data: transformedMember
       };
     } catch (error: any) {
-      console.error('Get Team Member Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to retrieve team member'
@@ -145,7 +146,7 @@ export class TeamMemberService {
         data: teamMember
       };
     } catch (error: any) {
-      console.error('Create Team Member Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to create team member'
@@ -204,7 +205,7 @@ export class TeamMemberService {
         data: teamMember
       };
     } catch (error: any) {
-      console.error('Update Team Member Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update team member'
@@ -258,7 +259,7 @@ export class TeamMemberService {
         }
       };
     } catch (error: any) {
-      console.error('Upload Profile Image Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to upload profile image'
@@ -307,7 +308,7 @@ export class TeamMemberService {
         message: 'Team member deleted successfully'
       };
     } catch (error: any) {
-      console.error('Delete Team Member Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to delete team member'

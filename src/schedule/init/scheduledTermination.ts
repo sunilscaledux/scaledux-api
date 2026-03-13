@@ -1,4 +1,5 @@
 import { prisma } from "@services/prismaService";
+import { Log } from "@services/loggerService";
 
 /**
  * Delete all users whose schedule_termination has scheduled_at <= now and cancelled_at is null.
@@ -19,9 +20,9 @@ export async function handle(): Promise<void> {
   for (const { user_id } of due) {
     try {
       await prisma.user.delete({ where: { id: user_id } });
-      console.log(`[scheduled-termination] Deleted user ${user_id}`);
+      Log.info(`[scheduled-termination] Deleted user ${user_id}`);
     } catch (err) {
-      console.error(`[scheduled-termination] Failed to delete user ${user_id}:`, err);
+      Log.error(`[scheduled-termination] Failed to delete user ${user_id}`, { err });
     }
   }
 }

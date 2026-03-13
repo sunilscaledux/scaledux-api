@@ -5,6 +5,7 @@ import { deletePublic } from '@services/bunnyStorageService'
 import fileConfig from '@config/file'
 import fs from 'fs'
 import path from 'path'
+import { Log } from '@services/loggerService';
 
 /**
  * Unified file upload and deletion controller for all modules
@@ -45,7 +46,7 @@ export async function uploadFile(req: Request, res: Response) {
     }, "Files uploaded successfully")
 
   } catch (error: any) {
-    console.error("Upload File Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to upload files", 500)
   }
 }
@@ -56,7 +57,7 @@ export async function deleteFile(req: Request, res: Response) {
     const userUniqueId = req.user?.unique_id
     const { filePath } = req.body
 
-    console.log("Unified delete request:", { userId, userUniqueId, filePath, body: req.body })
+    Log.info("Unified delete request:", { userId, userUniqueId, filePath, body: req.body })
 
     // Validate authentication
     if (!userId || !userUniqueId) {
@@ -73,7 +74,7 @@ export async function deleteFile(req: Request, res: Response) {
     
     // File paths should contain the user's unique_id (e.g., uploads/USER_UNIQUE_ID/...)
     if (!relativePath.includes(userUniqueId)) {
-      console.log("Security violation: File path doesn't contain user unique_id", {
+      Log.info("Security violation: File path doesn't contain user unique_id", {
         relativePath,
         userUniqueId,
         filePath
@@ -83,15 +84,15 @@ export async function deleteFile(req: Request, res: Response) {
 
     if (fileConfig.isBunny) {
       const deleted = await deletePublic(relativePath)
-      if (!deleted) console.log("Bunny delete returned false for:", relativePath)
+      if (!deleted) Log.info("Bunny delete returned false for:", relativePath)
     } else {
       const fullPath = path.join(process.cwd(), relativePath)
-      console.log("File deletion paths:", { relativePath, fullPath, exists: fs.existsSync(fullPath) })
+      Log.info("File deletion paths:", { relativePath, fullPath, exists: fs.existsSync(fullPath) })
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath)
-        console.log("File deleted successfully:", fullPath)
+        Log.info("File deleted successfully:", fullPath)
       } else {
-        console.log("File not found, but returning success:", fullPath)
+        Log.info("File not found, but returning success:", fullPath)
       }
     }
 
@@ -101,7 +102,7 @@ export async function deleteFile(req: Request, res: Response) {
     }, "File deleted successfully")
 
   } catch (error: any) {
-    console.error("Delete File Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to delete file", 500)
   }
 }

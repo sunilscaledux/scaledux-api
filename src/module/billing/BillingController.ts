@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { BillingService } from "./BillingService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getStringParam } from "@utils/requestHelpers";
+import { Log } from "@services/loggerService";
 import { ConversationService } from "@module/chat/ConversationService";
 import { createProposalActivity } from "@module/proposal/ProposalActivityService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
@@ -22,7 +23,7 @@ export class BillingController {
       );
       return ApiResponse.success(res, data);
     } catch (error: any) {
-      console.error("Error getting payment breakdown:", error);
+      Log.error("Error getting payment breakdown", { error });
       return ApiResponse.error(res, error.message || "Failed to get payment breakdown");
     }
   }
@@ -69,7 +70,7 @@ export class BillingController {
       if (!result.success) return ApiResponse.error(res, result.message);
       return ApiResponse.success(res, result.data, "Order created successfully");
     } catch (error: any) {
-      console.error("Error creating order:", error);
+      Log.error("Error creating order", { error });
       return ApiResponse.error(res, error.message || "Failed to create order");
     }
   }
@@ -110,7 +111,7 @@ export class BillingController {
 
       return ApiResponse.error(res, "Invalid or unsupported payment. Provide milestoneId or subjectType and subjectId.", 400);
     } catch (error: any) {
-      console.error("Error verifying payment:", error);
+      Log.error("Error verifying payment", { error });
       return ApiResponse.error(res, error.message || "Failed to verify payment");
     }
   }
@@ -298,7 +299,7 @@ export class BillingController {
       const result = await BillingService.getPaymentMethods(userId.toString());
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching payment methods:", error);
+      Log.error("Error fetching payment methods", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch payment methods");
     }
   }
@@ -321,7 +322,7 @@ export class BillingController {
 
       return ApiResponse.success(res, null, result.message);
     } catch (error: any) {
-      console.error("Error setting default payment method:", error);
+      Log.error("Error setting default payment method", { error });
       return ApiResponse.error(res, error.message || "Failed to set default payment method");
     }
   }
@@ -344,7 +345,7 @@ export class BillingController {
 
       return ApiResponse.success(res, null, result.message);
     } catch (error: any) {
-      console.error("Error deleting payment method:", error);
+      Log.error("Error deleting payment method", { error });
       return ApiResponse.error(res, error.message || "Failed to delete payment method");
     }
   }
@@ -360,7 +361,7 @@ export class BillingController {
       const result = await BillingService.saveTaxInformation(userId.toString(), req.body);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
-      console.error("Error saving tax information:", error);
+      Log.error("Error saving tax information", { error });
       return ApiResponse.error(res, error.message || "Failed to save tax information");
     }
   }
@@ -376,7 +377,7 @@ export class BillingController {
       const result = await BillingService.getTaxInformation(userId.toString());
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching tax information:", error);
+      Log.error("Error fetching tax information", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch tax information");
     }
   }
@@ -408,7 +409,7 @@ export class BillingController {
       );
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching billing history:", error);
+      Log.error("Error fetching billing history", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch billing history");
     }
   }
@@ -424,7 +425,7 @@ export class BillingController {
       const result = await BillingService.getUserBalance(userId.toString());
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching user balance:", error);
+      Log.error("Error fetching user balance", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch user balance");
     }
   }
@@ -443,7 +444,7 @@ export class BillingController {
       }
       return ApiResponse.success(res, null, "Payment released successfully");
     } catch (error: any) {
-      console.error("Error releasing payment:", error);
+      Log.error("Error releasing payment", { error });
       return ApiResponse.error(res, error.message || "Failed to release payment");
     }
   }
@@ -465,7 +466,7 @@ export class BillingController {
       }
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching transaction detail:", error);
+      Log.error("Error fetching transaction detail", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch transaction detail");
     }
   }
@@ -504,7 +505,7 @@ export class BillingController {
       const result = await BillingService.getWithdrawalMethods(userId.toString());
       return ApiResponse.success(res, result.data);
     } catch (error: any) {
-      console.error("Error fetching withdrawal methods:", error);
+      Log.error("Error fetching withdrawal methods", { error });
       return ApiResponse.error(res, error.message || "Failed to fetch withdrawal methods");
     }
   }
@@ -517,7 +518,7 @@ export class BillingController {
       const result = await BillingService.createWithdrawalMethod(userId.toString(), req.body);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
-      console.error("Error creating withdrawal method:", error);
+      Log.error("Error creating withdrawal method", { error });
       return ApiResponse.error(res, error.message || "Failed to create withdrawal method");
     }
   }
@@ -532,7 +533,7 @@ export class BillingController {
       await BillingService.deleteWithdrawalMethod(userId.toString(), methodId);
       return ApiResponse.success(res, null, "Withdrawal method removed");
     } catch (error: any) {
-      console.error("Error deleting withdrawal method:", error);
+      Log.error("Error deleting withdrawal method", { error });
       return ApiResponse.error(res, error.message || "Failed to delete withdrawal method");
     }
   }
@@ -546,7 +547,7 @@ export class BillingController {
       if (!result.success) return ApiResponse.error(res, result.message, 400);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
-      console.error("Error resubmitting for verification:", error);
+      Log.error("Error resubmitting for verification", { error });
       return ApiResponse.error(res, error.message || "Failed to resubmit for verification");
     }
   }
@@ -562,7 +563,7 @@ export class BillingController {
       if (!result.success) return ApiResponse.error(res, result.message, 400);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
-      console.error("Error updating withdrawal method:", error);
+      Log.error("Error updating withdrawal method", { error });
       return ApiResponse.error(res, error.message || "Failed to update bank details");
     }
   }
@@ -586,7 +587,7 @@ export class BillingController {
       }
       return ApiResponse.success(res, null, "Withdraw requested");
     } catch (error: any) {
-      console.error("Error requesting withdraw for payment:", error);
+      Log.error("Error requesting withdraw for payment", { error });
       return ApiResponse.error(res, error.message || "Failed to request withdraw");
     }
   }
@@ -602,7 +603,7 @@ export class BillingController {
       }
       return ApiResponse.success(res, null, "Receiver released");
     } catch (error: any) {
-      console.error("Error setting receiver released:", error);
+      Log.error("Error setting receiver released", { error });
       return ApiResponse.error(res, error.message || "Failed to set receiver released");
     }
   }
@@ -622,7 +623,7 @@ export class BillingController {
       }
       return ApiResponse.success(res, result.data, "OK");
     } catch (error: any) {
-      console.error("Error getting invoice data:", error);
+      Log.error("Error getting invoice data", { error });
       return ApiResponse.error(res, error.message || "Failed to get invoice data");
     }
   }

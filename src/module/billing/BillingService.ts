@@ -4,6 +4,7 @@ import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
 import { appConfig } from "@config/app";
+import { Log } from "@services/loggerService";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
 import {
@@ -221,7 +222,7 @@ export class BillingService {
 
       return customer.id;
     } catch (error: any) {
-      console.error('Error creating Razorpay customer:', error);
+      Log.error('Error creating Razorpay customer', { error });
       return null;
     }
   }
@@ -247,7 +248,7 @@ export class BillingService {
         contact: payment.contact
       };
     } catch (error) {
-      console.error('Error fetching payment details:', error);
+      Log.error('Error fetching payment details', { error });
       return null;
     }
   }
@@ -280,7 +281,7 @@ export class BillingService {
       }
       return meta;
     } catch (error) {
-      console.error('Error fetching Razorpay payment for meta:', error);
+      Log.error('Error fetching Razorpay payment for meta', { error });
       const fallback: Record<string, string> = { razorpay_payment_id: razorpayPaymentId };
       set(fallback, 'razorpay_order_id', razorpayOrderId);
       return fallback;
@@ -328,7 +329,7 @@ export class BillingService {
         }
       };
     } catch (error: any) {
-      console.error('Error charging saved card:', error);
+      Log.error('Error charging saved card', { error });
       return {
         success: false,
         message: error.message || 'Failed to charge saved card'

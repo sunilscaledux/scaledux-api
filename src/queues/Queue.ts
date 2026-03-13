@@ -1,6 +1,7 @@
 import { Queue } from 'bullmq';
 import defaultQueueConfig from '../config/queue';
 import { JobMetadata, JobClass } from '../jobs/BaseJob';
+import { Log } from '@services/loggerService';
 
 // Main queue for all job types
 export const mainQueue = new Queue<JobMetadata>('main-queue', defaultQueueConfig);
@@ -36,14 +37,14 @@ export async function dispatch<T = any>(
       }
     );
 
-    console.log(`✅ Job dispatched: ${jobClass.name} (${job.id})`);
+    Log.info(`Job dispatched: ${jobClass.name} (${job.id})`);
     return job;
   } catch (error: any) {
     if (error.message?.includes('already exists') || error.message?.includes('duplicate')) {
-      console.log(`ℹ️ Job already queued: ${jobClass.name} (${options?.jobId})`);
+      Log.info(`Job already queued: ${jobClass.name} (${options?.jobId})`);
       return null;
     }
-    console.error(`❌ Error dispatching job ${jobClass.name}:`, error);
+    Log.error(`Error dispatching job ${jobClass.name}`, { error });
     throw error;
   }
 }

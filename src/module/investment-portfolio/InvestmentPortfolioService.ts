@@ -5,6 +5,7 @@ import {
 } from "./InvestmentPortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, normalizeUploadedPaths } from "@utils/General";
+import { Log } from '@services/loggerService';
 
 export class InvestmentPortfolioService {
   static async getUserInvestmentPortfolios(
@@ -46,7 +47,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Get User Investment Portfolios Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get investment portfolios"
@@ -92,7 +93,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Get Investment Portfolio By ID Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get investment portfolio"
@@ -139,7 +140,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Get Public Investment Portfolio By ID Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to get investment portfolio"
@@ -202,7 +203,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Create Investment Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: error?.message || "Failed to create investment portfolio"
@@ -287,7 +288,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Update Investment Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to update investment portfolio"
@@ -323,7 +324,7 @@ export class InvestmentPortfolioService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Investment Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to delete investment portfolio"
@@ -389,7 +390,7 @@ export class InvestmentPortfolioService {
         data: transformed
       };
     } catch (error: any) {
-      console.error("Duplicate Investment Portfolio Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to duplicate investment portfolio"

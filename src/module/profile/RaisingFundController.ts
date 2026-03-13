@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ApiResponse } from "@utils/ApiResponse";
 import { RaisingFundService } from "./RaisingFundService";
 import * as CompanyProfileValidation from "./CompanyProfileValidation";
+import { Log } from '@services/loggerService';
 
 export class RaisingFundController {
   /**
@@ -18,7 +19,7 @@ export class RaisingFundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Get Raising Fund Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to retrieve raising fund status');
     }
   }
@@ -43,7 +44,7 @@ export class RaisingFundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Update Raising Fund Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to update raising fund status');
     }
   }

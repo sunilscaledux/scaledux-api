@@ -6,6 +6,7 @@ import { uploadFile } from '@module/general/FileController'
 import { extractRelativePath, getRelativePath, getFileUrl } from '@utils/General'
 import fs from 'fs'
 import path from 'path'
+import { Log } from '@services/loggerService';
 
 /**
  * Submit agency verification
@@ -96,7 +97,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     }, "Agency verification submitted for review")
 
   } catch (error: any) {
-    console.error("Submit Agency Verification Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to submit agency verification")
   }
 }
@@ -138,7 +139,7 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
     }, "Agency verification details retrieved successfully")
 
   } catch (error: any) {
-    console.error("Get Agency Verification Details Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get agency verification details")
   }
 }
@@ -221,7 +222,7 @@ export async function updateAgencyVerificationStatus(req: Request, res: Response
     }, `Agency verification ${status.toLowerCase()} successfully`)
 
   } catch (error: any) {
-    console.error("Update Agency Verification Status Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to update agency verification status")
   }
 }

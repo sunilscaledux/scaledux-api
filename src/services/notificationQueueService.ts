@@ -1,6 +1,7 @@
 import { dispatch } from '../queues/Queue';
 import { CreateNotificationJob } from '../jobs/NotificationJob';
 import { SendNotificationEmailJob } from '../jobs/EmailNotificationJob';
+import { Log } from '@services/loggerService';
 import type { NotificationJobPayload } from '../jobs/types';
 import type { NotificationEmailType } from '../constants/notificationTypes';
 
@@ -38,7 +39,7 @@ export async function queueNotification(input: QueueNotificationInput): Promise<
     await dispatch(CreateNotificationJob, data, { jobId: undefined });
     await dispatch(SendNotificationEmailJob, data, { jobId: undefined });
   } catch (err) {
-    console.error('notificationQueueService.queueNotification failed:', err);
+    Log.error('notificationQueueService.queueNotification failed', { err });
     throw err;
   }
 }

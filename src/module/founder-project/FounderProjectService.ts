@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
+import { Log } from "@services/loggerService";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
@@ -183,7 +184,7 @@ export class FounderProjectService {
         message: "Projects retrieved successfully"
       };
     } catch (error: any) {
-      console.error("Error in getUserProjects:", error);
+      Log.error("Error in getUserProjects", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve projects"
@@ -391,7 +392,7 @@ export class FounderProjectService {
         message: "Projects retrieved successfully"
       };
     } catch (error: any) {
-      console.error("Error in browseProjects:", error);
+      Log.error("Error in browseProjects", { error });
       return {
         success: false,
         message: error.message || "Failed to retrieve projects"
@@ -540,7 +541,7 @@ export class FounderProjectService {
         data: transformedProject
       };
     } catch (error: any) {
-      console.error("Get Project By ID Error:", error);
+      Log.error("Get Project By ID Error", { error });
       return {
         success: false,
         message: "Failed to get project"
@@ -595,7 +596,7 @@ export class FounderProjectService {
         data: transformedProject
       };
     } catch (error: any) {
-      console.error("Create Project Error:", error);
+      Log.error("Create Project Error", { error });
       return {
         success: false,
         message: "Failed to create project"
@@ -680,7 +681,7 @@ export class FounderProjectService {
         data: transformedProject
       };
     } catch (error: any) {
-      console.error("Update Project Error:", error);
+      Log.error("Update Project Error", { error });
       return {
         success: false,
         message: "Failed to update project"
@@ -719,7 +720,7 @@ export class FounderProjectService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Project Error:", error);
+      Log.error("Delete Project Error", { error });
       return {
         success: false,
         message: "Failed to delete project"
@@ -779,7 +780,7 @@ export class FounderProjectService {
         data: transformedProject
       };
     } catch (error: any) {
-      console.error("Duplicate Project Error:", error);
+      Log.error("Duplicate Project Error", { error });
       return {
         success: false,
         message: "Failed to duplicate project"
@@ -969,7 +970,7 @@ export class FounderProjectService {
         }
       };
     } catch (error: any) {
-      console.error("Get Service Providers Error:", error);
+      Log.error("Get Service Providers Error", { error });
       return {
         success: false,
         message: "Failed to get service providers"
@@ -1130,7 +1131,7 @@ export class FounderProjectService {
         data: null
       };
     } catch (error: any) {
-      console.error("Invite Provider Error:", error);
+      Log.error("Invite Provider Error", { error });
       return {
         success: false,
         message: "Failed to invite provider"
@@ -1226,7 +1227,7 @@ export class FounderProjectService {
         message: "Invitation rejected successfully"
       };
     } catch (error: any) {
-      console.error("Reject Invitation Error:", error);
+      Log.error("Reject Invitation Error", { error });
       return {
         success: false,
         message: "Failed to reject invitation"
@@ -1294,7 +1295,7 @@ export class FounderProjectService {
 
       return { success: true, message: "Invitation accepted successfully" };
     } catch (error: any) {
-      console.error("Accept Invitation Error:", error);
+      Log.error("Accept Invitation Error", { error });
       return { success: false, message: error?.message || "Failed to accept invitation" };
     }
   }
@@ -1365,7 +1366,7 @@ export class FounderProjectService {
         data: { is_saved: !isSaved }
       };
     } catch (error: any) {
-      console.error("Toggle Save Provider Error:", error);
+      Log.error("Toggle Save Provider Error", { error });
       return {
         success: false,
         message: "Failed to save provider"
@@ -1447,7 +1448,7 @@ export class FounderProjectService {
         data: { is_saved: true }
       };
     } catch (error: any) {
-      console.error("Toggle Save Project Error:", error);
+      Log.error("Toggle Save Project Error", { error });
       return {
         success: false,
         message: "Failed to save project"

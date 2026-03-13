@@ -1,6 +1,7 @@
 import { Server as SocketServer } from "socket.io";
 import axios from "axios";
 import socketConfig from "@config/socketConfig";
+import { Log } from '@services/loggerService';
 
 export type MessagePayload = {
   id: number;
@@ -66,7 +67,7 @@ async function notifySocketServerViaHttp(
       timeout: 5000
     });
   } catch (err: any) {
-    console.error("Socket server notify failed (is socket server running on", socketConfig.serverUrl, "?):", err?.message || err);
+    Log.error(`Socket server notify failed (is socket server running on ${socketConfig.serverUrl}?)`, { err: err?.message || err });
   }
 }
 

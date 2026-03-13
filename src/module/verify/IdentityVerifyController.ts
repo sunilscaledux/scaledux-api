@@ -6,6 +6,7 @@ import { updateCompletionSection } from '../profile/ProfileCompletionService'
 import { uploadFile } from '@module/general/FileController'
 import fs from 'fs'
 import path from 'path'
+import { Log } from '@services/loggerService';
 
 /**
  * Get identity verification status
@@ -51,7 +52,7 @@ export async function getIdentityVerificationStatus(req: Request, res: Response)
     }, "Identity verification status retrieved successfully")
 
   } catch (error: any) {
-    console.error("Get Identity Verification Status Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get identity verification status")
   }
 }
@@ -222,7 +223,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
     }, "Identity verification submitted for review")
 
   } catch (error: any) {
-    console.error("Submit Identity Verification Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to submit identity verification")
   }
 }
@@ -289,7 +290,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
     }, "Identity verification details retrieved successfully")
 
   } catch (error: any) {
-    console.error("Get Identity Verification Details Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get identity verification details")
   }
 }

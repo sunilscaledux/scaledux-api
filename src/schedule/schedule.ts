@@ -1,4 +1,5 @@
 import cron from "node-cron";
+import { Log } from "@services/loggerService";
 import { tasks } from "./init";
 
 /**
@@ -10,9 +11,9 @@ export function startSchedule(): void {
       try {
         await task.handle();
       } catch (err) {
-        console.error(`[${task.name}] Job error:`, err);
+        Log.error(`[${task.name}] Job error`, { err });
       }
     });
-    console.log(`[schedule] Registered: ${task.name} (${task.schedule})`);
+    Log.info(`[schedule] Registered: ${task.name} (${task.schedule})`);
   }
 }

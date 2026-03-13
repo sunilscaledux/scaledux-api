@@ -3,6 +3,7 @@ import { ApiResponse } from "@utils/ApiResponse";
 import { FundingRoundService } from "./FundingRoundService";
 import * as CompanyProfileValidation from "./CompanyProfileValidation";
 import { getIntParam } from "@utils/requestHelpers";
+import { Log } from '@services/loggerService';
 
 export class FundingRoundController {
   /**
@@ -19,7 +20,7 @@ export class FundingRoundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Get Funding Rounds Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to retrieve funding rounds');
     }
   }
@@ -44,7 +45,7 @@ export class FundingRoundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Create Funding Round Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to create funding round');
     }
   }
@@ -75,7 +76,7 @@ export class FundingRoundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Update Funding Round Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to update funding round');
     }
   }
@@ -100,7 +101,7 @@ export class FundingRoundController {
       }
       return ApiResponse.error(res, result.message);
     } catch (error: any) {
-      console.error('Delete Funding Round Controller Error:', error);
+      Log.error("Error", { error });
       return ApiResponse.error(res, 'Failed to delete funding round');
     }
   }

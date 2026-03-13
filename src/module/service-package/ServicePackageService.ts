@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
+import { Log } from '@services/loggerService';
 
 /**
  * Helper function to parse JSON fields in service package
@@ -71,7 +72,7 @@ export class ServicePackageService {
         data: transformedPackages
       };
     } catch (error: any) {
-      console.error("Get User Service Packages Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to retrieve service packages"
@@ -106,7 +107,7 @@ export class ServicePackageService {
         data: transformedPackage
       };
     } catch (error: any) {
-      console.error("Get Service Package By ID Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to retrieve service package"
@@ -165,7 +166,7 @@ export class ServicePackageService {
         data: transformedPackage
       };
     } catch (error: any) {
-      console.error("Create Service Package Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to create service package"
@@ -238,7 +239,7 @@ export class ServicePackageService {
         data: transformedPackage
       };
     } catch (error: any) {
-      console.error("Update Service Package Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to update service package"
@@ -251,9 +252,9 @@ export class ServicePackageService {
    */
   static async deleteServicePackage(userId: number, uniqueId: string): Promise<ServiceResponse> {
     try {
-      console.log("🗑️ DELETE SERVICE PACKAGE REQUEST");
-      console.log("- User ID:", userId);
-      console.log("- Package ID:", uniqueId);
+      Log.info("🗑️ DELETE SERVICE PACKAGE REQUEST");
+      Log.info("- User ID:", userId);
+      Log.info("- Package ID:", uniqueId);
 
       // Check if package exists and belongs to user
       const existingPackage = await prisma.servicePackage.findFirst({
@@ -280,7 +281,7 @@ export class ServicePackageService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete Service Package Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "An error occurred while deleting the service package"

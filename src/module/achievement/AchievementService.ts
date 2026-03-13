@@ -3,6 +3,7 @@ import { CreateAchievementInput, UpdateAchievementInput } from "./AchievementTyp
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getRelativePath, getFileUrl, normalizeUploadedPaths } from "@utils/General";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 
 export class AchievementService {
@@ -36,7 +37,7 @@ export class AchievementService {
         data: achievementsWithUrls
       };
     } catch (error) {
-      console.error('Error fetching achievements:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -73,7 +74,7 @@ export class AchievementService {
         data: achievement
       };
     } catch (error) {
-      console.error('Error creating achievement:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -127,7 +128,7 @@ export class AchievementService {
         data: updatedAchievement
       };
     } catch (error) {
-      console.error('Error updating achievement:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'
@@ -168,7 +169,7 @@ export class AchievementService {
         data: null
       };
     } catch (error) {
-      console.error('Error deleting achievement:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Internal server error'

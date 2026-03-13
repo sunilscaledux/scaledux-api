@@ -3,6 +3,7 @@ import { prisma } from "../../services/prismaService";
 import { ApiResponse } from "@utils/ApiResponse";
 import redisClient from "@services/redisService";
 import { getIntParam, getStringParam } from "@utils/requestHelpers";
+import { Log } from '@services/loggerService';
 
 import { getFileUrl } from "@utils/General"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
@@ -28,7 +29,7 @@ export async function invalidateLocationCache(countryId?: string) {
       await redisClient.del(...keysToDelete)
     }
   } catch (error) {
-    console.error('Cache invalidation error:', error)
+    Log.error("Error", { error })
   }
 }
 
@@ -42,7 +43,7 @@ export async function invalidateCache(req: Request, res: Response) {
       timestamp: new Date().toISOString()
     }, "Cache invalidated successfully")
   } catch (error: any) {
-    console.error("Cache invalidation error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to invalidate cache")
   }
 }
@@ -83,7 +84,7 @@ export async function getCountries(req: Request, res: Response) {
 
     return ApiResponse.success(res, countries, "Countries retrieved successfully")
   } catch (error: any) {
-    console.error("Get Countries Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get countries")
   }
 }
@@ -124,7 +125,7 @@ export async function getStatesByCountry(req: Request, res: Response) {
 
     return ApiResponse.success(res, states, "States retrieved successfully")
   } catch (error: any) {
-    console.error("Get States Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get states")
   }
 }
@@ -169,7 +170,7 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
 
     return ApiResponse.success(res, countries, "Countries with states retrieved successfully")
   } catch (error: any) {
-    console.error("Get Countries with States Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get countries with states")
   }
 }
@@ -195,7 +196,7 @@ export async function getLanguages(req: Request, res: Response) {
 
     return ApiResponse.success(res, languages, "Languages retrieved successfully")
   } catch (error: any) {
-    console.error("Get Languages Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get languages")
   }
 }
@@ -226,7 +227,7 @@ export async function getLanguagesByCountry(req: Request, res: Response) {
 
     return ApiResponse.success(res, languages, "Languages by country retrieved successfully")
   } catch (error: any) {
-    console.error("Get Languages by Country Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to get languages by country")
   }
 }
@@ -290,7 +291,7 @@ export async function warmLocationCache(req: Request, res: Response) {
       timestamp: new Date().toISOString()
     }, "Cache warmed successfully")
   } catch (error: any) {
-    console.error("Cache warming error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to warm cache")
   }
 }
@@ -322,7 +323,7 @@ export async function getCurrencies(req: Request, res: Response) {
 
     return ApiResponse.success(res, currencies, "Currencies retrieved successfully")
   } catch (error: any) {
-    console.error("Get currencies error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve currencies")
   }
 }
@@ -367,7 +368,7 @@ export async function getCountriesWithCurrencies(req: Request, res: Response) {
 
     return ApiResponse.success(res, countriesWithUrls, "Countries with currencies retrieved successfully")
   } catch (error: any) {
-    console.error("Get countries with currencies error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve countries with currencies")
   }
 }
@@ -394,7 +395,7 @@ export async function getExpertiseCategories(req: Request, res: Response) {
 
     return ApiResponse.success(res, categories, "Expertise categories retrieved successfully")
   } catch (error: any) {
-    console.error("Get Expertise Categories Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve expertise categories")
   }
 }
@@ -429,7 +430,7 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
 
     return ApiResponse.success(res, specialties, "Specialties retrieved successfully")
   } catch (error: any) {
-    console.error("Get Specialties Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve specialties")
   }
 }
@@ -464,7 +465,7 @@ export async function getSkillsByCategory(req: Request, res: Response) {
 
     return ApiResponse.success(res, skills, "Skills retrieved successfully")
   } catch (error: any) {
-    console.error("Get Skills Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve skills")
   }
 }
@@ -496,7 +497,7 @@ export async function getIndustries(req: Request, res: Response) {
 
     return ApiResponse.success(res, industries, "Industries retrieved successfully")
   } catch (error: any) {
-    console.error("Get Industries Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve industries")
   }
 }
@@ -536,7 +537,7 @@ export async function getSubIndustriesByIndustry(req: Request, res: Response) {
 
     return ApiResponse.success(res, subIndustries, "Sub-industries retrieved successfully")
   } catch (error: any) {
-    console.error("Get Sub-Industries Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve sub-industries")
   }
 }
@@ -568,7 +569,7 @@ export async function getBusinessModels(req: Request, res: Response) {
 
     return ApiResponse.success(res, businessModels, "Business models retrieved successfully")
   } catch (error: any) {
-    console.error("Get Business Models Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve business models")
   }
 }
@@ -600,7 +601,7 @@ export async function getRevenueModels(req: Request, res: Response) {
 
     return ApiResponse.success(res, revenueModels, "Revenue models retrieved successfully")
   } catch (error: any) {
-    console.error("Get Revenue Models Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve revenue models")
   }
 }
@@ -636,7 +637,7 @@ export async function getTeamRoles(req: Request, res: Response) {
 
     return ApiResponse.success(res, teamRoles, "Team roles retrieved successfully")
   } catch (error: any) {
-    console.error("Get Team Roles Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve team roles")
   }
 }
@@ -650,7 +651,7 @@ export async function getFundingStages(req: Request, res: Response) {
     // Return funding stages from constants (no database needed)
     return ApiResponse.success(res, FUNDING_STAGES, "Funding stages retrieved successfully")
   } catch (error: any) {
-    console.error("Get Funding Stages Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve funding stages")
   }
 }
@@ -663,7 +664,7 @@ export async function getInvestorTypes(req: Request, res: Response) {
   try {
     return ApiResponse.success(res, INVESTOR_TYPES, "Investor types retrieved successfully")
   } catch (error: any) {
-    console.error("Get Investor Types Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve investor types")
   }
 }
@@ -677,7 +678,7 @@ export async function getInvestmentProfileOptions(req: Request, res: Response) {
     const data = { criteria: [...INVESTMENT_CRITERIA_OPTIONS] }
     return ApiResponse.success(res, data, "Investment profile options retrieved successfully")
   } catch (error: any) {
-    console.error("Get Investment Profile Options Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve investment profile options")
   }
 }
@@ -690,7 +691,7 @@ export async function getContractEndReasons(req: Request, res: Response) {
   try {
     return ApiResponse.success(res, CONTRACT_END_REASONS, "Contract end reasons retrieved successfully")
   } catch (error: any) {
-    console.error("Get Contract End Reasons Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve contract end reasons")
   }
 }
@@ -736,7 +737,7 @@ export async function searchSkills(req: Request, res: Response) {
 
     return ApiResponse.success(res, skills, `Found ${skills.length} skills matching "${query}"`)
   } catch (error: any) {
-    console.error("Search Skills Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to search skills")
   }
 }
@@ -796,7 +797,7 @@ export async function getAllSkills(req: Request, res: Response) {
 
     return ApiResponse.success(res, result, "Skills retrieved successfully")
   } catch (error: any) {
-    console.error("Get All Skills Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve skills")
   }
 }
@@ -829,7 +830,7 @@ export async function getServiceCategories(req: Request, res: Response) {
 
     return ApiResponse.success(res, categories, "Service categories retrieved successfully")
   } catch (error: any) {
-    console.error("Get Service Categories Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve service categories")
   }
 }
@@ -869,7 +870,7 @@ export async function getServiceSubCategories(req: Request, res: Response) {
 
     return ApiResponse.success(res, subCategories, "Service subcategories retrieved successfully")
   } catch (error: any) {
-    console.error("Get Service SubCategories Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve service subcategories")
   }
 }
@@ -915,7 +916,7 @@ export async function getServiceKeywords(req: Request, res: Response) {
 
     return ApiResponse.success(res, keywords, "Service keywords retrieved successfully")
   } catch (error: any) {
-    console.error("Get Service Keywords Error:", error)
+    Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve service keywords")
   }
 }

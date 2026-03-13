@@ -1,4 +1,5 @@
 import { prisma } from '../services/prismaService';
+import { Log } from '@services/loggerService';
 
 /**
  * Convert amount from USD to user's currency
@@ -34,7 +35,7 @@ export async function convertToUserCurrency(userId: number, amountInUSD: number)
       currencySymbol: currencySymbol
     };
   } catch (error) {
-    console.error('Error converting currency:', error);
+    Log.error('Error converting currency', { error });
     // Return original amount in INR if conversion fails
     return {
       amount: amountInUSD,
@@ -77,7 +78,7 @@ export async function convertToUSD(userId: number, amount: number): Promise<numb
 
   //   return amountInUSD;
   // } catch (error) {
-  //   console.error('Error converting to USD:', error);
+  //   Log.error("Error", { error });
   //   // Return original amount if conversion fails
   //   return amount;
   // }
@@ -99,7 +100,7 @@ export async function getUserCurrency(userId: number): Promise<string> {
  
     return user?.currency?.code || 'INR';
   } catch (error) {
-    console.error('Error getting user currency:', error);
+    Log.error('Error getting user currency', { error });
     return 'INR';
   }
 }

@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { getFileUrl, extractRelativePath } from "@utils/General";
 import { emitNewMessageToBothUsers, emitConversationStatusToUser } from "./chatSocket";
+import { Log } from '@services/loggerService';
 
 function toProfileImageUrl(profileImage: string | null | undefined): string | null {
   if (!profileImage) return null;
@@ -111,7 +112,7 @@ export class ConversationService {
 
       return { success: true, message: "Conversation created", data: { id: created.id, unique_id: created.unique_id } };
     } catch (error: any) {
-      console.error("getOrCreateConversation Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to get or create conversation" };
     }
   }
@@ -198,7 +199,7 @@ export class ConversationService {
         }
       };
     } catch (error: any) {
-      console.error("findConversationByOtherUserUniqueId Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to find conversation" };
     }
   }
@@ -242,7 +243,7 @@ export class ConversationService {
       }));
       return { success: true, message: "OK", data: { users: list } };
     } catch (error: any) {
-      console.error("searchUsersForChat Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to search users" };
     }
   }
@@ -269,7 +270,7 @@ export class ConversationService {
       });
       return { success: true, message: "System message created", data: msg };
     } catch (error: any) {
-      console.error("createSystemMessage Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to create system message" };
     }
   }
@@ -379,7 +380,7 @@ export class ConversationService {
 
       return { success: true, message: "OK", data: { list, nextCursor, hasMore } };
     } catch (error: any) {
-      console.error("listConversationsForUser Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to list conversations" };
     }
   }
@@ -442,7 +443,7 @@ export class ConversationService {
         }
       };
     } catch (error: any) {
-      console.error("getConversationByUniqueId Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to get conversation" };
     }
   }
@@ -470,7 +471,7 @@ export class ConversationService {
       );
       return { success: true, message: "OK" };
     } catch (error: any) {
-      console.error("markConversationAsRead Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to mark as read" };
     }
   }
@@ -495,7 +496,7 @@ export class ConversationService {
       );
       return { success: true, message: "OK" };
     } catch (error: any) {
-      console.error("blockConversation Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to block" };
     }
   }
@@ -526,7 +527,7 @@ export class ConversationService {
       );
       return { success: true, message: "OK" };
     } catch (error: any) {
-      console.error("unblockConversation Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to unblock" };
     }
   }
@@ -584,7 +585,7 @@ export class ConversationService {
 
       return { success: true, message: "OK", data: { messages: formatted, hasMore } };
     } catch (error: any) {
-      console.error("getMessages Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to get messages" };
     }
   }
@@ -640,7 +641,7 @@ export class ConversationService {
 
       return { success: true, message: "OK", data: { messages: formatted } };
     } catch (error: any) {
-      console.error("searchMessages Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to search messages" };
     }
   }
@@ -751,7 +752,7 @@ export class ConversationService {
         }
       };
     } catch (error: any) {
-      console.error("sendMessage Error:", error);
+      Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to send message" };
     }
   }

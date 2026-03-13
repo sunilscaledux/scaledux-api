@@ -2,6 +2,7 @@ import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { ulid } from 'ulid';
 import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
+import { Log } from '@services/loggerService';
 
 /**
  * CompanyProfileService
@@ -118,7 +119,7 @@ export class CompanyProfileService {
         data: companyDetail,
       };
     } catch (error: any) {
-      console.error('Get Company Profile Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to retrieve company profile',
@@ -221,7 +222,7 @@ export class CompanyProfileService {
         data: companyDetail,
       };
     } catch (error: any) {
-      console.error('Get Public Company Profile Error:', error);
+      Log.error("Error", { error });
       return { success: false, message: 'Failed to retrieve company profile' };
     }
   }
@@ -251,7 +252,7 @@ export class CompanyProfileService {
         },
       };
     } catch (error: any) {
-      console.error('Upload Profile Image Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to upload profile image',
@@ -284,7 +285,7 @@ export class CompanyProfileService {
         },
       };
     } catch (error: any) {
-      console.error('Upload Cover Image Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to upload cover image',
@@ -423,7 +424,7 @@ export class CompanyProfileService {
         data: companyDetail,
       };
     } catch (error: any) {
-      console.error('Update Company Overview Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update company overview',
@@ -472,7 +473,7 @@ export class CompanyProfileService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Company Details Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update company details',
@@ -513,7 +514,7 @@ export class CompanyProfileService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Funding Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update funding information',
@@ -554,7 +555,7 @@ export class CompanyProfileService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Problem Solution Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update problem and solution',
@@ -594,7 +595,7 @@ export class CompanyProfileService {
         data: profile,
       };
     } catch (error: any) {
-      console.error('Update Target Market Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update target market',
@@ -659,7 +660,7 @@ export class CompanyProfileService {
         },
       };
     } catch (error: any) {
-      console.error('Update Revenue Model Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update revenue model',
@@ -712,7 +713,7 @@ export class CompanyProfileService {
         data: updatedProfile,
       };
     } catch (error: any) {
-      console.error('Update Traction Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update traction',
@@ -757,7 +758,7 @@ export class CompanyProfileService {
         },
       };
     } catch (error: any) {
-      console.error('Upload Traction Document Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to upload traction document',

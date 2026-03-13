@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import mailConfig from '@config/mail';
+import { Log } from '@services/loggerService';
 
 export interface TemplateVariables {
   [key: string]: string | number | boolean;
@@ -65,7 +66,7 @@ class TemplateService {
 
       return templateContent;
     } catch (error) {
-      console.error('Error compiling template:', error);
+      Log.error('Error compiling template', { error, templateName });
       throw new Error(`Failed to compile template: ${templateName}`);
     }
   }
@@ -80,7 +81,7 @@ class TemplateService {
       
       // Handle different data types
       if (value === undefined || value === null) {
-        console.warn(`Template variable not found: ${variableName}`);
+        Log.warn(`Template variable not found: ${variableName}`);
         return match; // Keep original placeholder if variable not found
       }
       
@@ -194,7 +195,7 @@ class TemplateService {
         .filter(file => file.endsWith('.html'))
         .map(file => file.replace('.html', ''));
     } catch (error) {
-      console.error('Error reading templates directory:', error);
+      Log.error('Error reading templates directory', { error });
       return [];
     }
   }

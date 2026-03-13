@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateUserExpertiseInput, UpdateUserExpertiseInput } from "./ExpertiseType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
+import { Log } from '@services/loggerService';
 
 export class ExpertiseService {
   /**
@@ -55,7 +56,7 @@ export class ExpertiseService {
         data: userExpertise
       };
     } catch (error: any) {
-      console.error("Create User Expertise Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to add expertise"
@@ -91,7 +92,7 @@ export class ExpertiseService {
         data: userExpertises
       };
     } catch (error: any) {
-      console.error("Get User Expertises Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to retrieve user expertises"
@@ -167,7 +168,7 @@ export class ExpertiseService {
         data: userExpertise
       };
     } catch (error: any) {
-      console.error("Update User Expertise Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to update user expertise"
@@ -208,7 +209,7 @@ export class ExpertiseService {
         data: null
       };
     } catch (error: any) {
-      console.error("Delete User Expertise Error:", error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: "Failed to delete user expertise"

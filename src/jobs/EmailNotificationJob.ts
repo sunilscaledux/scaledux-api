@@ -1,6 +1,7 @@
 import { BaseJob, Job } from './BaseJob';
 import { prisma } from '../services/prismaService';
 import { emailService } from '../services/emailService';
+import { Log } from '@services/loggerService';
 import { NotificationPreferencesService } from '../module/profile/NotificationPreferencesService';
 import { templateService } from '../services/templateService';
 import { isNotificationEmailType, type NotificationEmailType } from '../constants/notificationTypes';
@@ -11,7 +12,7 @@ export class SendNotificationEmailJob extends BaseJob<NotificationJobPayload> {
   async handle(data: NotificationJobPayload): Promise<void> {
     const type = data.type as NotificationEmailType;
     if (!isNotificationEmailType(type)) {
-      console.warn(`SendNotificationEmailJob: unknown type "${data.type}", skipping`);
+      Log.warn(`SendNotificationEmailJob: unknown type "${data.type}", skipping`);
       return;
     }
 
@@ -20,13 +21,13 @@ export class SendNotificationEmailJob extends BaseJob<NotificationJobPayload> {
       select: { id: true, email: true, first_name: true }
     });
     if (!user) {
-      console.warn(`SendNotificationEmailJob: user ${data.userId} not found, skipping`);
+      Log.warn(`SendNotificationEmailJob: user ${data.userId} not found, skipping`);
       return;
     }
 
     const shouldSend = await NotificationPreferencesService.shouldSendNotificationEmail(data.userId, type);
     if (!shouldSend || !user.email) {
-      if (!shouldSend) console.log(`SendNotificationEmailJob: user ${data.userId} opted out of email for ${type}`);
+      if (!shouldSend) Log.info(`SendNotificationEmailJob: user ${data.userId} opted out of email for ${type}`);
       return;
     }
 

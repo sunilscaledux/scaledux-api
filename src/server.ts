@@ -30,7 +30,7 @@ import reviewRoutes from './module/review/ReviewRoute';
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
 import { connectMongo } from '@services/mongoService';
-
+import { Log } from '@services/loggerService';
 
 // Bull Board for queue monitoring
 import { serverAdapter } from './config/bullBoard';
@@ -66,7 +66,7 @@ app.use("/api/v1/reviews", reviewRoutes);
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {
   app.use('/admin/queues', serverAdapter.getRouter());
-  console.log('📊 Bull Board available at: http://localhost:4000/admin/queues');
+  Log.info('Bull Board available at: http://localhost:4000/admin/queues');
 }
 
 const PORT = process.env.PORT || 4000;
@@ -80,7 +80,7 @@ async function start() {
     // Continue without MongoDB; proposal activities will be no-op
   }
   httpServer.listen(PORT, () => {
-    console.log(`API Base URL: http://localhost:${PORT}/api/v1`);
+    Log.info(`API Base URL: http://localhost:${PORT}/api/v1`);
   });
 }
 

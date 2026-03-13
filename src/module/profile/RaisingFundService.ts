@@ -1,4 +1,5 @@
 import { prisma } from "../../services/prismaService";
+import { Log } from '@services/loggerService';
 
 interface ServiceResponse {
   success: boolean;
@@ -44,7 +45,7 @@ export class RaisingFundService {
         data: raisingFund
       };
     } catch (error: any) {
-      console.error('Get Raising Fund Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to retrieve raising fund status'
@@ -89,7 +90,7 @@ export class RaisingFundService {
         data: raisingFund
       };
     } catch (error: any) {
-      console.error('Update Raising Fund Error:', error);
+      Log.error("Error", { error });
       return {
         success: false,
         message: 'Failed to update raising fund status'

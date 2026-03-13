@@ -1,5 +1,6 @@
 import axios from "axios";
 import socketConfig from "@config/socketConfig";
+import { Log } from "@services/loggerService";
 
 /**
  * Notify socket server to emit session_revoked to a device (so it can logout immediately).
@@ -15,7 +16,7 @@ export async function emitSessionRevoked(userId: number, deviceId: number): Prom
       }
     );
   } catch (err: any) {
-    console.error("Socket emit session_revoked failed:", err?.message || err);
+    Log.error("Socket emit session_revoked failed", { message: err?.message || err });
   }
 }
 
@@ -34,6 +35,6 @@ export async function emitSessionRevokedMany(userId: number, deviceIds: number[]
       }
     );
   } catch (err: any) {
-    console.error("Socket emit session_revoked_many failed:", err?.message || err);
+    Log.error("Socket emit session_revoked_many failed", { message: err?.message || err });
   }
 }
