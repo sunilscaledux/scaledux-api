@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "D:\\scaledux\\scaleDux-api\\storage\\logs\\.b82af4ceefc4dc39eeabda5e80dd9bf9661c139a-audit.json",
+    "files": [
+        {
+            "date": 1773417765245,
+            "name": "D:\\scaledux\\scaleDux-api\\storage\\logs\\app-2026-03-13.log",
+            "hash": "22f1204200772eef5cd7b5de0cf5b0a792b10778bf2814e117a66c43279eb66e"
+        }
+    ],
+    "hashType": "sha256"
+}

@@ -13,6 +13,7 @@ import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import socketConfig from '@config/socketConfig';
 import { Log } from '@services/loggerService';
+import redisClient from '@services/redisService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { emitNewMessageWithIO, emitNewMessageToBothUsersWithIO } from '@module/chat/chatSocket';
 
@@ -26,8 +27,31 @@ const io = new SocketServer(httpServer, {
   cors: { origin: socketConfig.corsOrigin, credentials: true }
 });
 
+const ONLINE_USERS_SET_KEY = 'socket:online_users';
+const onlineUserConnectionsKey = (userId: number) => `socket:online_user:${userId}:connections`;
+
+async function markUserOnline(userId: number): Promise<void> {
+  const count = await redisClient.incr(onlineUserConnectionsKey(userId));
+  if (count === 1) {
+    await redisClient.sadd(ONLINE_USERS_SET_KEY, String(userId));
+  }
+}
+
+async function markUserOffline(userId: number): Promise<void> {
+  const count = await redisClient.decr(onlineUserConnectionsKey(userId));
+  if (count <= 0) {
+    await redisClient.del(onlineUserConnectionsKey(userId));
+    await redisClient.srem(ONLINE_USERS_SET_KEY, String(userId));
+  }
+}
+
+async function isUserOnline(userId: number): Promise<boolean> {
+  const exists = await redisClient.sismember(ONLINE_USERS_SET_KEY, String(userId));
+  return exists === 1;
+}
+
 // Internal endpoint: API process POSTs here to trigger socket emits (no Socket.IO in API process)
-app.post('/emit', (req, res) => {
+app.post('/emit', async (req, res) => {
   const secret = req.headers['x-internal-secret'] || req.body?.secret;
   if (secret !== socketConfig.emitSecret) {
     res.status(401).json({ ok: false, error: 'Unauthorized' });
@@ -58,7 +82,10 @@ app.post('/emit', (req, res) => {
         res.status(400).json({ ok: false, error: 'conversationId and message required for new_message' });
         return;
       }
-      emitNewMessageWithIO(io, conversationId, message, receiverId);
+      const receiverOnline = typeof receiverId === 'number'
+        ? await isUserOnline(receiverId)
+        : false;
+      emitNewMessageWithIO(io, conversationId, message, receiverId, receiverOnline);
     } else if (type === 'new_message_both') {
       if (!conversationId || !message) {
         res.status(400).json({ ok: false, error: 'conversationId and message required for new_message_both' });
@@ -68,7 +95,11 @@ app.post('/emit', (req, res) => {
         res.status(400).json({ ok: false, error: 'userId1 and userId2 required for new_message_both' });
         return;
       }
-      emitNewMessageToBothUsersWithIO(io, conversationId, message, userId1, userId2);
+      const [user1Online, user2Online] = await Promise.all([
+        isUserOnline(userId1),
+        isUserOnline(userId2)
+      ]);
+      emitNewMessageToBothUsersWithIO(io, conversationId, message, userId1, userId2, user1Online, user2Online);
     } else if (type === 'conversation_status') {
       if (typeof userId !== 'number' || !conversationId || !status) {
         res.status(400).json({ ok: false, error: 'userId, conversationId and status required for conversation_status' });
@@ -98,6 +129,9 @@ io.on('connection', (socket) => {
     const userId = decoded.id;
     socket.data.userId = userId;
     socket.join(`user:${userId}`);
+    markUserOnline(userId).catch((err) => {
+      Log.warn('Failed to mark user online', { userId, err: err?.message || err });
+    });
   } catch {
     if (process.env.NODE_ENV !== 'production') Log.debug('[socket] connection rejected: invalid token');
     socket.disconnect(true);
@@ -136,6 +170,15 @@ io.on('connection', (socket) => {
     const uid = socket.data.userId;
     if (typeof deviceId === 'number' && uid != null) {
       socket.join(`user:${uid}:device:${deviceId}`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    const userId = socket.data.userId;
+    if (typeof userId === 'number') {
+      markUserOffline(userId).catch((err) => {
+        Log.warn('Failed to mark user offline', { userId, err: err?.message || err });
+      });
     }
   });
 });

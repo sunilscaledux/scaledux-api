@@ -21,11 +21,12 @@ export function emitNewMessageWithIO(
   io: SocketServer,
   conversationUniqueId: string,
   message: MessagePayload,
-  receiverUserId?: number
+  receiverUserId?: number,
+  emitReceiverConversationEvent: boolean = true
 ) {
   const payload = { message };
   io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  if (receiverUserId != null) {
+  if (receiverUserId != null && emitReceiverConversationEvent) {
     io.to(`user:${receiverUserId}`).emit("conversation:new_message", payload);
   }
 }
@@ -38,12 +39,18 @@ export function emitNewMessageToBothUsersWithIO(
   conversationUniqueId: string,
   message: MessagePayload,
   userId1: number,
-  userId2: number
+  userId2: number,
+  emitUser1ConversationEvent: boolean = true,
+  emitUser2ConversationEvent: boolean = true
 ) {
   const payload = { message };
   io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  io.to(`user:${userId1}`).emit("conversation:new_message", payload);
-  io.to(`user:${userId2}`).emit("conversation:new_message", payload);
+  if (emitUser1ConversationEvent) {
+    io.to(`user:${userId1}`).emit("conversation:new_message", payload);
+  }
+  if (emitUser2ConversationEvent) {
+    io.to(`user:${userId2}`).emit("conversation:new_message", payload);
+  }
 }
 
 /**

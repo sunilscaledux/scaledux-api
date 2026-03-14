@@ -3,7 +3,6 @@ import redisConfig from './redis';
 
 const defaultQueueName = process.env.NODE_ENV === 'production' ? 'main-queue' : 'main-queue-dev';
 export const mainQueueName = process.env.BULLMQ_QUEUE_NAME || defaultQueueName;
-
 // BullMQ connection configuration
 export const redisConnection = { 
   host: redisConfig.host,
