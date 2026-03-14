@@ -7,6 +7,7 @@ import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
 export class ProfileController {
   
   static async getMyProfile(req: Request, res: Response) {
+   
     try {
       const userId = req.user.id;
       const result = await PersonalInfoService.getProfileByUserId(userId);

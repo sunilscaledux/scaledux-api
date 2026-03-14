@@ -116,6 +116,9 @@ app.post('/emit', async (req, res) => {
     res.status(500).json({ ok: false, error: 'Emit failed' });
   }
 });
+app.get('/health', (req, res) => {
+  res.status(200).json({ message: 'Socket server is running' });
+});
 
 io.on('connection', (socket) => {
   const token = socket.handshake.auth?.token || socket.handshake.headers?.cookie?.match(/auth_token=([^;]+)/)?.[1];

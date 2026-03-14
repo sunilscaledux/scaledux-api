@@ -1,8 +1,9 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { PassThrough } from 'stream';
 import fileConfig from '@config/file';
-import { uploadPublic, isConfigured } from '@services/bunnyStorageService';
+import { uploadPublic, uploadPrivate, isConfigured } from '@services/bunnyStorageService';
 import { normalizePath } from '@utils/General';
 
 const useBunny = fileConfig.isBunny && isConfigured();
@@ -81,26 +82,58 @@ const milestoneDeliverableFileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
-/** When Bunny: after multer (memoryStorage) upload buffers to Bunny and set file.path */
-async function uploadBunnyFiles(req: any, uploadPath: string): Promise<void> {
-  const files = req.file ? [req.file] : req.files || [];
-  const userIdentifier = req.user?.unique_id || req.user?.id || 'anonymous';
-  for (const file of files) {
-    if (!file?.buffer) continue;
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname);
-    const storagePath = normalizePath(`uploads/${userIdentifier}/${uploadPath}/${filename}`);
-    const result = await uploadPublic(storagePath, file.buffer, file.mimetype);
-    if (!result.success) throw new Error(result.message || 'Bunny upload failed');
-    file.path = storagePath;
-    file.size = file.buffer.length;
+class BunnyStorageEngine implements multer.StorageEngine {
+  constructor(
+    private readonly uploadPath: string,
+    private readonly visibility: 'public' | 'private' = 'public'
+  ) {}
+
+  _handleFile(req: any, file: any, cb: (error?: any, info?: Partial<Express.Multer.File>) => void): void {
+    const userIdentifier = req.user?.unique_id || req.user?.id || 'anonymous';
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`;
+    const storagePath = normalizePath(`uploads/${userIdentifier}/${this.uploadPath}/${filename}`);
+
+    let size = 0;
+    const passThrough = new PassThrough();
+    file.stream.on('data', (chunk: Buffer) => {
+      size += chunk.length;
+    });
+    file.stream.on('error', (err: Error) => {
+      cb(err);
+    });
+
+    file.stream.pipe(passThrough);
+
+    const uploadPromise = this.visibility === 'private'
+      ? uploadPrivate(storagePath, passThrough, file.mimetype)
+      : uploadPublic(storagePath, passThrough, file.mimetype);
+
+    uploadPromise
+      .then((result) => {
+        if (!result.success) {
+          cb(new Error(result.message || 'Bunny upload failed'));
+          return;
+        }
+        cb(undefined, {
+          path: storagePath,
+          size,
+          filename,
+          destination: `uploads/${userIdentifier}/${this.uploadPath}`,
+        } as Partial<Express.Multer.File>);
+      })
+      .catch((err) => cb(err));
+  }
+
+  _removeFile(_req: any, _file: any, cb: (error: Error | null) => void): void {
+    cb(null);
   }
 }
 
-// Generic storage configuration: disk (local) or memory (Bunny) based on fileConfig.default
-const createStorage = (uploadPath: string) => {
+// Generic storage configuration: disk (local) or Bunny streaming based on fileConfig.default
+const createStorage = (uploadPath: string, visibility: 'public' | 'private') => {
   if (useBunny) {
-    return multer.memoryStorage();
+    return new BunnyStorageEngine(uploadPath, visibility);
   }
   return multer.diskStorage({
     destination: (req, file, cb) => {
@@ -129,8 +162,9 @@ export const FileUpload = (options: {
   fileFilter?: 'image' | 'document' | 'chat' | 'milestoneDeliverable' | 'any';
   maxSize?: number; // in MB
   maxFiles?: number;
+  visibility?: 'public' | 'private';
 }) => {
-  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1 } = options;
+  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, visibility = 'public' } = options;
   
   let filter;
   switch (fileFilter) {
@@ -151,7 +185,7 @@ export const FileUpload = (options: {
   }
 
   const multerOpts = {
-    storage: createStorage(uploadPath),
+    storage: createStorage(uploadPath, visibility),
     fileFilter: filter,
     limits: {
       fileSize: maxSize * 1024 * 1024, // Convert MB to bytes
@@ -159,26 +193,7 @@ export const FileUpload = (options: {
     }
   };
   const m = multer(multerOpts);
-
-  if (!useBunny) {
-    return m;
-  }
-
-  // When Bunny: wrap .single() / .array() so we upload buffer to Bunny and set file.path after multer
-  const wrap = (mw: (req: any, res: any, next: (err?: any) => void) => void) => {
-    return (req: any, res: any, next: (err?: any) => void) => {
-      mw(req, res, (err?: any) => {
-        if (err) return next(err);
-        uploadBunnyFiles(req, uploadPath).then(() => next(), next);
-      });
-    };
-  };
-  return {
-    single: (field: string) => wrap(m.single(field)),
-    array: (field: string, maxCount?: number) => wrap(m.array(field, maxCount)),
-    fields: (fields: multer.Field[]) => wrap(m.fields(fields)),
-    any: () => wrap(m.any()),
-  };
+  return m;
 };
 
 
