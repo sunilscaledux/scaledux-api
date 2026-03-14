@@ -1,77 +1,71 @@
 # ScaleDux — PROD: app services only (external Postgres + Redis)
-# Set POSTGRES_URL, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD in scaleDux-api/.env
+# Expected layout under /var/www:
+#   /var/www/backend
+#   /var/www/frontend
+# Set POSTGRES_URL, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD in /var/www/backend/.env
 #
-# Run from repo root:
-#   docker compose -f docker-compose.prod.yml up -d --build
+# Run from /var/www:
+#   docker compose -f backend/docker-compose.prod.yml up -d --build
 
 services:
   api:
     build:
-      context: ./scaleDux-api
+      context: ./backend
       dockerfile: Dockerfile
       target: prod
-    image: scaledux-api:prod
     container_name: scaledux-api
     restart: unless-stopped
     command: ["sh", "-c", "npx prisma migrate deploy && exec node dist/server.js"]
     ports:
       - "4000:4000"
     env_file:
-      - ./scaleDux-api/.env
-      - ./.env.docker.prod
+      - ./backend/.env
 
   socket:
     build:
-      context: ./scaleDux-api
+      context: ./backend
       dockerfile: Dockerfile
       target: prod
-    image: scaledux-api:prod
     container_name: scaledux-socket
     restart: unless-stopped
     command: ["node", "dist/socket-server.js"]
     ports:
       - "4001:4001"
     env_file:
-      - ./scaleDux-api/.env
-      - ./.env.docker.prod
+      - ./backend/.env
 
   worker:
     build:
-      context: ./scaleDux-api
+      context: ./backend
       dockerfile: Dockerfile
       target: prod
-    image: scaledux-api:prod
     container_name: scaledux-worker
     restart: unless-stopped
     command: ["node", "dist/workerServer.js"]
     env_file:
-      - ./scaleDux-api/.env
-      - ./.env.docker.prod
+      - ./backend/.env
 
   schedule:
     build:
-      context: ./scaleDux-api
+      context: ./backend
       dockerfile: Dockerfile
       target: prod
-    image: scaledux-api:prod
     container_name: scaledux-schedule
     restart: unless-stopped
     command: ["node", "dist/scheduleServer.js"]
     env_file:
-      - ./scaleDux-api/.env
-      - ./.env.docker.prod
+      - ./backend/.env
 
-      #comment if not needed maily while foing only backend development
+  # Comment this service if frontend is deployed separately.
   frontend:
     build:
-      context: ./scaledux-ui
+      context: ./frontend
       dockerfile: Dockerfile
       target: prod
-    image: scaledux-ui:prod
     container_name: scaledux-frontend
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file: ./.env.docker.prod
+    env_file: ./frontend/.env
     depends_on:
       - api

@@ -3,6 +3,13 @@ import { ApiResponse } from '@utils/ApiResponse';
 import { NotificationService } from './NotificationService';
 
 export class NotificationController {
+  private static parseNotificationId(req: Request): number | null {
+    const rawId = req.params.id;
+    const idValue = Array.isArray(rawId) ? rawId[0] : rawId;
+    const id = parseInt(idValue, 10);
+    return Number.isNaN(id) ? null : id;
+  }
+
   static async list(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id;
@@ -22,8 +29,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = this.parseNotificationId(req);
+      if (id === null) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.markAsRead(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);
@@ -37,8 +44,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = this.parseNotificationId(req);
+      if (id === null) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.markAsUnread(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);
@@ -65,8 +72,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = this.parseNotificationId(req);
+      if (id === null) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.remove(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);
@@ -80,8 +87,8 @@ export class NotificationController {
     try {
       const userId = (req as any).user?.id;
       if (!userId) return ApiResponse.error(res, 'Unauthorized', 401);
-      const id = parseInt(req.params.id, 10);
-      if (Number.isNaN(id)) return ApiResponse.error(res, 'Invalid id', 400);
+      const id = this.parseNotificationId(req);
+      if (id === null) return ApiResponse.error(res, 'Invalid id', 400);
       const result = await NotificationService.hide(userId, id);
       if (result.success) return ApiResponse.success(res, result.data, result.message);
       return ApiResponse.error(res, result.message, 404);
