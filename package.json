@@ -57,14 +57,18 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/server.ts",
+    "dev:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/server.ts",
     "dev:socket": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/socket-server.ts",
+    "dev:socket:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/socket-server.ts",
     "dev:worker": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/workerServer.ts",
+    "dev:worker:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/workerServer.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "start:socket": "node dist/socket-server.js",
     "start:worker": "node dist/workerServer.js",
     "start:schedule": "node dist/scheduleServer.js",
     "dev:schedule": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/scheduleServer.ts",
+    "dev:schedule:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/scheduleServer.ts",
     "worker": "ts-node -r tsconfig-paths/register src/workerServer.ts",
     "seed": "ts-node -r tsconfig-paths/register prisma/seed.ts"
   },
