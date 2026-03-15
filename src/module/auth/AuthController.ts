@@ -33,7 +33,7 @@ import {
 import { ApiResponse } from "@utils/ApiResponse";
 import * as AuthService from "@module/auth/AuthService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
-import { getFileUrl, normalizeContact } from '@utils/General';
+import { normalizeContact } from '@utils/General';
 import { Log } from '@services/loggerService';
 
 export async function initiateRegistration(req: Request, res: Response) {

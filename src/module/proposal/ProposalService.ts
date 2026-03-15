@@ -1,7 +1,8 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl, extractRelativePath } from '@utils/General';
+import { toAttachmentIds } from '@utils/General';
 import { Log } from '@services/loggerService';
+import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
@@ -41,7 +42,7 @@ function buildRemark(reasonLabel: string, reasonMessage?: string | null): string
   return a || b;
 }
 
-/** NDA + offer data stored in proposal.nda (single JSON column) */
+/** NDA + offer data (from ProposalNda table or legacy proposal.nda JSON). Dates in API as ISO strings. */
 export interface ProposalNdaData {
   offer_expires_at?: string | null;
   is_nda_signed?: boolean;
@@ -52,7 +53,20 @@ export interface ProposalNdaData {
   nda_downloaded_at?: string | null;
 }
 
+/** Read NDA from proposal.proposalNda (or legacy proposal.nda JSON). Returns same shape with dates as ISO strings. */
 function getNda(proposal: any): ProposalNdaData | null {
+  const row = proposal?.proposalNda;
+  if (row) {
+    return {
+      offer_expires_at: row.offer_expires_at ? new Date(row.offer_expires_at).toISOString() : null,
+      is_nda_signed: row.is_nda_signed ?? false,
+      nda_file_link: row.nda_file_link ?? null,
+      nda_sent_at: row.nda_sent_at ? new Date(row.nda_sent_at).toISOString() : null,
+      nda_signed_at: row.nda_signed_at ? new Date(row.nda_signed_at).toISOString() : null,
+      nda_signed_file_link: row.nda_signed_file_link ?? null,
+      nda_downloaded_at: row.nda_downloaded_at ? new Date(row.nda_downloaded_at).toISOString() : null,
+    };
+  }
   const nda = proposal?.nda;
   if (!nda || typeof nda !== 'object') return null;
   return nda as ProposalNdaData;
@@ -66,10 +80,10 @@ function getOfferExpiryHours(): number {
   return Number.isFinite(n) && n > 0 ? n : 24;
 }
 
-function flattenNdaToProposal(proposal: any): any {
+/** Flatten NDA from proposal.nda and resolve nda_file_link / nda_signed_file_link to URLs (attachment ids → protected URL). */
+async function flattenNdaToProposal(proposal: any): Promise<any> {
   const nda = getNda(proposal);
   let offer_expires_at = nda?.offer_expires_at ?? null;
-  // When NDA was sent but expiry not set (e.g. old data), derive from nda_sent_at so countdown can show
   const ndaSentAt = nda?.nda_sent_at;
   if ((offer_expires_at == null || offer_expires_at === '') && ndaSentAt) {
     const sent = new Date(ndaSentAt);
@@ -77,26 +91,30 @@ function flattenNdaToProposal(proposal: any): any {
     expires.setHours(expires.getHours() + getOfferExpiryHours());
     offer_expires_at = expires.toISOString();
   }
+  const [ndaFileLinkUrl, ndaSignedFileLinkUrl] = await Promise.all([
+    nda?.nda_file_link ? resolveAttachmentUrl(nda.nda_file_link, { entityType: 'proposal', fieldName: 'nda_file_link' }) : Promise.resolve(null),
+    nda?.nda_signed_file_link ? resolveAttachmentUrl(nda.nda_signed_file_link, { entityType: 'proposal', fieldName: 'nda_signed_file_link' }) : Promise.resolve(null),
+  ]);
   return {
     ...proposal,
     offer_expires_at,
     is_nda_signed: nda?.is_nda_signed ?? false,
-    nda_file_link: nda?.nda_file_link ?? null,
+    nda_file_link: (ndaFileLinkUrl || nda?.nda_file_link) ?? null,
     nda_sent_at: nda?.nda_sent_at ?? null,
     nda_signed_at: nda?.nda_signed_at ?? null,
-    nda_signed_file_link: nda?.nda_signed_file_link ?? null,
+    nda_signed_file_link: (ndaSignedFileLinkUrl || nda?.nda_signed_file_link) ?? null,
     nda_downloaded_at: nda?.nda_downloaded_at ?? null,
     status_label: getProposalStatusLabel(proposal.status)
   };
 }
 
 /** Build milestones array from Milestone table rows; deliverables from Deliverable table. */
-function milestonesFromRows(rows: any[] | null | undefined): any[] {
+async function milestonesFromRows(rows: any[] | null | undefined): Promise<any[]> {
   if (!Array.isArray(rows)) return [];
-  return rows
+  return Promise.all(rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((row) => {
-      const deliverables = buildDeliverablesFromRow(row);
+    .map(async (row) => {
+      const deliverables = await buildDeliverablesFromRow(row);
       return {
         id: row.unique_id,
         milestoneId: row.id,
@@ -111,45 +129,45 @@ function milestonesFromRows(rows: any[] | null | undefined): any[] {
         is_approved: row.is_approved === true,
         remark: row.remark ?? undefined
       };
-    });
+    }));
 }
 
 /** Build deliverables array from Deliverable table rows or fallback to JSON. */
-function buildDeliverablesFromRow(row: any): any[] {
+async function buildDeliverablesFromRow(row: any): Promise<any[]> {
   const fromTable = row.deliverablesRow;
   if (Array.isArray(fromTable) && fromTable.length > 0) {
-    return fromTable
+    return Promise.all(fromTable
       .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
-      .map((d: any) => {
+      .map(async (d: any) => {
         const approvedAt = d.approved_at ?? (d.status === 'APPROVED' && d.updated_at ? d.updated_at : null);
         return {
-        id: d.unique_id,
-        description: d.description ?? '',
-        deliverable: d.description ?? '',
-        status: d.status ?? 'PENDING',
-        submitted_at: d.submitted_at ?? null,
-        approved_at: approvedAt ?? null,
-        submitted_remark: d.submitted_remark ?? null,
-        submitted_file: Array.isArray(d.submitted_file)
-          ? (d.submitted_file as any[]).map((f: any) => ({
-              url: typeof f?.url === 'string' ? getFileUrl(f.url) : f?.url,
-              name: f?.name ?? (typeof f?.url === 'string' ? f.url.split('/').pop() : 'file')
-            }))
-          : [],
-        feedback: d.feedback ?? null
-      };
-      });
+          id: d.unique_id,
+          description: d.description ?? '',
+          deliverable: d.description ?? '',
+          status: d.status ?? 'PENDING',
+          submitted_at: d.submitted_at ?? null,
+          approved_at: approvedAt ?? null,
+          submitted_remark: d.submitted_remark ?? null,
+          submitted_file: Array.isArray(d.submitted_file)
+            ? await Promise.all((d.submitted_file as any[]).map(async (f: any) => ({
+                url: typeof f?.url === 'string' ? await resolveAttachmentUrl(f.url, { entityType: 'proposal', fieldName: 'attachments' }) : f?.url,
+                name: f?.name ?? (typeof f?.url === 'string' ? f.url.split('/').pop() : 'file')
+              })))
+            : [],
+          feedback: d.feedback ?? null
+        };
+      }));
   }
   return [];
 }
 
 /** Build milestones with submitted_file derived from deliverables (Deliverable table). */
-function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] {
+async function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): Promise<any[]> {
   if (!Array.isArray(rows)) return [];
-  return rows
+  return Promise.all(rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-    .map((row) => {
-      const deliverables = buildDeliverablesFromRow(row);
+    .map(async (row) => {
+      const deliverables = await buildDeliverablesFromRow(row);
       const submittedFile = deliverables.flatMap((d: any) => (Array.isArray(d.submitted_file) ? d.submitted_file : []));
       return {
         id: row.unique_id,
@@ -165,7 +183,7 @@ function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): any[] 
         is_approved: row.is_approved === true,
         remark: row.remark ?? undefined
       };
-    });
+    }));
 }
 
 /**
@@ -234,9 +252,7 @@ export class ProposalService {
         data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
           ? data.hours_required
           : null;
-      const attachmentPaths = Array.isArray(data.attachments)
-        ? data.attachments.map((url: string) => extractRelativePath(url)).filter(Boolean)
-        : [];
+      const attachmentPaths = toAttachmentIds(data.attachments);
       const proposal = await (prisma as any).proposal.create({
         data: {
           project_id: project.id,
@@ -552,6 +568,7 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          proposalNda: true,
           milestonesRows: {
             orderBy: { order_index: 'asc' },
             include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
@@ -597,17 +614,17 @@ export class ProposalService {
       });
 
       // Transform proposals: milestones from Milestone table; file URLs; flatten nda
-      const transformedProposals = proposals.map((proposal: any) =>
-        flattenNdaToProposal({
+      const transformedProposals = await Promise.all(proposals.map(async (proposal: any) =>
+        await flattenNdaToProposal({
           ...proposal,
-          milestones: milestonesFromRows(proposal.milestonesRows),
-          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          milestones: await milestonesFromRows(proposal.milestonesRows),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
           project: proposal.project ? {
             ...proposal.project,
             budget_currency: proposal.project.user?.currency?.symbol || '₹'
           } : null
         })
-      );
+      ));
 
       return {
         success: true,
@@ -685,6 +702,7 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          proposalNda: true,
           project: {
             select: {
               id: true,
@@ -726,22 +744,23 @@ export class ProposalService {
       });
 
       // Transform proposals: milestones from Milestone table; file URLs; flatten nda
-      const transformedProposals = proposals.map((proposal: any) =>
-        flattenNdaToProposal({
+      const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
+        const providerProfileImage = proposal.provider?.personalInfo?.profileImage
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          : null;
+        return await flattenNdaToProposal({
           ...proposal,
-          milestones: milestonesFromRows(proposal.milestonesRows),
-          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          milestones: await milestonesFromRows(proposal.milestonesRows),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
           provider: proposal.provider ? {
             ...proposal.provider,
             personalInfo: proposal.provider.personalInfo ? {
               ...proposal.provider.personalInfo,
-              profileImage: proposal.provider.personalInfo.profileImage 
-                ? getFileUrl(proposal.provider.personalInfo.profileImage)
-                : null
+              profileImage: providerProfileImage
             } : null
           } : null
-        })
-      );
+        });
+      }));
 
       return {
         success: true,
@@ -792,6 +811,7 @@ export class ProposalService {
       const proposals = await (prisma as any).proposal.findMany({
         where: whereClause,
         include: {
+          proposalNda: true,
           project: {
             select: {
               id: true,
@@ -832,22 +852,23 @@ export class ProposalService {
         take: limit
       });
 
-      const transformedProposals = proposals.map((proposal: any) =>
-        flattenNdaToProposal({
+      const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
+        const providerProfileImage = proposal.provider?.personalInfo?.profileImage
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          : null;
+        return await flattenNdaToProposal({
           ...proposal,
-          milestones: milestonesFromRows(proposal.milestonesRows),
-          attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+          milestones: await milestonesFromRows(proposal.milestonesRows),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
           provider: proposal.provider ? {
             ...proposal.provider,
             personalInfo: proposal.provider.personalInfo ? {
               ...proposal.provider.personalInfo,
-              profileImage: proposal.provider.personalInfo.profileImage
-                ? getFileUrl(proposal.provider.personalInfo.profileImage)
-                : null
+              profileImage: providerProfileImage
             } : null
           } : null
-        })
-      );
+        });
+      }));
 
       return {
         success: true,
@@ -884,6 +905,7 @@ export class ProposalService {
           unique_id: proposalId
         },
         include: {
+          proposalNda: true,
           milestonesRows: {
             orderBy: { order_index: 'asc' },
             include: { deliverablesRow: { orderBy: { order_index: 'asc' } } }
@@ -983,10 +1005,20 @@ export class ProposalService {
 
       // Transform with file URLs; milestones include submitted_file derived from deliverables
       const projectUser = proposal.project?.user;
+      const [milestones, attachments, projectUserProfileImage, providerProfileImage] = await Promise.all([
+        milestonesFromRowsWithDocuments(proposal.milestonesRows),
+        resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
+        projectUser?.personalInfo?.profileImage
+          ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          : Promise.resolve(null),
+        proposal.provider?.personalInfo?.profileImage
+          ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          : Promise.resolve(null),
+      ]);
       const transformedProposal: any = {
         ...proposal,
-        milestones: milestonesFromRowsWithDocuments(proposal.milestonesRows),
-        attachments: proposal.attachments?.map((url: string) => getFileUrl(url)) || [],
+        milestones,
+        attachments,
         milestonesRows: proposal.milestonesRows ?? [],
         project: proposal.project ? {
           ...proposal.project,
@@ -995,9 +1027,7 @@ export class ProposalService {
             ...projectUser,
             personalInfo: projectUser.personalInfo ? {
               ...projectUser.personalInfo,
-              profileImage: projectUser.personalInfo.profileImage
-                ? getFileUrl(projectUser.personalInfo.profileImage)
-                : null
+              profileImage: projectUserProfileImage
             } : null
           } : null
         } : null,
@@ -1005,9 +1035,7 @@ export class ProposalService {
           ...proposal.provider,
           personalInfo: proposal.provider.personalInfo ? {
             ...proposal.provider.personalInfo,
-            profileImage: proposal.provider.personalInfo.profileImage 
-              ? getFileUrl(proposal.provider.personalInfo.profileImage)
-              : null
+            profileImage: providerProfileImage
           } : null
         } : null
       };
@@ -1034,7 +1062,7 @@ export class ProposalService {
       return {
         success: true,
         message: "Proposal retrieved successfully",
-        data: flattenNdaToProposal(transformedProposal)
+        data: await flattenNdaToProposal(transformedProposal)
       };
     } catch (error: any) {
       Log.error("Get Proposal By ID Error", { error });
@@ -1099,9 +1127,7 @@ export class ProposalService {
           ...(hoursRequired !== undefined && { hours_required: hoursRequired }),
           screening_answers: data.screening_answers,
           ...(data.attachments !== undefined && {
-            attachments: Array.isArray(data.attachments)
-              ? data.attachments.map((url: string) => extractRelativePath(url)).filter(Boolean)
-              : []
+            attachments: toAttachmentIds(data.attachments)
           }),
           remark: null,
           main_reason: null // Clear when freelancer updates proposal
@@ -1280,6 +1306,7 @@ export class ProposalService {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
         include: {
+          proposalNda: true,
           project: {
             select: { id: true, user_id: true, project_title: true }
           }
@@ -1304,15 +1331,38 @@ export class ProposalService {
       const remark = buildRemark(reason ?? '', reasonMsg) || null;
       const mainReason = reason || null;
 
-      const nextNda = { ...(nda || {}), offer_expires_at: null };
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
           status: ProposalStatus.WITHDRAWN,
-          nda: nextNda,
           remark: remark ?? null,
           main_reason: mainReason
         }
+      });
+      const toDateOrNull = (v: string | null | undefined): Date | null =>
+        v == null || v === '' ? null : new Date(v);
+      const nextNda = { ...(nda || {}), offer_expires_at: null };
+      await (prisma as any).proposalNda.upsert({
+        where: { proposal_id: proposal.id },
+        create: {
+          proposal_id: proposal.id,
+          offer_expires_at: null,
+          is_nda_signed: nextNda.is_nda_signed ?? false,
+          nda_file_link: nextNda.nda_file_link ?? null,
+          nda_sent_at: toDateOrNull(nextNda.nda_sent_at ?? undefined),
+          nda_signed_at: toDateOrNull(nextNda.nda_signed_at ?? undefined),
+          nda_signed_file_link: nextNda.nda_signed_file_link ?? null,
+          nda_downloaded_at: toDateOrNull(nextNda.nda_downloaded_at ?? undefined),
+        },
+        update: {
+          offer_expires_at: null,
+          is_nda_signed: nextNda.is_nda_signed ?? false,
+          nda_file_link: nextNda.nda_file_link ?? null,
+          nda_sent_at: toDateOrNull(nextNda.nda_sent_at ?? undefined),
+          nda_signed_at: toDateOrNull(nextNda.nda_signed_at ?? undefined),
+          nda_signed_file_link: nextNda.nda_signed_file_link ?? null,
+          nda_downloaded_at: toDateOrNull(nextNda.nda_downloaded_at ?? undefined),
+        },
       });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
@@ -1552,6 +1602,7 @@ export class ProposalService {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
         include: {
+          proposalNda: true,
           project: {
             select: { id: true, user_id: true, project_title: true, unique_id: true, is_nda_required: true }
           }
@@ -1590,7 +1641,31 @@ export class ProposalService {
         const ndaUpdate = { ...nda, offer_expires_at: expiresAt.toISOString() };
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: { status: ProposalStatus.OFFER_SENT, nda: ndaUpdate }
+          data: { status: ProposalStatus.OFFER_SENT }
+        });
+        const toDateOrNullNda = (v: string | null | undefined): Date | null =>
+          v == null || v === '' ? null : new Date(v);
+        await (prisma as any).proposalNda.upsert({
+          where: { proposal_id: proposal.id },
+          create: {
+            proposal_id: proposal.id,
+            offer_expires_at: expiresAt,
+            is_nda_signed: ndaUpdate.is_nda_signed ?? false,
+            nda_file_link: ndaUpdate.nda_file_link ?? null,
+            nda_sent_at: toDateOrNullNda(ndaUpdate.nda_sent_at ?? undefined),
+            nda_signed_at: toDateOrNullNda(ndaUpdate.nda_signed_at ?? undefined),
+            nda_signed_file_link: ndaUpdate.nda_signed_file_link ?? null,
+            nda_downloaded_at: toDateOrNullNda(ndaUpdate.nda_downloaded_at ?? undefined),
+          },
+          update: {
+            offer_expires_at: expiresAt,
+            is_nda_signed: ndaUpdate.is_nda_signed ?? false,
+            nda_file_link: ndaUpdate.nda_file_link ?? null,
+            nda_sent_at: toDateOrNullNda(ndaUpdate.nda_sent_at ?? undefined),
+            nda_signed_at: toDateOrNullNda(ndaUpdate.nda_signed_at ?? undefined),
+            nda_signed_file_link: ndaUpdate.nda_signed_file_link ?? null,
+            nda_downloaded_at: toDateOrNullNda(ndaUpdate.nda_downloaded_at ?? undefined),
+          },
         });
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: proposal.status, newStatus: ProposalStatus.OFFER_SENT }, userId);
         await ConversationService.syncSystemMessage(
@@ -1699,9 +1774,29 @@ export class ProposalService {
         }
       }
 
-      await (prisma as any).proposal.update({
-        where: { id: proposal.id },
-        data: { nda: current }
+      const toDateOrNull = (v: string | null | undefined): Date | null =>
+        v == null || v === '' ? null : new Date(v);
+      await (prisma as any).proposalNda.upsert({
+        where: { proposal_id: proposal.id },
+        create: {
+          proposal_id: proposal.id,
+          offer_expires_at: toDateOrNull(current.offer_expires_at ?? undefined),
+          is_nda_signed: current.is_nda_signed ?? false,
+          nda_file_link: current.nda_file_link ?? null,
+          nda_sent_at: toDateOrNull(current.nda_sent_at ?? undefined),
+          nda_signed_at: toDateOrNull(current.nda_signed_at ?? undefined),
+          nda_signed_file_link: current.nda_signed_file_link ?? null,
+          nda_downloaded_at: toDateOrNull(current.nda_downloaded_at ?? undefined),
+        },
+        update: {
+          offer_expires_at: toDateOrNull(current.offer_expires_at ?? undefined),
+          is_nda_signed: current.is_nda_signed ?? false,
+          nda_file_link: current.nda_file_link ?? null,
+          nda_sent_at: toDateOrNull(current.nda_sent_at ?? undefined),
+          nda_signed_at: toDateOrNull(current.nda_signed_at ?? undefined),
+          nda_signed_file_link: current.nda_signed_file_link ?? null,
+          nda_downloaded_at: toDateOrNull(current.nda_downloaded_at ?? undefined),
+        },
       });
 
       // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT

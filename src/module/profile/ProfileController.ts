@@ -151,7 +151,8 @@ export class ProfileController {
 
       const userId = req.user.id;
       const profileType = req.body.profile_type || 'freelancer';
-      const result = await PersonalInfoService.uploadProfileImage(userId, req.file, profileType);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await PersonalInfoService.uploadProfileImage(userId, req.file, profileType, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -175,7 +176,8 @@ export class ProfileController {
 
       const userId = req.user.id;
       const profileType = req.body.profile_type || 'freelancer';
-      const result = await PersonalInfoService.uploadCoverImage(userId, req.file, profileType);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await PersonalInfoService.uploadCoverImage(userId, req.file, profileType, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);

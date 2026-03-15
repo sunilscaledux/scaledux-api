@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { extractRelativePath } from "@utils/General";
+import { toAttachmentIds } from "@utils/General";
 import { ConversationService } from "@module/chat/ConversationService";
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
@@ -49,7 +49,7 @@ export async function submitDeliverable(
   const now = new Date();
   const files = Array.isArray(submittedFileUrls) ? submittedFileUrls : [];
   const submittedFileRelative = files.map((f: { url: string; name?: string }) => ({
-    url: extractRelativePath(f.url),
+    url: toAttachmentIds([f.url])[0] ?? f.url,
     name: f.name
   })).filter((f: { url: string }) => Boolean(f.url));
   await (prisma as any).deliverable.update({

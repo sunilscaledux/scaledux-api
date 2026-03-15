@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { extractRelativePath, normalizeUploadedPaths, getRelativePath, getFileUrl } from '@utils/General'
+import { toAttachmentIds } from '@utils/General'
+import { resolveAttachmentUrls } from '@services/attachmentService'
 import { updateCompletionSection } from '../profile/ProfileCompletionService'
 import { uploadFile } from '@module/general/FileController'
 import fs from 'fs'
@@ -120,9 +121,9 @@ export async function submitIdentityVerification(req: Request, res: Response) {
 
     let identityVerification
 
-    const idDocumentPaths = normalizeUploadedPaths(idInformation?.idImage)
-    const selfiePaths = normalizeUploadedPaths(keycodeVerification?.picture)
-    const addressProofPaths = normalizeUploadedPaths(proofOfAddress?.uploadedAddressProofs)
+    const idDocumentPaths = toAttachmentIds(idInformation?.idImage)
+    const selfiePaths = toAttachmentIds(keycodeVerification?.picture)
+    const addressProofPaths = toAttachmentIds(proofOfAddress?.uploadedAddressProofs)
 
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
@@ -269,10 +270,10 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         idNumber: verification.id_number,
         idExpiryDate: verification.id_expiry_date,
         issuingCountry: verification.issuing_country,
-        idImage: idDocumentPaths.map((p: string) => getFileUrl(p))
+        idImage: await resolveAttachmentUrls(idDocumentPaths, { entityType: 'identityVerification', fieldName: 'id_documents' })
       },
       keycodeVerification: {
-        picture: selfiePaths.map((p: string) => getFileUrl(p))
+        picture: await resolveAttachmentUrls(selfiePaths, { entityType: 'identityVerification', fieldName: 'selfie' })
       },
       proofOfAddress: {
         address1: verification.address_line_1,
@@ -282,7 +283,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         zipCode: verification.postal_code,
         country: verification.address_country,
         proofConcent: verification.proof_of_address_consent,
-        uploadedAddressProofs: addressProofPaths.map((p: string) => getFileUrl(p)),
+        uploadedAddressProofs: await resolveAttachmentUrls(addressProofPaths, { entityType: 'identityVerification', fieldName: 'address_proof' }),
         documentType: verification.document_type,
         institutionName: verification.institution_name,
         dateIssued: verification.document_date_issued

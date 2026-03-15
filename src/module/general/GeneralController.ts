@@ -5,7 +5,7 @@ import redisClient from "@services/redisService";
 import { getIntParam, getStringParam } from "@utils/requestHelpers";
 import { Log } from '@services/loggerService';
 
-import { getFileUrl } from "@utils/General"
+import { getPublicUrl } from "@services/bunnyStorageService"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
 
@@ -73,10 +73,10 @@ export async function getCountries(req: Request, res: Response) {
       },
     });
 
-    // Map flag paths to full URLs using getFileUrl
+    // Map flag paths to full URLs using getPublicUrl
     const countries = countriesData.map(country => ({
       ...country,
-      flag: country.flag ? getFileUrl(country.flag) : null
+      flag: country.flag ? getPublicUrl(country.flag) : null
     }))
 
     // Store in Redis cache for 24 hours (864000 seconds)
@@ -159,10 +159,10 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
       }
     })
 
-    // Map flag paths to full URLs using getFileUrl
+    // Map flag paths to full URLs using getPublicUrl
     const countries = countriesData.map(country => ({
       ...country,
-      flag: country.flag ? getFileUrl(country.flag) : null
+      flag: country.flag ? getPublicUrl(country.flag) : null
     }))
 
     // Store in Redis cache for 24 hours (864000 seconds)
@@ -243,10 +243,10 @@ export async function warmLocationCache(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
     
-    // Map flag paths to full URLs using getFileUrl
+    // Map flag paths to full URLs using getPublicUrl
     const countriesWithUrls = countries.map(country => ({
       ...country,
-      flag: country.flag ? getFileUrl(country.flag) : null
+      flag: country.flag ? getPublicUrl(country.flag) : null
     }))
     
     await redisClient.setex('countries:all', 864000, JSON.stringify(countriesWithUrls))
@@ -267,10 +267,10 @@ export async function warmLocationCache(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
     
-    // Map flag paths to full URLs using getFileUrl
+    // Map flag paths to full URLs using getPublicUrl
     const countriesWithStatesAndUrls = countriesWithStates.map(country => ({
       ...country,
-      flag: country.flag ? getFileUrl(country.flag) : null
+      flag: country.flag ? getPublicUrl(country.flag) : null
     }))
     
     await redisClient.setex('countries:with-states:all', 864000, JSON.stringify(countriesWithStatesAndUrls))
@@ -357,10 +357,10 @@ export async function getCountriesWithCurrencies(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
 
-    // Map flag paths to full URLs using getFileUrl
+    // Map flag paths to full URLs using getPublicUrl
     const countriesWithUrls = countries.map(country => ({
       ...country,
-      flag: country.flag ? getFileUrl(country.flag) : null
+      flag: country.flag ? getPublicUrl(country.flag) : null
     }))
 
     // Cache the result for 24 hours

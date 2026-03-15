@@ -1,7 +1,8 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
-import { getFileUrl, getRelativePath } from '@utils/General';
 import { Log } from '@services/loggerService';
+import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import type { AttachmentMetaItem } from '@middleware/fileupload';
 
 /**
  * TeamMemberService
@@ -37,10 +38,10 @@ export class TeamMemberService {
       });
 
       // Transform profile images to full URLs
-      const transformedMembers = teamMembers.map(member => ({
+      const transformedMembers = await Promise.all(teamMembers.map(async member => ({
         ...member,
-        profile_image: member.profile_image ? getFileUrl(member.profile_image) : null
-      }));
+        profile_image: member.profile_image ? await resolveAttachmentUrl(member.profile_image, { entityType: 'teamMember', fieldName: 'profile_image' }) : null
+      })));
 
       return {
         success: true,
@@ -91,7 +92,7 @@ export class TeamMemberService {
 
       const transformedMember = {
         ...teamMember,
-        profile_image: teamMember.profile_image ? getFileUrl(teamMember.profile_image) : null
+        profile_image: teamMember.profile_image ? await resolveAttachmentUrl(teamMember.profile_image, { entityType: 'teamMember', fieldName: 'profile_image' }) : null
       };
 
       return {
@@ -213,11 +214,11 @@ export class TeamMemberService {
     }
   }
 
-  /**
-   * Upload team member profile image
-   */
-  static async uploadProfileImage(userId: number, uniqueId: string, file: any): Promise<ServiceResponse> {
+  static async uploadProfileImage(userId: number, uniqueId: string, file: any, attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
+      if (!attachmentMeta) {
+        return { success: false, message: 'Attachment flow required' };
+      }
       const companyProfile = await prisma.companyProfile.findUnique({
         where: { user_id: userId }
       });
@@ -229,9 +230,8 @@ export class TeamMemberService {
         };
       }
 
-      // Verify team member belongs to this company
       const existingMember = await prisma.teamMember.findFirst({
-        where: { 
+        where: {
           unique_id: uniqueId,
           company_profile_id: companyProfile.id
         }
@@ -244,18 +244,32 @@ export class TeamMemberService {
         };
       }
 
-      const relativePath = getRelativePath(file.path);
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: attachmentMeta.path,
+        disk: 'bunny',
+        visibility: 'public',
+        mimeType: attachmentMeta.mimeType,
+        sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+        originalName: attachmentMeta.originalName,
+        existingUniqueId: attachmentMeta.uniqueId,
+      });
+      if (!created) {
+        return { success: false, message: 'Failed to create attachment' };
+      }
+      const valueToStore = created.unique_id;
 
       const teamMember = await prisma.teamMember.update({
         where: { id: existingMember.id },
-        data: { profile_image: relativePath }
+        data: { profile_image: valueToStore }
       });
 
       return {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profile_image: getFileUrl(relativePath)
+          profile_image: await resolveAttachmentUrl(valueToStore, { entityType: 'teamMember', fieldName: 'profile_image' })
         }
       };
     } catch (error: any) {

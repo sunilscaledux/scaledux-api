@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateAchievementInput, UpdateAchievementInput } from "./AchievementType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, normalizeUploadedPaths } from "@utils/General";
+import { resolveAttachmentUrls } from "@services/attachmentService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -23,13 +23,13 @@ export class AchievementService {
         ]
       });
 
-      // Convert relative paths to full URLs for media files
-      const achievementsWithUrls = achievements.map(achievement => ({
+      // Convert relative paths or attachment ids to full URLs for media files
+      const achievementsWithUrls = await Promise.all(achievements.map(async achievement => ({
         ...achievement,
         media_files: Array.isArray(achievement.media_files)
-          ? (achievement.media_files as string[]).map((path: string) => getFileUrl(path))
+          ? await resolveAttachmentUrls(achievement.media_files as string[], { entityType: 'generic', fieldName: 'attachment' })
           : []
-      }));
+      })));
 
       return {
         success: true,
@@ -50,11 +50,6 @@ export class AchievementService {
    */
   static async createAchievement(userId: number, achievementData: CreateAchievementInput): Promise<ServiceResponse> {
     try {
-      // Normalize media file paths (handles both URLs and paths)
-      const normalizedMediaFiles = achievementData.media_files 
-        ? normalizeUploadedPaths(achievementData.media_files)
-        : undefined;
-
       const achievement = await prisma.achievement.create({
         data: {
           user_id: userId,
@@ -64,7 +59,7 @@ export class AchievementService {
           completed_month: achievementData.completed_month,
           completed_year: achievementData.completed_year,
           achievement_link: achievementData.achievement_link || undefined,
-          media_files: normalizedMediaFiles
+          media_files: Array.isArray(achievementData.media_files) ? achievementData.media_files : undefined
         }
       });
       await updateCompletionSection(userId, 'achievements', true);
@@ -102,11 +97,6 @@ export class AchievementService {
         };
       }
 
-      // Normalize media file paths (handles both URLs and paths)
-      const normalizedMediaFiles = achievementData.media_files 
-        ? normalizeUploadedPaths(achievementData.media_files)
-        : undefined;
-
       const updatedAchievement = await prisma.achievement.update({
         where: {
           id: achievementData.id
@@ -118,7 +108,7 @@ export class AchievementService {
           completed_month: achievementData.completed_month,
           completed_year: achievementData.completed_year,
           achievement_link: achievementData.achievement_link || undefined,
-          media_files: normalizedMediaFiles
+          media_files: Array.isArray(achievementData.media_files) ? achievementData.media_files : undefined
         }
       });
 

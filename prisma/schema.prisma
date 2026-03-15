@@ -71,6 +71,8 @@ model User {
   razorpay_contact_id          String?   @db.VarChar(64)
   /** Razorpay X fund account id (fa_xxx) for freelancer payouts (set after bank verification). */
   razorpay_account_id          String?   @db.VarChar(64)
+  attachmentsOwned              Attachment[] @relation("AttachmentOwner")
+  attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -863,10 +865,6 @@ model Proposal {
   remark                String?   @db.Text       // Optional message or full display text (reason label + message)
   main_reason           String?   @db.VarChar(50) // Predefined reason key (e.g. BUDGET_MISMATCH, OTHER) from proposal reasons
 
-  // NDA + offer: all NDA and offer-expiry fields in one JSON column
-  // Shape: { offer_expires_at?, is_nda_signed?, nda_file_link?, nda_sent_at?, nda_signed_at?, nda_signed_file_link?, nda_downloaded_at? }
-  nda                   Json?     // NDA and offer data (dates as ISO strings in JSON)
-
   // Lock milestones after hire (no more edit/delete)
   milestones_approved   Boolean   @default(false) // true when status becomes HIRED
 
@@ -882,12 +880,39 @@ model Proposal {
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
   provider              User @relation("UserProposals", fields: [provider_id], references: [id], onDelete: Cascade)
   milestonesRows       Milestone[]
+  proposalNda           ProposalNda?   // NDA + offer: sent/signed/download timestamps and file links (1:1)
 
   @@unique([project_id, provider_id]) // One proposal per provider per project
   @@index([project_id])
   @@index([provider_id])
   @@index([status])
   @@map("scd_proposals")
+}
+
+// NDA and offer data per proposal (sent document, signed document, timestamps)
+model ProposalNda {
+  id                      Int       @id @default(autoincrement())
+  proposal_id             Int       @unique
+  /** When the offer expires (countdown from nda_sent_at + OFFER_EXPIRY_HOURS). */
+  offer_expires_at        DateTime?
+  /** True when freelancer has signed the NDA. */
+  is_nda_signed           Boolean   @default(false)
+  /** Attachment unique_id or path for the NDA document sent by founder. */
+  nda_file_link           String?   @db.VarChar(512)
+  /** When founder sent the NDA / offer. */
+  nda_sent_at             DateTime?
+  /** When freelancer signed the NDA. */
+  nda_signed_at           DateTime?
+  /** Attachment unique_id or path for the signed NDA uploaded by freelancer. */
+  nda_signed_file_link    String?   @db.VarChar(512)
+  /** When NDA was downloaded (founder or freelancer). */
+  nda_downloaded_at      DateTime?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  proposal                Proposal  @relation(fields: [proposal_id], references: [id], onDelete: Cascade)
+
+  @@map("scd_proposal_ndas")
 }
 
 // Polymorphic review: one row per public or private review (review_type). Used for contracts, mentor sessions, etc.
@@ -1459,4 +1484,32 @@ model Activity {
 
   @@index([subject_type, subject_unique_id, created_at(sort: Desc)])
   @@map("scd_activities")
+}
+
+// Central file registry: storage path + ownership + access. Business tables store attachment.unique_id (cuid).
+model Attachment {
+  id                  Int       @id @default(autoincrement())
+  unique_id           String    @unique @db.VarChar(36)
+  owner_user_id       Int
+  uploaded_by_user_id Int
+  disk                String    @db.VarChar(20)   // local, bunny
+  path                String    @db.VarChar(512)  // opaque storage path
+  visibility          String    @db.VarChar(20)   // public, private
+  access_type         String?   @db.VarChar(40)   // owner_only, entity_members, admins_only, public
+  mime_type           String?   @db.VarChar(128)
+  size_bytes          Int?
+  original_name       String?   @db.VarChar(255)
+  status              String    @db.VarChar(20)  @default("attached") // temporary, attached, deleted
+  accessible_user_ids  Json?     // user ids who can access (e.g. NDA signer, chat participant)
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  deleted_at          DateTime?
+
+  owner               User      @relation("AttachmentOwner", fields: [owner_user_id], references: [id], onDelete: Cascade)
+  uploaded_by         User      @relation("AttachmentUploadedBy", fields: [uploaded_by_user_id], references: [id], onDelete: Cascade)
+
+  @@index([owner_user_id])
+  @@index([unique_id])
+  @@index([status])
+  @@map("scd_attachments")
 }

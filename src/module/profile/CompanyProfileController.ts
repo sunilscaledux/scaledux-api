@@ -59,7 +59,8 @@ export class CompanyProfileController {
       }
 
       const userId = req.user.id;
-      const result = await CompanyProfileService.uploadProfileImage(userId, req.file);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await CompanyProfileService.uploadProfileImage(userId, req.file, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -82,7 +83,8 @@ export class CompanyProfileController {
       }
 
       const userId = req.user.id;
-      const result = await CompanyProfileService.uploadCoverImage(userId, req.file);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await CompanyProfileService.uploadCoverImage(userId, req.file, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);
@@ -281,7 +283,8 @@ export class CompanyProfileController {
         return ApiResponse.error(res, 'Either file or title is required', 400);
       }
 
-      const result = await CompanyProfileService.uploadTractionDocument(userId, file, traction_title);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await CompanyProfileService.uploadTractionDocument(userId, file, traction_title, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);

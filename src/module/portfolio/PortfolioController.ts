@@ -2,7 +2,6 @@ import { Request, Response } from 'express'
 import { PortfolioService } from './PortfolioService'
 import { ApiResponse } from '@utils/ApiResponse'
 import { getStringParam } from '@utils/requestHelpers'
-import { extractRelativePath } from '@utils/General'
 import { 
   createPortfolioSchema, 
   updatePortfolioSchema,

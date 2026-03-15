@@ -2,9 +2,10 @@ import bcrypt from 'bcrypt';
 import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 import { ServiceResponse } from '@utils/ApiResponse';
-import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
+import { getDisplayName } from '@utils/General';
+import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import type { AttachmentMetaItem } from '@middleware/fileupload';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
-import { ulid } from 'ulid';
 import { updateCompletionSection } from './ProfileCompletionService';
 
 /**
@@ -52,8 +53,8 @@ export class PersonalInfoService {
       const publicProfile = {
         id: profile.id,
         unique_id: user.unique_id,
-        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
-        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'coverImage' }) : null,
         title: profile.title,
         about: profile.about,
         city: profile.city,
@@ -114,8 +115,8 @@ export class PersonalInfoService {
         // Profile data (from PersonalInfo table) - explicitly select fields
         id: profile.user.id,
         unique_id: profile.user.unique_id,
-        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
-        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'coverImage' }) : null,
         hideEmail: profile.hideEmail,
         hidePhone: profile.hidePhone,
         title: profile.title,
@@ -358,20 +359,33 @@ export class PersonalInfoService {
     }
   }
 
-  /**
-   * Upload profile image
-   */
-  static async uploadProfileImage(userId: number, file: any, profileType: string = 'freelancer'): Promise<ServiceResponse> {
+  static async uploadProfileImage(userId: number, file: any, profileType: string = 'freelancer', attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
-      const relativePath = getRelativePath(file.path);
+      if (!attachmentMeta) {
+        return { success: false, message: 'Attachment flow required' };
+      }
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: attachmentMeta.path,
+        disk: 'bunny',
+        visibility: 'public',
+        mimeType: attachmentMeta.mimeType,
+        sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+        originalName: attachmentMeta.originalName,
+        existingUniqueId: attachmentMeta.uniqueId,
+      });
+      if (!created) {
+        return { success: false, message: 'Failed to create attachment' };
+      }
+      const valueToStore = created.unique_id;
 
-      // Personal profile image: update PersonalInfo for all roles (freelancer, founder, mentor, investor)
       await prisma.personalInfo.upsert({
         where: { user_id: userId },
-        update: { profileImage: relativePath },
+        update: { profileImage: valueToStore },
         create: {
           user_id: userId,
-          profileImage: relativePath,
+          profileImage: valueToStore,
         },
       });
       await updateCompletionSection(userId, 'profilePicture', true);
@@ -379,7 +393,7 @@ export class PersonalInfoService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profileImage: getFileUrl(relativePath),
+          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'profileImage' }),
         },
       };
     } catch (error: any) {
@@ -391,20 +405,33 @@ export class PersonalInfoService {
     }
   }
 
-  /**
-   * Upload cover image
-   */
-  static async uploadCoverImage(userId: number, file: any, profileType: string = 'freelancer'): Promise<ServiceResponse> {
+  static async uploadCoverImage(userId: number, file: any, profileType: string = 'freelancer', attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
-      const relativePath = getRelativePath(file.path);
+      if (!attachmentMeta) {
+        return { success: false, message: 'Attachment flow required' };
+      }
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: attachmentMeta.path,
+        disk: 'bunny',
+        visibility: 'public',
+        mimeType: attachmentMeta.mimeType,
+        sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+        originalName: attachmentMeta.originalName,
+        existingUniqueId: attachmentMeta.uniqueId,
+      });
+      if (!created) {
+        return { success: false, message: 'Failed to create attachment' };
+      }
+      const valueToStore = created.unique_id;
 
-      // Personal cover image: update PersonalInfo for all roles (freelancer, founder, mentor, investor)
       await prisma.personalInfo.upsert({
         where: { user_id: userId },
-        update: { coverImage: relativePath },
+        update: { coverImage: valueToStore },
         create: {
           user_id: userId,
-          coverImage: relativePath,
+          coverImage: valueToStore,
         },
       });
       await updateCompletionSection(userId, 'profileCover', true);
@@ -412,7 +439,7 @@ export class PersonalInfoService {
         success: true,
         message: 'Cover image uploaded successfully',
         data: {
-          coverImage: getFileUrl(relativePath),
+          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'coverImage' }),
         },
       };
     } catch (error: any) {

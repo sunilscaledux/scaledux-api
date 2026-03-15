@@ -21,33 +21,12 @@ function storageUrl(path: string): string {
   return `${storageHost}/${storageZone}/${path}`;
 }
 
-/** Check if Bunny storage is configured (single zone) */
-export function isConfigured(): boolean {
-  return !!(storageZone && storageApiKey);
-}
-
-/** Check if public CDN URLs can be built (zone + CDN hostname) */
-export function isPublicConfigured(): boolean {
-  return !!(storageZone && storageApiKey);
-}
-
-/** Same as isConfigured – private uses same zone, different folder */
-export function isPrivateConfigured(): boolean {
-  return isConfigured();
-}
-
-/**
- * Upload a file to the public folder (CDN-served).
- * Returns the public CDN URL on success.
- */
 export async function uploadPublic(
   path: string,
   data: Buffer | Readable,
   contentType?: string
 ): Promise<{ success: true; url: string } | { success: false; message: string }> {
-  if (!isConfigured()) {
-    return { success: false, message: 'Bunny storage is not configured' };
-  }
+ 
   const fullPath = publicPath(path);
   const url = storageUrl(fullPath);
   const headers: Record<string, string> = {
@@ -78,9 +57,7 @@ export async function uploadPrivate(
   data: Buffer | Readable,
   contentType?: string
 ): Promise<{ success: true; path: string } | { success: false; message: string }> {
-  if (!isConfigured()) {
-    return { success: false, message: 'Bunny storage is not configured' };
-  }
+
   const fullPath = privatePath(path);
   const url = storageUrl(fullPath);
   const headers: Record<string, string> = {
@@ -133,9 +110,7 @@ export interface PrivateFileResult {
 export async function getPrivateFile(
   path: string
 ): Promise<PrivateFileResult | null> {
-  if (!isConfigured()) {
-    return null;
-  }
+
   const fullPath = privatePath(path);
   const url = storageUrl(fullPath);
   try {
@@ -187,7 +162,6 @@ export async function getPrivateFileAndSend(
  * Delete a file from the public folder.
  */
 export async function deletePublic(path: string): Promise<boolean> {
-  if (!isConfigured()) return false;
   const url = storageUrl(publicPath(path));
   try {
     await axios.delete(url, {
@@ -204,7 +178,7 @@ export async function deletePublic(path: string): Promise<boolean> {
  * Delete a file from the private folder.
  */
 export async function deletePrivate(path: string): Promise<boolean> {
-  if (!isConfigured()) return false;
+
   const url = storageUrl(privatePath(path));
   try {
     await axios.delete(url, {

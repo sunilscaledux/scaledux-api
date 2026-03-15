@@ -1,8 +1,10 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { ulid } from 'ulid';
-import { getFileUrl, getRelativePath, getDisplayName } from '@utils/General';
+import { getDisplayName } from '@utils/General';
 import { Log } from '@services/loggerService';
+import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import type { AttachmentMetaItem } from '@middleware/fileupload';
 
 /**
  * CompanyProfileService
@@ -55,8 +57,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
-        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
         
         // Company info
         company_name: profile.company_name,
@@ -85,7 +87,7 @@ export class CompanyProfileService {
         
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -175,8 +177,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
-        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
@@ -197,7 +199,7 @@ export class CompanyProfileService {
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
         funding_status: profile.funding_status,
         total_funding: totalFundingNum,
         fundingRounds,
@@ -227,20 +229,34 @@ export class CompanyProfileService {
     }
   }
 
-  /**
-   * Upload profile image
-   */
-  static async uploadProfileImage(userId: number, file: any): Promise<ServiceResponse> {
+  static async uploadProfileImage(userId: number, file: any, attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
-      const relativePath = getRelativePath(file.path);
+      if (!attachmentMeta) {
+        return { success: false, message: 'Attachment flow required' };
+      }
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: attachmentMeta.path,
+        disk: 'bunny',
+        visibility: 'public',
+        mimeType: attachmentMeta.mimeType,
+        sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+        originalName: attachmentMeta.originalName,
+        existingUniqueId: attachmentMeta.uniqueId,
+      });
+      if (!created) {
+        return { success: false, message: 'Failed to create attachment' };
+      }
+      const valueToStore = created.unique_id;
 
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
-        update: { profileImage: relativePath },
+        update: { profileImage: valueToStore },
         create: {
           user_id: userId,
           unique_id: ulid(),
-          profileImage: relativePath,
+          profileImage: valueToStore,
         },
       });
 
@@ -248,7 +264,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profileImage: getFileUrl(relativePath),
+          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'profileImage' }),
         },
       };
     } catch (error: any) {
@@ -260,20 +276,34 @@ export class CompanyProfileService {
     }
   }
 
-  /**
-   * Upload cover image
-   */
-  static async uploadCoverImage(userId: number, file: any): Promise<ServiceResponse> {
+  static async uploadCoverImage(userId: number, file: any, attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
-      const relativePath = getRelativePath(file.path);
+      if (!attachmentMeta) {
+        return { success: false, message: 'Attachment flow required' };
+      }
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: attachmentMeta.path,
+        disk: 'bunny',
+        visibility: 'public',
+        mimeType: attachmentMeta.mimeType,
+        sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+        originalName: attachmentMeta.originalName,
+        existingUniqueId: attachmentMeta.uniqueId,
+      });
+      if (!created) {
+        return { success: false, message: 'Failed to create attachment' };
+      }
+      const valueToStore = created.unique_id;
 
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
-        update: { coverImage: relativePath },
+        update: { coverImage: valueToStore },
         create: {
           user_id: userId,
           unique_id: ulid(),
-          coverImage: relativePath,
+          coverImage: valueToStore,
         },
       });
 
@@ -281,7 +311,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Cover image uploaded successfully',
         data: {
-          coverImage: getFileUrl(relativePath),
+          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'coverImage' }),
         },
       };
     } catch (error: any) {
@@ -364,8 +394,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? getFileUrl(profile.profileImage) : null,
-        coverImage: profile.coverImage ? getFileUrl(profile.coverImage) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
         
         // Company info
         company_name: profile.company_name,
@@ -390,7 +420,7 @@ export class CompanyProfileService {
         
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -721,20 +751,31 @@ export class CompanyProfileService {
     }
   }
 
-  /**
-   * Upload traction document with title
-   */
-  static async uploadTractionDocument(userId: number, file: any, traction_title?: string): Promise<ServiceResponse> {
+  static async uploadTractionDocument(userId: number, file: any, traction_title?: string, attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
       const updateData: any = {};
-      
-      // Handle file upload if provided
+
       if (file) {
-        const relativePath = getRelativePath(file.path);
-        updateData.traction_document = relativePath;
+        if (!attachmentMeta) {
+          return { success: false, message: 'Attachment flow required' };
+        }
+        const created = await createAttachment({
+          ownerUserId: userId,
+          uploadedByUserId: userId,
+          path: attachmentMeta.path,
+          disk: 'bunny',
+          visibility: 'private',
+          mimeType: attachmentMeta.mimeType,
+          sizeBytes: attachmentMeta.size ?? (file as any)?.size,
+          originalName: attachmentMeta.originalName,
+          existingUniqueId: attachmentMeta.uniqueId,
+        });
+        if (!created) {
+          return { success: false, message: 'Failed to create attachment' };
+        }
+        updateData.traction_document = created.unique_id;
       }
-      
-      // Handle title if provided
+
       if (traction_title !== undefined) {
         updateData.traction_title = traction_title;
       }
@@ -754,7 +795,7 @@ export class CompanyProfileService {
         message: 'Traction updated successfully',
         data: {
           traction_title: profile.traction_title,
-          traction_document: profile.traction_document ? getFileUrl(profile.traction_document) : null,
+          traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
         },
       };
     } catch (error: any) {

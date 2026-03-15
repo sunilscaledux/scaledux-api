@@ -1,52 +1,41 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
+import { toAttachmentIds } from '@utils/General';
 import { Log } from '@services/loggerService';
+import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 
 /**
- * Helper function to parse JSON fields in service package
+ * Helper to parse JSON fields and resolve file URLs (async).
  */
-const parseServicePackageJson = (pkg: any) => {
+async function parseServicePackageJsonAsync(pkg: any) {
+  const thumbnailNorm = toAttachmentIds([pkg.thumbnail])[0] ?? '';
+  const imagesArr = typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || []);
+  const videoArr = typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || []);
+  const documentsArr = typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || []);
+  const [thumbnail, images, video, documents] = await Promise.all([
+    thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, { entityType: 'servicePackage', fieldName: 'thumbnail' }) : Promise.resolve(null),
+    resolveAttachmentUrls(imagesArr, { entityType: 'servicePackage', fieldName: 'documents' }),
+    resolveAttachmentUrls(videoArr, { entityType: 'servicePackage', fieldName: 'documents' }),
+    resolveAttachmentUrls(documentsArr, { entityType: 'servicePackage', fieldName: 'documents' }),
+  ]);
   return {
     ...pkg,
-    features:
-      typeof pkg.features === "string"
-        ? JSON.parse(pkg.features)
-        : pkg.features,
-    industry:
-      typeof pkg.industries === "string"
-        ? JSON.parse(pkg.industries)
-        : pkg.industries || [], // Map 'industries' from DB to 'industry' for frontend
-    keywords:
-      typeof pkg.keywords === "string"
-        ? JSON.parse(pkg.keywords)
-        : pkg.keywords || [],
+    features: typeof pkg.features === "string" ? JSON.parse(pkg.features) : pkg.features,
+    industry: typeof pkg.industries === "string" ? JSON.parse(pkg.industries) : pkg.industries || [],
+    keywords: typeof pkg.keywords === "string" ? JSON.parse(pkg.keywords) : pkg.keywords || [],
     scope: typeof pkg.scope === "string" ? JSON.parse(pkg.scope) : pkg.scope,
-    extraAddOns:
-      typeof pkg.extra_add_ons === "string"
-        ? JSON.parse(pkg.extra_add_ons)
-        : pkg.extra_add_ons || null,
+    extraAddOns: typeof pkg.extra_add_ons === "string" ? JSON.parse(pkg.extra_add_ons) : pkg.extra_add_ons || null,
     packageDescription: pkg.package_description || pkg.packageDescription || "",
-    deliverables:
-      typeof pkg.deliverables === "string"
-        ? JSON.parse(pkg.deliverables)
-        : pkg.deliverables,
+    deliverables: typeof pkg.deliverables === "string" ? JSON.parse(pkg.deliverables) : pkg.deliverables,
     faqs: typeof pkg.faqs === "string" ? JSON.parse(pkg.faqs) : pkg.faqs,
     links: typeof pkg.links === "string" ? JSON.parse(pkg.links) : pkg.links,
-    requirements:
-      typeof pkg.requirements === "string"
-        ? JSON.parse(pkg.requirements)
-        : pkg.requirements,
-    // Parse media fields and convert relative paths to full URLs
-    thumbnail: (() => {
-      const normalized = pkg.thumbnail ? normalizeUploadedPaths([pkg.thumbnail])[0] : ''
-      return normalized ? getFileUrl(normalized) : null
-    })(),
-    images: (typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || [])).map((path: string) => getFileUrl(path)),
-    video: (typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || [])).map((path: string) => getFileUrl(path)),
-    documents: (typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || [])).map((path: string) => getFileUrl(path)),
+    requirements: typeof pkg.requirements === "string" ? JSON.parse(pkg.requirements) : pkg.requirements,
+    thumbnail,
+    images,
+    video,
+    documents,
   };
-};
+}
 
 export class ServicePackageService {
   /**
@@ -64,7 +53,7 @@ export class ServicePackageService {
         orderBy: { created_at: "desc" },
       });
 
-      const transformedPackages = packages.map(parseServicePackageJson);
+      const transformedPackages = await Promise.all(packages.map(parseServicePackageJsonAsync));
 
       return {
         success: true,
@@ -99,7 +88,7 @@ export class ServicePackageService {
         };
       }
 
-      const transformedPackage = parseServicePackageJson(servicePackage);
+      const transformedPackage = await parseServicePackageJsonAsync(servicePackage);
 
       return {
         success: true,
@@ -120,18 +109,10 @@ export class ServicePackageService {
    */
   static async createServicePackage(userId: number, packageData: any): Promise<ServiceResponse> {
     try {
-      const normalizedThumbnail = packageData.thumbnail
-        ? normalizeUploadedPaths([packageData.thumbnail])[0]
-        : null;
-      const normalizedImages = packageData.images
-        ? normalizeUploadedPaths(packageData.images)
-        : [];
-      const normalizedVideo = packageData.video
-        ? normalizeUploadedPaths(packageData.video)
-        : [];
-      const normalizedDocuments = packageData.documents
-        ? normalizeUploadedPaths(packageData.documents)
-        : [];
+      const normalizedThumbnail = toAttachmentIds([packageData.thumbnail])[0] ?? null
+      const normalizedImages = toAttachmentIds(packageData.images)
+      const normalizedVideo = toAttachmentIds(packageData.video)
+      const normalizedDocuments = toAttachmentIds(packageData.documents)
 
       const newPackage = await prisma.servicePackage.create({
         data: {
@@ -158,7 +139,7 @@ export class ServicePackageService {
         },
       });
 
-      const transformedPackage = parseServicePackageJson(newPackage);
+      const transformedPackage = await parseServicePackageJsonAsync(newPackage);
 
       return {
         success: true,
@@ -194,18 +175,10 @@ export class ServicePackageService {
         };
       }
 
-      const normalizedThumbnail = packageData.thumbnail
-        ? normalizeUploadedPaths([packageData.thumbnail])[0]
-        : null;
-      const normalizedImages = packageData.images
-        ? normalizeUploadedPaths(packageData.images)
-        : [];
-      const normalizedVideo = packageData.video
-        ? normalizeUploadedPaths(packageData.video)
-        : [];
-      const normalizedDocuments = packageData.documents
-        ? normalizeUploadedPaths(packageData.documents)
-        : [];
+      const normalizedThumbnail = toAttachmentIds([packageData.thumbnail])[0] ?? null
+      const normalizedImages = toAttachmentIds(packageData.images)
+      const normalizedVideo = toAttachmentIds(packageData.video)
+      const normalizedDocuments = toAttachmentIds(packageData.documents)
 
       const updatedPackage = await prisma.servicePackage.update({
         where: { id: existingPackage.id },
@@ -231,7 +204,7 @@ export class ServicePackageService {
         },
       });
 
-      const transformedPackage = parseServicePackageJson(updatedPackage);
+      const transformedPackage = await parseServicePackageJsonAsync(updatedPackage);
 
       return {
         success: true,

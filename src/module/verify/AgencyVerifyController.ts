@@ -1,9 +1,9 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { normalizeUploadedPaths } from '@utils/General'
+import { toAttachmentIds } from '@utils/General'
 import { uploadFile } from '@module/general/FileController'
-import { extractRelativePath, getRelativePath, getFileUrl } from '@utils/General'
+import { resolveAttachmentUrls } from '@services/attachmentService'
 import fs from 'fs'
 import path from 'path'
 import { Log } from '@services/loggerService';
@@ -53,7 +53,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
     let agencyVerification
 
-    const normalizedDocumentUrls = normalizeUploadedPaths(documents)
+    const normalizedDocumentUrls = toAttachmentIds(documents)
 
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
@@ -122,9 +122,9 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
       return ApiResponse.error(res, "No agency verification found", 404)
     }
 
-    // Convert relative paths to full URLs for documents
-    const documentUrls = Array.isArray(agencyVerification.document_urls) 
-      ? (agencyVerification.document_urls as string[]).map((url: string) => getFileUrl(url)) 
+    // Convert relative paths or attachment ids to full URLs for documents
+    const documentUrls = Array.isArray(agencyVerification.document_urls)
+      ? await resolveAttachmentUrls(agencyVerification.document_urls as string[], { entityType: 'agencyVerification', fieldName: 'document_urls' })
       : []
 
     return ApiResponse.success(res, {

@@ -129,7 +129,8 @@ export class TeamMemberController {
         return ApiResponse.error(res, 'No file uploaded', 400);
       }
 
-      const result = await TeamMemberService.uploadProfileImage(userId, uniqueId, req.file);
+      const attachmentMeta = (req as any).attachmentMeta?.[0];
+      const result = await TeamMemberService.uploadProfileImage(userId, uniqueId, req.file, attachmentMeta);
 
       if (result.success) {
         return ApiResponse.success(res, result.data, result.message);

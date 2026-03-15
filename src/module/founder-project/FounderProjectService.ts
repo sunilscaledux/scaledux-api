@@ -2,7 +2,8 @@ import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
-import { getRelativePath, getFileUrl, normalizeUploadedPaths, extractRelativePath } from '@utils/General';
+import { toAttachmentIds } from '@utils/General';
+import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { dispatch } from '@queues/Queue';
@@ -176,7 +177,7 @@ export class FounderProjectService {
         ...project,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
           : []
       }));
 
@@ -373,7 +374,7 @@ export class FounderProjectService {
           ...projectData,
           budget_currency: currencySymbol,
           project_files: project.project_files
-            ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
+            ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
             : [],
           is_saved: userId ? (savedByUsers?.length > 0) : false,
           is_invited: userId ? (invites?.length > 0) : false
@@ -527,7 +528,7 @@ export class FounderProjectService {
         ...projectData,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? (project.project_files as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
           : [],
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
@@ -556,8 +557,7 @@ export class FounderProjectService {
    */
   static async createProject(userId: number, data: CreateFounderProjectInput): Promise<ServiceResponse> {
     try {
-      // Store relative paths only (like chat); map with getFileUrl when returning
-      const projectFiles = data.projectFiles?.map(file => extractRelativePath(file.url)).filter(Boolean) || [];
+      const projectFiles = toAttachmentIds(data.projectFiles?.map((f: { url?: string; unique_id?: string }) => typeof f === 'string' ? f : (f?.unique_id ?? f?.url)) ?? []);
 
       const project = await prisma.founderProject.create({
         data: {
@@ -589,7 +589,7 @@ export class FounderProjectService {
       // Transform file URLs for response
       const transformedProject = {
         ...project,
-        project_files: (project.project_files as string[]).map((url: string) => getFileUrl(url))
+        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
       };
 
       return {
@@ -642,7 +642,7 @@ export class FounderProjectService {
       if (data.status !== undefined) updateData.status = data.status;
 
       if (data.projectFiles !== undefined) {
-        updateData.project_files = data.projectFiles.map(file => extractRelativePath(file.url)).filter(Boolean);
+        updateData.project_files = toAttachmentIds(data.projectFiles.map((f: { url?: string; unique_id?: string }) => typeof f === 'string' ? f : (f?.unique_id ?? f?.url)));
       }
 
       if (data.budget !== undefined) {
@@ -674,7 +674,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...updatedProject,
-        project_files: (updatedProject.project_files as string[]).map((url: string) => getFileUrl(url))
+        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
       };
 
       return {
@@ -773,7 +773,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...duplicatedProject,
-        project_files: (duplicatedProject.project_files as string[]).map((url: string) => getFileUrl(url))
+        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
       };
 
       return {
@@ -925,8 +925,8 @@ export class FounderProjectService {
           first_name: freelancer.first_name,
           last_name: freelancer.last_name,
           email: freelancer.email,
-          profile_image: freelancer.personalInfo?.profileImage 
-            ? getFileUrl(freelancer.personalInfo.profileImage) 
+          profile_image: freelancer.personalInfo?.profileImage
+            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) 
             : null,
           title: freelancer.personalInfo?.title || null,
           about: freelancer.personalInfo?.about || null,

@@ -1,7 +1,8 @@
 import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, normalizeUploadedPaths } from '@utils/General';
+import { toAttachmentIds } from '@utils/General';
+import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -35,16 +36,15 @@ export class PortfolioService {
       });
 
       // Transform URLs to full URLs
-      const transformedPortfolios = portfolios.map(portfolio => ({
+      const transformedPortfolios = await Promise.all(portfolios.map(async portfolio => ({
         ...portfolio,
-        // Use type assertion to bypass TypeScript errors until Prisma types are regenerated
-        thumbnail_url: (portfolio as any).thumbnail_url 
-          ? getFileUrl((portfolio as any).thumbnail_url as string)
+        thumbnail_url: (portfolio as any).thumbnail_url
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
           : null,
         media_urls: portfolio.media_urls
-          ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
           : []
-      }));
+      })));
 
       return {
         success: true,
@@ -92,11 +92,11 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...portfolio,
-        thumbnail_url: (portfolio as any).thumbnail_url 
-          ? getFileUrl((portfolio as any).thumbnail_url as string)
+        thumbnail_url: (portfolio as any).thumbnail_url
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
           : null,
         media_urls: portfolio.media_urls
-          ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
           : []
       };
 
@@ -119,13 +119,8 @@ export class PortfolioService {
    */
   static async createPortfolio(userId: number, portfolioData: CreatePortfolioInput): Promise<ServiceResponse> {
     try {
-      // Normalize thumbnail (single) and media (array) URLs to paths
-      const normalizedThumbnail = portfolioData.thumbnail 
-        ? normalizeUploadedPaths([portfolioData.thumbnail])[0]
-        : null;
-      const normalizedMedia = portfolioData.media 
-        ? normalizeUploadedPaths(portfolioData.media)
-        : [];
+      const normalizedThumbnail = toAttachmentIds([portfolioData.thumbnail])[0] ?? null
+      const normalizedMedia = toAttachmentIds(portfolioData.media)
 
       // Build data object conditionally
       const createData: any = {
@@ -165,11 +160,11 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...portfolio,
-        thumbnail_url: (portfolio as any).thumbnail_url 
-          ? getFileUrl((portfolio as any).thumbnail_url as string)
+        thumbnail_url: (portfolio as any).thumbnail_url
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
           : null,
         media_urls: portfolio.media_urls
-          ? (portfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
           : []
       };
 
@@ -208,13 +203,8 @@ export class PortfolioService {
         };
       }
 
-      // Normalize thumbnail (single) and media (array) URLs to paths
-      const normalizedThumbnail = portfolioData.thumbnail 
-        ? normalizeUploadedPaths([portfolioData.thumbnail])[0]
-        : null;
-      const normalizedMedia = portfolioData.media 
-        ? normalizeUploadedPaths(portfolioData.media)
-        : [];
+      const normalizedThumbnail = toAttachmentIds([portfolioData.thumbnail])[0] ?? null
+      const normalizedMedia = toAttachmentIds(portfolioData.media)
 
       const updatedPortfolio = await prisma.portfolio.update({
         where: { id: existingPortfolio.id },
@@ -248,11 +238,11 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...updatedPortfolio,
-        thumbnail_url: updatedPortfolio.thumbnail_url 
-          ? getFileUrl(updatedPortfolio.thumbnail_url as string)
+        thumbnail_url: updatedPortfolio.thumbnail_url
+          ? await resolveAttachmentUrl(updatedPortfolio.thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
           : null,
         media_urls: updatedPortfolio.media_urls
-          ? (updatedPortfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(updatedPortfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
           : []
       };
 
@@ -368,11 +358,11 @@ export class PortfolioService {
       // Transform URLs to full URLs
       const transformedPortfolio = {
         ...duplicatedPortfolio,
-        thumbnail_url: (duplicatedPortfolio as any).thumbnail_url 
-          ? getFileUrl((duplicatedPortfolio as any).thumbnail_url as string)
+        thumbnail_url: (duplicatedPortfolio as any).thumbnail_url
+          ? await resolveAttachmentUrl((duplicatedPortfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
           : null,
         media_urls: duplicatedPortfolio.media_urls
-          ? (duplicatedPortfolio.media_urls as string[]).map((url: string) => getFileUrl(url))
+          ? await resolveAttachmentUrls(duplicatedPortfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
           : []
       };
 

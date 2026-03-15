@@ -1,23 +1,25 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl, extractRelativePath } from "@utils/General";
+import { toAttachmentIds } from "@utils/General";
 import { emitNewMessageToBothUsers, emitConversationStatusToUser } from "./chatSocket";
 import { Log } from '@services/loggerService';
+import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 
-function toProfileImageUrl(profileImage: string | null | undefined): string | null {
+async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
   if (!profileImage) return null;
-  const url = getFileUrl(profileImage);
+  const url = await resolveAttachmentUrl(profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' });
   return url || null;
 }
 
-/** Map message metadata.attachments (relative paths) to full URLs for API response. */
-function metadataWithAttachmentUrls(metadata: any): any {
+/** Map message metadata.attachments (paths or attachment ids) to full URLs for API response. */
+async function metadataWithAttachmentUrls(metadata: any): Promise<any> {
   if (!metadata || typeof metadata !== "object") return metadata;
   const attachments = metadata.attachments;
   if (!Array.isArray(attachments) || attachments.length === 0) return metadata;
+  const urls = await resolveAttachmentUrls(attachments, { entityType: 'message', fieldName: 'attachments' });
   return {
     ...metadata,
-    attachments: attachments.map((p: string) => getFileUrl(p))
+    attachments: urls
   };
 }
 
@@ -161,7 +163,7 @@ export class ConversationService {
         unique_id: u.unique_id ?? null,
         first_name: u.first_name,
         last_name: u.last_name ?? null,
-        profile_image: toProfileImageUrl(u.personalInfo?.profileImage)
+        profile_image: await toProfileImageUrl(u.personalInfo?.profileImage)
       }
     };
   }
@@ -234,13 +236,13 @@ export class ConversationService {
         },
         take: 15
       });
-      const list = users.map((u: any) => ({
+      const list = await Promise.all(users.map(async (u: any) => ({
         id: u.id,
         unique_id: u.unique_id ?? null,
         first_name: u.first_name,
         last_name: u.last_name ?? null,
-        profile_image: toProfileImageUrl(u.personalInfo?.profileImage)
-      }));
+        profile_image: await toProfileImageUrl(u.personalInfo?.profileImage)
+      })));
       return { success: true, message: "OK", data: { users: list } };
     } catch (error: any) {
       Log.error("Error", { error });
@@ -349,13 +351,13 @@ export class ConversationService {
       const hasMore = convos.length > limit;
       const slice = hasMore ? convos.slice(0, limit) : convos;
 
-      const list = slice.map((c: any) => {
+      const list = await Promise.all(slice.map(async (c: any) => {
         const other = c.user1_id === userId ? c.user2 : c.user1;
         const lastMsg = c.messages[0];
         const lastContent = lastMsg
           ? resolveSystemMessageContent(lastMsg.type, lastMsg.content, lastMsg.metadata, lastMsg.sender_id, userId)
           : null;
-        const profileImageUrl = toProfileImageUrl(other.personalInfo?.profileImage);
+        const profileImageUrl = await toProfileImageUrl(other.personalInfo?.profileImage);
         const location = formatLocation(other.personalInfo?.city, other.personalInfo?.country?.name);
         const new_message = c.user1_id === userId ? !!c.user1_has_new_message : !!c.user2_has_new_message;
         return {
@@ -373,7 +375,7 @@ export class ConversationService {
           updated_at: c.updated_at,
           new_message
         };
-      });
+      }));
 
       const last = slice[slice.length - 1];
       const nextCursor = hasMore && last ? last.updated_at?.toISOString?.() ?? null : null;
@@ -413,7 +415,7 @@ export class ConversationService {
         unique_id: other.unique_id,
         first_name: other.first_name,
         last_name: other.last_name,
-        profile_image: toProfileImageUrl(other.personalInfo?.profileImage),
+        profile_image: await toProfileImageUrl(other.personalInfo?.profileImage),
         location: location || null
       };
       const firstUserMsg = await (prisma as any).message.findFirst({
@@ -560,8 +562,8 @@ export class ConversationService {
 
       const hasMore = messages.length > limit;
       const list = (hasMore ? messages.slice(0, limit) : messages).reverse();
-      const formatted = list.slice(0, limit).map((m: any) => {
-        const meta = metadataWithAttachmentUrls(m.metadata);
+      const formatted = await Promise.all(list.slice(0, limit).map(async (m: any) => {
+        const meta = await metadataWithAttachmentUrls(m.metadata);
         const content = resolveSystemMessageContent(m.type, m.content, meta, m.sender_id, userId);
         return {
           id: m.id,
@@ -573,7 +575,7 @@ export class ConversationService {
                 id: m.sender.id,
                 first_name: m.sender.first_name,
                 last_name: m.sender.last_name,
-                profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+                profile_image: await toProfileImageUrl(m.sender.personalInfo?.profileImage)
               }
             : null,
           type: m.type,
@@ -581,7 +583,7 @@ export class ConversationService {
           metadata: meta,
           created_at: m.created_at
         };
-      });
+      }));
 
       return { success: true, message: "OK", data: { messages: formatted, hasMore } };
     } catch (error: any) {
@@ -616,8 +618,8 @@ export class ConversationService {
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
 
-      const formatted = messages.map((m: any) => {
-        const meta = metadataWithAttachmentUrls(m.metadata);
+      const formatted = await Promise.all(messages.map(async (m: any) => {
+        const meta = await metadataWithAttachmentUrls(m.metadata);
         const content = resolveSystemMessageContent(m.type, m.content, meta, m.sender_id, userId);
         return {
           id: m.id,
@@ -629,7 +631,7 @@ export class ConversationService {
                 id: m.sender.id,
                 first_name: m.sender.first_name,
                 last_name: m.sender.last_name,
-                profile_image: toProfileImageUrl(m.sender.personalInfo?.profileImage)
+                profile_image: await toProfileImageUrl(m.sender.personalInfo?.profileImage)
               }
             : null,
           type: m.type,
@@ -637,7 +639,7 @@ export class ConversationService {
           metadata: meta,
           created_at: m.created_at
         };
-      });
+      }));
 
       return { success: true, message: "OK", data: { messages: formatted } };
     } catch (error: any) {
@@ -686,10 +688,7 @@ export class ConversationService {
       const hasAttachments = Array.isArray(attachmentUrls) && attachmentUrls.length > 0;
       if (!trimmed && !hasAttachments) return { success: false, message: "Content or attachments are required" };
 
-      // Store relative paths only; map to full URLs when sending response
-      const attachmentPaths = hasAttachments
-        ? attachmentUrls!.map((url) => extractRelativePath(url)).filter(Boolean)
-        : undefined;
+      const attachmentPaths = hasAttachments ? toAttachmentIds(attachmentUrls!) : undefined;
       const metadata: any = {};
       if (attachmentPaths?.length) metadata.attachments = attachmentPaths;
       if (replyTo?.messageId && replyTo?.unique_id) metadata.replyTo = replyTo;
@@ -732,7 +731,7 @@ export class ConversationService {
             id: msg.sender.id,
             first_name: msg.sender.first_name,
             last_name: msg.sender.last_name,
-            profile_image: toProfileImageUrl(msg.sender.personalInfo?.profileImage)
+            profile_image: await toProfileImageUrl(msg.sender.personalInfo?.profileImage)
           }
         : null;
       return {
@@ -746,7 +745,7 @@ export class ConversationService {
           sender: senderPayload,
           type: msg.type,
           content: msg.content,
-          metadata: metadataWithAttachmentUrls(msg.metadata),
+          metadata: await metadataWithAttachmentUrls(msg.metadata),
           created_at: msg.created_at,
           receiverId
         }

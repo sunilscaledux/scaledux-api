@@ -1,29 +1,3 @@
-/**
- * Get file URL. Uses fileConfig.default: "local" = assetUrl + path; "bunny" = Bunny CDN URL.
- */
-export const getFileUrl = (path: string | null): string => {
-  if (!path) return '';
-
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
-  }
-
-  const fileConfig = require('@config/file').default;
-  if (fileConfig.default === 'bunny') {
-    const { buildPublicUrl } = require('@config/file');
-    return buildPublicUrl(path);
-  }
-
-  const baseUrl = fileConfig.disks.local.url;
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  return `${cleanBaseUrl}${cleanPath}`;
-};
-
-export const getRelativePath = (path:string): string => {
- return path.replace(process.cwd() + '/', '').replace(/\\/g, '/');
-};
-
 /** Display name for API: "Scaledux user" when deactivated, else first + last name */
 export function getDisplayName(user: { first_name: string; last_name?: string | null; is_deactivated?: boolean }): { firstName: string; lastName: string | null } {
   if ((user as { is_deactivated?: boolean }).is_deactivated) {
@@ -35,44 +9,17 @@ export function getDisplayName(user: { first_name: string; last_name?: string | 
   };
 }
 
-/** Normalize path: no leading slash, forward slashes only (e.g. for storage paths) */
 export const normalizePath = (path: string): string => {
   return path.replace(/^\/+/, '').replace(/\\/g, '/');
 };
 
-export const extractRelativePath = (urlOrPath: string): string => {
-  if (!urlOrPath) return ''
-  
-  // If it's already a relative path, return as is
-  if (!urlOrPath.startsWith('http://') && !urlOrPath.startsWith('https://')) {
-    return urlOrPath
-  }
-  try {
-    const url = new URL(urlOrPath)
-    return url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname
-  } catch (error) {
-    const parts = urlOrPath.split('/')
-    const uploadsIndex = parts.findIndex(part => part === 'uploads')
-    if (uploadsIndex !== -1) {
-      return parts.slice(uploadsIndex).join('/')
-    }
-    return urlOrPath
-  }
-};
-
-export const normalizeUploadedPaths = (docs: any): string[] => {
-  if (!docs || !Array.isArray(docs)) return []
-
-  return docs
-    .map((d: any) => {
-      if (!d) return ''
-      if (typeof d === 'string') return extractRelativePath(d)
-      if (typeof d?.path === 'string' && d.path) return extractRelativePath(d.path)
-      if (typeof d?.url === 'string' && d.url) return extractRelativePath(d.url)
-      return ''
-    })
-    .filter(Boolean)
-};
+/** Expects unique_id(s) as JSON; returns string[] for storage/API. */
+export const toAttachmentIds = (val: any): string[] => {
+  if (val == null) return []
+  if (typeof val === 'string') return val ? [val] : []
+  if (!Array.isArray(val)) return []
+  return val.filter((id): id is string => typeof id === 'string' && id.length > 0)
+}
 
 /**
  * Generate a random OTP code

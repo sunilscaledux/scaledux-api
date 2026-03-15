@@ -1,10 +1,9 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getRelativePath, getFileUrl, extractRelativePath } from '@utils/General';
+import { resolveAttachmentUrl, getByUniqueId, isAttachmentId } from '@services/attachmentService';
 import TwilioService from "@services/TwilioService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
-import fs from 'fs';
-import path from 'path';
+import { deletePublic } from '@services/bunnyStorageService';
 import { Log } from '@services/loggerService';
 
 export class VerificationService {
@@ -108,15 +107,15 @@ export class VerificationService {
         };
       }
 
-      const uploadedFiles = files.map((file: Express.Multer.File) => {
-        const relativePath = getRelativePath(file.path);
+      const uploadedFiles = await Promise.all(files.map(async (file: Express.Multer.File) => {
+        const pathOrId = file.path;
         return {
-          url: relativePath,
-          fullUrl: getFileUrl(relativePath),
+          url: pathOrId,
+          fullUrl: await resolveAttachmentUrl(pathOrId, { entityType: 'agencyVerification', fieldName: 'document_urls' }),
           name: file.originalname,
           size: file.size
         };
-      });
+      }));
 
       return {
         success: true,
@@ -464,16 +463,17 @@ export class VerificationService {
         };
       }
 
-      const uploadedFiles = files.map((file: Express.Multer.File) => {
-        const relativePath = getRelativePath(file.path);
+      const uploadedFiles = await Promise.all(files.map(async (file: Express.Multer.File) => {
+        const pathOrId = file.path;
+        const fieldName = documentType === 'id_documents' ? 'id_documents' : documentType === 'selfie' ? 'selfie' : 'address_proof';
         return {
-          url: relativePath,
-          fullUrl: getFileUrl(relativePath),
+          url: pathOrId,
+          fullUrl: await resolveAttachmentUrl(pathOrId, { entityType: 'identityVerification', fieldName }),
           name: file.originalname,
           type: documentType,
           size: file.size
         };
-      });
+      }));
 
       return {
         success: true,
@@ -501,14 +501,19 @@ export class VerificationService {
         };
       }
 
-      // Extract relative path and construct full path
-      const relativePath = extractRelativePath(filePath);
-      const fullPath = path.join(process.cwd(), "uploads", relativePath);
-
-      // Check if file exists and delete it
-      if (fs.existsSync(fullPath)) {
-        fs.unlinkSync(fullPath);
+      let pathToDelete: string;
+      if (isAttachmentId(filePath)) {
+        const att = await getByUniqueId(filePath);
+        if (!att) return { success: false, message: "File not found" };
+        pathToDelete = att.path;
+        await prisma.attachment.update({
+          where: { id: att.id },
+          data: { deleted_at: new Date() }
+        });
+      } else {
+        pathToDelete = filePath;
       }
+      await deletePublic(pathToDelete);
 
       return {
         success: true,

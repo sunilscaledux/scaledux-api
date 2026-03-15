@@ -4,7 +4,8 @@ import {
   UpdateInvestmentPortfolioInput
 } from "./InvestmentPortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { getFileUrl, normalizeUploadedPaths } from "@utils/General";
+import { toAttachmentIds } from "@utils/General";
+import { resolveAttachmentUrl } from "@services/attachmentService";
 import { Log } from '@services/loggerService';
 
 export class InvestmentPortfolioService {
@@ -34,12 +35,12 @@ export class InvestmentPortfolioService {
         orderBy: { created_at: "desc" }
       });
 
-      const transformed = portfolios.map((p) => ({
+      const transformed = await Promise.all(portfolios.map(async (p) => ({
         ...p,
         company_logo_url: p.company_logo
-          ? getFileUrl(p.company_logo)
+          ? await resolveAttachmentUrl(p.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
-      }));
+      })));
 
       return {
         success: true,
@@ -83,7 +84,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? getFileUrl(portfolio.company_logo)
+          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
       };
 
@@ -130,7 +131,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? getFileUrl(portfolio.company_logo)
+          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
       };
 
@@ -153,9 +154,7 @@ export class InvestmentPortfolioService {
     data: CreateInvestmentPortfolioInput
   ): Promise<ServiceResponse> {
     try {
-      const normalizedLogo = data.companyLogo
-        ? normalizeUploadedPaths([data.companyLogo])[0]
-        : null;
+      const normalizedLogo = toAttachmentIds([data.companyLogo])[0] ?? null;
 
       const createData: any = {
         user_id: userId,
@@ -193,7 +192,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? getFileUrl(portfolio.company_logo)
+          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
       };
 
@@ -229,9 +228,7 @@ export class InvestmentPortfolioService {
         return { success: false, message: "Investment portfolio not found" };
       }
 
-      const normalizedLogo = data.companyLogo
-        ? normalizeUploadedPaths([data.companyLogo])[0]
-        : undefined;
+      const normalizedLogo = data.companyLogo ? toAttachmentIds([data.companyLogo])[0] : undefined;
 
       const updateData: any = {};
       if (data.companyName !== undefined) updateData.company_name = data.companyName;
@@ -278,7 +275,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? getFileUrl(portfolio.company_logo)
+          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
       };
 
@@ -380,7 +377,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? getFileUrl(portfolio.company_logo)
+          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
           : null
       };
 
