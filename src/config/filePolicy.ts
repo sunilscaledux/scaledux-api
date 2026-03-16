@@ -1,51 +1,52 @@
-/**
- * Which file fields are public vs private. Used when resolving attachment unique_id to URL.
- * Keys: "entityType.fieldName". Default for unknown = private.
- */
+
 export type FileVisibility = 'public' | 'private';
 
 const policy: Record<string, FileVisibility> = {
-  // Profile (personal)
-  'personalInfo.profileImage': 'public',
-  'personalInfo.coverImage': 'public',
-  // Company profile
-  'companyProfile.profileImage': 'public',
-  'companyProfile.coverImage': 'public',
-  'companyProfile.traction_document': 'private',
-  // Team member
-  'teamMember.profile_image': 'public',
-  // Portfolio
-  'portfolio.thumbnail_url': 'public',
-  'portfolio.media_urls': 'public',
-  // Founder project
-  'founderProject.project_files': 'private',
-  // Proposal
-  'proposal.attachments': 'private',
-  'proposal.nda_file_link': 'private',
-  'proposal.nda_signed_file_link': 'private',
-  // Service package
-  'servicePackage.thumbnail': 'public',
-  'servicePackage.documents': 'private',
-  // Billing / invoice
-  'billingTransaction.file_url': 'private',
-  // Verification
-  'identityVerification.id_documents': 'private',
-  'identityVerification.selfie': 'private',
-  'identityVerification.address_proof': 'private',
-  'agencyVerification.document_urls': 'private',
-  // Chat
-  'message.attachments': 'private',
-  // Generic upload (e.g. general file upload route)
-  'generic.attachment': 'private',
+  attachments: 'private',
+  nda_file_link: 'private',
+  nda_signed_file_link: 'private',
+  document_urls: 'private',
+  id_documents: 'private',
+  selfie: 'private',
+  thumbnail: 'public',
+  documents: 'private',
+  founder_project_files: 'public',
+  portfolio_thumbnail: 'public',
+  portfolio_files: 'public',
+  profile_image: 'public',
+  cover_image: 'public',
+  company_profile_image: 'public',
+  company_cover_image: 'public',
+  company_traction_document: 'private',
+  team_member_profile_image: 'public',
+  investment_portfolio_logo: 'public',
+  target_market_document: 'private',
+  traction_document: 'private',
+  service_package_thumbnail: 'public',
+  service_package_documents: 'private',
+  service_package_media: 'public',
+  proposal_attachments: 'private',
+  proposal_nda: 'private',
+  proposal_milestone_document: 'private',
+  achievement_media: 'public',
+  chat_files: 'private',
+  identity_documents: 'private',
+  identity_selfie: 'private',
+  identity_address_proof: 'private',
+  agency_documents: 'private',
+  attachment: 'private',
 };
 
-export function getVisibility(entityType: string, fieldName: string): FileVisibility {
-  const key = `${entityType}.${fieldName}`;
-  return policy[key] ?? 'private';
+export function getVisibility(_entityType: string, fieldName: string): FileVisibility {
+  return policy[fieldName] ?? 'private';
 }
 
-export function isPublic(entityType: string, fieldName: string): boolean {
-  return getVisibility(entityType, fieldName) === 'public';
+export function getVisibilityByField(fieldKey: string): FileVisibility {
+  return policy[fieldKey] ?? 'private';
 }
 
-export default { getVisibility, isPublic, policy };
+export function isPublicField(fieldKey: string): boolean {
+  return getVisibilityByField(fieldKey) === 'public';
+}
+
+export default { getVisibility, getVisibilityByField, isPublicField, policy };

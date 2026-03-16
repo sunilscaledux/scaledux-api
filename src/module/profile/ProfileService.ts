@@ -52,8 +52,8 @@ export class PersonalInfoService {
       const publicProfile = {
         id: profile.id,
         unique_id: user.unique_id,
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'coverImage' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'cover_image' }) : null,
         title: profile.title,
         about: profile.about,
         city: profile.city,
@@ -114,8 +114,8 @@ export class PersonalInfoService {
         // Profile data (from PersonalInfo table) - explicitly select fields
         id: profile.user.id,
         unique_id: profile.user.unique_id,
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'coverImage' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'personalInfo', fieldName: 'cover_image' }) : null,
         hideEmail: profile.hideEmail,
         hidePhone: profile.hidePhone,
         title: profile.title,
@@ -392,7 +392,7 @@ export class PersonalInfoService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'profileImage' }),
+          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'profile_image' }),
         },
       };
     } catch (error: any) {
@@ -438,7 +438,7 @@ export class PersonalInfoService {
         success: true,
         message: 'Cover image uploaded successfully',
         data: {
-          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'coverImage' }),
+          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'personalInfo', fieldName: 'cover_image' }),
         },
       };
     } catch (error: any) {

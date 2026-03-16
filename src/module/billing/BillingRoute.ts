@@ -7,13 +7,11 @@ const router = Router();
 
 router.use(authenticateToken)
 
-// Payment breakdown (fee, gst, total) – optional query ?amount=<milestoneAmount>
 router.get(
   "/payment-breakdown",
   BillingController.getPaymentBreakdown
 );
 
-// Razorpay Order Creation (for testing)
 router.post(
   "/initiate-verification-order",
   BillingController.createVerificationOrder
@@ -25,7 +23,6 @@ router.post(
   BillingController.verifyPaymentSignature
 );
 
-// Payment Method Routes
 router.get(
   "/payment-methods",
   BillingController.getPaymentMethods
@@ -41,7 +38,6 @@ router.delete(
   BillingController.deletePaymentMethod
 );
 
-// Tax Information Routes
 router.post(
   "/tax-information",
   BillingController.saveTaxInformation
@@ -52,7 +48,6 @@ router.get(
   BillingController.getTaxInformation
 );
 
-// Billing History Routes
 router.get(
   "/billing-history",
   BillingController.getBillingHistory
@@ -76,13 +71,11 @@ router.post(
   BillingController.webhookReceiverReleased
 );
 
-// Balance Route
 router.get(
   "/balance",
   BillingController.getUserBalance
 );
 
-// Withdrawal methods and withdraw (freelancer only)
 router.get(
   "/withdrawal-methods",
   BillingController.getWithdrawalMethods
@@ -95,7 +88,6 @@ router.delete(
   "/withdrawal-method/:withdrawalMethodId",
   BillingController.deleteWithdrawalMethod
 );
-/** Retry verification without editing: sets status to pending and clears failure reason (e.g. after temporary Razorpay failure). */
 router.post(
   "/withdrawal-methods/resubmit-verification",
   BillingController.resubmitForVerification
@@ -105,7 +97,6 @@ router.patch(
   BillingController.updateWithdrawalMethod
 );
 
-// Invoice data for client-side PDF (JSON)
 router.get(
   "/invoice/:uniqueId",
   BillingController.getInvoiceData

@@ -9,10 +9,8 @@ import {
 
 const router = Router()
 
-// Apply authentication middleware to all routes
 router.use(authenticateToken)
 
-// Work experience routes
 router.get('/', getWorkExperiences)
 router.post('/', createWorkExperience)
 router.put('/', updateWorkExperience)

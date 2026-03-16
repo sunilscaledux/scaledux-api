@@ -12,14 +12,11 @@ import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
-// All routes require authentication
 router.use(authenticateToken)
 
-// Service package CRUD routes
 router.get("/", getUserServicePackages)
 router.post("/", createServicePackage)
 
-// Specific routes MUST come before generic /:id routes
 router.post(
   "/upload-media",
   FileUpload({
@@ -27,7 +24,7 @@ router.post(
     fileFilter: "any",
     maxSize: 50,
     maxFiles: 10,
-    visibility: "public"
+    fieldName: "service_package_media"
   }).array("media"),
   uploadFile,
   handleMulterError
@@ -35,12 +32,11 @@ router.post(
 
 router.post(
   "/upload-thumbnail",
-  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public" }).array("thumbnail"),
+  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, fieldName: "service_package_thumbnail" }).array("thumbnail"),
   uploadFile,
   handleMulterError
 )
 
-// Generic /:id routes MUST come after specific routes
 router.get("/:id", getServicePackageById)
 router.put("/:id", updateServicePackage)
 router.delete("/:id", deleteServicePackage)

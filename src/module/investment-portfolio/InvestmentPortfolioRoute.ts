@@ -16,12 +16,10 @@ import { authenticateToken } from "@middleware/auth";
 
 const router = Router();
 
-// Public: get published investment portfolio by id (no auth)
 router.get("/public/:id", getPublicInvestmentPortfolioById);
 
 router.use(authenticateToken);
 
-// CRUD
 router.get("/", getUserInvestmentPortfolios);
 router.get("/:id", getInvestmentPortfolioById);
 router.post("/", createInvestmentPortfolio);
@@ -38,7 +36,7 @@ router.post(
     fileFilter: "image",
     maxSize: 10,
     maxFiles: 1,
-    visibility: "public"
+    fieldName: "investment_portfolio_logo"
   }).array("logo"),
   uploadFile,
   handleMulterError

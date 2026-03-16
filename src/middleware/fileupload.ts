@@ -3,6 +3,7 @@ import path from 'path';
 import { PassThrough } from 'stream';
 import { uploadPublic, uploadPrivate } from '@services/bunnyStorageService';
 import { normalizePath } from '@utils/General';
+import { getVisibilityByField } from '@config/filePolicy';
 import cuid from 'cuid';
 
 export type AttachmentMetaItem = {
@@ -152,16 +153,23 @@ const createStorage = (uploadPath: string, visibility: 'public' | 'private') => 
   return new BunnyStorageEngine(uploadPath, visibility);
 };
 
-// Multer configurations for different use cases
+// Multer configurations for different use cases. Visibility is derived from fieldName via file policy.
 export const FileUpload = (options: {
   uploadPath: string;
   fileFilter?: 'image' | 'document' | 'chat' | 'milestoneDeliverable' | 'any';
   maxSize?: number; // in MB
   maxFiles?: number;
-  visibility?: 'public' | 'private';
+  /** Flat field name for policy/URL resolution and visibility (e.g. founder_project_files, profile_image). Default: 'attachment'. */
+  fieldName?: string;
 }) => {
-  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, visibility = 'public' } = options;
-  
+  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, fieldName = 'attachment' } = options;
+  const visibility = getVisibilityByField(fieldName) as 'public' | 'private';
+
+  const middleware = (req: any, _res: any, next: any) => {
+    (req as any).uploadFieldName = fieldName;
+    next();
+  };
+
   let filter;
   switch (fileFilter) {
     case 'image':
@@ -189,7 +197,18 @@ export const FileUpload = (options: {
     }
   };
   const m = multer(multerOpts);
-  return m;
+  const wrap = (fn: (req: any, res: any, next: any) => void) => (req: any, res: any, next: any) => {
+    middleware(req, res, (err?: any) => {
+      if (err) return next(err);
+      fn(req, res, next);
+    });
+  };
+  return {
+    single: (name: string) => wrap(m.single(name)),
+    array: (name: string, maxCount?: number) => wrap(m.array(name, maxCount)),
+    fields: (fields: multer.Field[]) => wrap(m.fields(fields)),
+    any: () => wrap(m.any()),
+  };
 };
 
 

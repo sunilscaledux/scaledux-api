@@ -22,7 +22,7 @@ router.post("/conversations/:id/messages", sendMessage);
 
 router.post(
   "/conversations/upload-files",
-  FileUpload({ uploadPath: "chat", fileFilter: "chat", maxSize: 10, maxFiles: 3, visibility: "private" }).array("files"),
+  FileUpload({ uploadPath: "chat", fileFilter: "chat", maxSize: 10, maxFiles: 3, fieldName: "chat_files" }).array("files"),
   handleMulterError,
   uploadFile
 );

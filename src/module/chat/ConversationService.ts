@@ -7,7 +7,7 @@ import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmen
 
 async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
   if (!profileImage) return null;
-  const url = await resolveAttachmentUrl(profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' });
+  const url = await resolveAttachmentUrl(profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' });
   return url || null;
 }
 

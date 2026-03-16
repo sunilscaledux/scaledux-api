@@ -9,7 +9,6 @@ import { authenticateToken } from "@middleware/auth";
 
 const router = Router();
 
-// User Expertise CRUD routes
 router.post("/", authenticateToken, createUserExpertise);
 router.get("/", authenticateToken, getUserExpertises);
 router.put("/:id", authenticateToken, updateUserExpertise);

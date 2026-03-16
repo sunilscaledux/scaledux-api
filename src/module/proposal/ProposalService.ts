@@ -745,7 +745,7 @@ export class ProposalService {
       // Transform proposals: milestones from Milestone table; file URLs; flatten nda
       const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
-          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
           : null;
         return await flattenNdaToProposal({
           ...proposal,
@@ -853,7 +853,7 @@ export class ProposalService {
 
       const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
-          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
           : null;
         return await flattenNdaToProposal({
           ...proposal,
@@ -1008,10 +1008,10 @@ export class ProposalService {
         milestonesFromRowsWithDocuments(proposal.milestonesRows),
         resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
         projectUser?.personalInfo?.profileImage
-          ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
           : Promise.resolve(null),
         proposal.provider?.personalInfo?.profileImage
-          ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' })
+          ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
           : Promise.resolve(null),
       ]);
       const transformedProposal: any = {

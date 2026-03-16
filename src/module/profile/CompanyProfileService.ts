@@ -57,8 +57,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
         
         // Company info
         company_name: profile.company_name,
@@ -177,8 +177,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
@@ -264,7 +264,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'profileImage' }),
+          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'profile_image' }),
         },
       };
     } catch (error: any) {
@@ -311,7 +311,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Cover image uploaded successfully',
         data: {
-          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'coverImage' }),
+          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'cover_image' }),
         },
       };
     } catch (error: any) {
@@ -394,8 +394,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profileImage' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'coverImage' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
         
         // Company info
         company_name: profile.company_name,

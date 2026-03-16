@@ -11,10 +11,8 @@ import { uploadFile } from '@module/general/FileController'
 
 const router = express.Router()
 
-// All routes require authentication
 router.use(authenticateToken)
 
-// Achievement routes
 router.get('/', getAchievements)
 router.post('/', createAchievement)
 router.put('/', updateAchievement)
@@ -27,7 +25,7 @@ router.post(
     fileFilter: 'any',
     maxSize: 10,
     maxFiles: 5,
-    visibility: 'public'
+    fieldName: 'achievement_media'
   }).array('media', 5),
   uploadFile,
   handleMulterError

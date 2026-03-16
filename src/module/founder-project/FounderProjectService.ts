@@ -926,7 +926,7 @@ export class FounderProjectService {
           last_name: freelancer.last_name,
           email: freelancer.email,
           profile_image: freelancer.personalInfo?.profileImage
-            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profileImage' }) 
+            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' }) 
             : null,
           title: freelancer.personalInfo?.title || null,
           about: freelancer.personalInfo?.about || null,

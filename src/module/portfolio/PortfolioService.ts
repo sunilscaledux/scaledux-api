@@ -39,10 +39,10 @@ export class PortfolioService {
       const transformedPortfolios = await Promise.all(portfolios.map(async portfolio => ({
         ...portfolio,
         thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { fieldName: 'portfolio_thumbnail' })
           : null,
         media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { fieldName: 'portfolio_files' })
           : []
       })));
 
@@ -93,10 +93,10 @@ export class PortfolioService {
       const transformedPortfolio = {
         ...portfolio,
         thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { fieldName: 'portfolio_thumbnail' })
           : null,
         media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { fieldName: 'portfolio_files' })
           : []
       };
 
@@ -161,10 +161,10 @@ export class PortfolioService {
       const transformedPortfolio = {
         ...portfolio,
         thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
+          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, { fieldName: 'portfolio_thumbnail' })
           : null,
         media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
+          ? await resolveAttachmentUrls(portfolio.media_urls as string[], { fieldName: 'portfolio_files' })
           : []
       };
 
@@ -239,10 +239,10 @@ export class PortfolioService {
       const transformedPortfolio = {
         ...updatedPortfolio,
         thumbnail_url: updatedPortfolio.thumbnail_url
-          ? await resolveAttachmentUrl(updatedPortfolio.thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
+          ? await resolveAttachmentUrl(updatedPortfolio.thumbnail_url as string, { fieldName: 'portfolio_thumbnail' })
           : null,
         media_urls: updatedPortfolio.media_urls
-          ? await resolveAttachmentUrls(updatedPortfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
+          ? await resolveAttachmentUrls(updatedPortfolio.media_urls as string[], { fieldName: 'portfolio_files' })
           : []
       };
 
@@ -358,10 +358,10 @@ export class PortfolioService {
       const transformedPortfolio = {
         ...duplicatedPortfolio,
         thumbnail_url: (duplicatedPortfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((duplicatedPortfolio as any).thumbnail_url as string, { entityType: 'portfolio', fieldName: 'thumbnail_url' })
+          ? await resolveAttachmentUrl((duplicatedPortfolio as any).thumbnail_url as string, { fieldName: 'portfolio_thumbnail' })
           : null,
         media_urls: duplicatedPortfolio.media_urls
-          ? await resolveAttachmentUrls(duplicatedPortfolio.media_urls as string[], { entityType: 'portfolio', fieldName: 'media_urls' })
+          ? await resolveAttachmentUrls(duplicatedPortfolio.media_urls as string[], { fieldName: 'portfolio_files' })
           : []
       };
 

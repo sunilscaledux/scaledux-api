@@ -28,7 +28,6 @@ export async function uploadFile(req: Request, res: Response) {
     if (meta?.length) {
       const disk = 'bunny'
       const visibility = (req as any).uploadVisibility as 'public' | 'private' | undefined ?? 'private'
-      const entityType = (req as any).uploadEntityType as string | undefined ?? 'generic'
       const fieldName = (req as any).uploadFieldName as string | undefined ?? 'attachment'
       const filesList = files as Express.Multer.File[]
       const uniqueIds: string[] = []
@@ -50,7 +49,7 @@ export async function uploadFile(req: Request, res: Response) {
         })
         if (created) {
           uniqueIds.push(created.unique_id)
-          const url = await resolveAttachmentUrl(created.unique_id, { entityType, fieldName })
+          const url = await resolveAttachmentUrl(created.unique_id, { fieldName })
           urls.push(url)
         }
       }

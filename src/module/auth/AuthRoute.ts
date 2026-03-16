@@ -40,7 +40,6 @@ router.post("/reset-password", generalRateLimiter, resetPassword);
 router.post("/logout", authenticateToken, logout);
 router.post("/refresh-token", generalRateLimiter, refreshAccessToken);
 
-// Login devices
 router.get("/auth/devices", authenticateToken, listLoginDevices);
 router.delete("/auth/devices/:deviceId", authenticateToken, logoutDevice);
 router.delete("/auth/devices", authenticateToken, logoutAllOtherDevices);

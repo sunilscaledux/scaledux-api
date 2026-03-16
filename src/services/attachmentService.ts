@@ -1,7 +1,7 @@
 import cuid from 'cuid';
 import { prisma } from '@services/prismaService';
 import { getPublicUrl, getPrivateFileAndSend } from '@services/bunnyStorageService';
-import { isPublic } from '@config/filePolicy';
+import { isPublicField } from '@config/filePolicy';
 
 const ASSET_URL = process.env.APP_URL || process.env.ASSET_URL || 'http://127.0.0.1:4000';
 
@@ -78,10 +78,10 @@ export async function resolveAttachmentUrl(
   const att = await getByUniqueId(value);
   if (!att) return '';
 
-  const entityType = options?.entityType ?? 'generic';
   const fieldName = options?.fieldName ?? 'attachment';
+  const allowed = att.visibility === 'public' && isPublicField(fieldName);
 
-  if (att.visibility === 'public' && isPublic(entityType, fieldName)) {
+  if (allowed) {
     return getPublicUrl(att.path);
   }
 
@@ -106,14 +106,14 @@ export async function resolveAttachmentUrls(
   });
   const map = new Map(attachments.map((a) => [a.unique_id, a]));
   const baseUrl = (options?.baseUrl || process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
-  const entityType = options?.entityType ?? 'generic';
   const fieldName = options?.fieldName ?? 'attachment';
 
   return values.map((v) => {
     if (!v) return '';
     const att = map.get(v);
     if (!att) return '';
-    if (att.visibility === 'public' && isPublic(entityType, fieldName)) {
+    const allowed = att.visibility === 'public' && isPublicField(fieldName);
+    if (allowed) {
       return getPublicUrl(att.path);
     }
     return `${baseUrl}/api/v1/files/view/${att.unique_id}`;
