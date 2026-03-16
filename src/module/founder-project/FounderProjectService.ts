@@ -1114,7 +1114,7 @@ export class FounderProjectService {
 
       const notificationTitle = `You're invited to work on "${projectTitle}"`;
       const notificationBody = `A project owner invited you to submit a proposal for "${projectTitle}".`;
-      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
 
       const notifData = { userId: providerId, type: 'PROJECT_INVITATION' as const, notificationTitle, notificationBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
@@ -1205,7 +1205,7 @@ export class FounderProjectService {
         userId
       );
 
-      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
       const notifData = { userId: project.user_id, type: 'INVITATION_REJECTED' as const, notificationTitle: 'Invitation declined', notificationBody: `A freelancer declined your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
@@ -1269,7 +1269,7 @@ export class FounderProjectService {
       );
       await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
 
-      const notificationLink = `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
       const notifData = { userId: project.user_id, type: 'INVITATION_ACCEPTED' as const, notificationTitle: 'Invitation accepted', notificationBody: `A freelancer accepted your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);

@@ -46,6 +46,7 @@ export async function uploadFile(req: Request, res: Response) {
           mimeType: m.mimeType,
           sizeBytes: size,
           originalName: m.originalName,
+          status: 'temporary',
         })
         if (created) {
           uniqueIds.push(created.unique_id)
@@ -145,6 +146,9 @@ export async function deleteFile(req: Request, res: Response) {
   }
 }
 
+const fileLostUrl = () =>
+  `${(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '')}/file-lost`
+
 /** GET /api/v1/files/view/:uniqueId - stream protected file after access check */
 export async function viewProtectedFile(req: Request, res: Response) {
   try {
@@ -152,7 +156,7 @@ export async function viewProtectedFile(req: Request, res: Response) {
     const userId = req.user?.id
 
     if (!uniqueId) {
-      return ApiResponse.error(res, "File id is required", 400)
+      return res.redirect(302, fileLostUrl())
     }
 
     const checkAccess = async (): Promise<boolean> => {
@@ -167,10 +171,10 @@ export async function viewProtectedFile(req: Request, res: Response) {
 
     const sent = await viewProtectedFileService(uniqueId, checkAccess, res)
     if (!sent) {
-      return ApiResponse.error(res, "File not found or access denied", 404)
+      return res.redirect(302, fileLostUrl())
     }
   } catch (error: any) {
     Log.error("Error in viewProtectedFile", { error })
-    return ApiResponse.error(res, "Failed to load file", 500)
+    return res.redirect(302, fileLostUrl())
   }
 }

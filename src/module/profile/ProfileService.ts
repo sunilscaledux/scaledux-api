@@ -372,7 +372,7 @@ export class PersonalInfoService {
         mimeType: attachmentMeta.mimeType,
         sizeBytes: attachmentMeta.size ?? (file as any)?.size,
         originalName: attachmentMeta.originalName,
-        existingUniqueId: attachmentMeta.uniqueId,
+        status: 'attached',
       });
       if (!created) {
         return { success: false, message: 'Failed to create attachment' };
@@ -418,7 +418,7 @@ export class PersonalInfoService {
         mimeType: attachmentMeta.mimeType,
         sizeBytes: attachmentMeta.size ?? (file as any)?.size,
         originalName: attachmentMeta.originalName,
-        existingUniqueId: attachmentMeta.uniqueId,
+        status: 'attached',
       });
       if (!created) {
         return { success: false, message: 'Failed to create attachment' };

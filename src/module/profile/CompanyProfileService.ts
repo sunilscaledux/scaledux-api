@@ -243,7 +243,7 @@ export class CompanyProfileService {
         mimeType: attachmentMeta.mimeType,
         sizeBytes: attachmentMeta.size ?? (file as any)?.size,
         originalName: attachmentMeta.originalName,
-        existingUniqueId: attachmentMeta.uniqueId,
+        status: 'attached',
       });
       if (!created) {
         return { success: false, message: 'Failed to create attachment' };
@@ -290,7 +290,7 @@ export class CompanyProfileService {
         mimeType: attachmentMeta.mimeType,
         sizeBytes: attachmentMeta.size ?? (file as any)?.size,
         originalName: attachmentMeta.originalName,
-        existingUniqueId: attachmentMeta.uniqueId,
+        status: 'attached',
       });
       if (!created) {
         return { success: false, message: 'Failed to create attachment' };
@@ -767,8 +767,8 @@ export class CompanyProfileService {
           visibility: 'private',
           mimeType: attachmentMeta.mimeType,
           sizeBytes: attachmentMeta.size ?? (file as any)?.size,
-          originalName: attachmentMeta.originalName,
-          existingUniqueId: attachmentMeta.uniqueId,
+        originalName: attachmentMeta.originalName,
+        status: 'attached',
         });
         if (!created) {
           return { success: false, message: 'Failed to create attachment' };

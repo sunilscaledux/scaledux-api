@@ -28,15 +28,13 @@ export type CreateAttachmentInput = {
   sizeBytes?: number | null;
   originalName?: string | null;
   status?: 'temporary' | 'attached';
-  /** When set (e.g. from upload middleware), use this as unique_id instead of generating one */
   existingUniqueId?: string;
-  /** User IDs who can access this attachment (e.g. NDA signer, chat participant). Stored as JSON array. */
   accessibleUserIds?: number[] | null;
 };
 
 export async function createAttachment(input: CreateAttachmentInput): Promise<{ unique_id: string } | null> {
   const uniqueId = input.existingUniqueId ?? cuid();
-  const status = input.status ?? 'attached';
+  const status = input.status ?? 'temporary';
   try {
     await prisma.attachment.create({
       data: {
@@ -46,7 +44,6 @@ export async function createAttachment(input: CreateAttachmentInput): Promise<{ 
         path: input.path,
         disk: input.disk,
         visibility: input.visibility,
-        access_type: input.visibility === 'public' ? 'public' : 'owner_only',
         mime_type: input.mimeType ?? null,
         size_bytes: input.sizeBytes ?? null,
         original_name: input.originalName ?? null,

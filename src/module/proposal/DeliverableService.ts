@@ -102,7 +102,7 @@ export async function submitDeliverable(
       project.id,
       userId
     );
-    const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
+    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
     const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: 'Deliverable submitted', notificationBody: `A freelancer submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
@@ -295,7 +295,7 @@ export async function approveDeliverable(
       project.id,
       userId
     );
-    const baseUrl = process.env.CLIENT_APP_URL || process.env.APP_URL || "";
+    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
     const notifData = { userId: providerId, type: 'DELIVERABLE_APPROVED' as const, notificationTitle: 'Deliverable approved', notificationBody: `Your deliverable for "${projectTitle}" was approved.`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);

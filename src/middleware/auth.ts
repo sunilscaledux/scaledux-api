@@ -9,6 +9,27 @@ declare global {
   }
 }
 
+
+export function privateFileAccess(req: Request, res: Response, next: NextFunction) {
+  try {
+    const token = req.cookies?.auth_token;
+
+    if (!token) {
+      const loginUrl = process.env.FRONTEND_URL||'http://localhost:3000';
+      return res.redirect(302, loginUrl);
+    }
+
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || "fallback-secret"
+    );
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return ApiResponse.unauthorized(res, 'Invalid or expired token');
+  }
+}
+
 export function authenticateToken(req: Request, res: Response, next: NextFunction) {
   try {
     const token = req.cookies?.auth_token;

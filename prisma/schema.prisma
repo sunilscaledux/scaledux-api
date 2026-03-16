@@ -1495,7 +1495,6 @@ model Attachment {
   disk                String    @db.VarChar(20)   // local, bunny
   path                String    @db.VarChar(512)  // opaque storage path
   visibility          String    @db.VarChar(20)   // public, private
-  access_type         String?   @db.VarChar(40)   // owner_only, entity_members, admins_only, public
   mime_type           String?   @db.VarChar(128)
   size_bytes          Int?
   original_name       String?   @db.VarChar(255)

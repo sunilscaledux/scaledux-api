@@ -31,7 +31,7 @@ export class NotificationEmailJob extends BaseJob<NotificationJobPayload> {
     }
 
     const link = data.notificationLink
-      ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${process.env.CLIENT_APP_URL || process.env.APP_URL || ''}${data.notificationLink}`)
+      ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${process.env.FRONTEND_URL || process.env.APP_URL || ''}${data.notificationLink}`)
       : '#';
     const compiled = await templateService.getCustomTemplate(
       'notification',
