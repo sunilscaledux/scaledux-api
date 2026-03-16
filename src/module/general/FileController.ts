@@ -69,7 +69,6 @@ export async function uploadFile(req: Request, res: Response) {
       }, "Files uploaded successfully")
     }
 
-    // Legacy: return paths and Bunny public URLs
     const uploadedFiles = files.map((file: any) => {
       const relativePath = file.path ?? ''
       const url = relativePath ? getPublicUrl(relativePath) : ''

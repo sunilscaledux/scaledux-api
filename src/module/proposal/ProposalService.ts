@@ -208,7 +208,6 @@ export class ProposalService {
     }
   ): Promise<ServiceResponse> {
     try {
-      // Find the project by unique_id
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,

@@ -302,7 +302,6 @@ export class PortfolioService {
     }
   }
 
-  // Portfolio file deletion is now handled by unified delete controller at /api/v1/files/delete-file
 
   /**
    * Duplicate a portfolio

@@ -27,22 +27,19 @@ router.put("/:id", updatePortfolio)
 router.put("/:id/draft", updateDraft) // Update as draft (relaxed validation)
 router.delete("/:id", deletePortfolio)
 
-// Portfolio file upload routes
 router.post(
   "/upload-thumbnail",
-  FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
+  FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public", useAttachment: true }).array("thumbnail"),
   uploadFile,
   handleMulterError
 )
 
 router.post(
   "/upload-media",
-  FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10 }).array("media"),
+  FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10, visibility: "public", useAttachment: true }).array("media"),
   uploadFile,
   handleMulterError
 )
-
-// Portfolio file delete route - now handled by unified delete controller at /api/v1/files/delete-file
 
 // Duplicate portfolio
 router.post("/:id/duplicate", duplicatePortfolio)

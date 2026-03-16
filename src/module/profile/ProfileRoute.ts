@@ -74,7 +74,7 @@ router.patch('/company/problem-solution', authenticateToken, CompanyProfileContr
 router.post(
   '/company/target-market-document',
   authenticateToken,
-  FileUpload({ uploadPath: 'documents/target-market', fileFilter: 'document', maxSize: 5, maxFiles: 1 }).array('document'),
+  FileUpload({ uploadPath: 'documents/target-market', fileFilter: 'document', maxSize: 5, maxFiles: 1, visibility: 'private', useAttachment: true }).array('document'),
   uploadFile,
   handleMulterError
 );

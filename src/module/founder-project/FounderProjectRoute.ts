@@ -35,10 +35,9 @@ router.post("/", createProject)
 router.put("/:id", updateProject)
 router.delete("/:id", deleteProject)
 
-// Project file upload routes
 router.post(
   "/upload-files",
-  FileUpload({ uploadPath: "founder-projects/files", fileFilter: "any", maxSize: 50, maxFiles: 10 }).array("files"),
+  FileUpload({ uploadPath: "founder-projects/files", fileFilter: "any", maxSize: 50, maxFiles: 10, visibility: "public", useAttachment: true }).array("files"),
   uploadFile,
   handleMulterError
 )

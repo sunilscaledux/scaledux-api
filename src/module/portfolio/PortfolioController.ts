@@ -160,7 +160,7 @@ export async function updateDraft(req: Request, res: Response) {
 export async function updatePortfolio(req: Request, res: Response) {
   const rawBody = req.body || {};
   const userId = req.user?.id;
-  const id = getStringParam(req.params.id); // This is unique_id
+  const id = getStringParam(req.params.id);
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);

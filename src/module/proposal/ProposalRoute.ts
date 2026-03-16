@@ -32,40 +32,43 @@ const router = Router();
 // All routes require authentication
 router.use(authenticateToken);
 
-// File upload route for proposal attachments (images only)
 router.post(
   "/upload-images",
-  FileUpload({ 
-    uploadPath: "proposals/attachments", 
-    fileFilter: "image", 
-    maxSize: 5, 
-    maxFiles: 5 
+  FileUpload({
+    uploadPath: "proposals/attachments",
+    fileFilter: "image",
+    maxSize: 5,
+    maxFiles: 5,
+    visibility: "private",
+    useAttachment: true
   }).array("files"),
   uploadFile,
   handleMulterError
 );
  
-// NDA document upload (founder, for send-offer flow)
 router.post(
   "/upload-nda",
   FileUpload({
     uploadPath: "proposals/nda",
     fileFilter: "document",
     maxSize: 5,
-    maxFiles: 1
+    maxFiles: 1,
+    visibility: "private",
+    useAttachment: true
   }).array("files"),
   uploadFile,
   handleMulterError
 );
 
-// Milestone deliverable upload (freelancer): images, video, audio, zip, documents; max 5 files per request, each up to 500MB
 router.post(
   "/upload-milestone-document",
   FileUpload({
     uploadPath: "proposals/milestone-documents",
     fileFilter: "milestoneDeliverable",
     maxSize: 500,
-    maxFiles: 1
+    maxFiles: 1,
+    visibility: "private",
+    useAttachment: true
   }).array("files"),
   uploadFile,
   handleMulterError

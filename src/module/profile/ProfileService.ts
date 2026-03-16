@@ -18,7 +18,6 @@ export class PersonalInfoService {
    */
   static async getProfileByUniqueId(uniqueId: string): Promise<ServiceResponse> {
     try {
-      // Find user by unique_id first (since unique_id is now in User model)
       const user = await prisma.user.findUnique({
         where: { unique_id: uniqueId },
         include: {

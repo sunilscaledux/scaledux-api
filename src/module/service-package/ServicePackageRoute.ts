@@ -22,20 +22,21 @@ router.post("/", createServicePackage)
 // Specific routes MUST come before generic /:id routes
 router.post(
   "/upload-media",
-  FileUpload({ 
-    uploadPath: "service-packages/media", 
-    fileFilter: "any", 
-    maxSize: 50, 
-    maxFiles: 10 
+  FileUpload({
+    uploadPath: "service-packages/media",
+    fileFilter: "any",
+    maxSize: 50,
+    maxFiles: 10,
+    visibility: "public",
+    useAttachment: true
   }).array("media"),
   uploadFile,
   handleMulterError
 )
 
-// Service package thumbnail upload route
 router.post(
   "/upload-thumbnail",
-  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1 }).array("thumbnail"),
+  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public", useAttachment: true }).array("thumbnail"),
   uploadFile,
   handleMulterError
 )

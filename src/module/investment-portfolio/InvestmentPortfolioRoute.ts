@@ -31,14 +31,15 @@ router.put("/:id/draft", updateDraft);
 router.delete("/:id", deleteInvestmentPortfolio);
 router.post("/:id/duplicate", duplicateInvestmentPortfolio);
 
-// Upload company logo
 router.post(
   "/upload-logo",
   FileUpload({
     uploadPath: "investment-portfolio/logos",
     fileFilter: "image",
     maxSize: 10,
-    maxFiles: 1
+    maxFiles: 1,
+    visibility: "public",
+    useAttachment: true
   }).array("logo"),
   uploadFile,
   handleMulterError

@@ -27,9 +27,6 @@ import { uploadFile } from "@module/general/FileController"
 
 const router = Router()
 
-// All routes require authentication
-// router.use(authenticateToken)
-
 // Phone verification routes
 router.get("/phone/status", authenticateToken, getPhoneVerificationStatus)
 router.post("/phone/send-otp", authenticateToken, sendPhoneOTP)
@@ -47,11 +44,10 @@ router.get("/identity/status", authenticateToken, getIdentityVerificationStatus)
 router.post("/identity/submit", authenticateToken, submitIdentityVerification)
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
 
-// Identity verification file upload routes
 router.post(
   "/identity/upload-id-documents",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("idDocuments"),
+  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("idDocuments"),
   uploadFile,
   handleMulterError
 )
@@ -59,7 +55,7 @@ router.post(
 router.post(
   "/identity/upload-selfie",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("selfieImages"),
+  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("selfieImages"),
   uploadFile,
   handleMulterError
 )
@@ -67,28 +63,22 @@ router.post(
 router.post(
   "/identity/upload-address-proof",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2 }).array("addressProof"),
+  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("addressProof"),
   uploadFile,
   handleMulterError
 )
 
-// Identity verification file delete routes - now handled by unified delete controller at /api/v1/files/delete-file
 
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
 
-// Agency verification file upload routes
 router.post(
   "/agency/upload-documents",
   authenticateToken,
-  FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5 }).array("documents"),
+  FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5, visibility: "private", useAttachment: true }).array("documents"),
   uploadFile,
   handleMulterError
 )
 
-// Agency verification file delete routes - now handled by unified delete controller at /api/v1/files/delete-file
-
-// Admin route to approve/reject agency verification
-router.put("/agency/update-status", authenticateToken, updateAgencyVerificationStatus)
 
 export default router

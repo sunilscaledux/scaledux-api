@@ -20,10 +20,9 @@ router.get("/conversations/:id/messages", getMessages);
 router.get("/conversations/:id/search", searchMessages);
 router.post("/conversations/:id/messages", sendMessage);
 
-// Chat file upload: max 10MB per file, max 3 files, PDF/JPG/JPEG/DOC/DOCX/ZIP
 router.post(
   "/conversations/upload-files",
-  FileUpload({ uploadPath: "chat", fileFilter: "chat", maxSize: 10, maxFiles: 3 }).array("files"),
+  FileUpload({ uploadPath: "chat", fileFilter: "chat", maxSize: 10, maxFiles: 3, visibility: "private", useAttachment: true }).array("files"),
   handleMulterError,
   uploadFile
 );

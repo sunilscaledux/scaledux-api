@@ -73,7 +73,6 @@ export async function getCountries(req: Request, res: Response) {
       },
     });
 
-    // Map flag paths to full URLs using getPublicUrl
     const countries = countriesData.map(country => ({
       ...country,
       flag: country.flag ? getPublicUrl(country.flag) : null
@@ -159,7 +158,6 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
       }
     })
 
-    // Map flag paths to full URLs using getPublicUrl
     const countries = countriesData.map(country => ({
       ...country,
       flag: country.flag ? getPublicUrl(country.flag) : null
@@ -243,7 +241,6 @@ export async function warmLocationCache(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
     
-    // Map flag paths to full URLs using getPublicUrl
     const countriesWithUrls = countries.map(country => ({
       ...country,
       flag: country.flag ? getPublicUrl(country.flag) : null
@@ -267,7 +264,6 @@ export async function warmLocationCache(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
     
-    // Map flag paths to full URLs using getPublicUrl
     const countriesWithStatesAndUrls = countriesWithStates.map(country => ({
       ...country,
       flag: country.flag ? getPublicUrl(country.flag) : null
@@ -357,7 +353,6 @@ export async function getCountriesWithCurrencies(req: Request, res: Response) {
       orderBy: { name: 'asc' }
     })
 
-    // Map flag paths to full URLs using getPublicUrl
     const countriesWithUrls = countries.map(country => ({
       ...country,
       flag: country.flag ? getPublicUrl(country.flag) : null

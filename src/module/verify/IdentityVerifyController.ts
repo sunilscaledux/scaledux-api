@@ -310,15 +310,9 @@ export async function uploadSelfieImages(req: Request, res: Response) {
   return uploadFile(req, res);
 }
 
-// ID document deletion is now handled by unified delete controller at /api/v1/files/delete-file
-
-// Selfie image deletion is now handled by unified delete controller at /api/v1/files/delete-file
-
 /**
  * Upload address proof documents
  */
 export async function uploadAddressProof(req: Request, res: Response) {
   return uploadFile(req, res);
 }
-
-// Address proof deletion is now handled by unified delete controller at /api/v1/files/delete-file

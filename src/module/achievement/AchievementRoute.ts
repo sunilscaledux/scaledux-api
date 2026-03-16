@@ -20,14 +20,15 @@ router.post('/', createAchievement)
 router.put('/', updateAchievement)
 router.delete('/:id', deleteAchievement)
 
-// Media upload route
 router.post(
   '/upload-media',
-  FileUpload({ 
-    uploadPath: 'achievements', 
-    fileFilter: 'any', 
-    maxSize: 10, 
-    maxFiles: 5 
+  FileUpload({
+    uploadPath: 'achievements',
+    fileFilter: 'any',
+    maxSize: 10,
+    maxFiles: 5,
+    visibility: 'public',
+    useAttachment: true
   }).array('media', 5),
   uploadFile,
   handleMulterError

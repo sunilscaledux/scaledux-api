@@ -151,8 +151,6 @@ export async function uploadAgencyDocuments(req: Request, res: Response) {
   return uploadFile(req, res);
 }
 
-// Agency document deletion is now handled by unified delete controller at /api/v1/files/delete-file
-
 /**
  * Admin function to approve or reject agency verification
  * This function should be called by admin interface
