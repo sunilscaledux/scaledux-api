@@ -4,9 +4,7 @@
  */
 const disk = (process.env.FILES_DISK || 'local').toLowerCase();
 
-const regionPrefix = process.env.BUNNY_STORAGE_REGION
-  ? `${process.env.BUNNY_STORAGE_REGION}.`
-  : '';
+
 
 export const fileConfig = {
   /** Default disk: "local" or "bunny" */
@@ -21,12 +19,19 @@ export const fileConfig = {
 
     bunny: {
       driver: 'bunny' as const,
-      storageHost: process.env.BUNNY_STORAGE_HOST || `https://${regionPrefix}storage.bunnycdn.com`,
-      storageZone: process.env.BUNNY_STORAGE_ZONE || '',
-      storageApiKey: process.env.BUNNY_STORAGE_API_KEY || '',
       cdnHostname: process.env.BUNNY_CDN_HOSTNAME || '',
-      publicFolder: process.env.BUNNY_PUBLIC_FOLDER || 'public',
-      privateFolder: process.env.BUNNY_PRIVATE_FOLDER || 'private',
+      /** Public zone: separate zone, key, host */
+      publicZone: {
+        storageZone: process.env.BUNNY_PUBLIC_STORAGE_ZONE || '',
+        storageApiKey: process.env.BUNNY_PUBLIC_STORAGE_API_KEY || '',
+        storageHost: process.env.BUNNY_PUBLIC_STORAGE_HOST || '',
+      },
+      /** Private zone: separate zone, key, host */
+      privateZone: {
+        storageZone: process.env.BUNNY_PRIVATE_STORAGE_ZONE || '',
+        storageApiKey: process.env.BUNNY_PRIVATE_STORAGE_API_KEY || '',
+        storageHost: process.env.BUNNY_PRIVATE_STORAGE_HOST || '',
+      },
     },
   },
 

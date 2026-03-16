@@ -4,21 +4,10 @@ import fileConfig from '@config/file';
 import { normalizePath } from '@utils/General';
 
 const bunny = fileConfig.disks.bunny;
-const { storageHost, storageZone, storageApiKey, cdnHostname, publicFolder, privateFolder } = bunny;
+const { publicZone, privateZone, cdnHostname } = bunny;
 
-/** Build full path inside zone: folder + path */
-function publicPath(path: string): string {
-  const p = normalizePath(path);
-  return p ? `${normalizePath(publicFolder)}/${p}` : normalizePath(publicFolder);
-}
-
-function privatePath(path: string): string {
-  const p = normalizePath(path);
-  return p ? `${normalizePath(privateFolder)}/${p}` : normalizePath(privateFolder);
-}
-
-function storageUrl(path: string): string {
-  return `${storageHost}/${storageZone}/${path}`;
+function storageUrl(host: string, zone: string, path: string): string {
+  return `${host.replace(/\/$/, '')}/${zone}/${path}`;
 }
 
 export async function uploadPublic(
@@ -26,9 +15,9 @@ export async function uploadPublic(
   data: Buffer | Readable,
   contentType?: string
 ): Promise<{ success: true; url: string } | { success: false; message: string }> {
- 
-  const fullPath = publicPath(path);
-  const url = storageUrl(fullPath);
+  const { storageHost, storageZone, storageApiKey } = publicZone;
+  const fullPath = normalizePath(path);
+  const url = storageUrl(storageHost, storageZone, fullPath);
   const headers: Record<string, string> = {
     AccessKey: storageApiKey,
   };
@@ -57,9 +46,9 @@ export async function uploadPrivate(
   data: Buffer | Readable,
   contentType?: string
 ): Promise<{ success: true; path: string } | { success: false; message: string }> {
-
-  const fullPath = privatePath(path);
-  const url = storageUrl(fullPath);
+  const { storageHost, storageZone, storageApiKey } = privateZone;
+  const fullPath = normalizePath(path);
+  const url = storageUrl(storageHost, storageZone, fullPath);
   const headers: Record<string, string> = {
     AccessKey: storageApiKey,
   };
@@ -83,12 +72,12 @@ export async function uploadPrivate(
  * Get the public CDN URL for a file in the public folder (does not check existence).
  */
 export function getPublicUrl(path: string): string {
-  const p = publicPath(path);
+  const p = normalizePath(path);
   if (cdnHostname) {
     const host = cdnHostname.startsWith('http') ? cdnHostname : `https://${cdnHostname}`;
     return `${host.replace(/\/$/, '')}/${p}`;
   }
-  return storageUrl(p);
+  return storageUrl(publicZone.storageHost, publicZone.storageZone, p);
 }
 
 /**
@@ -111,8 +100,9 @@ export async function getPrivateFile(
   path: string
 ): Promise<PrivateFileResult | null> {
 
-  const fullPath = privatePath(path);
-  const url = storageUrl(fullPath);
+  const { storageHost, storageZone, storageApiKey } = privateZone;
+  const fullPath = normalizePath(path);
+  const url = storageUrl(storageHost, storageZone, fullPath);
   try {
     const response: AxiosResponse<Readable> = await axios.get(url, {
       responseType: 'stream',
@@ -162,7 +152,8 @@ export async function getPrivateFileAndSend(
  * Delete a file from the public folder.
  */
 export async function deletePublic(path: string): Promise<boolean> {
-  const url = storageUrl(publicPath(path));
+  const { storageHost, storageZone, storageApiKey } = publicZone;
+  const url = storageUrl(storageHost, storageZone, normalizePath(path));
   try {
     await axios.delete(url, {
       headers: { AccessKey: storageApiKey },
@@ -179,7 +170,8 @@ export async function deletePublic(path: string): Promise<boolean> {
  */
 export async function deletePrivate(path: string): Promise<boolean> {
 
-  const url = storageUrl(privatePath(path));
+  const { storageHost, storageZone, storageApiKey } = privateZone;
+  const url = storageUrl(storageHost, storageZone, normalizePath(path));
   try {
     await axios.delete(url, {
       headers: { AccessKey: storageApiKey },

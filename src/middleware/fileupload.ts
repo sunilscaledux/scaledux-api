@@ -3,7 +3,6 @@ import path from 'path';
 import { PassThrough } from 'stream';
 import { uploadPublic, uploadPrivate } from '@services/bunnyStorageService';
 import { normalizePath } from '@utils/General';
-import { opaqueStoragePath } from '@services/attachmentService';
 import cuid from 'cuid';
 
 export type AttachmentMetaItem = {
@@ -92,26 +91,15 @@ class BunnyStorageEngine implements multer.StorageEngine {
   constructor(
     private readonly uploadPath: string,
     private readonly visibility: 'public' | 'private' = 'public',
-    private readonly useOpaquePath = false
   ) {}
 
   _handleFile(req: any, file: any, cb: (error?: any, info?: Partial<Express.Multer.File>) => void): void {
     const ext = path.extname(file.originalname) || '';
-    const uniqueId = this.useOpaquePath ? cuid() : '';
-    let filename: string;
-    let destination: string;
-    let storagePath: string;
-    if (this.useOpaquePath) {
-      filename = uniqueId + ext;
-      destination = 'attachments';
-      storagePath = opaqueStoragePath(uniqueId, ext);
-    } else {
-      const userIdentifier = req.user?.unique_id || req.user?.id || 'anonymous';
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      filename = `${file.fieldname}-${uniqueSuffix}${ext}`;
-      destination = `uploads/${userIdentifier}/${this.uploadPath}`;
-      storagePath = normalizePath(`${destination}/${filename}`);
-    }
+    const uniqueId = cuid();
+    const suffix = ext && !ext.startsWith('.') ? `.${ext}` : ext || '';
+    const filename = uniqueId + ext;
+    const destination = 'attachments';
+    const storagePath = `attachments/${uniqueId}${suffix}`;
 
     let size = 0;
     const passThrough = new PassThrough();
@@ -134,16 +122,14 @@ class BunnyStorageEngine implements multer.StorageEngine {
           cb(new Error(result.message || 'Bunny upload failed'));
           return;
         }
-        if (this.useOpaquePath && uniqueId) {
-          (req.attachmentMeta = req.attachmentMeta || []).push({
-            uniqueId,
-            path: storagePath,
-            size,
-            mimeType: file.mimetype,
-            originalName: file.originalname,
-          } as AttachmentMetaItem);
-          (req as any).uploadVisibility = this.visibility;
-        }
+        (req.attachmentMeta = req.attachmentMeta || []).push({
+          uniqueId,
+          path: storagePath,
+          size,
+          mimeType: file.mimetype,
+          originalName: file.originalname,
+        } as AttachmentMetaItem);
+        (req as any).uploadVisibility = this.visibility;
         cb(undefined, {
           path: storagePath,
           size,
@@ -160,8 +146,8 @@ class BunnyStorageEngine implements multer.StorageEngine {
 }
 
 // Storage: Bunny only (streaming upload)
-const createStorage = (uploadPath: string, visibility: 'public' | 'private', useOpaquePath = false) => {
-  return new BunnyStorageEngine(uploadPath, visibility, useOpaquePath);
+const createStorage = (uploadPath: string, visibility: 'public' | 'private') => {
+  return new BunnyStorageEngine(uploadPath, visibility);
 };
 
 // Multer configurations for different use cases
@@ -171,10 +157,9 @@ export const FileUpload = (options: {
   maxSize?: number; // in MB
   maxFiles?: number;
   visibility?: 'public' | 'private';
-  /** When true, store under opaque path (attachments/{cuid}.ext) and set req.attachmentMeta for createAttachment */
   useAttachment?: boolean;
 }) => {
-  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, visibility = 'public', useAttachment = false } = options;
+  const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, visibility = 'public' } = options;
   
   let filter;
   switch (fileFilter) {
@@ -195,7 +180,7 @@ export const FileUpload = (options: {
   }
 
   const multerOpts = {
-    storage: createStorage(uploadPath, visibility, useAttachment),
+    storage: createStorage(uploadPath, visibility),
     fileFilter: filter,
     limits: {
       fileSize: maxSize * 1024 * 1024, // Convert MB to bytes

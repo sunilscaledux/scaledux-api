@@ -173,13 +173,13 @@ export class FounderProjectService {
       });
 
       // Transform file URLs to full URLs and add currency symbol
-      const transformedProjects = projects.map(project => ({
+      const transformedProjects = await Promise.all(projects.map(async project => ({
         ...project,
         budget_currency: currencySymbol,
         project_files: project.project_files
           ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
           : []
-      }));
+      })));
 
       return {
         success: true,
@@ -366,7 +366,7 @@ export class FounderProjectService {
       const paginatedProjects = allProjects.slice((page - 1) * limit, page * limit);
 
       // Transform projects
-      const transformedProjects = paginatedProjects.map((project: any) => {
+      const transformedProjects = await Promise.all(paginatedProjects.map(async (project: any) => {
         const { invites, savedByUsers, ...projectData } = project;
         // Use user's currency symbol if available, otherwise fallback to budget_currency or default
         const currencySymbol = project.user?.currency?.symbol || '₹';
@@ -379,7 +379,7 @@ export class FounderProjectService {
           is_saved: userId ? (savedByUsers?.length > 0) : false,
           is_invited: userId ? (invites?.length > 0) : false
         };
-      });
+      }));
 
       return {
         success: true,
@@ -906,7 +906,7 @@ export class FounderProjectService {
       });
 
       // Transform freelancers to provider format
-      const providers = freelancers.map(freelancer => {
+      const providers = await Promise.all(freelancers.map(async freelancer => {
         const userSkills: string[] = [];
         freelancer.expertises.forEach((exp: any) => {
           if (exp.skills && Array.isArray(exp.skills)) {
@@ -954,7 +954,7 @@ export class FounderProjectService {
           is_saved: isSaved,
           invite_rejection_reason: (invite as any)?.status === ProposalStatus.REJECTED ? (invite as any)?.message || null : null
         };
-      });
+      }));
 
       // Pagination
       const total = providers.length;
