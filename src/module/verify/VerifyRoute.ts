@@ -47,7 +47,7 @@ router.get("/identity/details", authenticateToken, getIdentityVerificationDetail
 router.post(
   "/identity/upload-id-documents",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("idDocuments"),
+  FileUpload({ uploadPath: "identity/documents", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private" }).array("idDocuments"),
   uploadFile,
   handleMulterError
 )
@@ -55,7 +55,7 @@ router.post(
 router.post(
   "/identity/upload-selfie",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("selfieImages"),
+  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private" }).array("selfieImages"),
   uploadFile,
   handleMulterError
 )
@@ -63,7 +63,7 @@ router.post(
 router.post(
   "/identity/upload-address-proof",
   authenticateToken,
-  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private", useAttachment: true }).array("addressProof"),
+  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2, visibility: "private" }).array("addressProof"),
   uploadFile,
   handleMulterError
 )
@@ -75,7 +75,7 @@ router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
 router.post(
   "/agency/upload-documents",
   authenticateToken,
-  FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5, visibility: "private", useAttachment: true }).array("documents"),
+  FileUpload({ uploadPath: "agency/documents", fileFilter: "document", maxSize: 10, maxFiles: 5, visibility: "private" }).array("documents"),
   uploadFile,
   handleMulterError
 )

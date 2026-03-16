@@ -98,8 +98,10 @@ class BunnyStorageEngine implements multer.StorageEngine {
     const uniqueId = cuid();
     const suffix = ext && !ext.startsWith('.') ? `.${ext}` : ext || '';
     const filename = uniqueId + ext;
-    const destination = 'attachments';
-    const storagePath = `attachments/${uniqueId}${suffix}`;
+    const userUniqueId = (req.user?.unique_id || req.user?.id || 'anonymous').toString().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const destination = this.uploadPath;
+    const randomSegment = Math.random().toString(36).slice(2, 10);
+    const storagePath = `${userUniqueId}/${normalizePath(this.uploadPath)}/${randomSegment}/${uniqueId}${suffix}`;
 
     let size = 0;
     const passThrough = new PassThrough();
@@ -157,7 +159,6 @@ export const FileUpload = (options: {
   maxSize?: number; // in MB
   maxFiles?: number;
   visibility?: 'public' | 'private';
-  useAttachment?: boolean;
 }) => {
   const { uploadPath, fileFilter = 'any', maxSize = 5, maxFiles = 1, visibility = 'public' } = options;
   

@@ -29,14 +29,14 @@ router.delete("/:id", deletePortfolio)
 
 router.post(
   "/upload-thumbnail",
-  FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public", useAttachment: true }).array("thumbnail"),
+  FileUpload({ uploadPath: "portfolio/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public" }).array("thumbnail"),
   uploadFile,
   handleMulterError
 )
 
 router.post(
   "/upload-media",
-  FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10, visibility: "public", useAttachment: true }).array("media"),
+  FileUpload({ uploadPath: "portfolio/media", fileFilter: "any", maxSize: 50, maxFiles: 10, visibility: "public" }).array("media"),
   uploadFile,
   handleMulterError
 )

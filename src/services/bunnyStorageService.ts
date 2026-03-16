@@ -7,8 +7,10 @@ const bunny = fileConfig.disks.bunny;
 const { publicZone, privateZone, cdnHostname } = bunny;
 
 function storageUrl(host: string, zone: string, path: string): string {
-  return `${host.replace(/\/$/, '')}/${zone}/${path}`;
+  const base = `${host.replace(/\/$/, '')}/${zone}/${path}`;
+  return base;
 }
+
 
 export async function uploadPublic(
   path: string,
@@ -33,8 +35,11 @@ export async function uploadPublic(
     const publicUrl = getPublicUrl(path);
     return { success: true, url: publicUrl };
   } catch (err: any) {
-    const message = err?.response?.data ?? err?.message ?? 'Upload failed';
-    return { success: false, message: String(message) };
+    const raw = err?.response?.data ?? err?.message ?? 'Upload failed';
+    const message = String(raw).toLowerCase().includes('invalid url')
+      ? 'Bunny public storage URL is invalid. Check BUNNY_PUBLIC_STORAGE_HOST and BUNNY_PUBLIC_STORAGE_ZONE.'
+      : String(raw);
+    return { success: false, message };
   }
 }
 
@@ -63,8 +68,11 @@ export async function uploadPrivate(
     });
     return { success: true, path: normalizePath(path) };
   } catch (err: any) {
-    const message = err?.response?.data ?? err?.message ?? 'Upload failed';
-    return { success: false, message: String(message) };
+    const raw = err?.response?.data ?? err?.message ?? 'Upload failed';
+    const message = String(raw).toLowerCase().includes('invalid url')
+      ? 'Bunny private storage URL is invalid. Check BUNNY_PRIVATE_STORAGE_HOST and BUNNY_PRIVATE_STORAGE_ZONE.'
+      : String(raw);
+    return { success: false, message };
   }
 }
 
@@ -74,8 +82,8 @@ export async function uploadPrivate(
 export function getPublicUrl(path: string): string {
   const p = normalizePath(path);
   if (cdnHostname) {
-    const host = cdnHostname.startsWith('http') ? cdnHostname : `https://${cdnHostname}`;
-    return `${host.replace(/\/$/, '')}/${p}`;
+    const base = cdnHostname.replace(/\/$/, '');
+    return `${base}/${p}`;
   }
   return storageUrl(publicZone.storageHost, publicZone.storageZone, p);
 }

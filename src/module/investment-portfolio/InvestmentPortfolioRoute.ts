@@ -38,8 +38,7 @@ router.post(
     fileFilter: "image",
     maxSize: 10,
     maxFiles: 1,
-    visibility: "public",
-    useAttachment: true
+    visibility: "public"
   }).array("logo"),
   uploadFile,
   handleMulterError

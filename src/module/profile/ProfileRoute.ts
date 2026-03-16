@@ -31,14 +31,14 @@ router.patch('/languages', authenticateToken, ProfileController.updateLanguages)
 router.post(
   '/profile-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'profile', visibility: 'public', useAttachment: true }).single('image'),
+  FileUpload({ uploadPath: 'profile', visibility: 'public' }).single('image'),
   ProfileController.uploadProfileImage,
   handleMulterError
 );
 router.post(
   '/cover-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'cover', visibility: 'public', useAttachment: true }).single('image'),
+  FileUpload({ uploadPath: 'cover', visibility: 'public' }).single('image'),
   ProfileController.uploadCoverImage,
   handleMulterError
 );
@@ -56,14 +56,14 @@ router.get('/company/public/:uniqueId', CompanyProfileController.getPublicProfil
 router.post(
   '/company/profile-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'profile/company', visibility: 'public', useAttachment: true }).single('image'),
+  FileUpload({ uploadPath: 'profile/company', visibility: 'public' }).single('image'),
   CompanyProfileController.uploadProfileImage,
   handleMulterError
 );
 router.post(
   '/company/cover-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'cover/company', visibility: 'public', useAttachment: true }).single('image'),
+  FileUpload({ uploadPath: 'cover/company', visibility: 'public' }).single('image'),
   CompanyProfileController.uploadCoverImage,
   handleMulterError
 );
@@ -74,7 +74,7 @@ router.patch('/company/problem-solution', authenticateToken, CompanyProfileContr
 router.post(
   '/company/target-market-document',
   authenticateToken,
-  FileUpload({ uploadPath: 'documents/target-market', fileFilter: 'document', maxSize: 5, maxFiles: 1, visibility: 'private', useAttachment: true }).array('document'),
+  FileUpload({ uploadPath: 'documents/target-market', fileFilter: 'document', maxSize: 5, maxFiles: 1, visibility: 'private' }).array('document'),
   uploadFile,
   handleMulterError
 );
@@ -83,7 +83,7 @@ router.patch('/company/revenue-model', authenticateToken, CompanyProfileControll
 router.patch(
   '/company/traction',
   authenticateToken,
-  FileUpload({ uploadPath: 'documents/traction', fileFilter: 'any', maxSize: 50, maxFiles: 1, visibility: 'private', useAttachment: true }).single('document'),
+  FileUpload({ uploadPath: 'documents/traction', fileFilter: 'any', maxSize: 50, maxFiles: 1, visibility: 'private' }).single('document'),
   CompanyProfileController.uploadTractionDocument,
   handleMulterError
 );
@@ -113,7 +113,7 @@ router.delete('/company/team-members/:id', authenticateToken, TeamMemberControll
 router.post(
   '/company/team-members/:id/profile-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'team/members', fileFilter: 'image', maxSize: 2, visibility: 'public', useAttachment: true }).single('image'),
+  FileUpload({ uploadPath: 'team/members', fileFilter: 'image', maxSize: 2, visibility: 'public' }).single('image'),
   TeamMemberController.uploadProfileImage,
   handleMulterError
 );

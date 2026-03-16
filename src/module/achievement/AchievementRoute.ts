@@ -27,8 +27,7 @@ router.post(
     fileFilter: 'any',
     maxSize: 10,
     maxFiles: 5,
-    visibility: 'public',
-    useAttachment: true
+    visibility: 'public'
   }).array('media', 5),
   uploadFile,
   handleMulterError

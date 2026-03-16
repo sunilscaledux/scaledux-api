@@ -4,13 +4,10 @@
  */
 const disk = (process.env.FILES_DISK || 'local').toLowerCase();
 
-
-
 export const fileConfig = {
   /** Default disk: "local" or "bunny" */
   default: disk as 'local' | 'bunny',
 
-  /** Laravel-style disks */
   disks: {
     local: {
       driver: 'local' as const,
@@ -20,13 +17,11 @@ export const fileConfig = {
     bunny: {
       driver: 'bunny' as const,
       cdnHostname: process.env.BUNNY_CDN_HOSTNAME || '',
-      /** Public zone: separate zone, key, host */
       publicZone: {
         storageZone: process.env.BUNNY_PUBLIC_STORAGE_ZONE || '',
         storageApiKey: process.env.BUNNY_PUBLIC_STORAGE_API_KEY || '',
         storageHost: process.env.BUNNY_PUBLIC_STORAGE_HOST || '',
       },
-      /** Private zone: separate zone, key, host */
       privateZone: {
         storageZone: process.env.BUNNY_PRIVATE_STORAGE_ZONE || '',
         storageApiKey: process.env.BUNNY_PRIVATE_STORAGE_API_KEY || '',

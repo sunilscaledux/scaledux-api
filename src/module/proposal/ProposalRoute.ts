@@ -39,8 +39,7 @@ router.post(
     fileFilter: "image",
     maxSize: 5,
     maxFiles: 5,
-    visibility: "private",
-    useAttachment: true
+    visibility: "private"
   }).array("files"),
   uploadFile,
   handleMulterError
@@ -53,8 +52,7 @@ router.post(
     fileFilter: "document",
     maxSize: 5,
     maxFiles: 1,
-    visibility: "private",
-    useAttachment: true
+    visibility: "private"
   }).array("files"),
   uploadFile,
   handleMulterError
@@ -67,8 +65,7 @@ router.post(
     fileFilter: "milestoneDeliverable",
     maxSize: 500,
     maxFiles: 1,
-    visibility: "private",
-    useAttachment: true
+    visibility: "private"
   }).array("files"),
   uploadFile,
   handleMulterError

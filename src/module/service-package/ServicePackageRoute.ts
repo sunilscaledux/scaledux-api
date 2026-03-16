@@ -27,8 +27,7 @@ router.post(
     fileFilter: "any",
     maxSize: 50,
     maxFiles: 10,
-    visibility: "public",
-    useAttachment: true
+    visibility: "public"
   }).array("media"),
   uploadFile,
   handleMulterError
@@ -36,7 +35,7 @@ router.post(
 
 router.post(
   "/upload-thumbnail",
-  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public", useAttachment: true }).array("thumbnail"),
+  FileUpload({ uploadPath: "service-packages/thumbnails", fileFilter: "image", maxSize: 10, maxFiles: 1, visibility: "public" }).array("thumbnail"),
   uploadFile,
   handleMulterError
 )
