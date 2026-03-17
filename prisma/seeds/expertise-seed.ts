@@ -81,7 +81,9 @@ export async function seedExpertise(prisma: PrismaClient) {
       if (batch.length === 0) continue
       await prisma.$executeRaw`
         INSERT INTO "scd_skills" ("name", "expertise_category_id", "is_active", "created_at", "updated_at")
-        VALUES ${Prisma.join(batch.map((name) => Prisma.sql`(${name}, ${categoryId}, true, NOW(), NOW())`)}
+        VALUES ${Prisma.join(
+          batch.map((name) => Prisma.sql`(${name}, ${categoryId}, true, NOW(), NOW())`)
+        )}
         ON CONFLICT ("name", "expertise_category_id") DO NOTHING
       `
     }
