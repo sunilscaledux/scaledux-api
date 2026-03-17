@@ -2,7 +2,8 @@ import { Request, Response } from 'express'
 import { ApiResponse } from '@utils/ApiResponse'
 import { deletePublic, getPublicUrl } from '@services/bunnyStorageService'
 import { Log } from '@services/loggerService'
-import { viewProtectedFile as viewProtectedFileService, getByUniqueId, createAttachment, resolveAttachmentUrl } from '@services/attachmentService'
+import { viewProtectedFile as viewProtectedFileService, getByUniqueId, createAttachment, resolveAttachmentUrl, urlOrPathToAttachmentId, isAttachmentId } from '@services/attachmentService'
+import { prisma } from '@services/prismaService'
 import type { AttachmentMetaItem } from '@middleware/fileupload'
 
 /**
@@ -46,6 +47,7 @@ export async function uploadFile(req: Request, res: Response) {
           sizeBytes: size,
           originalName: m.originalName,
           status: 'temporary',
+          existingUniqueId: m.uniqueId,
         })
         if (created) {
           uniqueIds.push(created.unique_id)
@@ -53,39 +55,15 @@ export async function uploadFile(req: Request, res: Response) {
           urls.push(url)
         }
       }
-      const filesPayload = uniqueIds.map((id, i) => ({
-        path: id,
-        unique_id: id,
-        url: urls[i] ?? '',
-        name: meta[i]?.originalName,
-        size: filesList[i]?.size ?? meta[i]?.size,
-        mimetype: meta[i]?.mimeType,
-      }))
-      return ApiResponse.success(res, {
-        paths: uniqueIds,
-        unique_ids: uniqueIds,
-        urls,
-        files: filesPayload,
-      }, "Files uploaded successfully")
+      return ApiResponse.success(res, { urls }, "Files uploaded successfully")
     }
 
-    const uploadedFiles = files.map((file: any) => {
+    const urls = (files as any[]).map((file: any) => {
       const relativePath = file.path ?? ''
-      const url = relativePath ? getPublicUrl(relativePath) : ''
-      return {
-        path: relativePath,
-        url: url,
-        name: file.originalname,
-        size: file.size,
-        mimetype: file.mimetype
-      }
-    })
+      return relativePath ? getPublicUrl(relativePath) : ''
+    }).filter(Boolean)
 
-    return ApiResponse.success(res, {
-      paths: uploadedFiles.map(f => f.path),
-      urls: uploadedFiles.map(f => f.url),
-      files: uploadedFiles
-    }, "Files uploaded successfully")
+    return ApiResponse.success(res, { urls }, "Files uploaded successfully")
 
   } catch (error: any) {
     Log.error("Error", { error })
@@ -106,19 +84,18 @@ export async function deleteFile(req: Request, res: Response) {
       return ApiResponse.error(res, "User not authenticated", 401)
     }
 
-    const uniqueId = (req.body as any).uniqueId ?? filePath
-    if (!uniqueId) {
+    const rawIdOrUrl = (req.body as any).uniqueId ?? filePath
+    if (!rawIdOrUrl) {
       return ApiResponse.error(res, "uniqueId or filePath is required", 400)
     }
+    const uniqueId = urlOrPathToAttachmentId(rawIdOrUrl) ?? rawIdOrUrl
 
-    const { isAttachmentId } = await import('@services/attachmentService')
     let pathToDelete: string
     if (isAttachmentId(uniqueId)) {
       const att = await getByUniqueId(uniqueId)
       if (!att) return ApiResponse.error(res, "File not found", 404)
       if (att.owner_user_id !== userId) return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
       pathToDelete = att.path
-      const { prisma } = await import('@services/prismaService')
       await (prisma as any).attachment.update({
         where: { id: att.id },
         data: { deleted_at: new Date() }

@@ -2,8 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
-import { toAttachmentIds } from '@utils/General';
-import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { dispatch } from '@queues/Queue';
@@ -557,7 +556,8 @@ export class FounderProjectService {
    */
   static async createProject(userId: number, data: CreateFounderProjectInput): Promise<ServiceResponse> {
     try {
-      const projectFiles = toAttachmentIds(data.projectFiles?.map((f: { url?: string; unique_id?: string }) => typeof f === 'string' ? f : (f?.unique_id ?? f?.url)) ?? []);
+      const rawFileRefs = (data.projectFiles ?? []).map((f: { url?: string; unique_id?: string } | string) => (typeof f === 'string' ? f : (f?.url ?? (f as { unique_id?: string }).unique_id ?? '')));
+      const projectFiles = urlsOrPathsToAttachmentIds(rawFileRefs);
 
       const project = await prisma.founderProject.create({
         data: {
@@ -642,7 +642,8 @@ export class FounderProjectService {
       if (data.status !== undefined) updateData.status = data.status;
 
       if (data.projectFiles !== undefined) {
-        updateData.project_files = toAttachmentIds(data.projectFiles.map((f: { url?: string; unique_id?: string }) => typeof f === 'string' ? f : (f?.unique_id ?? f?.url)));
+        const rawFileRefs = data.projectFiles.map((f: { url?: string; unique_id?: string } | string) => (typeof f === 'string' ? f : (f?.url ?? (f as { unique_id?: string }).unique_id ?? '')));
+        updateData.project_files = urlsOrPathsToAttachmentIds(rawFileRefs);
       }
 
       if (data.budget !== undefined) {

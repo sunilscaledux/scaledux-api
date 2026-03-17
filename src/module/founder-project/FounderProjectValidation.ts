@@ -25,13 +25,11 @@ export const createFounderProjectSchema = Joi.object({
     'number.integer': 'Sub-category ID must be an integer',
     'number.positive': 'Sub-category ID must be positive'
   }),
-  projectFiles: Joi.array().items(
-    Joi.object({
-      url: Joi.string().required()
-    })
-  ).optional().allow(null).messages({
-    'array.base': 'Project files must be an array'
-  }),
+  projectFiles: Joi.array()
+    .items(Joi.alternatives().try(Joi.string(), Joi.object({ url: Joi.string() })))
+    .optional()
+    .allow(null)
+    .messages({ 'array.base': 'Project files must be an array' }),
   scopeOfWork: Joi.string().required().min(1).messages({
     'string.base': 'Scope of work must be a string',
     'string.empty': 'Scope of work is required',
@@ -124,7 +122,7 @@ export const saveDraftProjectSchema = Joi.object({
     'any.required': 'Sub-category is required'
   }),
   projectFiles: Joi.array()
-    .items(Joi.object({ url: Joi.string().optional().allow('') }))
+    .items(Joi.alternatives().try(Joi.string(), Joi.object({ url: Joi.string().optional().allow('') })))
     .optional()
     .allow(null),
   scopeOfWork: Joi.string().optional().allow(''),
@@ -170,13 +168,11 @@ export const updateFounderProjectSchema = Joi.object({
     'number.integer': 'Sub-category ID must be an integer',
     'number.positive': 'Sub-category ID must be positive'
   }),
-  projectFiles: Joi.array().items(
-    Joi.object({
-      url: Joi.string().required()
-    })
-  ).optional().allow(null).messages({
-    'array.base': 'Project files must be an array'
-  }),
+  projectFiles: Joi.array()
+    .items(Joi.alternatives().try(Joi.string(), Joi.object({ url: Joi.string() })))
+    .optional()
+    .allow(null)
+    .messages({ 'array.base': 'Project files must be an array' }),
   scopeOfWork: Joi.string().optional().allow(''),
   skillsRequired: Joi.array().items(Joi.string()).optional().allow(null),
   experienceNeeded: Joi.string().optional().allow(''),

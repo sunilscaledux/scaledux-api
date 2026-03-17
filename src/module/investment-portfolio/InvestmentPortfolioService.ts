@@ -4,8 +4,7 @@ import {
   UpdateInvestmentPortfolioInput
 } from "./InvestmentPortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { toAttachmentIds } from "@utils/General";
-import { resolveAttachmentUrl } from "@services/attachmentService";
+import { resolveAttachmentUrl, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
 import { Log } from '@services/loggerService';
 
 export class InvestmentPortfolioService {
@@ -154,7 +153,7 @@ export class InvestmentPortfolioService {
     data: CreateInvestmentPortfolioInput
   ): Promise<ServiceResponse> {
     try {
-      const normalizedLogo = toAttachmentIds([data.companyLogo])[0] ?? null;
+      const normalizedLogo = urlsOrPathsToAttachmentIds([data.companyLogo])[0] ?? null;
 
       const createData: any = {
         user_id: userId,
@@ -228,7 +227,7 @@ export class InvestmentPortfolioService {
         return { success: false, message: "Investment portfolio not found" };
       }
 
-      const normalizedLogo = data.companyLogo ? toAttachmentIds([data.companyLogo])[0] : undefined;
+      const normalizedLogo = data.companyLogo ? urlsOrPathsToAttachmentIds([data.companyLogo])[0] : undefined;
 
       const updateData: any = {};
       if (data.companyName !== undefined) updateData.company_name = data.companyName;

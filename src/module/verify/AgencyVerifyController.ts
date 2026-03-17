@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { toAttachmentIds } from '@utils/General'
+import { urlsOrPathsToAttachmentIds } from '@services/attachmentService'
 import { uploadFile } from '@module/general/FileController'
 import { resolveAttachmentUrls } from '@services/attachmentService'
 import fs from 'fs'
@@ -53,7 +53,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
     let agencyVerification
 
-    const normalizedDocumentUrls = toAttachmentIds(documents)
+    const normalizedDocumentUrls = urlsOrPathsToAttachmentIds(documents)
 
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)

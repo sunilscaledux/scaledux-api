@@ -12,6 +12,32 @@ export function isAttachmentId(value: string | null): boolean {
   return value.length >= 20 && value.length <= 32 && /^c[a-z0-9]+$/i.test(value);
 }
 
+
+export function urlOrPathToAttachmentId(value: string | null | undefined): string | null {
+  if (value == null || typeof value !== 'string') return null;
+  const s = value.trim().replace(/\?.*$/, '');
+  if (!s) return null;
+  if (isAttachmentId(s)) return s;
+  const segments = s.split('/').filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (!last) return null;
+  const id = last.replace(/\.[^.]+$/, '');
+  return isAttachmentId(id) ? id : null;
+}
+
+/**
+ * Decode an array of URLs/paths to attachment unique_ids. Skips null/invalid. Preserves order.
+ */
+export function urlsOrPathsToAttachmentIds(values: (string | null | undefined)[] | null | undefined): string[] {
+  if (values == null || !Array.isArray(values)) return [];
+  const ids: string[] = [];
+  for (const v of values) {
+    const id = urlOrPathToAttachmentId(v);
+    if (id) ids.push(id);
+  }
+  return ids;
+}
+
 /** Generate opaque storage path: attachments/{unique_id}{ext} */
 export function opaqueStoragePath(uniqueId: string, ext?: string): string {
   const suffix = ext && !ext.startsWith('.') ? `.${ext}` : ext || '';
@@ -63,11 +89,7 @@ export async function getByUniqueId(uniqueId: string) {
   });
 }
 
-/**
- * Resolve attachment unique_id to a URL for API response.
- * If value is not an attachment id, returns '' (no legacy path resolution).
- * baseUrl: e.g. process.env.APP_URL for protected URL.
- */
+
 export async function resolveAttachmentUrl(
   value: string | null,
   options?: { entityType?: string; fieldName?: string; baseUrl?: string }

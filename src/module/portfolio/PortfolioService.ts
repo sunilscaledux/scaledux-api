@@ -1,8 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { toAttachmentIds } from '@utils/General';
-import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -119,8 +118,8 @@ export class PortfolioService {
    */
   static async createPortfolio(userId: number, portfolioData: CreatePortfolioInput): Promise<ServiceResponse> {
     try {
-      const normalizedThumbnail = toAttachmentIds([portfolioData.thumbnail])[0] ?? null
-      const normalizedMedia = toAttachmentIds(portfolioData.media)
+      const normalizedThumbnail = urlsOrPathsToAttachmentIds([portfolioData.thumbnail])[0] ?? null
+      const normalizedMedia = urlsOrPathsToAttachmentIds(portfolioData.media || [])
 
       // Build data object conditionally
       const createData: any = {
@@ -203,8 +202,8 @@ export class PortfolioService {
         };
       }
 
-      const normalizedThumbnail = toAttachmentIds([portfolioData.thumbnail])[0] ?? null
-      const normalizedMedia = toAttachmentIds(portfolioData.media)
+      const normalizedThumbnail = urlsOrPathsToAttachmentIds([portfolioData.thumbnail])[0] ?? null
+      const normalizedMedia = urlsOrPathsToAttachmentIds(portfolioData.media || [])
 
       const updatedPortfolio = await prisma.portfolio.update({
         where: { id: existingPortfolio.id },

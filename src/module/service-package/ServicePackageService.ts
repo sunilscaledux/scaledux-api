@@ -1,14 +1,13 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { toAttachmentIds } from '@utils/General';
 import { Log } from '@services/loggerService';
-import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
 
 /**
  * Helper to parse JSON fields and resolve file URLs (async).
  */
 async function parseServicePackageJsonAsync(pkg: any) {
-  const thumbnailNorm = toAttachmentIds([pkg.thumbnail])[0] ?? '';
+  const thumbnailNorm = urlsOrPathsToAttachmentIds([pkg.thumbnail])[0] ?? '';
   const imagesArr = typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || []);
   const videoArr = typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || []);
   const documentsArr = typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || []);
@@ -109,10 +108,10 @@ export class ServicePackageService {
    */
   static async createServicePackage(userId: number, packageData: any): Promise<ServiceResponse> {
     try {
-      const normalizedThumbnail = toAttachmentIds([packageData.thumbnail])[0] ?? null
-      const normalizedImages = toAttachmentIds(packageData.images)
-      const normalizedVideo = toAttachmentIds(packageData.video)
-      const normalizedDocuments = toAttachmentIds(packageData.documents)
+      const normalizedThumbnail = urlsOrPathsToAttachmentIds([packageData.thumbnail])[0] ?? null
+      const normalizedImages = urlsOrPathsToAttachmentIds(packageData.images || [])
+      const normalizedVideo = urlsOrPathsToAttachmentIds(packageData.video || [])
+      const normalizedDocuments = urlsOrPathsToAttachmentIds(packageData.documents || [])
 
       const newPackage = await prisma.servicePackage.create({
         data: {
@@ -175,10 +174,10 @@ export class ServicePackageService {
         };
       }
 
-      const normalizedThumbnail = toAttachmentIds([packageData.thumbnail])[0] ?? null
-      const normalizedImages = toAttachmentIds(packageData.images)
-      const normalizedVideo = toAttachmentIds(packageData.video)
-      const normalizedDocuments = toAttachmentIds(packageData.documents)
+      const normalizedThumbnail = urlsOrPathsToAttachmentIds([packageData.thumbnail])[0] ?? null
+      const normalizedImages = urlsOrPathsToAttachmentIds(packageData.images || [])
+      const normalizedVideo = urlsOrPathsToAttachmentIds(packageData.video || [])
+      const normalizedDocuments = urlsOrPathsToAttachmentIds(packageData.documents || [])
 
       const updatedPackage = await prisma.servicePackage.update({
         where: { id: existingPackage.id },

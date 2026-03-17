@@ -3,7 +3,7 @@ export interface CreateFounderProjectInput {
   projectDescription: string
   categoryId: number
   subCategoryId?: number | null
-  projectFiles?: Array<{ url: string }>
+  projectFiles?: (string | { url: string })[]
   scopeOfWork: string
   skillsRequired: string[]
   experienceNeeded: string
@@ -29,7 +29,7 @@ export interface UpdateFounderProjectInput {
   projectDescription?: string
   categoryId?: number
   subCategoryId?: number | null
-  projectFiles?: Array<{ url: string }>
+  projectFiles?: (string | { url: string })[]
   scopeOfWork?: string
   skillsRequired?: string[]
   experienceNeeded?: string

@@ -1,9 +1,8 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { toAttachmentIds } from "@utils/General";
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
 import { emitNewMessageToBothUsers, emitConversationStatusToUser } from "./chatSocket";
 import { Log } from '@services/loggerService';
-import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 
 async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
   if (!profileImage) return null;
@@ -688,7 +687,7 @@ export class ConversationService {
       const hasAttachments = Array.isArray(attachmentUrls) && attachmentUrls.length > 0;
       if (!trimmed && !hasAttachments) return { success: false, message: "Content or attachments are required" };
 
-      const attachmentPaths = hasAttachments ? toAttachmentIds(attachmentUrls!) : undefined;
+      const attachmentPaths = hasAttachments ? urlsOrPathsToAttachmentIds(attachmentUrls!) : undefined;
       const metadata: any = {};
       if (attachmentPaths?.length) metadata.attachments = attachmentPaths;
       if (replyTo?.messageId && replyTo?.unique_id) metadata.replyTo = replyTo;

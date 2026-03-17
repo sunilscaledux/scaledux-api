@@ -1,8 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { toAttachmentIds } from '@utils/General';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
 import { Log } from '@services/loggerService';
-import { resolveAttachmentUrl, resolveAttachmentUrls } from '@services/attachmentService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
@@ -251,7 +250,7 @@ export class ProposalService {
         data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
           ? data.hours_required
           : null;
-      const attachmentPaths = toAttachmentIds(data.attachments);
+      const attachmentPaths = urlsOrPathsToAttachmentIds(data.attachments || []);
       const proposal = await (prisma as any).proposal.create({
         data: {
           project_id: project.id,
@@ -1126,7 +1125,7 @@ export class ProposalService {
           ...(hoursRequired !== undefined && { hours_required: hoursRequired }),
           screening_answers: data.screening_answers,
           ...(data.attachments !== undefined && {
-            attachments: toAttachmentIds(data.attachments)
+            attachments: urlsOrPathsToAttachmentIds(data.attachments || [])
           }),
           remark: null,
           main_reason: null // Clear when freelancer updates proposal

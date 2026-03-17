@@ -1,8 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { toAttachmentIds } from '@utils/General'
-import { resolveAttachmentUrls } from '@services/attachmentService'
+import { resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService'
 import { updateCompletionSection } from '../profile/ProfileCompletionService'
 import { uploadFile } from '@module/general/FileController'
 import fs from 'fs'
@@ -121,9 +120,9 @@ export async function submitIdentityVerification(req: Request, res: Response) {
 
     let identityVerification
 
-    const idDocumentPaths = toAttachmentIds(idInformation?.idImage)
-    const selfiePaths = toAttachmentIds(keycodeVerification?.picture)
-    const addressProofPaths = toAttachmentIds(proofOfAddress?.uploadedAddressProofs)
+    const idDocumentPaths = urlsOrPathsToAttachmentIds(idInformation?.idImage || [])
+    const selfiePaths = urlsOrPathsToAttachmentIds(keycodeVerification?.picture || [])
+    const addressProofPaths = urlsOrPathsToAttachmentIds(proofOfAddress?.uploadedAddressProofs || [])
 
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
