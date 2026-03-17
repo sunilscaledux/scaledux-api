@@ -6,6 +6,8 @@ dotenv.config();
 import http from 'http';
 import express from 'express';
 import { Server as SocketServer } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 import jwt from 'jsonwebtoken';
 import socketConfig from '@config/socketConfig';
 import { Log } from '@services/loggerService';
@@ -25,6 +27,20 @@ const io = new SocketServer(httpServer, {
   path: '/socket.io',
   cors: { origin: socketConfig.corsOrigin, credentials: true }
 });
+
+/** Same Redis as API; lets all socket replicas share Engine.IO sessions (fixes "Session ID unknown" behind LB). */
+function socketIoRedisUrl(): string {
+  const explicit = process.env.REDIS_URL?.trim();
+  if (explicit) return explicit;
+  const host = process.env.REDIS_HOST || 'localhost';
+  const port = process.env.REDIS_PORT || '6379';
+  const password = process.env.REDIS_PASSWORD;
+  const db = process.env.REDIS_DB || '0';
+  if (password) {
+    return `redis://:${encodeURIComponent(password)}@${host}:${port}/${db}`;
+  }
+  return `redis://${host}:${port}/${db}`;
+}
 
 const ONLINE_USERS_SET_KEY = 'socket:online_users';
 const onlineUserConnectionsKey = (userId: number) => `socket:online_user:${userId}:connections`;
@@ -192,9 +208,41 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(socketConfig.port, () => {
-  Log.info(`Socket server: http://localhost:${socketConfig.port}/socket.io`);
-  Log.info('Ensure frontend uses this URL (NEXT_PUBLIC_SOCKET_URL or default :4001) and both API + socket processes are running.');
+async function startSocketServer(): Promise<void> {
+  if (process.env.SOCKET_IO_DISABLE_REDIS_ADAPTER === 'true') {
+    Log.warn(
+      '[socket] SOCKET_IO_DISABLE_REDIS_ADAPTER=true — single replica only, or use sticky sessions at the proxy'
+    );
+  } else {
+    try {
+      const url = socketIoRedisUrl();
+      const pubClient = createClient({ url });
+      const subClient = pubClient.duplicate();
+      pubClient.on('error', (err) => Log.error('[socket-io-redis] pub client', { err: String(err) }));
+      subClient.on('error', (err) => Log.error('[socket-io-redis] sub client', { err: String(err) }));
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      io.adapter(createAdapter(pubClient, subClient));
+      Log.info('[socket] Redis adapter on — Engine.IO sessions work across multiple instances / load balancers');
+    } catch (e) {
+      const msg = (e as Error)?.message || String(e);
+      Log.error('[socket] Failed to attach Redis adapter', { err: msg });
+      if (process.env.NODE_ENV === 'production') {
+        Log.error('[socket] Fix Redis (REDIS_URL / REDIS_HOST) or set SOCKET_IO_DISABLE_REDIS_ADAPTER=true with one socket node only');
+        process.exit(1);
+      }
+      Log.warn('[socket] Continuing without Redis adapter (local single process)');
+    }
+  }
+
+  httpServer.listen(socketConfig.port, () => {
+    Log.info(`Socket server: http://localhost:${socketConfig.port}/socket.io`);
+    Log.info('Ensure frontend uses NEXT_PUBLIC_SOCKET_URL and API + socket processes share Redis when scaled out.');
+  });
+}
+
+void startSocketServer().catch((e) => {
+  Log.error('[socket] Fatal startup error', { err: (e as Error)?.message });
+  process.exit(1);
 });
 
 export default httpServer;
