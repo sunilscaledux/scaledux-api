@@ -33,21 +33,17 @@ export async function getUserPortfolios(req: Request, res: Response) {
 }
 
 /**
- * Get portfolio by unique ID
+ * Get portfolio by unique ID. Optional auth: returns portfolio if owner or if published (viewable by anyone).
  */
 export async function getPortfolioById(req: Request, res: Response) {
   const userId = req.user?.id;
   const id = getStringParam(req.params.id);
 
-  if (!userId) {
-    return ApiResponse.error(res, "User not authenticated", 401);
-  }
-
   if (!id) {
     return ApiResponse.error(res, "Portfolio ID is required", 400);
   }
 
-  const result = await PortfolioService.getPortfolioById(userId, id);
+  const result = await PortfolioService.getPortfolioById(id, userId);
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);

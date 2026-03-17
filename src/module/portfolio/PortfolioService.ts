@@ -60,15 +60,16 @@ export class PortfolioService {
   }
 
   /**
-   * Get a single portfolio by ID (unique_id)
+   * Get a single portfolio by ID (unique_id).
+   * If userId is provided: return if owner or if portfolio is PUBLISHED.
+   * If userId is not provided (public): return only if portfolio is PUBLISHED.
    */
-  static async getPortfolioById(userId: number, uniqueId: string): Promise<ServiceResponse> {
+  static async getPortfolioById(uniqueId: string, userId?: number): Promise<ServiceResponse> {
     try {
       const portfolio = await prisma.portfolio.findFirst({
-        where: { 
+        where: {
           unique_id: uniqueId,
-          user_id: userId,
-          deleted_at: null // Only get non-deleted portfolio
+          deleted_at: null
         },
         include: {
           industry: {
@@ -82,6 +83,15 @@ export class PortfolioService {
       });
 
       if (!portfolio) {
+        return {
+          success: false,
+          message: "Portfolio not found"
+        };
+      }
+
+      const isOwner = userId != null && portfolio.user_id === userId;
+      const isPublished = portfolio.status === 'PUBLISHED';
+      if (!isOwner && !isPublished) {
         return {
           success: false,
           message: "Portfolio not found"

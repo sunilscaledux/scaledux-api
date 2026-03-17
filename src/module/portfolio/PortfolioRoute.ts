@@ -10,15 +10,16 @@ import {
   updateDraft
 } from "./PortfolioController"
 import { uploadFile } from "@module/general/FileController"
-import { authenticateToken } from "@middleware/auth"
+import { authenticateToken, optionalAuth } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
+router.get("/:id", optionalAuth, getPortfolioById)
+
 router.use(authenticateToken)
 
 router.get("/", getUserPortfolios)
-router.get("/:id", getPortfolioById)
 router.post("/", createPortfolio)
 router.post("/draft", saveDraft)
 router.put("/:id", updatePortfolio)
