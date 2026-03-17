@@ -9,13 +9,12 @@ import { Server as SocketServer } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import socketConfig from '@config/socketConfig';
 import { Log } from '@services/loggerService';
+import Redis from 'ioredis';
+import redisConfig from '@config/redis';
 import redisClient from '@services/redisService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { emitNewMessageWithIO, emitNewMessageToBothUsersWithIO } from '@module/chat/chatSocket';
-import {
-  createSocketEventsSubscriber,
-  type SocketEventPayload
-} from '@services/socketPubSub';
+import { SOCKET_EVENTS_CHANNEL, type SocketEventPayload } from '@services/socketPubSub';
 
 const app = express();
 app.use(express.json());
@@ -99,7 +98,29 @@ async function handleSocketEvent(payload: SocketEventPayload): Promise<void> {
   }
 }
 
-createSocketEventsSubscriber(handleSocketEvent);
+const socketEventsRedisSub = new Redis(redisConfig);
+socketEventsRedisSub.subscribe(SOCKET_EVENTS_CHANNEL, (err) => {
+  if (err) Log.error('Socket events subscribe error', { err: err?.message });
+  else Log.info(`Subscribed to Redis channel: ${SOCKET_EVENTS_CHANNEL}`);
+});
+socketEventsRedisSub.on('message', (channel, message) => {
+  if (channel !== SOCKET_EVENTS_CHANNEL) return;
+  let payload: SocketEventPayload;
+  try {
+    payload = JSON.parse(message) as SocketEventPayload;
+  } catch {
+    Log.error('Invalid socket event payload', { raw: message });
+    return;
+  }
+  void (async () => {
+    try {
+      await handleSocketEvent(payload);
+    } catch (e) {
+      Log.error('Socket event handler error', { err: (e as Error)?.message });
+    }
+  })();
+});
+socketEventsRedisSub.on('error', (err) => Log.error('Socket events subscriber error', { err: err?.message }));
 
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Socket server is running' });

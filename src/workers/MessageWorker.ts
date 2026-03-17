@@ -2,7 +2,7 @@
  * Worker for messagequeuedev: saves chat messages to DB and publishes to Redis for realtime.
  * Run separately: npx ts-node src/workers/MessageWorker.ts (or via npm script).
  */
-import './moduleAlias';
+import '../moduleAlias';
 import dotenv from 'dotenv';
 dotenv.config();
 
