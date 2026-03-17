@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { EXPERTISE_TAXONOMY_BUNDLES } from '../data/taxonomy'
 
 const CHUNK = 400
@@ -10,8 +10,11 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Removes all user-facing data tied to expertise categories, then the taxonomy tables.
- * Founder projects and service packages are deleted (they reference category/subcategory).
+ * Taxonomy rows live in scd_expertise_categories, scd_specialties, scd_skills.
+ * We use raw SQL for deletes/inserts here so the seed works even when
+ * `prisma generate` used different model names (e.g. ExpertiseCategory vs Category)
+ * or Skill field names (expertise_category_id vs categoryId) — common when prod
+ * schema and local schema drift or Prisma versions differ.
  */
 export async function clearExpertiseTaxonomy(prisma: PrismaClient) {
   console.log('🗑️  Clearing old expertise data (user expertises, projects, packages, taxonomy)...')
@@ -25,14 +28,12 @@ export async function clearExpertiseTaxonomy(prisma: PrismaClient) {
   const deletedSp = await prisma.servicePackage.deleteMany({})
   console.log(`   ServicePackage removed: ${deletedSp.count}`)
 
-  const deletedSkills = await prisma.skill.deleteMany({})
-  console.log(`   Skill rows removed: ${deletedSkills.count}`)
-
-  const deletedSubs = await prisma.subcategory.deleteMany({})
-  console.log(`   Subcategory rows removed: ${deletedSubs.count}`)
-
-  const deletedCats = await prisma.category.deleteMany({})
-  console.log(`   Category rows removed: ${deletedCats.count}`)
+  const skills = await prisma.$executeRawUnsafe(`DELETE FROM "scd_skills"`)
+  const subs = await prisma.$executeRawUnsafe(`DELETE FROM "scd_specialties"`)
+  const cats = await prisma.$executeRawUnsafe(`DELETE FROM "scd_expertise_categories"`)
+  console.log(
+    `   Taxonomy tables cleared (skills/specialties/categories affected rows: ${skills}/${subs}/${cats})`
+  )
 }
 
 export async function seedExpertise(prisma: PrismaClient) {
@@ -44,22 +45,26 @@ export async function seedExpertise(prisma: PrismaClient) {
   let totalSkills = 0
 
   for (const bundle of EXPERTISE_TAXONOMY_BUNDLES) {
-    const category = await prisma.category.create({
-      data: {
-        name: bundle.categoryName,
-        description: null,
-        is_active: true,
-      },
-    })
+    const inserted = await prisma.$queryRaw<{ id: number }[]>`
+      INSERT INTO "scd_expertise_categories" ("name", "description", "is_active", "created_at", "updated_at")
+      VALUES (${bundle.categoryName}, ${null}, true, NOW(), NOW())
+      RETURNING "id"
+    `
+    const categoryId = inserted[0].id
 
     const subRows = bundle.subcategories.map((s) => ({
       name: s.name,
-      categoryId: category.id,
-      is_active: true,
+      expertise_category_id: categoryId,
     }))
 
     for (const batch of chunkArray(subRows, CHUNK)) {
-      await prisma.subcategory.createMany({ data: batch })
+      if (batch.length === 0) continue
+      await prisma.$executeRaw`
+        INSERT INTO "scd_specialties" ("name", "expertise_category_id", "is_active", "created_at", "updated_at")
+        VALUES ${Prisma.join(
+          batch.map((s) => Prisma.sql`(${s.name}, ${s.expertise_category_id}, true, NOW(), NOW())`)
+        )}
+      `
     }
     totalSubs += subRows.length
 
@@ -71,19 +76,16 @@ export async function seedExpertise(prisma: PrismaClient) {
       }
     }
 
-    const skillRows = [...skillNames].map((name) => ({
-      name,
-      categoryId: category.id,
-      is_active: true,
-    }))
-
-    for (const batch of chunkArray(skillRows, CHUNK)) {
-      await prisma.skill.createMany({
-        data: batch,
-        skipDuplicates: true,
-      })
+    const skillList = [...skillNames]
+    for (const batch of chunkArray(skillList, CHUNK)) {
+      if (batch.length === 0) continue
+      await prisma.$executeRaw`
+        INSERT INTO "scd_skills" ("name", "expertise_category_id", "is_active", "created_at", "updated_at")
+        VALUES ${Prisma.join(batch.map((name) => Prisma.sql`(${name}, ${categoryId}, true, NOW(), NOW())`)}
+        ON CONFLICT ("name", "expertise_category_id") DO NOTHING
+      `
     }
-    totalSkills += skillRows.length
+    totalSkills += skillList.length
 
     console.log(
       `   ✓ ${bundle.categoryName}: ${bundle.subcategories.length} subcategories, ${skillNames.size} unique skills`
