@@ -290,7 +290,7 @@ export class FounderProjectService {
             description: true
           }
         },
-        subCategory: {
+        subcategory: {
           select: {
             id: true,
             name: true,
@@ -373,11 +373,12 @@ export class FounderProjectService {
 
       // Transform projects
       const transformedProjects = await Promise.all(paginatedProjects.map(async (project: any) => {
-        const { invites, savedByUsers, ...projectData } = project;
+        const { invites, savedByUsers, subcategory, ...projectData } = project;
         // Use user's currency symbol if available, otherwise fallback to budget_currency or default
         const currencySymbol = project.user?.currency?.symbol || '₹';
         return {
           ...projectData,
+          subCategory: subcategory,
           budget_currency: currencySymbol,
           project_files: project.project_files
             ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
@@ -425,7 +426,7 @@ export class FounderProjectService {
             description: true
           }
         },
-        subCategory: {
+        subcategory: {
           select: {
             id: true,
             name: true,
@@ -527,11 +528,12 @@ export class FounderProjectService {
       const invitationMessageForViewer = !isOwner && inviteStatus === ProposalStatus.REJECTED ? null : (inviteData?.message || null);
 
       // Transform file URLs and remove relation data from response
-      const { invites, savedByUsers, ...projectData } = project as any;
+      const { invites, savedByUsers, subcategory, ...projectData } = project as any;
       // Use user's currency symbol if available
       const currencySymbol = (project as any).user?.currency?.symbol || '₹';
       const transformedProject = {
         ...projectData,
+        subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
           ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
