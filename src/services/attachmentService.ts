@@ -107,7 +107,7 @@ export async function resolveAttachmentUrl(
     return getPublicUrl(att.path);
   }
 
-  return `${baseUrl}/api/v1/files/view/${att.unique_id}`;
+  return `${baseUrl}/files/view/${att.unique_id}`;
 }
 
 /**
@@ -138,7 +138,7 @@ export async function resolveAttachmentUrls(
     if (allowed) {
       return getPublicUrl(att.path);
     }
-    return `${baseUrl}/api/v1/files/view/${att.unique_id}`;
+    return `${baseUrl}/files/view/${att.unique_id}`;
   });
 }
 

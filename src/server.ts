@@ -29,6 +29,8 @@ import reviewRoutes from './module/review/ReviewRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
+import { privateFileAccess } from "@middleware/auth";
+import { viewProtectedFile } from "@module/general/FileController";
 import { Log } from '@services/loggerService';
 
 // Bull Board for queue monitoring
@@ -41,6 +43,8 @@ app.use(corsMiddleware());
 
 app.use(express.json());
 app.use(cookieParser());
+/** Private file download — short URL (no /api/v1). Same handler as /api/v1/files/view/:uniqueId */
+app.get("get/file/:uniqueId/view", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/v1", userRoutes);
 app.use("/api/v1/profile", profileRoutes);
@@ -63,10 +67,10 @@ app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 
 // Bull Board UI for queue monitoring (only in development)
-// if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production') {
   app.use('/admin/queues', serverAdapter.getRouter());
   Log.info('Bull Board available at: http://localhost:4000/admin/queues');
-// }
+}
 
 const PORT = process.env.PORT || 4000;
 

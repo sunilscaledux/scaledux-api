@@ -125,7 +125,6 @@ export async function deleteFile(req: Request, res: Response) {
 const fileLostUrl = () =>
   `${(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '')}/file-lost`
 
-/** GET /api/v1/files/view/:uniqueId - stream protected file after access check */
 export async function viewProtectedFile(req: Request, res: Response) {
   try {
     const uniqueId = req.params.uniqueId as string
