@@ -24,6 +24,10 @@ CMD ["npm", "run", "dev:worker"]
 FROM dev AS dev-schedule
 CMD ["npm", "run", "dev:schedule"]
 
+# -------- Target: dev-message-worker (BullMQ message persistence) --------
+FROM dev AS dev-message-worker
+CMD ["npm", "run", "dev:message-worker"]
+
 # -------- Stage: builder (for all prod targets) --------
 FROM node:20-alpine AS builder
 
@@ -67,3 +71,7 @@ CMD ["node", "dist/workerServer.js"]
 # -------- Target: prod-schedule --------
 FROM prod-base AS prod-schedule
 CMD ["node", "dist/scheduleServer.js"]
+
+# -------- Target: prod-message-worker --------
+FROM prod-base AS prod-message-worker
+CMD ["node", "dist/workers/MessageWorker.js"]

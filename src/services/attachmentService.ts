@@ -123,10 +123,14 @@ export async function resolveAttachmentUrls(
   if (uniqueIds.length === 0) {
     return values.map(() => '');
   }
+  type AttUrlRow = { unique_id: string; visibility: string; path: string };
   const attachments = await prisma.attachment.findMany({
     where: { unique_id: { in: uniqueIds }, deleted_at: null },
+    select: { unique_id: true, visibility: true, path: true },
   });
-  const map = new Map(attachments.map((a) => [a.unique_id, a]));
+  const map = new Map<string, AttUrlRow>(
+    (attachments as AttUrlRow[]).map((a) => [a.unique_id, a])
+  );
   const baseUrl = (options?.baseUrl || process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
   const fieldName = options?.fieldName ?? 'attachment';
 

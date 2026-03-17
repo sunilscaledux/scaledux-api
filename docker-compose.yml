@@ -1,13 +1,5 @@
-# ScaleDux — DEV: full stack (Postgres + Redis + API + Socket + Worker + Schedule + Frontend)
-# Run from scaleDux-api:  docker compose up -d --build
-#
-# Migrations run automatically when the api container starts (prisma migrate deploy).
-#
-# URLs when running locally:
-#   Frontend:  http://localhost:3000
-#   API:       http://localhost:4000/api/v1
-#   Socket:    http://localhost:4001
-#   Schedule:  (cron process, no HTTP port)
+# Backend dev: from this folder → docker compose up
+# Set DATABASE_URL host to `postgres`, REDIS_URL to `redis://redis:6379` in .env for Docker.
 
 services:
   postgres:
@@ -28,36 +20,23 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: scaledux-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
-  api:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
       target: dev
-    container_name: scaledux-api
+    container_name: scaledux-app
     restart: unless-stopped
-    command: ["sh", "-c", "npx prisma generate && npx prisma migrate deploy && npm run dev"]
+    command: ["sh", "-c", "npm install && npx prisma generate && npx prisma migrate deploy && npm run dev:docker"]
     ports:
       - "4000:4000"
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
     env_file:
-      - ./.env
+      - .env
     depends_on:
       postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
 
   socket:
     build:
@@ -66,16 +45,16 @@ services:
       target: dev-socket
     container_name: scaledux-socket
     restart: unless-stopped
+    command: ["npm", "run", "dev:socket"]
     ports:
       - "4001:4001"
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
     env_file:
-      - ./.env
+      - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      app: { condition: service_started }
 
   worker:
     build:
@@ -84,14 +63,30 @@ services:
       target: dev-worker
     container_name: scaledux-worker
     restart: unless-stopped
+    command: ["npm", "run", "dev:worker"]
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
     env_file:
-      - ./.env
+      - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      app: { condition: service_started }
+
+  message-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev-message-worker
+    container_name: scaledux-message-worker
+    restart: unless-stopped
+    command: ["npm", "run", "dev:message-worker"]
+    volumes:
+      - .:/app
+      - scaledux_api_node_modules:/app/node_modules
+    env_file:
+      - .env
+    depends_on:
+      app: { condition: service_started }
 
   schedule:
     build:
@@ -100,35 +95,15 @@ services:
       target: dev-schedule
     container_name: scaledux-schedule
     restart: unless-stopped
+    command: ["npm", "run", "dev:schedule"]
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
     env_file:
-      - ./.env
+      - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-
-      #comment if not needed maily while foing only backend development
-
-  frontend:
-    build:
-      context: ../scaledux-ui
-      dockerfile: Dockerfile
-      target: dev
-    container_name: scaledux-frontend
-    restart: unless-stopped
-    command: ["npm", "run", "dev"]
-    ports:
-      - "3000:3000"
-    volumes:
-      - ../scaledux-ui:/app
-      - scaledux_ui_node_modules:/app/node_modules
-    env_file: ../scaledux-ui/.env
-    depends_on:
-      - api
+      app: { condition: service_started }
 
 volumes:
   postgres_data:
   scaledux_api_node_modules:
-  scaledux_ui_node_modules:

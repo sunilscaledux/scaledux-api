@@ -1,16 +1,10 @@
-# ScaleDux — PROD: app services only (external Postgres + Redis)
-# Expected layout under /var/www:
-#   /var/www/backend
-#   /var/www/frontend
-# Set POSTGRES_URL, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD in /var/www/backend/.env
-#
-# Run from /var/www:
-#   docker compose -f backend/docker-compose.prod.yml up -d --build
+# Backend production: from this folder → docker compose -f docker-compose.prod.yml up -d
 
 services:
+
   api:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
       target: prod
     container_name: scaledux-api
@@ -19,53 +13,67 @@ services:
     ports:
       - "4000:4000"
     env_file:
-      - ./backend/.env
+      - .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   socket:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-      target: prod
+      target: prod-socket
     container_name: scaledux-socket
     restart: unless-stopped
     command: ["node", "dist/socket-server.js"]
     ports:
       - "4001:4001"
     env_file:
-      - ./backend/.env
+      - .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   worker:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-      target: prod
+      target: prod-worker
     container_name: scaledux-worker
     restart: unless-stopped
     command: ["node", "dist/workerServer.js"]
     env_file:
-      - ./backend/.env
+      - .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  message-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-message-worker
+    container_name: scaledux-message-worker
+    restart: unless-stopped
+    command: ["node", "dist/workers/MessageWorker.js"]
+    env_file:
+      - .env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      api: { condition: service_started }
 
   schedule:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-      target: prod
+      target: prod-schedule
     container_name: scaledux-schedule
     restart: unless-stopped
     command: ["node", "dist/scheduleServer.js"]
     env_file:
-      - ./backend/.env
-
-  # Comment this service if frontend is deployed separately.
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: prod
-    container_name: scaledux-frontend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    env_file: ./frontend/.env
+      - .env
     depends_on:
-      - api
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
