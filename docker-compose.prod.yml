@@ -16,7 +16,7 @@ services:
     env_file:
       - .env
     extra_hosts:
-      - "host.docker.internal"
+      - "host.docker.internal:host-gateway"
 
   socket:
     build:
@@ -33,7 +33,7 @@ services:
     depends_on:
       app: { condition: service_started }
     extra_hosts:
-      - "host.docker.internal"
+      - "host.docker.internal:host-gateway"
 
   worker:
     build:
@@ -48,7 +48,7 @@ services:
     depends_on:
       app: { condition: service_started }
     extra_hosts:
-      - "host.docker.internal"
+      - "host.docker.internal:host-gateway"
 
   message-worker:
     build:
@@ -63,7 +63,7 @@ services:
     depends_on:
       app: { condition: service_started }
     extra_hosts:
-      - "host.docker.internal"
+      - "host.docker.internal:host-gateway"
 
   schedule:
     build:
@@ -78,4 +78,4 @@ services:
     depends_on:
       app: { condition: service_started }
     extra_hosts:
-      - "host.docker.internal"
+      - "host.docker.internal:host-gateway"
