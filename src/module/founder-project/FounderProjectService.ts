@@ -42,7 +42,7 @@ export class FounderProjectService {
       }
 
       if (categoryId) {
-        whereClause.category_id = categoryId;
+        whereClause.expertise_category_id = categoryId;
       }
 
       // Search across title and description
@@ -160,7 +160,7 @@ export class FounderProjectService {
               description: true
             }
           },
-          subCategory: {
+          subcategory: {
             select: {
               id: true,
               name: true,
@@ -172,13 +172,20 @@ export class FounderProjectService {
       });
 
       // Transform file URLs to full URLs and add currency symbol
-      const transformedProjects = await Promise.all(projects.map(async project => ({
-        ...project,
+      const transformedProjects = await Promise.all(projects.map(async (project: any) => {
+        const { category: cat, subcategory, ...rest } = project;
+        return {
+        ...rest,
+        category_id: rest.expertise_category_id,
+        sub_category_id: rest.specialty_id,
+        category: cat,
+        subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
           ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
           : []
-      })));
+      };
+      }));
 
       return {
         success: true,
@@ -235,7 +242,7 @@ export class FounderProjectService {
 
       // Category filter (supports multiple categories)
       if (categoryIds && categoryIds.length > 0) {
-        whereClause.category_id = { in: categoryIds };
+        whereClause.expertise_category_id = { in: categoryIds };
       }
 
       // Search across title and description
@@ -564,8 +571,8 @@ export class FounderProjectService {
           user_id: userId,
           project_title: data.projectTitle,
           project_description: data.projectDescription,
-          category_id: data.categoryId,
-          sub_category_id: data.subCategoryId || null,
+          expertise_category_id: data.categoryId,
+          specialty_id: data.subCategoryId || null,
           project_files: projectFiles,
           scope_of_work: data.scopeOfWork,
           skills_required: data.skillsRequired,
@@ -756,8 +763,8 @@ export class FounderProjectService {
           user_id: userId,
           project_title: `${originalProject.project_title} (Copy)`,
           project_description: originalProject.project_description,
-          category_id: originalProject.category_id,
-          sub_category_id: originalProject.sub_category_id,
+          expertise_category_id: originalProject.expertise_category_id,
+          specialty_id: originalProject.specialty_id,
           project_files: originalProject.project_files as any,
           scope_of_work: originalProject.scope_of_work,
           skills_required: originalProject.skills_required as any,
@@ -895,8 +902,8 @@ export class FounderProjectService {
           },
           expertises: {
             include: {
-              expertiseCategory: { select: { id: true, name: true } },
-              specialty: { select: { id: true, name: true } }
+              category: { select: { id: true, name: true } },
+              subcategory: { select: { id: true, name: true } }
             }
           },
           servicePackages: {
@@ -937,8 +944,8 @@ export class FounderProjectService {
           city: freelancer.personalInfo?.city || null,
           expertises: freelancer.expertises.map((exp: any) => ({
             id: exp.id,
-            category: exp.expertiseCategory,
-            specialty: exp.specialty,
+            category: exp.category,
+            subcategory: exp.subcategory,
             skills: exp.skills || []
           })),
           all_skills: userSkills,

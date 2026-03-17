@@ -23,7 +23,6 @@ import founderProjectRoutes from './module/founder-project/FounderProjectRoute';
 import proposalRoutes from './module/proposal/ProposalRoute';
 import chatRoutes from './module/chat/ChatRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
-import serviceCategoryRoutes from './module/service-category/ServiceCategoryRoute';
 import billingRoutes from './module/billing/BillingRoute';
 import reviewRoutes from './module/review/ReviewRoute';
 
@@ -62,7 +61,6 @@ app.use("/api/v1/founder-projects", founderProjectRoutes);
 app.use("/api/v1/proposals", proposalRoutes);
 app.use("/api/v1", chatRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
-app.use("/api/v1/service-categories", serviceCategoryRoutes);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 

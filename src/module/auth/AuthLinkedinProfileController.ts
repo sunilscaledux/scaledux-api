@@ -226,39 +226,37 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
     if (skillsData.length > 0) {
       try {
         // Find or create a general "Technology" expertise category
-        let techCategory = await prisma.expertiseCategory.findFirst({
+        let techCategory = await prisma.category.findFirst({
           where: { name: 'Technology' }
         });
 
         if (!techCategory) {
-          techCategory = await prisma.expertiseCategory.create({
+          techCategory = await prisma.category.create({
             data: { name: 'Technology', description: 'Technology and technical skills' }
           });
         }
 
-        // Find or create a general "General Skills" specialty
-        let generalSpecialty = await prisma.specialty.findFirst({
+        let generalSubcategory = await prisma.subcategory.findFirst({
           where: { name: 'General Skills' }
         });
 
-        if (!generalSpecialty) {
-          generalSpecialty = await prisma.specialty.create({
+        if (!generalSubcategory) {
+          generalSubcategory = await prisma.subcategory.create({
             data: { 
               name: 'General Skills', 
               description: 'General professional skills',
-              expertise_category_id: techCategory.id
+              categoryId: techCategory.id
             }
           });
         }
 
-        // Create user expertise with LinkedIn skills
-        const skillNames = skillsData.map(skill => skill.name).slice(0, 20); // Limit to 20 skills
+        const skillNames = skillsData.map(skill => skill.name).slice(0, 20);
 
         await prisma.userExpertise.create({
           data: {
             user_id: userId,
-            expertise_category_id: techCategory.id,
-            specialty_id: generalSpecialty.id,
+            categoryId: techCategory.id,
+            subcategoryId: generalSubcategory.id,
             description: 'Skills imported from LinkedIn profile',
             skills: skillNames,
           },

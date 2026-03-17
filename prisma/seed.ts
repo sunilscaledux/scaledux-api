@@ -3,7 +3,6 @@ import { seedCurrencies } from "./seeds/currencies-seed";
 import { seedCountriesAndStates } from "./seeds/countries-states-seed";
 import { seedLanguages } from "./seeds/languages-seed";
 import { seedExpertise } from "./seeds/expertise-seed";
-import { seedServiceCategories } from "./seeds/service-categories-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
 import { seedTeamRoles } from "./seeds/team-roles-seed";
@@ -27,19 +26,16 @@ async function main() {
   // // 4. Seed Expertise System
   await seedExpertise(prisma);
 
-  // 5. Seed Service Categories
-  await seedServiceCategories(prisma);
-
-  // 6. Seed Industries
+  // 5. Seed Industries
   await seedIndustries(prisma);
 
-  // 7. Seed Sub-Industries and Business Models
+  // 6. Seed Sub-Industries and Business Models
   await seedSubIndustriesAndBusinessModels(prisma);
 
-  // 8. Seed Team Roles
+  // 7. Seed Team Roles
   await seedTeamRoles(prisma);
 
-  // 9. Seed Revenue Models
+  // 8. Seed Revenue Models
   await seedRevenueModels(prisma);
 
   // await seedBillingData(prisma);

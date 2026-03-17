@@ -24,9 +24,6 @@ import {
   getContractEndReasons,
   searchSkills,
   getAllSkills,
-  getServiceCategories,
-  getServiceSubCategories,
-  getServiceKeywords,
 } from "./GeneralController"
 
 const router = Router()
@@ -57,10 +54,6 @@ router.get("/contract-end-reasons", getContractEndReasons)
 
 router.get("/skills/search", searchSkills)
 router.get("/skills", getAllSkills)
-
-router.get("/service-categories", getServiceCategories)
-router.get("/service-categories/:categoryId/subcategories", getServiceSubCategories)
-router.get("/service-categories/:categoryId/keywords", getServiceKeywords)
 
 router.post("/cache/warm", warmLocationCache)
 router.delete("/cache/invalidate", invalidateCache)

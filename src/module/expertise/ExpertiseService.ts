@@ -5,48 +5,33 @@ import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
 export class ExpertiseService {
-  /**
-   * Create a new user expertise record
-   */
   static async createUserExpertise(userId: number, data: CreateUserExpertiseInput): Promise<ServiceResponse> {
     try {
-      // Check if expertise category exists
-      const expertiseCategory = await prisma.expertiseCategory.findFirst({
+      const category = await prisma.category.findFirst({
         where: { id: data.expertise_category_id, is_active: true }
       });
-      if (!expertiseCategory) {
-        return {
-          success: false,
-          message: "Invalid expertise category"
-        };
+      if (!category) {
+        return { success: false, message: "Invalid expertise category" };
       }
 
-      // Check if specialty exists
-      const specialty = await prisma.specialty.findFirst({
+      const subcategory = await prisma.subcategory.findFirst({
         where: { id: data.specialty_id, is_active: true }
       });
-      if (!specialty) {
-        return {
-          success: false,
-          message: "Invalid specialty"
-        };
+      if (!subcategory) {
+        return { success: false, message: "Invalid subcategory" };
       }
 
       const userExpertise = await prisma.userExpertise.create({
         data: {
           user_id: userId,
-          expertise_category_id: data.expertise_category_id,
-          specialty_id: data.specialty_id,
+          categoryId: data.expertise_category_id,
+          subcategoryId: data.specialty_id,
           description: data.description,
           skills: data.skills || []
         },
         include: {
-          expertiseCategory: {
-            select: { id: true, name: true, description: true }
-          },
-          specialty: {
-            select: { id: true, name: true, description: true }
-          }
+          category: { select: { id: true, name: true, description: true } },
+          subcategory: { select: { id: true, name: true, description: true } }
         }
       });
       await updateCompletionSection(userId, 'skillsExpertise', true);
@@ -57,33 +42,19 @@ export class ExpertiseService {
       };
     } catch (error: any) {
       Log.error("Error", { error });
-      return {
-        success: false,
-        message: "Failed to add expertise"
-      };
+      return { success: false, message: "Failed to add expertise" };
     }
   }
 
-  /**
-   * Get all user expertise records for a user
-   */
   static async getUserExpertises(userId: number): Promise<ServiceResponse> {
     try {
       const userExpertises = await prisma.userExpertise.findMany({
-        where: {
-          user_id: userId
-        },
+        where: { user_id: userId },
         include: {
-          expertiseCategory: {
-            select: { id: true, name: true, description: true }
-          },
-          specialty: {
-            select: { id: true, name: true, description: true }
-          }
+          category: { select: { id: true, name: true, description: true } },
+          subcategory: { select: { id: true, name: true, description: true } }
         },
-        orderBy: {
-          created_at: 'desc'
-        }
+        orderBy: { created_at: 'desc' }
       });
 
       return {
@@ -93,72 +64,45 @@ export class ExpertiseService {
       };
     } catch (error: any) {
       Log.error("Error", { error });
-      return {
-        success: false,
-        message: "Failed to retrieve user expertises"
-      };
+      return { success: false, message: "Failed to retrieve user expertises" };
     }
   }
 
-  /**
-   * Update a user expertise record
-   */
   static async updateUserExpertise(userId: number, expertiseId: number, data: UpdateUserExpertiseInput): Promise<ServiceResponse> {
     try {
-      // Check if user expertise belongs to user
       const existingUserExpertise = await prisma.userExpertise.findFirst({
-        where: {
-          id: expertiseId,
-          user_id: userId
-        }
+        where: { id: expertiseId, user_id: userId }
       });
 
       if (!existingUserExpertise) {
-        return {
-          success: false,
-          message: "User expertise not found"
-        };
+        return { success: false, message: "User expertise not found" };
       }
 
-      // Check if expertise category exists
-      const expertiseCategory = await prisma.expertiseCategory.findFirst({
+      const category = await prisma.category.findFirst({
         where: { id: data.expertise_category_id, is_active: true }
       });
-      if (!expertiseCategory) {
-        return {
-          success: false,
-          message: "Invalid expertise category"
-        };
+      if (!category) {
+        return { success: false, message: "Invalid expertise category" };
       }
 
-      // Check if specialty exists
-      const specialty = await prisma.specialty.findFirst({
+      const subcategory = await prisma.subcategory.findFirst({
         where: { id: data.specialty_id, is_active: true }
       });
-      if (!specialty) {
-        return {
-          success: false,
-          message: "Invalid specialty"
-        };
+      if (!subcategory) {
+        return { success: false, message: "Invalid subcategory" };
       }
 
       const userExpertise = await prisma.userExpertise.update({
-        where: {
-          id: expertiseId
-        },
+        where: { id: expertiseId },
         data: {
-          expertise_category_id: data.expertise_category_id,
-          specialty_id: data.specialty_id,
+          categoryId: data.expertise_category_id,
+          subcategoryId: data.specialty_id,
           description: data.description,
           skills: data.skills || []
         },
         include: {
-          expertiseCategory: {
-            select: { id: true, name: true, description: true }
-          },
-          specialty: {
-            select: { id: true, name: true, description: true }
-          }
+          category: { select: { id: true, name: true, description: true } },
+          subcategory: { select: { id: true, name: true, description: true } }
         }
       });
 
@@ -169,38 +113,21 @@ export class ExpertiseService {
       };
     } catch (error: any) {
       Log.error("Error", { error });
-      return {
-        success: false,
-        message: "Failed to update user expertise"
-      };
+      return { success: false, message: "Failed to update user expertise" };
     }
   }
 
-  /**
-   * Delete a user expertise record
-   */
   static async deleteUserExpertise(userId: number, expertiseId: number): Promise<ServiceResponse> {
     try {
-      // Check if user expertise belongs to user
       const existingUserExpertise = await prisma.userExpertise.findFirst({
-        where: {
-          id: expertiseId,
-          user_id: userId
-        }
+        where: { id: expertiseId, user_id: userId }
       });
 
       if (!existingUserExpertise) {
-        return {
-          success: false,
-          message: "User expertise not found"
-        };
+        return { success: false, message: "User expertise not found" };
       }
 
-      await prisma.userExpertise.delete({
-        where: {
-          id: expertiseId
-        }
-      });
+      await prisma.userExpertise.delete({ where: { id: expertiseId } });
       const remaining = await prisma.userExpertise.count({ where: { user_id: userId } });
       await updateCompletionSection(userId, 'skillsExpertise', remaining > 0);
       return {
@@ -210,10 +137,7 @@ export class ExpertiseService {
       };
     } catch (error: any) {
       Log.error("Error", { error });
-      return {
-        success: false,
-        message: "Failed to delete user expertise"
-      };
+      return { success: false, message: "Failed to delete user expertise" };
     }
   }
 }
