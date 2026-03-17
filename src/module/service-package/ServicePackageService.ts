@@ -6,11 +6,17 @@ import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds
 /**
  * Helper to parse JSON fields and resolve file URLs (async).
  */
+const packageRelationInclude = {
+  category: { select: { id: true, name: true } as const },
+  subcategory: { select: { id: true, name: true } as const },
+} as const;
+
 async function parseServicePackageJsonAsync(pkg: any) {
-  const thumbnailNorm = urlsOrPathsToAttachmentIds([pkg.thumbnail])[0] ?? '';
-  const imagesArr = typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || []);
-  const videoArr = typeof pkg.video === "string" ? JSON.parse(pkg.video) : (pkg.video || []);
-  const documentsArr = typeof pkg.documents === "string" ? JSON.parse(pkg.documents) : (pkg.documents || []);
+  const { category, subcategory, ...pkgRow } = pkg;
+  const thumbnailNorm = urlsOrPathsToAttachmentIds([pkgRow.thumbnail])[0] ?? '';
+  const imagesArr = typeof pkgRow.images === "string" ? JSON.parse(pkgRow.images) : (pkgRow.images || []);
+  const videoArr = typeof pkgRow.video === "string" ? JSON.parse(pkgRow.video) : (pkgRow.video || []);
+  const documentsArr = typeof pkgRow.documents === "string" ? JSON.parse(pkgRow.documents) : (pkgRow.documents || []);
   const [thumbnail, images, video, documents] = await Promise.all([
     thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, { entityType: 'servicePackage', fieldName: 'thumbnail' }) : Promise.resolve(null),
     resolveAttachmentUrls(imagesArr, { entityType: 'servicePackage', fieldName: 'documents' }),
@@ -18,18 +24,20 @@ async function parseServicePackageJsonAsync(pkg: any) {
     resolveAttachmentUrls(documentsArr, { entityType: 'servicePackage', fieldName: 'documents' }),
   ]);
   return {
-    ...pkg,
-    features: typeof pkg.features === "string" ? JSON.parse(pkg.features) : pkg.features,
-    industry: typeof pkg.industries === "string" ? JSON.parse(pkg.industries) : pkg.industries || [],
-    keywords: Array.isArray(pkg.skill_ids) ? pkg.skill_ids : (typeof pkg.skill_ids === "string" ? JSON.parse(pkg.skill_ids || "[]") : []),
-    skill_ids: typeof pkg.skill_ids === "string" ? JSON.parse(pkg.skill_ids) : pkg.skill_ids || [],
-    scope: typeof pkg.scope === "string" ? JSON.parse(pkg.scope) : pkg.scope,
-    extraAddOns: typeof pkg.extra_add_ons === "string" ? JSON.parse(pkg.extra_add_ons) : pkg.extra_add_ons || null,
-    packageDescription: pkg.package_description || pkg.packageDescription || "",
-    deliverables: typeof pkg.deliverables === "string" ? JSON.parse(pkg.deliverables) : pkg.deliverables,
-    faqs: typeof pkg.faqs === "string" ? JSON.parse(pkg.faqs) : pkg.faqs,
-    links: typeof pkg.links === "string" ? JSON.parse(pkg.links) : pkg.links,
-    requirements: typeof pkg.requirements === "string" ? JSON.parse(pkg.requirements) : pkg.requirements,
+    ...pkgRow,
+    subCategory: subcategory ?? null,
+    category: category ?? null,
+    features: typeof pkgRow.features === "string" ? JSON.parse(pkgRow.features) : pkgRow.features,
+    industry: typeof pkgRow.industries === "string" ? JSON.parse(pkgRow.industries) : pkgRow.industries || [],
+    keywords: Array.isArray(pkgRow.skill_ids) ? pkgRow.skill_ids : (typeof pkgRow.skill_ids === "string" ? JSON.parse(pkgRow.skill_ids || "[]") : []),
+    skill_ids: typeof pkgRow.skill_ids === "string" ? JSON.parse(pkgRow.skill_ids) : pkgRow.skill_ids || [],
+    scope: typeof pkgRow.scope === "string" ? JSON.parse(pkgRow.scope) : pkgRow.scope,
+    extraAddOns: typeof pkgRow.extra_add_ons === "string" ? JSON.parse(pkgRow.extra_add_ons) : pkgRow.extra_add_ons || null,
+    packageDescription: pkgRow.package_description || pkgRow.packageDescription || "",
+    deliverables: typeof pkgRow.deliverables === "string" ? JSON.parse(pkgRow.deliverables) : pkgRow.deliverables,
+    faqs: typeof pkgRow.faqs === "string" ? JSON.parse(pkgRow.faqs) : pkgRow.faqs,
+    links: typeof pkgRow.links === "string" ? JSON.parse(pkgRow.links) : pkgRow.links,
+    requirements: typeof pkgRow.requirements === "string" ? JSON.parse(pkgRow.requirements) : pkgRow.requirements,
     thumbnail,
     images,
     video,
@@ -51,6 +59,7 @@ export class ServicePackageService {
       const packages = await prisma.servicePackage.findMany({
         where: whereClause,
         orderBy: { created_at: "desc" },
+        include: packageRelationInclude,
       });
 
       const transformedPackages = await Promise.all(packages.map(parseServicePackageJsonAsync));
@@ -79,6 +88,7 @@ export class ServicePackageService {
           unique_id: uniqueId,
           user_id: userId,
         },
+        include: packageRelationInclude,
       });
 
       if (!servicePackage) {
@@ -136,6 +146,7 @@ export class ServicePackageService {
           documents: normalizedDocuments,
           status: packageData.status || "DRAFT",
         },
+        include: packageRelationInclude,
       });
 
       const transformedPackage = await parseServicePackageJsonAsync(newPackage);
@@ -201,6 +212,7 @@ export class ServicePackageService {
           documents: normalizedDocuments,
           status: packageData.status || existingPackage.status,
         },
+        include: packageRelationInclude,
       });
 
       const transformedPackage = await parseServicePackageJsonAsync(updatedPackage);

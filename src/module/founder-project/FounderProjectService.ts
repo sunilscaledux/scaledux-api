@@ -642,8 +642,8 @@ export class FounderProjectService {
 
       if (data.projectTitle !== undefined) updateData.project_title = data.projectTitle;
       if (data.projectDescription !== undefined) updateData.project_description = data.projectDescription;
-      if (data.categoryId !== undefined) updateData.category_id = data.categoryId;
-      if (data.subCategoryId !== undefined) updateData.sub_category_id = data.subCategoryId;
+      if (data.categoryId !== undefined) updateData.expertise_category_id = data.categoryId;
+      if (data.subCategoryId !== undefined) updateData.specialty_id = data.subCategoryId;
       if (data.scopeOfWork !== undefined) updateData.scope_of_work = data.scopeOfWork;
       if (data.skillsRequired !== undefined) updateData.skills_required = data.skillsRequired;
       if (data.experienceNeeded !== undefined) updateData.experience_needed = data.experienceNeeded;
