@@ -1,8 +1,10 @@
-# Backend production: from this folder → docker compose -f docker-compose.prod.yml up -d
+# Backend production: docker compose -f docker-compose.prod.yml up -d --build
+# Use external Postgres + Redis — set POSTGRES_URL (or DATABASE_URL) and REDIS_URL in .env
+# (e.g. host not "postgres"/"redis" unless on same Docker network)
 
 services:
 
-  api:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
@@ -14,9 +16,6 @@ services:
       - "4000:4000"
     env_file:
       - .env
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
 
   socket:
     build:
@@ -31,8 +30,7 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      app: { condition: service_started }
 
   worker:
     build:
@@ -45,8 +43,7 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
+      app: { condition: service_started }
 
   message-worker:
     build:
@@ -59,9 +56,7 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      api: { condition: service_started }
+      app: { condition: service_started }
 
   schedule:
     build:
@@ -74,6 +69,4 @@ services:
     env_file:
       - .env
     depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-
+      app: { condition: service_started }
