@@ -1,7 +1,8 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
-import { emitNewMessageToBothUsers, emitConversationStatusToUser } from "./chatSocket";
+import { emitConversationStatusToUser } from "./chatSocket";
+import { publishSocketEvent } from "@services/socketPubSub";
 import { Log } from '@services/loggerService';
 
 async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
@@ -306,7 +307,7 @@ export class ConversationService {
       data
     });
 
-    // Realtime: emit to conversation room and both user rooms
+    // Realtime: publish to Redis (socket-server subscribes and emits)
     const payload = {
       id: msg.data!.id,
       unique_id: msg.data!.unique_id,
@@ -317,7 +318,13 @@ export class ConversationService {
       metadata: msg.data!.metadata ?? undefined,
       createdAt: msg.data!.created_at
     };
-    emitNewMessageToBothUsers(conv.data.unique_id, payload, userId1, userId2);
+    await publishSocketEvent({
+      type: "new_message_both",
+      conversationId: conv.data.unique_id,
+      message: payload,
+      userId1,
+      userId2
+    });
 
     return { success: true, message: "Synced", data: { conversationUniqueId: conv.data.unique_id } };
   }
@@ -649,13 +656,16 @@ export class ConversationService {
 
   /**
    * Send a user message. Returns the created message.
+   * When skipEmit is true, no socket emit is called (used by message queue worker; worker publishes to Redis).
+   * When skipEmit and a status update would have been emitted, returns statusUpdate for the worker to publish.
    */
   static async sendMessage(
     conversationUniqueId: string,
     userId: number,
     content: string,
     attachmentUrls?: string[],
-    replyTo?: { messageId: number; unique_id: string; content: string; senderName?: string }
+    replyTo?: { messageId: number; unique_id: string; content: string; senderName?: string },
+    options?: { skipEmit?: boolean }
   ): Promise<ServiceResponse<any>> {
     try {
       const conv = await this.getConversationByUniqueId(conversationUniqueId, userId);
@@ -716,14 +726,18 @@ export class ConversationService {
         where: { id: conv.data.id },
         data: sendUpdateData
       });
-      if (statusUpdate != null) {
+      let statusUpdatePayload: { conversationId: string; status: string; userId: number } | undefined;
+      if (statusUpdate != null && !options?.skipEmit) {
         if (statusUpdate === "NOT_ACCEPTED") {
           emitConversationStatusToUser(userId, conv.data.unique_id, statusUpdate);
         } else if (statusUpdate === "ACCEPTED" && convStatus === "NOT_ACCEPTED" && firstUserMessage?.sender_id != null) {
           emitConversationStatusToUser(firstUserMessage.sender_id, conv.data.unique_id, statusUpdate);
         }
+      } else if (statusUpdate != null && options?.skipEmit) {
+        const targetUserId = statusUpdate === "NOT_ACCEPTED" ? userId : (firstUserMessage?.sender_id ?? userId);
+        statusUpdatePayload = { conversationId: conv.data.unique_id, status: statusUpdate, userId: targetUserId };
       }
-      
+
       const receiverId = conv.data.otherParticipant.id;
       const senderPayload = msg.sender
         ? {
@@ -733,7 +747,7 @@ export class ConversationService {
             profile_image: await toProfileImageUrl(msg.sender.personalInfo?.profileImage)
           }
         : null;
-      return {
+      const response: ServiceResponse<any> = {
         success: true,
         message: "Sent",
         data: {
@@ -749,6 +763,8 @@ export class ConversationService {
           receiverId
         }
       };
+      if (statusUpdatePayload) (response as any).statusUpdate = statusUpdatePayload;
+      return response;
     } catch (error: any) {
       Log.error("Error", { error });
       return { success: false, message: error.message || "Failed to send message" };

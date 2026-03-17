@@ -1,8 +1,4 @@
-/**
- * Standalone Socket.IO server (same app, separate process).
- * Run alongside server.ts so the API and real-time layer use separate event loops.
- * API notifies this process via POST /emit (internal secret required).
- */
+
 import './moduleAlias';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -16,6 +12,10 @@ import { Log } from '@services/loggerService';
 import redisClient from '@services/redisService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { emitNewMessageWithIO, emitNewMessageToBothUsersWithIO } from '@module/chat/chatSocket';
+import {
+  createSocketEventsSubscriber,
+  type SocketEventPayload
+} from '@services/socketPubSub';
 
 const app = express();
 app.use(express.json());
@@ -50,72 +50,57 @@ async function isUserOnline(userId: number): Promise<boolean> {
   return exists === 1;
 }
 
-// Internal endpoint: API process POSTs here to trigger socket emits (no Socket.IO in API process)
-app.post('/emit', async (req, res) => {
-  const secret = req.headers['x-internal-secret'] || req.body?.secret;
-  if (secret !== socketConfig.emitSecret) {
-    res.status(401).json({ ok: false, error: 'Unauthorized' });
-    return;
-  }
-  const { type, conversationId, message, receiverId, userId1, userId2, userId, status, deviceId, deviceIds } = req.body || {};
-  if (!type) {
-    res.status(400).json({ ok: false, error: 'Missing type' });
-    return;
-  }
-  try {
-    if (type === 'session_revoked') {
-      if (typeof userId !== 'number' || deviceId == null) {
-        res.status(400).json({ ok: false, error: 'userId and deviceId required for session_revoked' });
-        return;
-      }
-      io.to(`user:${userId}:device:${deviceId}`).emit('session_revoked');
-    } else if (type === 'session_revoked_many') {
-      if (typeof userId !== 'number' || !Array.isArray(deviceIds)) {
-        res.status(400).json({ ok: false, error: 'userId and deviceIds[] required for session_revoked_many' });
-        return;
-      }
-      deviceIds.forEach((id: number) => {
-        io.to(`user:${userId}:device:${id}`).emit('session_revoked');
+async function handleSocketEvent(payload: SocketEventPayload): Promise<void> {
+  switch (payload.type) {
+    case 'session_revoked':
+      io.to(`user:${payload.userId}:device:${payload.deviceId}`).emit('session_revoked');
+      break;
+    case 'session_revoked_many':
+      payload.deviceIds.forEach((id: number) => {
+        io.to(`user:${payload.userId}:device:${id}`).emit('session_revoked');
       });
-    } else if (type === 'new_message') {
-      if (!conversationId || !message) {
-        res.status(400).json({ ok: false, error: 'conversationId and message required for new_message' });
-        return;
-      }
-      const receiverOnline = typeof receiverId === 'number'
-        ? await isUserOnline(receiverId)
-        : false;
-      emitNewMessageWithIO(io, conversationId, message, receiverId, receiverOnline);
-    } else if (type === 'new_message_both') {
-      if (!conversationId || !message) {
-        res.status(400).json({ ok: false, error: 'conversationId and message required for new_message_both' });
-        return;
-      }
-      if (typeof userId1 !== 'number' || typeof userId2 !== 'number') {
-        res.status(400).json({ ok: false, error: 'userId1 and userId2 required for new_message_both' });
-        return;
-      }
-      const [user1Online, user2Online] = await Promise.all([
-        isUserOnline(userId1),
-        isUserOnline(userId2)
-      ]);
-      emitNewMessageToBothUsersWithIO(io, conversationId, message, userId1, userId2, user1Online, user2Online);
-    } else if (type === 'conversation_status') {
-      if (typeof userId !== 'number' || !conversationId || !status) {
-        res.status(400).json({ ok: false, error: 'userId, conversationId and status required for conversation_status' });
-        return;
-      }
-      io.to(`user:${userId}`).emit('conversation:status_updated', { conversationId, status });
-    } else {
-      res.status(400).json({ ok: false, error: 'Unknown type' });
-      return;
+      break;
+    case 'new_message': {
+      const receiverOnline =
+        typeof payload.receiverId === 'number' ? await isUserOnline(payload.receiverId) : false;
+      emitNewMessageWithIO(
+        io,
+        payload.conversationId,
+        payload.message,
+        payload.receiverId,
+        receiverOnline
+      );
+      break;
     }
-    res.json({ ok: true });
-  } catch (err) {
-    Log.error('Emit error', { err });
-    res.status(500).json({ ok: false, error: 'Emit failed' });
+    case 'new_message_both': {
+      const [user1Online, user2Online] = await Promise.all([
+        isUserOnline(payload.userId1),
+        isUserOnline(payload.userId2)
+      ]);
+      emitNewMessageToBothUsersWithIO(
+        io,
+        payload.conversationId,
+        payload.message,
+        payload.userId1,
+        payload.userId2,
+        user1Online,
+        user2Online
+      );
+      break;
+    }
+    case 'conversation_status':
+      io.to(`user:${payload.userId}`).emit('conversation:status_updated', {
+        conversationId: payload.conversationId,
+        status: payload.status
+      });
+      break;
+    default:
+      Log.warn('Unknown socket event type', { payload: (payload as any)?.type });
   }
-});
+}
+
+createSocketEventsSubscriber(handleSocketEvent);
+
 app.get('/health', (req, res) => {
   res.status(200).json({ message: 'Socket server is running' });
 });

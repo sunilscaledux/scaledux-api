@@ -63,6 +63,8 @@
     "dev:socket:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/socket-server.ts",
     "dev:worker": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/workerServer.ts",
     "dev:worker:docker": "nodemon -L --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/workerServer.ts",
+    "dev:message-worker": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/workers/MessageWorker.ts",
+    "start:message-worker": "node dist/workers/MessageWorker.js",
     "build": "tsc",
     "start": "node dist/server.js",
     "start:socket": "node dist/socket-server.js",

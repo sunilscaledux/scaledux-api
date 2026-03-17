@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { ConversationService } from "./ConversationService";
 import { ApiResponse } from "@utils/ApiResponse";
-import { emitNewMessage } from "./chatSocket";
+import { addSaveMessageJob } from "@queues/MessageQueue";
+import { publishSocketEvent } from "@services/socketPubSub";
 
 function getStringParam(param: unknown): string {
   return typeof param === "string" ? param : "";
@@ -161,32 +162,48 @@ export async function sendMessage(req: Request, res: Response) {
           senderName: typeof replyTo.senderName === "string" ? replyTo.senderName.slice(0, 200) : undefined
         }
       : undefined;
-  const result = await ConversationService.sendMessage(
+
+  const conv = await ConversationService.getConversationByUniqueId(conversationId, userId);
+  if (!conv.success || !conv.data) {
+    if (conv.message === "Conversation not found") return ApiResponse.error(res, conv.message, null, 404);
+    if (conv.message === "Forbidden") return ApiResponse.forbidden(res, conv.message);
+    return ApiResponse.error(res, conv.message || "Failed to get conversation", 500);
+  }
+  const receiverId = (conv.data as any).otherParticipant?.id as number | undefined;
+
+  const job = await addSaveMessageJob({
     conversationId,
     userId,
-    typeof content === "string" ? content : "",
-    hasAttachments ? attachmentUrls : undefined,
-    replyPayload
+    content: typeof content === "string" ? content : "",
+    attachmentUrls: hasAttachments ? attachmentUrls : undefined,
+    replyTo: replyPayload
+  });
+
+  const contentForPayload = typeof content === "string" ? content.trim() || "(attachment)" : "(attachment)";
+  const metadata: Record<string, unknown> = {};
+  if (replyPayload) metadata.replyTo = replyPayload;
+  if (hasAttachments && attachmentUrls?.length) metadata.attachments = attachmentUrls;
+
+  await publishSocketEvent({
+    type: "new_message",
+    conversationId,
+    message: {
+      id: 0,
+      unique_id: `pending-${job.id}`,
+      conversationId,
+      senderId: userId,
+      type: "USER",
+      content: contentForPayload,
+      metadata: Object.keys(metadata).length ? metadata : undefined,
+      createdAt: new Date()
+    },
+    receiverId
+  });
+
+  return ApiResponse.success(
+    res,
+    { queued: true, jobId: job.id },
+    "Message queued; you will receive it via realtime when saved.",
+    202
   );
-  if (result.success) {
-    const data = result.data as any;
-    if (data.receiverId != null) {
-      emitNewMessage(conversationId, {
-        id: data.id,
-        unique_id: data.unique_id,
-        conversationId: data.conversation_id,
-        senderId: data.sender_id,
-        type: data.type,
-        content: data.content,
-        metadata: data.metadata,
-        createdAt: data.created_at
-      }, data.receiverId);
-    }
-    const { receiverId: _, ...rest } = data;
-    return ApiResponse.success(res, rest, result.message, 201);
-  }
-  if (result.message === "Conversation not found") return ApiResponse.error(res, result.message, null, 404);
-  if (result.message === "Forbidden") return ApiResponse.forbidden(res, result.message);
-  const statusCode = (result as { statusCode?: number }).statusCode;
-  return ApiResponse.error(res, result.message, null, statusCode === 403 ? 403 : 500);
 }
