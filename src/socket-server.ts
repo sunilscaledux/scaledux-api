@@ -214,7 +214,6 @@ async function startSocketServer(): Promise<void> {
       subClient.on('error', (err) => Log.error('[socket-io-redis] sub client', { err: String(err) }));
       await Promise.all([pubClient.connect(), subClient.connect()]);
       io.adapter(createAdapter(pubClient, subClient));
-      bootLog('Redis adapter enabled');
       Log.info('[socket] Redis adapter on — Engine.IO sessions work across multiple instances / load balancers');
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
