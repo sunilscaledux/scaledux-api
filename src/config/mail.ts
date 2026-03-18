@@ -1,12 +1,12 @@
 const mailConfig = {
-    ZEPTO_URL: process.env.ZEPTO_URL || "api.zeptomail.in/",
-    ZEPTO_TOKEN: process.env.ZEPTO_TOKEN,
-    ZEPTO_FROM_EMAIL: process.env.ZEPTO_FROM_EMAIL || "noreply@scaledux.com",
-    ZEPTO_FROM_NAME: process.env.ZEPTO_FROM_NAME || "ScaleDux",
+    SMTP_HOST: process.env.SMTP_HOST || "",
+    SMTP_PORT: parseInt(process.env.SMTP_PORT || "587"),
+    SMTP_USER: process.env.SMTP_USER || "",
+    SMTP_PASS: process.env.SMTP_PASS || "",
+    SMTP_FROM_EMAIL: process.env.SMTP_FROM_EMAIL || process.env.ZEPTO_FROM_EMAIL || "noreply@scaledux.com",
+    SMTP_FROM_NAME: process.env.SMTP_FROM_NAME || process.env.ZEPTO_FROM_NAME || "ScaleDux",
     APP_NAME: process.env.APP_NAME || "ScaleDux",
-    /** Company/brand name in emails; falls back to APP_NAME if not set */
     COMPANY_NAME: process.env.COMPANY_NAME || process.env.APP_NAME || "ScaleDux",
-    /** Used in email layout footer (from env) */
     FOOTER_MESSAGE: process.env.EMAIL_FOOTER_MESSAGE || "Best regards,",
     FOOTER_NOTE: process.env.EMAIL_FOOTER_NOTE || "This is an automated email. Please do not reply to this message.",
     OTP_VALIDITY_MINUTES: parseInt(process.env.OTP_VALIDITY_MINUTES || "10"),

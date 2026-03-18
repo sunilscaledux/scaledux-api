@@ -1,15 +1,14 @@
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 import mailConfig from "@config/mail";
 import { Log } from "@services/loggerService";
 import { templateService } from "./templateService";
-
-const { SendMailClient } = require("zeptomail");
 
 export interface EmailOptions {
   to: string;
   subject: string;
   html?: string;
   text?: string;
-  /** Optional. If omitted, uses ZEPTO_FROM_EMAIL / ZEPTO_FROM_NAME from config */
   from?: {
     address: string;
     name?: string;
@@ -17,68 +16,60 @@ export interface EmailOptions {
 }
 
 class EmailService {
-  private client: any;
-  private isConfigured: boolean;
+  private transporter: Transporter | null = null;
+  private isConfigured = false;
 
   constructor() {
-    const url = mailConfig.ZEPTO_URL;
-    const token = mailConfig.ZEPTO_TOKEN;
+    const host = mailConfig.SMTP_HOST;
+    const port = mailConfig.SMTP_PORT;
+    const user = mailConfig.SMTP_USER;
+    const pass = mailConfig.SMTP_PASS;
 
-    if (!token) {
-      Log.warn("ZEPTO_TOKEN not configured - Email service will be disabled");
-      this.isConfigured = false;
+    if (!host || !user || !pass) {
+      Log.warn("SMTP not configured (SMTP_HOST / SMTP_USER / SMTP_PASS) - Email service disabled");
       return;
     }
 
     try {
-      this.client = new SendMailClient({ url, token });
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass },
+      });
       this.isConfigured = true;
-      Log.info("Email service initialized successfully");
+      Log.info("Email service initialized (SMTP)", { host, port });
     } catch (error) {
       Log.error("Failed to initialize email service", { error });
-      this.isConfigured = false;
     }
   }
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured || !this.transporter) {
       Log.warn("Email service not configured - Skipping email to", { to: options.to });
       return false;
     }
 
     try {
-      const fromAddress = options.from?.address ?? mailConfig.ZEPTO_FROM_EMAIL ?? "test@scaledux.com";
-      const fromName = options.from?.name ?? mailConfig.ZEPTO_FROM_NAME ?? "";
-      const mailData = {
-        from: {
-          address: fromAddress,
-          name: fromName,
-        },
-        to: [
-          {
-            email_address: {
-              address: options.to,
-              name: "",
-            },
-          },
-        ],
-        subject: options.subject,
-        htmlbody: options.html || "",
-        textbody: options.text || "",
-      };
+      const fromAddress = options.from?.address ?? mailConfig.SMTP_FROM_EMAIL;
+      const fromName = options.from?.name ?? mailConfig.SMTP_FROM_NAME;
 
-      const response = await this.client.sendMail(mailData);
-      Log.info("Email sent successfully via ZeptoMail", { response });
+      await this.transporter.sendMail({
+        from: fromName ? `"${fromName}" <${fromAddress}>` : fromAddress,
+        to: options.to,
+        subject: options.subject,
+        html: options.html || undefined,
+        text: options.text || undefined,
+      });
+
+      Log.info("Email sent successfully", { to: options.to, subject: options.subject });
       return true;
     } catch (error) {
-      Log.error("Failed to send email via ZeptoMail", { error });
+      Log.error("Failed to send email", { error, to: options.to });
       return false;
     }
   }
 
-  /**
-   * Send OTP verification email
-   */
   async sendOtpEmail(
     email: string,
     otp: string,
@@ -103,9 +94,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Send welcome email after successful verification
-   */
   async sendWelcomeEmail(email: string, firstName: string): Promise<boolean> {
     try {
       const template = await templateService.getWelcomeTemplate({
@@ -124,16 +112,13 @@ class EmailService {
     }
   }
 
-  /**
-   * Send password reset email
-   */
   async sendPasswordResetEmail(
     email: string,
     otp: string,
   ): Promise<boolean> {
     try {
       const template = await templateService.getPasswordResetTemplate({
-        OTP_CODE:otp,
+        OTP_CODE: otp,
         companyName: mailConfig.COMPANY_NAME,
         linkValidity: mailConfig.OTP_VALIDITY_MINUTES
       });
@@ -149,9 +134,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Send custom email using template
-   */
   async sendCustomEmail(
     email: string,
     templateName: string,
@@ -176,27 +158,17 @@ class EmailService {
     }
   }
 
-  /**
-   * Test email configuration
-   */
   async testConnection(): Promise<boolean> {
+    if (!this.transporter) {
+      Log.error("SMTP not configured");
+      return false;
+    }
     try {
-      // Send a test email to verify the configuration
-      const testResult = await this.sendEmail({
-        to: mailConfig.ZEPTO_FROM_EMAIL || "test@scaledux.com",
-        subject: "ZeptoMail Test Email",
-        html: "<div><b>ZeptoMail service is working correctly!</b></div>",
-      });
-
-      if (testResult) {
-        Log.info("ZeptoMail service is ready");
-        return true;
-      } else {
-        Log.error("ZeptoMail test failed");
-        return false;
-      }
+      await this.transporter.verify();
+      Log.info("SMTP connection verified");
+      return true;
     } catch (error) {
-      Log.error("ZeptoMail service configuration error", { error });
+      Log.error("SMTP connection failed", { error });
       return false;
     }
   }
