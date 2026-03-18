@@ -35,6 +35,8 @@ import * as AuthService from "@module/auth/AuthService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { normalizeContact } from '@utils/General';
 import { Log } from '@services/loggerService';
+import { NotificationService } from '@module/notification/NotificationService';
+import { emailService } from '@services/emailService';
 
 export async function initiateRegistration(req: Request, res: Response) {
   const rawBody = req.body || {};
@@ -773,6 +775,22 @@ export async function updateUserRole(req: Request, res: Response) {
       create: { user_id: userId },
       update: {},
     });
+
+    NotificationService.create(userId, {
+      type: 'WELCOME',
+      title: 'Welcome to ScaleDux!',
+      body: 'Your account is ready. Complete your profile to get the most out of ScaleDux.',
+      link: '/my-profile',
+    }).catch((e) => Log.error('Failed to create welcome notification', { error: e }));
+
+    NotificationService.create(userId, {
+      type: 'PROFILE_INCOMPLETE',
+      title: 'Complete your profile',
+      body: 'Profiles with complete information are 4.5x more likely to get noticed.',
+      link: '/my-profile',
+    }).catch((e) => Log.error('Failed to create profile notification', { error: e }));
+
+ 
 
     return ApiResponse.success(
       res,

@@ -108,4 +108,16 @@ export class NotificationService {
     });
     return { success: true, message: 'OK', data: count };
   }
+
+  static async create(userId: number, data: { type: string; title: string; body?: string; link?: string }): Promise<void> {
+    await prisma.notification.create({
+      data: {
+        user_id: userId,
+        type: data.type,
+        title: data.title,
+        body: data.body ?? null,
+        link: data.link ?? null,
+      }
+    });
+  }
 }
