@@ -15,16 +15,16 @@ export type MessagePayload = {
 /**
  * Emit using the given io instance (used by socket-server process).
  */
+/** Always emit to user room so inbox updates work even if Redis "online" tracking is wrong or races. */
 export function emitNewMessageWithIO(
   io: SocketServer,
   conversationUniqueId: string,
   message: MessagePayload,
-  receiverUserId?: number,
-  emitReceiverConversationEvent: boolean = true
+  receiverUserId?: number
 ) {
   const payload = { message };
   io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  if (receiverUserId != null && emitReceiverConversationEvent) {
+  if (receiverUserId != null) {
     io.to(`user:${receiverUserId}`).emit("conversation:new_message", payload);
   }
 }
@@ -37,18 +37,12 @@ export function emitNewMessageToBothUsersWithIO(
   conversationUniqueId: string,
   message: MessagePayload,
   userId1: number,
-  userId2: number,
-  emitUser1ConversationEvent: boolean = true,
-  emitUser2ConversationEvent: boolean = true
+  userId2: number
 ) {
   const payload = { message };
   io.to(`conversation:${conversationUniqueId}`).emit("message:new", payload);
-  if (emitUser1ConversationEvent) {
-    io.to(`user:${userId1}`).emit("conversation:new_message", payload);
-  }
-  if (emitUser2ConversationEvent) {
-    io.to(`user:${userId2}`).emit("conversation:new_message", payload);
-  }
+  io.to(`user:${userId1}`).emit("conversation:new_message", payload);
+  io.to(`user:${userId2}`).emit("conversation:new_message", payload);
 }
 
 export function emitConversationStatusToUser(

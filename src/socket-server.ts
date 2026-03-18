@@ -60,11 +60,6 @@ async function markUserOffline(userId: number): Promise<void> {
   }
 }
 
-async function isUserOnline(userId: number): Promise<boolean> {
-  const exists = await redisClient.sismember(ONLINE_USERS_SET_KEY, String(userId));
-  return exists === 1;
-}
-
 async function handleSocketEvent(payload: SocketEventPayload): Promise<void> {
   switch (payload.type) {
     case 'session_revoked':
@@ -76,30 +71,16 @@ async function handleSocketEvent(payload: SocketEventPayload): Promise<void> {
       });
       break;
     case 'new_message': {
-      const receiverOnline =
-        typeof payload.receiverId === 'number' ? await isUserOnline(payload.receiverId) : false;
-      emitNewMessageWithIO(
-        io,
-        payload.conversationId,
-        payload.message,
-        payload.receiverId,
-        receiverOnline
-      );
+      emitNewMessageWithIO(io, payload.conversationId, payload.message, payload.receiverId);
       break;
     }
     case 'new_message_both': {
-      const [user1Online, user2Online] = await Promise.all([
-        isUserOnline(payload.userId1),
-        isUserOnline(payload.userId2)
-      ]);
       emitNewMessageToBothUsersWithIO(
         io,
         payload.conversationId,
         payload.message,
         payload.userId1,
-        payload.userId2,
-        user1Online,
-        user2Online
+        payload.userId2
       );
       break;
     }
@@ -167,7 +148,15 @@ io.on('connection', (socket) => {
     if (!conversationId || typeof conversationId !== 'string') return;
     const userId = socket.data.userId;
     const result = await ConversationService.getConversationByUniqueId(conversationId, userId);
-    if (result.success) socket.join(`conversation:${conversationId}`);
+    if (result.success) {
+      socket.join(`conversation:${conversationId}`);
+    } else if (process.env.NODE_ENV === 'production') {
+      Log.warn('[socket] join_conversation denied', {
+        conversationId,
+        userId,
+        message: result.message
+      });
+    }
   });
 
   socket.on('leave_conversation', (conversationId: string) => {
