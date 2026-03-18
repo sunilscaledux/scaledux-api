@@ -152,6 +152,7 @@ export async function getPrivateFileAndSend(
   if (file.contentType) res.setHeader('Content-Type', file.contentType);
   if (file.contentLength != null) res.setHeader('Content-Length', String(file.contentLength));
   res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
   file.stream.pipe(res);
   return true;
 }
