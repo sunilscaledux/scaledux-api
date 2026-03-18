@@ -37,6 +37,12 @@ import { serverAdapter } from './config/bullBoard';
 
 const app = express();
 
+if (process.env.TRUST_PROXY !== 'false' && process.env.TRUST_PROXY !== '0') {
+  const raw = process.env.TRUST_PROXY;
+  const hops = raw && /^\d+$/.test(raw) ? parseInt(raw, 10) : 1;
+  app.set('trust proxy', Math.max(1, hops));
+}
+
 // Setup CORS middleware
 app.use(corsMiddleware());
 

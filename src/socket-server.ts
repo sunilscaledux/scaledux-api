@@ -3,6 +3,9 @@ import './moduleAlias';
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Docker logs: winston may write mostly to files; keep critical lines on stdout
+const bootLog = (msg: string) => process.stdout.write(`[scaledux-socket] ${msg}\n`);
+
 import http from 'http';
 import express from 'express';
 import { Server as SocketServer } from 'socket.io';
@@ -211,26 +214,27 @@ async function startSocketServer(): Promise<void> {
       subClient.on('error', (err) => Log.error('[socket-io-redis] sub client', { err: String(err) }));
       await Promise.all([pubClient.connect(), subClient.connect()]);
       io.adapter(createAdapter(pubClient, subClient));
+      bootLog('Redis adapter enabled');
       Log.info('[socket] Redis adapter on — Engine.IO sessions work across multiple instances / load balancers');
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
+      bootLog(`ERROR: Redis adapter failed (${msg}) — continuing without adapter (single replica OK). Use REDIS_URL=rediss://... for TLS or SOCKET_IO_DISABLE_REDIS_ADAPTER=true`);
       Log.error('[socket] Failed to attach Redis adapter', { err: msg });
-      if (process.env.NODE_ENV === 'production') {
-        Log.error('[socket] Fix Redis (REDIS_URL / REDIS_HOST) or set SOCKET_IO_DISABLE_REDIS_ADAPTER=true with one socket node only');
-        process.exit(1);
-      }
-      Log.warn('[socket] Continuing without Redis adapter (local single process)');
+      Log.warn('[socket] Continuing without Redis adapter');
     }
   }
 
   httpServer.listen(socketConfig.port, () => {
+    bootLog(`listening on port ${socketConfig.port} (path /socket.io)`);
     Log.info(`Socket server: http://localhost:${socketConfig.port}/socket.io`);
-    Log.info('Ensure frontend uses NEXT_PUBLIC_SOCKET_URL and API + socket processes share Redis when scaled out.');
   });
 }
 
+bootLog('starting…');
 void startSocketServer().catch((e) => {
-  Log.error('[socket] Fatal startup error', { err: (e as Error)?.message });
+  const m = (e as Error)?.message || String(e);
+  bootLog(`FATAL: ${m}`);
+  Log.error('[socket] Fatal startup error', { err: m });
   process.exit(1);
 });
 
