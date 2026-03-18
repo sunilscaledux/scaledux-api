@@ -1,9 +1,9 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrl, getByUniqueId, isAttachmentId } from '@services/attachmentService';
+import { resolveAttachmentUrl } from '@services/attachmentService';
 import TwilioService from "@services/TwilioService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
-import { deletePublic } from '@services/bunnyStorageService';
+
 import { Log } from '@services/loggerService';
 
 export class VerificationService {
@@ -487,45 +487,4 @@ export class VerificationService {
         message: "Failed to upload verification documents"
       };
     }
-  }
-
-  /**
-   * Delete verification document
-   */
-  static async deleteVerificationDocument(userId: number, filePath: string): Promise<ServiceResponse> {
-    try {
-      if (!filePath) {
-        return {
-          success: false,
-          message: "File path is required"
-        };
-      }
-
-      let pathToDelete: string;
-      if (isAttachmentId(filePath)) {
-        const att = await getByUniqueId(filePath);
-        if (!att) return { success: false, message: "File not found" };
-        pathToDelete = att.path;
-        await prisma.attachment.update({
-          where: { id: att.id },
-          data: { deleted_at: new Date() }
-        });
-      } else {
-        pathToDelete = filePath;
-      }
-      await deletePublic(pathToDelete);
-
-      return {
-        success: true,
-        message: "Document deleted successfully",
-        data: null
-      };
-    } catch (error: any) {
-      Log.error("Error", { error });
-      return {
-        success: false,
-        message: "Failed to delete document"
-      };
-    }
-  }
-}
+  }}

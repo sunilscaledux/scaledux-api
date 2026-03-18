@@ -5,29 +5,29 @@ import { isPublicField } from '@config/filePolicy';
 
 const ASSET_URL = process.env.APP_URL || process.env.ASSET_URL || 'http://127.0.0.1:4000';
 
-/** Heuristic: is this value an attachment unique_id (cuid) or legacy path? */
+/** Check if value is a valid attachment unique_id (cuid). */
 export function isAttachmentId(value: string | null): boolean {
   if (!value || typeof value !== 'string') return false;
-  if (value.includes('/') || value.includes('uploads') || value.startsWith('http')) return false;
   return value.length >= 20 && value.length <= 32 && /^c[a-z0-9]+$/i.test(value);
 }
 
-
+/** Extract attachment unique_id from a raw value (plain id or URL containing one). */
 export function urlOrPathToAttachmentId(value: string | null | undefined): string | null {
   if (value == null || typeof value !== 'string') return null;
   const s = value.trim().replace(/\?.*$/, '');
   if (!s) return null;
   if (isAttachmentId(s)) return s;
   const segments = s.split('/').filter(Boolean);
-  const last = segments[segments.length - 1];
-  if (!last) return null;
-  const id = last.replace(/\.[^.]+$/, '');
-  return isAttachmentId(id) ? id : null;
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const raw = segments[i];
+    if (!raw) continue;
+    const id = raw.replace(/\.[^.]+$/, '');
+    if (isAttachmentId(id)) return id;
+  }
+  return null;
 }
 
-/**
- * Decode an array of URLs/paths to attachment unique_ids. Skips null/invalid. Preserves order.
- */
+/** Extract attachment unique_ids from an array. Skips null/invalid. Preserves order. */
 export function urlsOrPathsToAttachmentIds(values: (string | null | undefined)[] | null | undefined): string[] {
   if (values == null || !Array.isArray(values)) return [];
   const ids: string[] = [];
@@ -36,12 +36,6 @@ export function urlsOrPathsToAttachmentIds(values: (string | null | undefined)[]
     if (id) ids.push(id);
   }
   return ids;
-}
-
-/** Generate opaque storage path: attachments/{unique_id}{ext} */
-export function opaqueStoragePath(uniqueId: string, ext?: string): string {
-  const suffix = ext && !ext.startsWith('.') ? `.${ext}` : ext || '';
-  return `attachments/${uniqueId}${suffix}`;
 }
 
 export type CreateAttachmentInput = {
@@ -107,7 +101,7 @@ export async function resolveAttachmentUrl(
     return getPublicUrl(att.path);
   }
 
-  return `${baseUrl}/files/view/${att.unique_id}`;
+  return buildPrivateUrl(baseUrl, att.unique_id, att.original_name);
 }
 
 /**
@@ -123,10 +117,10 @@ export async function resolveAttachmentUrls(
   if (uniqueIds.length === 0) {
     return values.map(() => '');
   }
-  type AttUrlRow = { unique_id: string; visibility: string; path: string };
+  type AttUrlRow = { unique_id: string; visibility: string; path: string; original_name: string | null };
   const attachments = await prisma.attachment.findMany({
     where: { unique_id: { in: uniqueIds }, deleted_at: null },
-    select: { unique_id: true, visibility: true, path: true },
+    select: { unique_id: true, visibility: true, path: true, original_name: true },
   });
   const map = new Map<string, AttUrlRow>(
     (attachments as AttUrlRow[]).map((a) => [a.unique_id, a])
@@ -142,8 +136,33 @@ export async function resolveAttachmentUrls(
     if (allowed) {
       return getPublicUrl(att.path);
     }
-    return `${baseUrl}/files/view/${att.unique_id}`;
+    return buildPrivateUrl(baseUrl, att.unique_id, att.original_name);
   });
+}
+
+function buildPrivateUrl(baseUrl: string, uniqueId: string, originalName: string | null): string {
+  const fileName = originalName || uniqueId;
+  return `${baseUrl}/files/view/${uniqueId}/${encodeURIComponent(fileName)}`;
+}
+
+/**
+ * Mark attachments as 'attached' and grant access to additional user IDs.
+ */
+export async function markAttachmentsAttached(
+  attachmentIds: string[],
+  grantAccessToUserIds: number[]
+): Promise<void> {
+  if (!attachmentIds.length) return;
+  for (const uid of attachmentIds) {
+    const att = await getByUniqueId(uid);
+    if (!att || att.status === 'attached') continue;
+    const existing = Array.isArray(att.accessible_user_ids) ? (att.accessible_user_ids as number[]) : [];
+    const merged = [...new Set([...existing, ...grantAccessToUserIds])];
+    await prisma.attachment.update({
+      where: { id: att.id },
+      data: { status: 'attached', accessible_user_ids: merged },
+    });
+  }
 }
 
 /**

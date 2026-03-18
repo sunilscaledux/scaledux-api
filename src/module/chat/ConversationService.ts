@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from "@services/attachmentService";
 import { emitConversationStatusToUser } from "./chatSocket";
 import { publishSocketEvent } from "@services/socketPubSub";
 import { Log } from '@services/loggerService';
@@ -11,7 +11,7 @@ async function toProfileImageUrl(profileImage: string | null | undefined): Promi
   return url || null;
 }
 
-/** Map message metadata.attachments (paths or attachment ids) to full URLs for API response. */
+/** Map message metadata.attachments (ids) to full URLs (includes original filename). */
 async function metadataWithAttachmentUrls(metadata: any): Promise<any> {
   if (!metadata || typeof metadata !== "object") return metadata;
   const attachments = metadata.attachments;
@@ -19,7 +19,7 @@ async function metadataWithAttachmentUrls(metadata: any): Promise<any> {
   const urls = await resolveAttachmentUrls(attachments, { entityType: 'message', fieldName: 'attachments' });
   return {
     ...metadata,
-    attachments: urls
+    attachments: urls,
   };
 }
 
@@ -712,6 +712,13 @@ export class ConversationService {
         },
         include: { sender: { select: { id: true, first_name: true, last_name: true, personalInfo: { select: { profileImage: true } } } } }
       });
+
+      if (attachmentPaths?.length) {
+        const receiverId = conv.data.otherParticipant.id;
+        markAttachmentsAttached(attachmentPaths, [userId, receiverId]).catch((e) =>
+          Log.error('markAttachmentsAttached failed', { error: e })
+        );
+      }
 
       let statusUpdate: string | undefined;
       if (firstUserMessage == null) statusUpdate = "NOT_ACCEPTED";

@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { ApiResponse } from '@utils/ApiResponse'
 import { deletePublic, getPublicUrl } from '@services/bunnyStorageService'
 import { Log } from '@services/loggerService'
-import { viewProtectedFile as viewProtectedFileService, getByUniqueId, createAttachment, resolveAttachmentUrl, urlOrPathToAttachmentId, isAttachmentId } from '@services/attachmentService'
+import { viewProtectedFile as viewProtectedFileService, getByUniqueId, createAttachment, resolveAttachmentUrl, urlOrPathToAttachmentId } from '@services/attachmentService'
 import { prisma } from '@services/prismaService'
 import type { AttachmentMetaItem } from '@middleware/fileupload'
 
@@ -86,27 +86,21 @@ export async function deleteFile(req: Request, res: Response) {
 
     const rawIdOrUrl = (req.body as any).uniqueId ?? filePath
     if (!rawIdOrUrl) {
-      return ApiResponse.error(res, "uniqueId or filePath is required", 400)
+      return ApiResponse.error(res, "uniqueId is required", 400)
     }
-    const uniqueId = urlOrPathToAttachmentId(rawIdOrUrl) ?? rawIdOrUrl
+    const uniqueId = urlOrPathToAttachmentId(rawIdOrUrl)
+    if (!uniqueId) {
+      return ApiResponse.error(res, "Invalid attachment id", 400)
+    }
 
-    let pathToDelete: string
-    if (isAttachmentId(uniqueId)) {
-      const att = await getByUniqueId(uniqueId)
-      if (!att) return ApiResponse.error(res, "File not found", 404)
-      if (att.owner_user_id !== userId) return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
-      pathToDelete = att.path
-      await (prisma as any).attachment.update({
-        where: { id: att.id },
-        data: { deleted_at: new Date() }
-      })
-    } else {
-      pathToDelete = uniqueId
-      if (!pathToDelete.includes(userUniqueId)) {
-        Log.info("Security violation: File path doesn't contain user unique_id", { pathToDelete, userUniqueId })
-        return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
-      }
-    }
+    const att = await getByUniqueId(uniqueId)
+    if (!att) return ApiResponse.error(res, "File not found", 404)
+    if (att.owner_user_id !== userId) return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
+    const pathToDelete = att.path
+    await (prisma as any).attachment.update({
+      where: { id: att.id },
+      data: { deleted_at: new Date() }
+    })
 
     const deleted = await deletePublic(pathToDelete)
     if (!deleted) Log.info("Bunny delete returned false for:", pathToDelete)

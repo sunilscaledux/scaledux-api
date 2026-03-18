@@ -4,7 +4,7 @@ import { authenticateToken, privateFileAccess } from "@middleware/auth"
 
 const router = Router()
 
-router.get("/view/:uniqueId", privateFileAccess, viewProtectedFile)
+router.get("/view/:uniqueId/:fileName?", privateFileAccess, viewProtectedFile)
 router.delete("/delete-file", authenticateToken, deleteFile)
 
 export default router
