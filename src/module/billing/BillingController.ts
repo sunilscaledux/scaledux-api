@@ -8,6 +8,7 @@ import { createProposalActivity } from "@module/proposal/ProposalActivityService
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
+import { saveTaxInformationSchema } from "./BillingValidation";
 
 export class BillingController {
   // Get payment breakdown (platform fee only on first milestone, gst, service fee) for display and Razorpay total
@@ -358,7 +359,12 @@ export class BillingController {
         return ApiResponse.error(res, "User not authenticated", 401);
       }
 
-      const result = await BillingService.saveTaxInformation(userId.toString(), req.body);
+      const { error, value } = saveTaxInformationSchema.validate(req.body, { abortEarly: false });
+      if (error) {
+        return ApiResponse.error(res, error.details.map(detail => detail.message).join(', '), 400);
+      }
+
+      const result = await BillingService.saveTaxInformation(userId.toString(), value);
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
       Log.error("Error saving tax information", { error });

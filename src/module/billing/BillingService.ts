@@ -880,19 +880,53 @@ export class BillingService {
   // Save or update tax information
   static async saveTaxInformation(userId: string, data: TaxInformationInput) {
     const userIdNum = parseInt(userId);
+    const activeTab = data.activeTab;
+    const individualPAN = data.individualPAN?.trim().toUpperCase() || null;
+    const individualGSTIN = data.individualHasGSTIN ? data.individualGSTIN?.trim().toUpperCase() || null : null;
+    const agencyPAN = data.agencyPAN?.trim().toUpperCase() || null;
+    const agencyGSTIN = data.agencyHasGSTIN ? data.agencyGSTIN?.trim().toUpperCase() || null : null;
+    const activePanNumber = activeTab === 'AGENCY' ? agencyPAN : individualPAN;
+    const activeGSTIN = activeTab === 'AGENCY' ? agencyGSTIN : individualGSTIN;
+    const activeHasGSTIN = activeTab === 'AGENCY' ? !!agencyGSTIN : !!individualGSTIN;
+
+    if (activeTab === 'AGENCY') {
+      const user = await prisma.user.findUnique({
+        where: { id: userIdNum },
+        select: {
+          agency_verification_status: true
+        }
+      });
+
+      if (user?.agency_verification_status !== 'APPROVED') {
+        throw new Error("You need to verify your agency before saving agency tax details");
+      }
+    }
+
     const taxInfo = await prisma.taxInformation.upsert({
       where: { user_id: userIdNum },
       update: {
         tax_residence: data.taxResidence,
-        has_gstin: data.hasGSTIN,
-        gstin: data.gstin || null,
+        entity_type: activeTab,
+        pan_number: activePanNumber,
+        individual_pan: individualPAN,
+        individual_gstin: individualGSTIN,
+        agency_pan: agencyPAN,
+        agency_gstin: agencyGSTIN,
+        has_gstin: activeHasGSTIN,
+        gstin: activeGSTIN,
         updated_at: new Date()
       },
       create: {
         user_id: userIdNum,
         tax_residence: data.taxResidence,
-        has_gstin: data.hasGSTIN,
-        gstin: data.gstin || null
+        entity_type: activeTab,
+        pan_number: activePanNumber,
+        individual_pan: individualPAN,
+        individual_gstin: individualGSTIN,
+        agency_pan: agencyPAN,
+        agency_gstin: agencyGSTIN,
+        has_gstin: activeHasGSTIN,
+        gstin: activeGSTIN
       }
     });
 
@@ -902,8 +936,13 @@ export class BillingService {
       data: {
         id: taxInfo.id,
         taxResidence: taxInfo.tax_residence,
-        hasGSTIN: taxInfo.has_gstin,
-        gstin: taxInfo.gstin
+        activeTab: taxInfo.entity_type === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL',
+        individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
+        individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
+        individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
+        agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
+        agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
+        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : '')
       }
     };
   }
@@ -927,8 +966,13 @@ export class BillingService {
       data: {
         id: taxInfo.id,
         taxResidence: taxInfo.tax_residence,
-        hasGSTIN: taxInfo.has_gstin,
-        gstin: taxInfo.gstin
+        activeTab: taxInfo.entity_type === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL',
+        individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
+        individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
+        individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
+        agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
+        agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
+        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : '')
       }
     };
   }

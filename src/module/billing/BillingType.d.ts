@@ -40,8 +40,15 @@ export interface TaxInformationInput {
     city: string;
     zipCode: string;
   };
-  hasGSTIN: boolean;
-  gstin?: string;
+  activeTab: 'INDIVIDUAL' | 'AGENCY';
+  individualPAN: string;
+  individualHasGSTIN: boolean;
+  individualGSTIN: string;
+  individualGSTConsent?: boolean;
+  agencyPAN: string;
+  agencyHasGSTIN: boolean;
+  agencyGSTIN: string;
+  agencyGSTConsent?: boolean;
 }
 
 import type { BillingTransactionTypeValue, BillingTransactionStatusValue } from "../../constants/status";

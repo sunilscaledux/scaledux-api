@@ -45,7 +45,7 @@ services:
       target: dev-socket
     container_name: scaledux-socket
     restart: unless-stopped
-    command: ["npm", "run", "dev:socket"]
+    command: ["sh", "-c", "npx prisma generate && npm run dev:socket"]
     ports:
       - "4001:4001"
     volumes:
@@ -63,7 +63,7 @@ services:
       target: dev-worker
     container_name: scaledux-worker
     restart: unless-stopped
-    command: ["npm", "run", "dev:worker"]
+    command: ["sh", "-c", "npx prisma generate && npm run dev:worker"]
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
@@ -79,7 +79,7 @@ services:
       target: dev-message-worker
     container_name: scaledux-message-worker
     restart: unless-stopped
-    command: ["npm", "run", "dev:message-worker"]
+    command: ["sh", "-c", "npx prisma generate && npm run dev:message-worker"]
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules
@@ -95,7 +95,7 @@ services:
       target: dev-schedule
     container_name: scaledux-schedule
     restart: unless-stopped
-    command: ["npm", "run", "dev:schedule"]
+    command: ["sh", "-c", "npx prisma generate && npm run dev:schedule"]
     volumes:
       - .:/app
       - scaledux_api_node_modules:/app/node_modules

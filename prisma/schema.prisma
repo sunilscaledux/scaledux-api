@@ -1208,6 +1208,12 @@ model TaxInformation {
   id             Int      @id @default(autoincrement())
   user_id        Int      @unique
   tax_residence  Json
+  entity_type    String   @default("INDIVIDUAL")
+  pan_number     String?  @db.VarChar(10)
+  individual_pan String?  @db.VarChar(10)
+  individual_gstin String? @db.VarChar(15)
+  agency_pan     String?  @db.VarChar(10)
+  agency_gstin   String?  @db.VarChar(15)
   has_gstin      Boolean  @default(false)
   gstin          String?  @db.VarChar(15)
   created_at     DateTime @default(now())
