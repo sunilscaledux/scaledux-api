@@ -48,9 +48,8 @@ app.use(corsMiddleware());
 
 app.use(express.json());
 app.use(cookieParser());
-/** Private file download — /files/view/:uniqueId or /files/view/:uniqueId/:fileName */
+/** Private file download — /files/view/:uniqueId?f=originalName */
 app.get("/files/view/:uniqueId", privateFileAccess, viewProtectedFile);
-app.get("/files/view/:uniqueId/:fileName", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/v1", userRoutes);
 app.use("/api/v1/profile", profileRoutes);

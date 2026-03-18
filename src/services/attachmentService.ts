@@ -141,8 +141,8 @@ export async function resolveAttachmentUrls(
 }
 
 function buildPrivateUrl(baseUrl: string, uniqueId: string, originalName: string | null): string {
-  const fileName = originalName || uniqueId;
-  return `${baseUrl}/files/view/${uniqueId}/${encodeURIComponent(fileName)}`;
+  if (!originalName) return `${baseUrl}/files/view/${uniqueId}`;
+  return `${baseUrl}/files/view/${uniqueId}?f=${encodeURIComponent(originalName)}`;
 }
 
 /**
