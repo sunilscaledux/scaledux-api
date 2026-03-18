@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
 import { prisma } from "@services/prismaService";
-import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from "@utils/jwtUtils";
+import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions, baseCookieOptions } from "@utils/jwtUtils";
 import {
   checkUserExists,
   userLogin,
@@ -597,7 +597,7 @@ export async function resetPassword(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
-    const clearOpts = { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" };
+    const clearOpts = baseCookieOptions();
     res.clearCookie("auth_token", clearOpts);
 
     const refreshToken = req.cookies?.refresh_token;

@@ -3,8 +3,9 @@ import { ApiResponse } from "@utils/ApiResponse";
 import * as DeactivationService from "./DeactivationService";
 import { revokeAllDevices } from "@module/auth/AuthService";
 import { emitSessionRevokedMany } from "@module/auth/authSocket";
+import { baseCookieOptions } from "@utils/jwtUtils";
 
-const clearAuthCookieOpts = { httpOnly: true, secure: true, sameSite: "none" as const, path: "/" };
+const clearAuthCookieOpts = baseCookieOptions();
 
 export async function confirmDeactivate(req: Request, res: Response) {
   try {

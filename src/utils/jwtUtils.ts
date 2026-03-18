@@ -2,6 +2,25 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { Log } from '@services/loggerService';
 
+/**
+ * Parent domain for auth cookies so they're sent to all subdomains
+ * (e.g. staging.scaledux.com AND socket.scaledux.com).
+ * Set COOKIE_DOMAIN=.scaledux.com in production .env.
+ * Leave unset for local dev (cookie scoped to current host).
+ */
+const COOKIE_DOMAIN: string | undefined = process.env.COOKIE_DOMAIN?.trim() || undefined;
+
+/** Shared base options for auth/refresh cookies. */
+export function baseCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none" as "none" | "lax" | "strict",
+    path: "/",
+    domain: COOKIE_DOMAIN,
+  };
+}
+
 export function generateTokenAndSetCookie(
   user: any,
   rememberMe: boolean = false
@@ -26,12 +45,8 @@ export function generateTokenAndSetCookie(
   );
 
   const cookieOptions = {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none" as "none" | "lax" | "strict",
+    ...baseCookieOptions(),
     maxAge: cookieMaxAge,
-    path: "/",
-    domain: undefined,
   };
 
   Log.info(
@@ -55,11 +70,7 @@ export function generateRefreshToken(rememberMe: boolean = false): {
 /** Refresh cookie options (long-lived, httpOnly) */
 export function getRefreshCookieOptions(expiresAt: Date) {
   return {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none" as "none" | "lax" | "strict",
+    ...baseCookieOptions(),
     expires: expiresAt,
-    path: "/",
-    domain: undefined,
   };
 }
