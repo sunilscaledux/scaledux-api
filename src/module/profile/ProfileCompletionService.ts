@@ -42,19 +42,34 @@ export async function ensureSectionsInitialized(userId: number, role: UserRole |
  * Set profile_sections for the given role (all keys false, percentage 0). Call when user selects/updates role (PATCH /auth/role).
  */
 export async function setProfileSectionsForRole(userId: number, role: UserRole | string | null): Promise<void> {
-  const roleSections = getSectionsForRole(role);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true, email_verified_at: true },
+  });
+
+  const normalizedRole = normalizeRole(user?.role ?? role);
+  const roleSections = getSectionsForRole(normalizedRole);
+
   const initial: ProfileCompletionSectionsMap = {};
   for (const s of roleSections) {
-    initial[s.key] = false;
+    let value = false;
+    if (s.key === 'emailVerification' && user?.email_verified_at) {
+      value = true;
+    }
+    initial[s.key] = value;
   }
+
+  const percentage = computeCompletionPercentage(initial, normalizedRole);
+
   await prisma.userPreference.upsert({
     where: { user_id: userId },
     create: { user_id: userId, profile_sections: initial as object },
     update: { profile_sections: initial as object },
   });
+
   await prisma.user.update({
     where: { id: userId },
-    data: { profile_completion_percentage: 0 },
+    data: { profile_completion_percentage: percentage },
   });
 }
 
