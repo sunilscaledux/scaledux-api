@@ -14,7 +14,9 @@ export async function invalidateLocationCache(countryId?: string) {
   try {
     const keysToDelete = [
       'countries:all',
-      'countries:with-states:all'
+      'countries:with-states:all',
+      'currencies:all',
+      'countries:with-currencies:all'
     ]
     
     if (countryId) {
@@ -280,6 +282,42 @@ export async function warmLocationCache(req: Request, res: Response) {
       })
       await redisClient.setex(`states:country:${country.id}`, 864000, JSON.stringify(states))
     }
+
+    const currencies = await prisma.currency.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        symbol: true,
+      }
+    })
+    await redisClient.setex('currencies:all', 864000, JSON.stringify(currencies))
+
+    const countriesWithCurrencies = await prisma.country.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        flag: true,
+        currency: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+          }
+        }
+      }
+    })
+    const countriesWithCurrenciesAndUrls = countriesWithCurrencies.map(country => ({
+      ...country,
+      flag: country.flag ? getPublicUrl(country.flag) : null
+    }))
+    await redisClient.setex(
+      'countries:with-currencies:all',
+      864000,
+      JSON.stringify(countriesWithCurrenciesAndUrls)
+    )
     
     return ApiResponse.success(res, { 
       message: 'Cache warmed successfully',

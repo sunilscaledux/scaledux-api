@@ -16,26 +16,6 @@ const nationalLanguages = [
   { name: 'Punjabi', native_name: 'ਪੰਜਾਬੀ', code: 'pa', country_code: 'IN' },
   { name: 'Assamese', native_name: 'অসমীয়া', code: 'as', country_code: 'IN' },
   { name: 'Sanskrit', native_name: 'संस्कृतम्', code: 'sa', country_code: 'IN' },
-  
-  // Nepali
-  { name: 'Nepali', native_name: 'नेपाली', code: 'ne', country_code: 'NP' },
-  
-  // Other major world languages
-  { name: 'Chinese (Mandarin)', native_name: '中文', code: 'zh', country_code: 'CN' },
-  { name: 'Spanish', native_name: 'Español', code: 'es', country_code: 'ES' },
-  { name: 'French', native_name: 'Français', code: 'fr', country_code: 'FR' },
-  { name: 'Arabic', native_name: 'العربية', code: 'ar', country_code: 'SA' },
-  { name: 'Russian', native_name: 'Русский', code: 'ru', country_code: 'RU' },
-  { name: 'Portuguese', native_name: 'Português', code: 'pt', country_code: 'PT' },
-  { name: 'German', native_name: 'Deutsch', code: 'de', country_code: 'DE' },
-  { name: 'Japanese', native_name: '日本語', code: 'ja', country_code: 'JP' },
-  { name: 'Korean', native_name: '한국어', code: 'ko', country_code: 'KR' },
-  { name: 'Italian', native_name: 'Italiano', code: 'it', country_code: 'IT' },
-  { name: 'Dutch', native_name: 'Nederlands', code: 'nl', country_code: 'NL' },
-  { name: 'Turkish', native_name: 'Türkçe', code: 'tr', country_code: 'TR' },
-  { name: 'Persian', native_name: 'فارسی', code: 'fa', country_code: 'IR' },
-  { name: 'Thai', native_name: 'ไทย', code: 'th', country_code: 'TH' },
-  { name: 'Vietnamese', native_name: 'Tiếng Việt', code: 'vi', country_code: 'VN' }
 ]
 
 export async function seedLanguages(prisma: PrismaClient) {
