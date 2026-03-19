@@ -20,10 +20,14 @@ function shouldUseHostOnlyCookie(req?: Request) {
 export function baseCookieOptions(req?: Request) {
   // Browsers require cookies with SameSite=None to also be Secure.
   // For local dev over http, fall back to SameSite=Lax and secure=false.
-  const isHttps =
-    !!req?.secure ||
-    (req?.headers['x-forwarded-proto'] &&
-      String(req.headers['x-forwarded-proto']).includes('https'));
+  const forwardedProto = req?.headers['x-forwarded-proto'];
+  const isForwardedHttps = Array.isArray(forwardedProto)
+    ? forwardedProto.join(',').toLowerCase().includes('https')
+    : typeof forwardedProto === 'string'
+      ? forwardedProto.toLowerCase().includes('https')
+      : false;
+
+  const isHttps = !!req?.secure || isForwardedHttps;
 
   const sameSite: 'none' | 'lax' | 'strict' = isHttps ? 'none' : 'lax';
 
