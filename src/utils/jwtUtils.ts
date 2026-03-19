@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import type { Request } from "express";
 import { Log } from '@services/loggerService';
 
 /**
@@ -10,20 +11,35 @@ import { Log } from '@services/loggerService';
  */
 const COOKIE_DOMAIN: string | undefined = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
+function shouldUseHostOnlyCookie(req?: Request) {
+  const origin = req?.headers.origin?.toLowerCase() || '';
+  return origin.includes('localhost') || origin.includes('127.0.0.1');
+}
+
 /** Shared base options for auth/refresh cookies. */
-export function baseCookieOptions() {
+export function baseCookieOptions(req?: Request) {
+  // Browsers require cookies with SameSite=None to also be Secure.
+  // For local dev over http, fall back to SameSite=Lax and secure=false.
+  const isHttps =
+    !!req?.secure ||
+    (req?.headers['x-forwarded-proto'] &&
+      String(req.headers['x-forwarded-proto']).includes('https'));
+
+  const sameSite: 'none' | 'lax' | 'strict' = isHttps ? 'none' : 'lax';
+
   return {
     httpOnly: true,
-    secure: true,
-    sameSite: "none" as "none" | "lax" | "strict",
+    secure: isHttps,
+    sameSite,
     path: "/",
-    domain: COOKIE_DOMAIN,
+    domain: shouldUseHostOnlyCookie(req) ? undefined : COOKIE_DOMAIN,
   };
 }
 
 export function generateTokenAndSetCookie(
   user: any,
-  rememberMe: boolean = false
+  rememberMe: boolean = false,
+  req?: Request
 ) {
   const tokenExpiry = rememberMe ? "7d" : "24h";
   const cookieMaxAge = rememberMe
@@ -45,7 +61,7 @@ export function generateTokenAndSetCookie(
   );
 
   const cookieOptions = {
-    ...baseCookieOptions(),
+    ...baseCookieOptions(req),
     maxAge: cookieMaxAge,
   };
 
@@ -68,9 +84,9 @@ export function generateRefreshToken(rememberMe: boolean = false): {
 }
 
 /** Refresh cookie options (long-lived, httpOnly) */
-export function getRefreshCookieOptions(expiresAt: Date) {
+export function getRefreshCookieOptions(expiresAt: Date, req?: Request) {
   return {
-    ...baseCookieOptions(),
+    ...baseCookieOptions(req),
     expires: expiresAt,
   };
 }
