@@ -111,12 +111,12 @@ const googleCallback = async (req: Request, res: Response) => {
     await reactivateOnLogin(user.id);
 
     // Generate access token
-    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, false);
+    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, false, req);
     res.cookie('auth_token', token, cookieOptions);
 
     // Generate refresh token & store device (same as email/password login)
     const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(false);
-    res.cookie('refresh_token', refreshToken, getRefreshCookieOptions(rfExpiry));
+    res.cookie('refresh_token', refreshToken, getRefreshCookieOptions(rfExpiry, req));
     await createLoginDevice(
       user.id,
       refreshToken,

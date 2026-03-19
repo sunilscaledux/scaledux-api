@@ -122,13 +122,14 @@ export async function register(req: Request, res: Response) {
     // Generate access token
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
       userResult.data,
-      false
+      false,
+      req
     );
     res.cookie("auth_token", token, cookieOptions);
 
     // Generate refresh token & store device
     const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(false);
-    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry));
+    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry, req));
     await createLoginDevice(
       userResult.data.id,
       refreshToken,
@@ -185,13 +186,14 @@ export async function login(req: Request, res: Response) {
     const rememberMe = body.rememberMe || false;
     const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
       loginResult.data,
-      rememberMe
+      rememberMe,
+      req
     );
     res.cookie("auth_token", token, cookieOptions);
 
     // Generate refresh token & store device
     const { token: refreshToken, expiresAt: rfExpiry } = generateRefreshToken(rememberMe);
-    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry));
+    res.cookie("refresh_token", refreshToken, getRefreshCookieOptions(rfExpiry, req));
     await createLoginDevice(
       loginResult.data.id,
       refreshToken,
@@ -434,12 +436,13 @@ export async function verifyOtp(req: Request, res: Response) {
 
         const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
           loginResult.data,
-          false
+          false,
+          req
         );
         res.cookie("auth_token", token, cookieOptions);
 
         const { token: rfToken, expiresAt: rfExpiry } = generateRefreshToken(false);
-        res.cookie("refresh_token", rfToken, getRefreshCookieOptions(rfExpiry));
+        res.cookie("refresh_token", rfToken, getRefreshCookieOptions(rfExpiry, req));
         await createLoginDevice(
           loginResult.data.id,
           rfToken,
@@ -599,7 +602,7 @@ export async function resetPassword(req: Request, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   try {
-    const clearOpts = baseCookieOptions();
+    const clearOpts = baseCookieOptions(req);
     res.clearCookie("auth_token", clearOpts);
 
     const refreshToken = req.cookies?.refresh_token;
@@ -654,10 +657,10 @@ export async function refreshAccessToken(req: Request, res: Response) {
     // Auto-reactivate if they were deactivated (login = become active again)
     await reactivateOnLogin(user.id);
 
-    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, rememberMe);
+    const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(user, rememberMe, req);
 
     res.cookie("auth_token", token, cookieOptions);
-    res.cookie("refresh_token", newRefreshToken, getRefreshCookieOptions(expiresAt));
+    res.cookie("refresh_token", newRefreshToken, getRefreshCookieOptions(expiresAt, req));
 
     return ApiResponse.success(res, { token, expiresIn }, "Token refreshed");
   } catch (error: any) {

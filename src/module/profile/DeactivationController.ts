@@ -5,8 +5,6 @@ import { revokeAllDevices } from "@module/auth/AuthService";
 import { emitSessionRevokedMany } from "@module/auth/authSocket";
 import { baseCookieOptions } from "@utils/jwtUtils";
 
-const clearAuthCookieOpts = baseCookieOptions();
-
 export async function confirmDeactivate(req: Request, res: Response) {
   try {
     const userId = (req as any).user?.id;
@@ -22,6 +20,7 @@ export async function confirmDeactivate(req: Request, res: Response) {
     const { deviceIds } = await revokeAllDevices(userId);
     if (deviceIds.length > 0) await emitSessionRevokedMany(userId, deviceIds);
 
+    const clearAuthCookieOpts = baseCookieOptions(req);
     res.clearCookie("auth_token", clearAuthCookieOpts);
     res.clearCookie("refresh_token", clearAuthCookieOpts);
 
