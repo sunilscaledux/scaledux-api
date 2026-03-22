@@ -108,7 +108,10 @@ export class CompanyProfileService {
         currency: profile.user.currency,
         
         // User data
-        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
+        ...getDisplayName(
+          profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+          { maskLastName: false }
+        ),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,
@@ -211,7 +214,10 @@ export class CompanyProfileService {
         country: profile.country,
         state: profile.state,
         currency: profile.user.currency,
-        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
+        ...getDisplayName(
+          profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+          { maskLastName: true }
+        ),
         email: null,
         phone: null,
         emailVerified: false,
@@ -441,7 +447,10 @@ export class CompanyProfileService {
         currency: profile.user.currency,
         
         // User data
-        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
+        ...getDisplayName(
+          profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+          { maskLastName: false }
+        ),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,

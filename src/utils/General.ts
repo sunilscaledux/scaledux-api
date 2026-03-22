@@ -1,11 +1,15 @@
-/** Display name for API: "Scaledux user" when deactivated, else first + last name */
-export function getDisplayName(user: { first_name: string; last_name?: string | null; is_deactivated?: boolean }): { firstName: string; lastName: string | null } {
+/** Display name for API: "Scaledux user" when deactivated, else first + last name. */
+export function getDisplayName(
+  user: { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+  options?: { maskLastName?: boolean }
+): { firstName: string; lastName: string | null } {
   if ((user as { is_deactivated?: boolean }).is_deactivated) {
     return { firstName: "Scaledux user", lastName: null };
   }
+  const maskLastName = !!options?.maskLastName;
   return {
     firstName: user.first_name,
-    lastName: user.last_name ? `${user.last_name.charAt(0)}.` : null,
+    lastName: user.last_name ? (maskLastName ? `${user.last_name.charAt(0)}.` : user.last_name) : null,
   };
 }
 

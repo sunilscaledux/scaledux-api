@@ -46,7 +46,10 @@ export class PersonalInfoService {
       }
 
       const profile = user.personalInfo;
-      const { firstName, lastName } = getDisplayName(user as { first_name: string; last_name?: string | null; is_deactivated?: boolean });
+      const { firstName, lastName } = getDisplayName(
+        user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+        { maskLastName: true }
+      );
 
       // Return public profile data (hide sensitive information)
       const publicProfile = {
@@ -135,7 +138,10 @@ export class PersonalInfoService {
         currency: profile.user.currency,
         // User account data (from User table)
         role: profile.user.role, // User's role from backend
-        ...getDisplayName(profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean }),
+        ...getDisplayName(
+          profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+          { maskLastName: false }
+        ),
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,

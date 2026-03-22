@@ -4,6 +4,7 @@ import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds
 import { emitConversationStatusToUser } from "./chatSocket";
 import { publishSocketEvent } from "@services/socketPubSub";
 import { Log } from '@services/loggerService';
+import { getDisplayName } from '@utils/General';
 
 async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
   if (!profileImage) return null;
@@ -162,7 +163,7 @@ export class ConversationService {
         id: u.id,
         unique_id: u.unique_id ?? null,
         first_name: u.first_name,
-        last_name: u.last_name ?? null,
+        last_name: getDisplayName({ first_name: u.first_name, last_name: u.last_name }, { maskLastName: true }).lastName,
         profile_image: await toProfileImageUrl(u.personalInfo?.profileImage)
       }
     };
@@ -240,7 +241,7 @@ export class ConversationService {
         id: u.id,
         unique_id: u.unique_id ?? null,
         first_name: u.first_name,
-        last_name: u.last_name ?? null,
+        last_name: getDisplayName({ first_name: u.first_name, last_name: u.last_name }, { maskLastName: true }).lastName,
         profile_image: await toProfileImageUrl(u.personalInfo?.profileImage)
       })));
       return { success: true, message: "OK", data: { users: list } };
@@ -373,7 +374,7 @@ export class ConversationService {
             id: other.id,
             unique_id: other.unique_id,
             first_name: other.first_name,
-            last_name: other.last_name,
+            last_name: getDisplayName({ first_name: other.first_name, last_name: other.last_name }, { maskLastName: true }).lastName,
             profile_image: profileImageUrl,
             location: location || null
           },
@@ -420,7 +421,7 @@ export class ConversationService {
         id: other.id,
         unique_id: other.unique_id,
         first_name: other.first_name,
-        last_name: other.last_name,
+        last_name: getDisplayName({ first_name: other.first_name, last_name: other.last_name }, { maskLastName: true }).lastName,
         profile_image: await toProfileImageUrl(other.personalInfo?.profileImage),
         location: location || null
       };
@@ -580,7 +581,7 @@ export class ConversationService {
             ? {
                 id: m.sender.id,
                 first_name: m.sender.first_name,
-                last_name: m.sender.last_name,
+                last_name: getDisplayName({ first_name: m.sender.first_name, last_name: m.sender.last_name }, { maskLastName: true }).lastName,
                 profile_image: await toProfileImageUrl(m.sender.personalInfo?.profileImage)
               }
             : null,
@@ -636,7 +637,7 @@ export class ConversationService {
             ? {
                 id: m.sender.id,
                 first_name: m.sender.first_name,
-                last_name: m.sender.last_name,
+                last_name: getDisplayName({ first_name: m.sender.first_name, last_name: m.sender.last_name }, { maskLastName: true }).lastName,
                 profile_image: await toProfileImageUrl(m.sender.personalInfo?.profileImage)
               }
             : null,
@@ -750,7 +751,7 @@ export class ConversationService {
         ? {
             id: msg.sender.id,
             first_name: msg.sender.first_name,
-            last_name: msg.sender.last_name,
+            last_name: getDisplayName({ first_name: msg.sender.first_name, last_name: msg.sender.last_name }, { maskLastName: true }).lastName,
             profile_image: await toProfileImageUrl(msg.sender.personalInfo?.profileImage)
           }
         : null;
