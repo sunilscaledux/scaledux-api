@@ -1,3 +1,6 @@
+
+import { appConfig } from '@config/app'
+
 /** Display name for API: "Scaledux user" when deactivated, else first + last name. */
 export function getDisplayName(
   user: { first_name: string; last_name?: string | null; is_deactivated?: boolean },
@@ -62,3 +65,30 @@ export const normalizeContact = (email: string) => {
     return { email: incoming, phone: null };
   }
 };
+
+
+
+export function addDaysUtc(d: Date, days: number): Date {
+  const x = new Date(d.getTime())
+  x.setUTCDate(x.getUTCDate() + days)
+  return x
+}
+
+/**
+ * After an approved identity/agency verification, the user must wait N days before resubmitting.
+ */
+export function getResubmitWindow(
+  lastApprovedAt: Date | null | undefined,
+  cooldownDays: number = appConfig.verification.identityCooldownDays
+): { canSubmit: boolean; nextSubmitAllowedAt: Date | null } {
+  const days = cooldownDays
+  if (!lastApprovedAt) {
+    return { canSubmit: true, nextSubmitAllowedAt: null }
+  }
+  const next = addDaysUtc(lastApprovedAt, days)
+  const canSubmit = new Date() >= next
+  return {
+    canSubmit,
+    nextSubmitAllowedAt: canSubmit ? null : next
+  }
+}

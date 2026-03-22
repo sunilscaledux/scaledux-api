@@ -8,6 +8,15 @@ const appFeeFounderRaw = process.env.APP_FEE_FOUNDER;
 const gstPercentRaw = process.env.GST_PERCENT;
 const razorpayPlatformAccountRaw = (process.env.RAZORPAY_PLATFORM_ACCOUNT_ID ?? '').trim();
 
+const identityCooldownDays = Math.max(
+  1,
+  parseInt(process.env.IDENTITY_VERIFICATION_COOLDOWN_DAYS || '15', 10)
+);
+const agencyCooldownDays = Math.max(
+  1,
+  parseInt(process.env.AGENCY_VERIFICATION_COOLDOWN_DAYS || '15', 10)
+);
+
 export const appConfig = {
   /** Platform GSTIN (for invoices). */
   platformGstNumber: platformGstRaw || null as string | null,
@@ -23,4 +32,13 @@ export const appConfig = {
 
   /** Razorpay platform linked account id (e.g. acc_scaledux123). When set, payment orders include a transfer to this account. */
   razorpayPlatformAccountId: razorpayPlatformAccountRaw || null as string | null,
+
+  /**
+   * Legal name (identity) and agency verifications: minimum days between approved submissions before resubmitting.
+   * Email and phone can be updated anytime (separate flows).
+   */
+  verification: {
+    identityCooldownDays,
+    agencyCooldownDays,
+  },
 };

@@ -14,11 +14,13 @@ import {
 import {
   getIdentityVerificationStatus,
   submitIdentityVerification,
-  getIdentityVerificationDetails
+  getIdentityVerificationDetails,
+  updateIdentityVerificationStatus
 } from "./IdentityVerifyController"
 import {
   submitAgencyVerification,
   getAgencyVerificationDetails,
+  getAgencyVerificationStatus,
   updateAgencyVerificationStatus
 } from "./AgencyVerifyController"
 import { authenticateToken } from "@middleware/auth"
@@ -40,6 +42,7 @@ router.put("/email/update", authenticateToken, updateEmailAddress)
 router.get("/identity/status", authenticateToken, getIdentityVerificationStatus)
 router.post("/identity/submit", authenticateToken, submitIdentityVerification)
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
+router.post("/identity/review", authenticateToken, updateIdentityVerificationStatus)
 
 router.post(
   "/identity/upload-id-documents",
@@ -66,8 +69,10 @@ router.post(
 )
 
 
+router.get("/agency/status", authenticateToken, getAgencyVerificationStatus)
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
+router.post("/agency/review", authenticateToken, updateAgencyVerificationStatus)
 
 router.post(
   "/agency/upload-documents",

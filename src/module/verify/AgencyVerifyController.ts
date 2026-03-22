@@ -7,6 +7,10 @@ import { resolveAttachmentUrls } from '@services/attachmentService'
 import fs from 'fs'
 import path from 'path'
 import { Log } from '@services/loggerService';
+import { appConfig } from '@config/app';
+import { getResubmitWindow } from '@utils/verificationPolicy';
+
+
 
 /**
  * Submit agency verification
@@ -49,6 +53,21 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     // If there's a pending submission, don't allow new submission
     if (existingVerification && ['PENDING', 'UNDER_REVIEW'].includes(existingVerification.status)) {
       return ApiResponse.error(res, "You already have a pending agency verification submission", 400)
+    }
+
+    const lastApprovedAgency = await prisma.agencyVerification.findFirst({
+      where: { user_id: userId, status: 'APPROVED' },
+      orderBy: { verified_at: 'desc' }
+    })
+    if (lastApprovedAgency?.verified_at) {
+      const cooldown = getResubmitWindow(lastApprovedAgency.verified_at, appConfig.verification.agencyCooldownDays)
+      if (!cooldown.canSubmit && cooldown.nextSubmitAllowedAt) {
+        return ApiResponse.error(
+          res,
+          `Agency verification can be updated at most once every ${appConfig.verification.agencyCooldownDays} days after approval. You can submit again after ${cooldown.nextSubmitAllowedAt.toISOString()}.`,
+          429
+        )
+      }
     }
 
     let agencyVerification
@@ -135,7 +154,9 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
       status: agencyVerification.status,
       submittedAt: agencyVerification.submitted_at,
       verifiedAt: agencyVerification.verified_at,
-      rejectionReason: agencyVerification.rejection_reason
+      rejectionReason: agencyVerification.rejection_reason,
+      cooldownDays: appConfig.verification.agencyCooldownDays,
+      cansubmit: getResubmitWindow(agencyVerification.verified_at, appConfig.verification.agencyCooldownDays).canSubmit
     }, "Agency verification details retrieved successfully")
 
   } catch (error: any) {
@@ -207,7 +228,7 @@ export async function updateAgencyVerificationStatus(req: Request, res: Response
       where: { id: agencyVerification.user_id },
       data: {
         agency_verification_status: status,
-        // agency_verified_at: status === 'APPROVED' ? currentTime : null // TODO: Uncomment after migration
+        agency_verified_at: status === 'APPROVED' ? currentTime : null
       }
     })
 

@@ -7,6 +7,8 @@ import { resolveAttachmentUrl, createAttachment } from '@services/attachmentServ
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { updateCompletionSection } from './ProfileCompletionService';
+import { getResubmitWindow } from '@utils/verificationPolicy';
+import { appConfig } from '@config/app';
 
 /**
  * PersonalInfoService
@@ -164,6 +166,32 @@ export class PersonalInfoService {
           (userDetail as Record<string, unknown>).agencyName = approvedAgency.agency_name;
         }
       }
+
+      // Cooldown windows (same logic as /verify/identity/status and /verify/agency/status) for /me consumers
+      const [lastApprovedIdentity, lastApprovedAgency] = await Promise.all([
+        prisma.identityVerification.findFirst({
+          where: { user_id: userId, status: 'APPROVED' },
+          orderBy: { reviewed_at: 'desc' },
+        }),
+        prisma.agencyVerification.findFirst({
+          where: { user_id: userId, status: 'APPROVED' },
+          orderBy: { verified_at: 'desc' },
+        }),
+      ]);
+      const identityAnchor =
+        lastApprovedIdentity?.reviewed_at ?? profile.user.identity_verified_at ?? null;
+      const identityCooldown = getResubmitWindow(identityAnchor, appConfig.verification.identityCooldownDays);
+      const agencyAnchor =
+        lastApprovedAgency?.verified_at ?? profile.user.agency_verified_at ?? null;
+      const agencyCooldown = getResubmitWindow(agencyAnchor, appConfig.verification.agencyCooldownDays);
+
+      const detail = userDetail as Record<string, unknown>;
+      detail.identity_next_submit_allowed_at =
+        identityCooldown.nextSubmitAllowedAt?.toISOString() ?? null;
+      detail.agency_next_submit_allowed_at =
+        agencyCooldown.nextSubmitAllowedAt?.toISOString() ?? null;
+      detail.identity_verification_cooldown_days = appConfig.verification.identityCooldownDays;
+      detail.agency_verification_cooldown_days = appConfig.verification.agencyCooldownDays;
 
       return {
         success: true,
