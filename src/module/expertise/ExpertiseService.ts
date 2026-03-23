@@ -4,6 +4,33 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
+/** Enrich expertise records with subcategory details resolved from specialty_ids JSON */
+async function enrichWithSpecialties(expertises: any[]) {
+  const allIds = new Set<number>();
+  for (const e of expertises) {
+    const ids = Array.isArray(e.specialty_ids) ? e.specialty_ids : [];
+    ids.forEach((id: number) => allIds.add(id));
+  }
+
+  if (allIds.size === 0) return expertises;
+
+  const subcategories = await prisma.subcategory.findMany({
+    where: { id: { in: [...allIds] } },
+    select: { id: true, name: true, description: true }
+  });
+  const subMap = new Map(subcategories.map((s) => [s.id, s]));
+
+  return expertises.map((e) => {
+    const ids = Array.isArray(e.specialty_ids) ? e.specialty_ids : [];
+    return {
+      ...e,
+      specialties: ids
+        .map((id: number) => subMap.get(id))
+        .filter(Boolean)
+    };
+  });
+}
+
 export class ExpertiseService {
   static async createUserExpertise(userId: number, data: CreateUserExpertiseInput): Promise<ServiceResponse> {
     try {
@@ -14,31 +41,33 @@ export class ExpertiseService {
         return { success: false, message: "Invalid expertise category" };
       }
 
-      const subcategory = await prisma.subcategory.findFirst({
-        where: { id: data.specialty_id, is_active: true }
+      // Validate all specialty IDs
+      const subcategories = await prisma.subcategory.findMany({
+        where: { id: { in: data.specialty_ids }, is_active: true }
       });
-      if (!subcategory) {
-        return { success: false, message: "Invalid subcategory" };
+      if (subcategories.length !== data.specialty_ids.length) {
+        return { success: false, message: "One or more invalid specialties" };
       }
 
       const userExpertise = await prisma.userExpertise.create({
         data: {
           user_id: userId,
           categoryId: data.expertise_category_id,
-          subcategoryId: data.specialty_id,
+          specialty_ids: data.specialty_ids,
           description: data.description,
           skills: data.skills || []
         },
         include: {
-          category: { select: { id: true, name: true, description: true } },
-          subcategory: { select: { id: true, name: true, description: true } }
+          category: { select: { id: true, name: true, description: true } }
         }
       });
+
+      const [enriched] = await enrichWithSpecialties([userExpertise]);
       await updateCompletionSection(userId, 'skillsExpertise', true);
       return {
         success: true,
         message: "Expertise added successfully",
-        data: userExpertise
+        data: enriched
       };
     } catch (error: any) {
       Log.error("Error", { error });
@@ -51,16 +80,17 @@ export class ExpertiseService {
       const userExpertises = await prisma.userExpertise.findMany({
         where: { user_id: userId },
         include: {
-          category: { select: { id: true, name: true, description: true } },
-          subcategory: { select: { id: true, name: true, description: true } }
+          category: { select: { id: true, name: true, description: true } }
         },
         orderBy: { created_at: 'desc' }
       });
 
+      const enriched = await enrichWithSpecialties(userExpertises);
+
       return {
         success: true,
         message: "User expertises retrieved successfully",
-        data: userExpertises
+        data: enriched
       };
     } catch (error: any) {
       Log.error("Error", { error });
@@ -85,31 +115,33 @@ export class ExpertiseService {
         return { success: false, message: "Invalid expertise category" };
       }
 
-      const subcategory = await prisma.subcategory.findFirst({
-        where: { id: data.specialty_id, is_active: true }
+      // Validate all specialty IDs
+      const subcategories = await prisma.subcategory.findMany({
+        where: { id: { in: data.specialty_ids }, is_active: true }
       });
-      if (!subcategory) {
-        return { success: false, message: "Invalid subcategory" };
+      if (subcategories.length !== data.specialty_ids.length) {
+        return { success: false, message: "One or more invalid specialties" };
       }
 
       const userExpertise = await prisma.userExpertise.update({
         where: { id: expertiseId },
         data: {
           categoryId: data.expertise_category_id,
-          subcategoryId: data.specialty_id,
+          specialty_ids: data.specialty_ids,
           description: data.description,
           skills: data.skills || []
         },
         include: {
-          category: { select: { id: true, name: true, description: true } },
-          subcategory: { select: { id: true, name: true, description: true } }
+          category: { select: { id: true, name: true, description: true } }
         }
       });
+
+      const [enriched] = await enrichWithSpecialties([userExpertise]);
 
       return {
         success: true,
         message: "User expertise updated successfully",
-        data: userExpertise
+        data: enriched
       };
     } catch (error: any) {
       Log.error("Error", { error });

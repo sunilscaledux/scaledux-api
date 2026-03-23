@@ -17,8 +17,15 @@ export async function invalidateLocationCache(countryId?: string) {
       'countries:all',
       'countries:with-states:all',
       'currencies:all',
-      'countries:with-currencies:all'
+      'countries:with-currencies:all',
+      'expertise:categories:all'
     ]
+
+    // Invalidate all reference data caches
+    const specialtyKeys = await redisClient.keys('specialties:*')
+    const skillKeys = await redisClient.keys('skills:*')
+    const languageKeys = await redisClient.keys('languages:*')
+    keysToDelete.push(...specialtyKeys, ...skillKeys, ...languageKeys)
     
     if (countryId) {
       keysToDelete.push(`states:country:${countryId}`)
@@ -179,10 +186,14 @@ export async function getAllCountriesWithStates(req: Request, res: Response) {
 // Language related functions
 export async function getLanguages(req: Request, res: Response) {
   try {
+    const cacheKey = 'languages:all'
+    const cached = await redisClient.get(cacheKey)
+    if (cached) {
+      return ApiResponse.success(res, JSON.parse(cached), "Languages retrieved successfully")
+    }
+
     const languages = await prisma.language.findMany({
-      where: {
-        is_active: true
-      },
+      where: { is_active: true },
       select: {
         id: true,
         name: true,
@@ -190,10 +201,10 @@ export async function getLanguages(req: Request, res: Response) {
         code: true,
         country_code: true,
       },
-      orderBy: {
-        name: 'asc'
-      }
+      orderBy: { name: 'asc' }
     })
+
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(languages))
 
     return ApiResponse.success(res, languages, "Languages retrieved successfully")
   } catch (error: any) {
@@ -210,9 +221,16 @@ export async function getLanguagesByCountry(req: Request, res: Response) {
       return ApiResponse.error(res, "Country code is required", 400)
     }
 
+    const upperCode = countryCode.toUpperCase()
+    const cacheKey = `languages:country:${upperCode}`
+    const cached = await redisClient.get(cacheKey)
+    if (cached) {
+      return ApiResponse.success(res, JSON.parse(cached), "Languages by country retrieved successfully")
+    }
+
     const languages = await prisma.language.findMany({
       where: {
-        country_code: countryCode.toUpperCase(),
+        country_code: upperCode,
         is_active: true
       },
       select: {
@@ -221,10 +239,10 @@ export async function getLanguagesByCountry(req: Request, res: Response) {
         native_name: true,
         code: true,
       },
-      orderBy: {
-        name: 'asc'
-      }
+      orderBy: { name: 'asc' }
     })
+
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(languages))
 
     return ApiResponse.success(res, languages, "Languages by country retrieved successfully")
   } catch (error: any) {
@@ -437,30 +455,26 @@ export async function getExpertiseCategories(req: Request, res: Response) {
 export async function getSpecialtiesByCategory(req: Request, res: Response) {
   try {
     const categoryId = getIntParam(req.params.categoryId)
-    
+
     if (!categoryId) {
       return ApiResponse.error(res, "Category ID is required", 400)
     }
 
-    const cacheKey = `expertise:specialties:category:${categoryId}`
-    
-    // Try to get from Redis cache first
-    const cachedSpecialties = await redisClient.get(cacheKey)
-    if (cachedSpecialties) {
-      return ApiResponse.success(res, JSON.parse(cachedSpecialties), "Specialties retrieved successfully")
+    const cacheKey = `specialties:category:${categoryId}`
+    const cached = await redisClient.get(cacheKey)
+    if (cached) {
+      return ApiResponse.success(res, JSON.parse(cached), "Specialties retrieved successfully")
     }
 
-    // If not in cache, fetch from database
     const specialties = await prisma.subcategory.findMany({
-      where: { 
+      where: {
         categoryId: categoryId,
-        is_active: true 
+        is_active: true
       },
       orderBy: { name: 'asc' }
     })
 
-    // Cache for 24 hours
-    await redisClient.setex(cacheKey, 864000, JSON.stringify(specialties))
+    await redisClient.setex(cacheKey, 86400, JSON.stringify(specialties))
 
     return ApiResponse.success(res, specialties, "Specialties retrieved successfully")
   } catch (error: any) {
@@ -472,32 +486,52 @@ export async function getSpecialtiesByCategory(req: Request, res: Response) {
 export async function getSkillsByCategory(req: Request, res: Response) {
   try {
     const categoryId = getIntParam(req.params.categoryId)
-    
+
     if (!categoryId) {
       return ApiResponse.error(res, "Category ID is required", 400)
     }
 
-    const cacheKey = `expertise:skills:category:${categoryId}`
-    
-    // Try to get from Redis cache first
-    const cachedSkills = await redisClient.get(cacheKey)
-    if (cachedSkills) {
-      return ApiResponse.success(res, JSON.parse(cachedSkills), "Skills retrieved successfully")
+    const { q, page = 1, limit = 30 } = req.query
+    const searchQuery = typeof q === 'string' ? q.trim() : ''
+    const pageNum = Math.max(parseInt(page as string) || 1, 1)
+    const limitNum = Math.min(parseInt(limit as string) || 30, 100)
+
+    // Cache full list per category, filter/paginate in memory
+    const cacheKey = `skills:category:${categoryId}`
+    let allSkills: any[]
+
+    const cached = await redisClient.get(cacheKey)
+    if (cached) {
+      allSkills = JSON.parse(cached)
+    } else {
+      allSkills = await prisma.skill.findMany({
+        where: { categoryId, is_active: true },
+        orderBy: { name: 'asc' }
+      })
+      await redisClient.setex(cacheKey, 86400, JSON.stringify(allSkills))
     }
 
-    // If not in cache, fetch from database
-    const skills = await prisma.skill.findMany({
-      where: { 
-        categoryId: categoryId,
-        is_active: true 
-      },
-      orderBy: { name: 'asc' }
-    })
+    // Filter by search in memory
+    let filtered = allSkills
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase()
+      filtered = allSkills.filter((s: any) => s.name.toLowerCase().includes(lowerQuery))
+    }
 
-    // Cache for 24 hours
-    await redisClient.setex(cacheKey, 864000, JSON.stringify(skills))
+    // Paginate in memory
+    const total = filtered.length
+    const skip = (pageNum - 1) * limitNum
+    const skills = filtered.slice(skip, skip + limitNum)
 
-    return ApiResponse.success(res, skills, "Skills retrieved successfully")
+    return ApiResponse.success(res, {
+      skills,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        pages: Math.ceil(total / limitNum)
+      }
+    }, "Skills retrieved successfully")
   } catch (error: any) {
     Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve skills")

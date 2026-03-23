@@ -58,6 +58,6 @@ router.get("/skills/search", searchSkills)
 router.get("/skills", getAllSkills)
 
 router.post("/cache/warm", warmLocationCache)
-router.delete("/cache/invalidate", invalidateCache)
+router.get("/cache/invalidate", invalidateCache)
 
 export default router

@@ -303,7 +303,6 @@ model Subcategory {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
   category      Category  @relation(fields: [categoryId], references: [id])
-  expertises    UserExpertise[]
   founderProjects FounderProject[]
   servicePackages ServicePackage[]
 
@@ -423,14 +422,13 @@ model UserExpertise {
   id            Int         @id @default(autoincrement())
   user_id       Int
   categoryId    Int         @map("expertise_category_id")
-  subcategoryId Int         @map("specialty_id")
+  specialty_ids Json?
   description   String?
   skills        Json?
   created_at    DateTime    @default(now())
   updated_at    DateTime    @updatedAt
   user          User        @relation(fields: [user_id], references: [id], onDelete: Cascade)
   category      Category    @relation(fields: [categoryId], references: [id])
-  subcategory   Subcategory @relation(fields: [subcategoryId], references: [id])
 
   @@map("scd_user_expertises")
 }

@@ -256,7 +256,7 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
           data: {
             user_id: userId,
             categoryId: techCategory.id,
-            subcategoryId: generalSubcategory.id,
+            specialty_ids: [generalSubcategory.id],
             description: 'Skills imported from LinkedIn profile',
             skills: skillNames,
           },

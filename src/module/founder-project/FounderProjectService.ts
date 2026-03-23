@@ -904,8 +904,7 @@ export class FounderProjectService {
           },
           expertises: {
             include: {
-              category: { select: { id: true, name: true } },
-              subcategory: { select: { id: true, name: true } }
+              category: { select: { id: true, name: true } }
             }
           },
           servicePackages: {
@@ -947,7 +946,7 @@ export class FounderProjectService {
           expertises: freelancer.expertises.map((exp: any) => ({
             id: exp.id,
             category: exp.category,
-            subcategory: exp.subcategory,
+            specialty_ids: exp.specialty_ids || [],
             skills: exp.skills || []
           })),
           all_skills: userSkills,

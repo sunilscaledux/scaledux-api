@@ -1,6 +1,6 @@
 export interface CreateUserExpertiseInput {
   expertise_category_id: number;
-  specialty_id: number;
+  specialty_ids: number[];
   description?: string;
   skills?: string[];
 }

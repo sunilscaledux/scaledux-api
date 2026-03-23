@@ -7,10 +7,15 @@ export const createUserExpertiseSchema = Joi.object({
     'number.positive': 'Expertise category ID must be positive',
     'any.required': 'Expertise category is required'
   }),
-  specialty_id: Joi.number().integer().positive().required().messages({
-    'number.base': 'Specialty ID must be a number',
-    'number.integer': 'Specialty ID must be an integer',
-    'number.positive': 'Specialty ID must be positive',
+  specialty_ids: Joi.array().items(
+    Joi.number().integer().positive().messages({
+      'number.base': 'Each specialty ID must be a number',
+      'number.integer': 'Each specialty ID must be an integer',
+      'number.positive': 'Each specialty ID must be positive'
+    })
+  ).min(1).required().messages({
+    'array.base': 'Specialty IDs must be an array',
+    'array.min': 'At least one specialty is required',
     'any.required': 'Specialty is required'
   }),
   description: Joi.string().max(1000).optional().allow('').messages({
