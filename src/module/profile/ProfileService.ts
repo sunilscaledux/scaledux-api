@@ -30,6 +30,16 @@ export class PersonalInfoService {
               state: true,
             },
           },
+          education: { orderBy: { created_at: 'desc' } },
+          workExperiences: { orderBy: { created_at: 'desc' } },
+          expertises: {
+            include: {
+              category: { select: { id: true, name: true, description: true } },
+            },
+            orderBy: { created_at: 'desc' },
+          },
+          licenses: { orderBy: { created_at: 'desc' } },
+          achievements: { orderBy: { created_at: 'desc' } },
         },
       });
 
@@ -53,6 +63,9 @@ export class PersonalInfoService {
         { maskLastName: true }
       );
 
+      // Enrich expertises with subcategory details
+      const enrichedExpertises = await this.enrichExpertisesWithSpecialties(user.expertises || []);
+
       // Return public profile data (hide sensitive information)
       const publicProfile = {
         id: profile.id,
@@ -73,10 +86,20 @@ export class PersonalInfoService {
         role: user.role,
         firstName,
         lastName,
+        hideEmail: profile.hideEmail,
+        hidePhone: profile.hidePhone,
         // Only show email/phone if not hidden
         email: profile.hideEmail ? null : user.email,
         phone: profile.hidePhone ? null : user.phone,
         show_as_agency: user.show_as_agency,
+        identity_verification_status: (user as any).identity_verification_status,
+        profile_type: (user as any).profile_type || user.role,
+        // Professional sections
+        educations: user.education || [],
+        workExperiences: user.workExperiences || [],
+        userExpertises: enrichedExpertises,
+        licenses: user.licenses || [],
+        achievements: user.achievements || [],
       };
 
       return {
@@ -91,6 +114,36 @@ export class PersonalInfoService {
         message: 'Failed to retrieve public profile',
       };
     }
+  }
+
+  /** Enrich expertise records with subcategory details resolved from specialty_ids JSON */
+  private static async enrichExpertisesWithSpecialties(expertises: any[]) {
+    const allIds = new Set<number>();
+    for (const e of expertises) {
+      const ids = Array.isArray(e.specialty_ids) ? e.specialty_ids : [];
+      ids.forEach((id: number) => allIds.add(id));
+    }
+
+    if (allIds.size === 0) {
+      return expertises.map((e) => ({
+        ...e,
+        specialties: [],
+        subcategory: { id: 0, name: '', description: '' },
+      }));
+    }
+
+    const subcategories = await prisma.subcategory.findMany({
+      where: { id: { in: [...allIds] } },
+      select: { id: true, name: true, description: true },
+    });
+    const subMap = new Map(subcategories.map((s) => [s.id, s]));
+
+    return expertises.map((e) => {
+      const ids = Array.isArray(e.specialty_ids) ? e.specialty_ids : [];
+      const specialties = ids.map((id: number) => subMap.get(id)).filter(Boolean);
+      const firstSub = specialties[0] || { id: 0, name: '', description: '' };
+      return { ...e, specialties, subcategory: firstSub };
+    });
   }
 
   /**
