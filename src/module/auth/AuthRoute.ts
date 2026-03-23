@@ -24,9 +24,9 @@ import { authenticateToken, preventAuthenticatedAccess } from "@middleware/auth"
 const router = express.Router();
 
 
-router.post("/request-otp", createRateLimiter(15 * 60, 5), preventAuthenticatedAccess, requestOtp);
-router.post("/verify-otp", createRateLimiter(15 * 60, 5), verifyOtp);
-router.post("/resend-otp", createRateLimiter(15 * 60, 5), preventAuthenticatedAccess, resendOtpUnified);
+router.post("/request-otp", createRateLimiter(15 * 60, 15), preventAuthenticatedAccess, requestOtp);
+router.post("/verify-otp", createRateLimiter(15 * 60, 15), verifyOtp);
+router.post("/resend-otp", createRateLimiter(15 * 60, 15), preventAuthenticatedAccess, resendOtpUnified);
 
 router.post("/register", createRateLimiter(5 * 60, 10), preventAuthenticatedAccess, register);
 router.post("/login", createRateLimiter(5 * 60, 10), preventAuthenticatedAccess, login);
