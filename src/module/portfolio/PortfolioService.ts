@@ -9,10 +9,8 @@ import { Log } from '@services/loggerService';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
-/** Transform a portfolio record: resolve attachment URLs + wrap external links in redirects */
+/** Transform a portfolio record: resolve attachment URLs */
 async function transformPortfolio(portfolio: any): Promise<any> {
-  const entityOpts = { entityType: 'portfolio', entityId: portfolio.id };
-
   const [thumbnailUrl, mediaUrls] = await Promise.all([
     portfolio.thumbnail_url
       ? resolveAttachmentUrl(portfolio.thumbnail_url as string, 'portfolio_thumbnail')
@@ -22,33 +20,40 @@ async function transformPortfolio(portfolio: any): Promise<any> {
       : Promise.resolve([])
   ]);
 
-  // Wrap project_link in redirect
-  let projectLinkRedirect: string | null = null;
-  if (portfolio.project_link) {
-    projectLinkRedirect = await createRedirectLink(portfolio.project_link, entityOpts);
+  return {
+    ...portfolio,
+    thumbnail_url: thumbnailUrl,
+    media_urls: mediaUrls,
+    scaledux_url: `${FRONTEND_URL}/portfolio/${portfolio.unique_id}`
+  };
+}
+
+/** Convert project_link and reference URLs to redirect links before storing */
+async function wrapExternalUrls(
+  data: { projectLink?: string; references?: any[] },
+  entityType: string,
+  entityId: number,
+  createdBy?: number
+): Promise<{ project_link?: string; references?: any[] }> {
+  const entityOpts = { entityType, entityId, createdBy };
+  const result: any = {};
+
+  if (data.projectLink) {
+    result.project_link = await createRedirectLink(data.projectLink, entityOpts);
   }
 
-  // Wrap reference URLs in redirects
-  let references = portfolio.references;
-  if (Array.isArray(references) && references.length > 0) {
-    references = await Promise.all(
-      references.map(async (ref: any) => {
-        if (ref?.url) {
-          return { ...ref, redirect_url: await createRedirectLink(ref.url, entityOpts) };
+  if (Array.isArray(data.references) && data.references.length > 0) {
+    result.references = await Promise.all(
+      data.references.map(async (ref: any) => {
+        if (ref?.url && !ref.url.includes('/r/')) {
+          return { url: ref.url, redirect_url: await createRedirectLink(ref.url, entityOpts) };
         }
         return ref;
       })
     );
   }
 
-  return {
-    ...portfolio,
-    thumbnail_url: thumbnailUrl,
-    media_urls: mediaUrls,
-    project_link_redirect: projectLinkRedirect,
-    scaledux_url: `${FRONTEND_URL}/portfolio/${portfolio.unique_id}`,
-    references
-  };
+  return result;
 }
 
 export class PortfolioService {
@@ -168,7 +173,7 @@ export class PortfolioService {
         references: (portfolioData.references || []) as any,
         status: portfolioData.status || 'DRAFT'
       };
-      
+
       // Only add optional fields if they have values
       if (portfolioData.title) createData.title = portfolioData.title;
       if (portfolioData.description) createData.description = portfolioData.description;
@@ -177,7 +182,7 @@ export class PortfolioService {
       if (portfolioData.projectLink) createData.project_link = portfolioData.projectLink;
       if (portfolioData.completionMonth) createData.completion_month = portfolioData.completionMonth;
       if (portfolioData.completionYear) createData.completion_year = portfolioData.completionYear;
-      
+
       // Validate industry exists before adding it
       if (portfolioData.industryId) {
         const industryExists = await prisma.industry.findUnique({
@@ -187,11 +192,25 @@ export class PortfolioService {
           createData.industry_id = portfolioData.industryId;
         }
       }
-      
+
       const portfolio = await prisma.portfolio.create({
         data: createData
       });
       await updateCompletionSection(userId, 'portfolio', true);
+
+      // Wrap external URLs in redirect links and update the record
+      const wrappedUrls = await wrapExternalUrls(portfolioData, 'portfolio', portfolio.id, userId);
+      if (wrappedUrls.project_link || wrappedUrls.references) {
+        await prisma.portfolio.update({
+          where: { id: portfolio.id },
+          data: {
+            ...(wrappedUrls.project_link ? { project_link: wrappedUrls.project_link } : {}),
+            ...(wrappedUrls.references ? { references: wrappedUrls.references as any } : {})
+          }
+        });
+        if (wrappedUrls.project_link) portfolio.project_link = wrappedUrls.project_link;
+        if (wrappedUrls.references) portfolio.references = wrappedUrls.references as any;
+      }
 
       const transformedPortfolio = await transformPortfolio(portfolio);
 
@@ -233,6 +252,9 @@ export class PortfolioService {
       const normalizedThumbnail = urlsOrPathsToAttachmentIds([portfolioData.thumbnail])[0] ?? null
       const normalizedMedia = urlsOrPathsToAttachmentIds(portfolioData.media || [])
 
+      // Wrap external URLs in redirect links before storing
+      const wrappedUrls = await wrapExternalUrls(portfolioData, 'portfolio', existingPortfolio.id, userId);
+
       const updatedPortfolio = await prisma.portfolio.update({
         where: { id: existingPortfolio.id },
         data: {
@@ -245,10 +267,10 @@ export class PortfolioService {
           project_skills: (portfolioData.projectSkills || []) as any,
           thumbnail_url: normalizedThumbnail as any,
           media_urls: normalizedMedia as any,
-          project_link: portfolioData.projectLink,
+          project_link: wrappedUrls.project_link || portfolioData.projectLink,
           completion_month: portfolioData.completionMonth,
           completion_year: portfolioData.completionYear,
-          references: (portfolioData.references || []) as any,
+          references: (wrappedUrls.references || portfolioData.references || []) as any,
           status: portfolioData.status || existingPortfolio.status
         },
         include: {

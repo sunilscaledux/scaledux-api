@@ -42,9 +42,6 @@ export class InvestmentPortfolioService {
         company_logo_url: p.company_logo
           ? await resolveAttachmentUrl(p.company_logo, 'attachment')
           : null,
-        company_website_redirect: p.company_website
-          ? await createRedirectLink(p.company_website, { entityType: 'investor_portfolio', entityId: p.id })
-          : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${p.unique_id}`
       })));
 
@@ -91,9 +88,6 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null,
-        company_website_redirect: portfolio.company_website
-          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
           : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
@@ -143,9 +137,6 @@ export class InvestmentPortfolioService {
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null,
-        company_website_redirect: portfolio.company_website
-          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
-          : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
@@ -175,7 +166,7 @@ export class InvestmentPortfolioService {
         company_name: data.companyName || "",
         company_logo: normalizedLogo,
         description: data.description,
-        company_website: data.companyWebsite,
+        company_website: data.companyWebsite || null,
         industry_id: data.industryId,
         sub_industry_id: data.subIndustryId,
         investment_size: data.investmentSize,
@@ -203,13 +194,20 @@ export class InvestmentPortfolioService {
         }
       });
 
+      // Wrap company_website in redirect link and store
+      if (data.companyWebsite) {
+        const redirectUrl = await createRedirectLink(data.companyWebsite, { entityType: 'investor_portfolio', entityId: portfolio.id, createdBy: userId });
+        await prisma.investorPortfolio.update({
+          where: { id: portfolio.id },
+          data: { company_website: redirectUrl }
+        });
+        (portfolio as any).company_website = redirectUrl;
+      }
+
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null,
-        company_website_redirect: portfolio.company_website
-          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
           : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
@@ -252,8 +250,13 @@ export class InvestmentPortfolioService {
       if (data.companyName !== undefined) updateData.company_name = data.companyName;
       if (normalizedLogo !== undefined) updateData.company_logo = normalizedLogo;
       if (data.description !== undefined) updateData.description = data.description;
-      if (data.companyWebsite !== undefined)
-        updateData.company_website = data.companyWebsite;
+      if (data.companyWebsite !== undefined) {
+        if (data.companyWebsite && !data.companyWebsite.includes('/r/')) {
+          updateData.company_website = await createRedirectLink(data.companyWebsite, { entityType: 'investor_portfolio', entityId: existing.id, createdBy: userId });
+        } else {
+          updateData.company_website = data.companyWebsite;
+        }
+      }
       if (data.industryId !== undefined) updateData.industry_id = data.industryId;
       if (data.subIndustryId !== undefined)
         updateData.sub_industry_id = data.subIndustryId;
@@ -294,9 +297,6 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null,
-        company_website_redirect: portfolio.company_website
-          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
           : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
@@ -400,9 +400,6 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null,
-        company_website_redirect: portfolio.company_website
-          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
           : null,
         scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
