@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import { Log } from '@services/loggerService';
 import { appConfig } from '@config/app';
-import { getResubmitWindow } from '@utils/verificationPolicy';
+import { getResubmitWindow } from '@utils/General';
 
 /**
  * Get identity verification status
@@ -17,9 +17,7 @@ export async function getIdentityVerificationStatus(req: Request, res: Response)
   try {
     const userId = req.user?.id
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
+
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -38,25 +36,21 @@ export async function getIdentityVerificationStatus(req: Request, res: Response)
       }
     })
 
-    if (!user) {
-      return ApiResponse.error(res, "User not found", 404)
-    }
-
-    const isVerified = !!user.identity_verified_at
-    const status = user.identity_verification_status || 'PENDING'
-    const latestVerification = user.identityVerifications[0]
+    const isVerified = !!user!.identity_verified_at
+    const status = user!.identity_verification_status || 'PENDING'
+    const latestVerification = user!.identityVerifications[0]
 
     const lastApproved = await prisma.identityVerification.findFirst({
       where: { user_id: userId, status: 'APPROVED' },
       orderBy: { reviewed_at: 'desc' }
     })
-    const anchor = lastApproved?.reviewed_at ?? user.identity_verified_at ?? null
+    const anchor = lastApproved?.reviewed_at ?? user!.identity_verified_at ?? null
     const cooldown = getResubmitWindow(anchor, appConfig.verification.identityCooldownDays)
 
     return ApiResponse.success(res, {
       isVerified,
       status, // PENDING, UNDER_REVIEW, APPROVED, REJECTED
-      verifiedAt: user.identity_verified_at,
+      verifiedAt: user!.identity_verified_at,
       rejectionReason: latestVerification?.rejection_reason || null,
       cooldownDays: appConfig.verification.identityCooldownDays,
       nextSubmitAllowedAt: cooldown.nextSubmitAllowedAt?.toISOString() ?? null,
@@ -82,9 +76,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
       proofOfAddress
     } = req.body
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
+
 
     // Validate required fields
     if (!customerInformation?.firstName || !customerInformation?.lastName || !customerInformation?.dob) {
@@ -101,15 +93,6 @@ export async function submitIdentityVerification(req: Request, res: Response) {
 
     if (!proofOfAddress?.address1 || !proofOfAddress?.city || !proofOfAddress?.country) {
       return ApiResponse.error(res, "Proof of address is required", 400)
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    })
-
-    if (!user) {
-      return ApiResponse.error(res, "User not found", 404)
     }
 
     // Check for existing verification (any status)
@@ -129,7 +112,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
       where: { user_id: userId, status: 'APPROVED' },
       orderBy: { reviewed_at: 'desc' }
     })
-    const anchor = lastApproved?.reviewed_at ?? user.identity_verified_at ?? null
+    const anchor = lastApproved?.reviewed_at ?? null
     const cooldown = getResubmitWindow(anchor, appConfig.verification.identityCooldownDays)
     if (!cooldown.canSubmit && cooldown.nextSubmitAllowedAt) {
       return ApiResponse.error(
@@ -256,9 +239,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
   try {
     const userId = req.user?.id
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
+
 
     const verification = await prisma.identityVerification.findFirst({
       where: { user_id: userId },

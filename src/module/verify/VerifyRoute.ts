@@ -1,18 +1,13 @@
 import { Router } from "express"
-import { 
+import {
   sendPhoneOTP,
   verifyPhoneOTP,
-  getPhoneVerificationStatus,
-  updatePhoneNumber
 } from "./VerifyPhoneController"
 import {
-  getEmailVerificationStatus,
   sendEmailOTP,
   verifyEmailOTP,
-  updateEmailAddress
 } from "./EmailVerifyController"
 import {
-  getIdentityVerificationStatus,
   submitIdentityVerification,
   getIdentityVerificationDetails,
   updateIdentityVerificationStatus
@@ -20,29 +15,23 @@ import {
 import {
   submitAgencyVerification,
   getAgencyVerificationDetails,
-  getAgencyVerificationStatus,
   updateAgencyVerificationStatus
 } from "./AgencyVerifyController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 import { uploadFile } from "@module/general/FileController"
+import { createRateLimiter } from "@middleware/rateLimiter"
 
 const router = Router()
 
-router.get("/phone/status", authenticateToken, getPhoneVerificationStatus)
-router.post("/phone/send-otp", authenticateToken, sendPhoneOTP)
-router.post("/phone/verify-otp", authenticateToken, verifyPhoneOTP)
-router.put("/phone/update", authenticateToken, updatePhoneNumber)
+router.post("/phone/send-otp",createRateLimiter(15 * 60, 5), authenticateToken, sendPhoneOTP)
+router.post("/phone/verify-otp",createRateLimiter(5 * 60, 10), authenticateToken, verifyPhoneOTP)
 
-router.get("/email/status", authenticateToken, getEmailVerificationStatus)
-router.post("/email/send-otp", authenticateToken, sendEmailOTP)
-router.post("/email/verify-otp", authenticateToken, verifyEmailOTP)
-router.put("/email/update", authenticateToken, updateEmailAddress)
+router.post("/email/send-otp",createRateLimiter(5 * 60, 15), authenticateToken, sendEmailOTP)
+router.post("/email/verify-otp", createRateLimiter(5 * 60, 10),authenticateToken, verifyEmailOTP)
 
-router.get("/identity/status", authenticateToken, getIdentityVerificationStatus)
 router.post("/identity/submit", authenticateToken, submitIdentityVerification)
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
-router.post("/identity/review", authenticateToken, updateIdentityVerificationStatus)
 
 router.post(
   "/identity/upload-id-documents",
@@ -69,10 +58,9 @@ router.post(
 )
 
 
-router.get("/agency/status", authenticateToken, getAgencyVerificationStatus)
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
-router.post("/agency/review", authenticateToken, updateAgencyVerificationStatus)
+
 
 router.post(
   "/agency/upload-documents",

@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from '@services/attachmentService';
-import TwilioService from "@services/TwilioService";
+import { verifyOtpByType, generateAndSendOtp, OTP_TYPES } from '@module/auth/AuthService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 
 import { Log } from '@services/loggerService';
@@ -266,8 +266,11 @@ export class VerificationService {
         };
       }
 
-      // Use Twilio service to send OTP
-      const result = await TwilioService.sendOTP(phone);
+      const result = await generateAndSendOtp({
+        phone: phone,
+        otpType: OTP_TYPES.PHONE_VERIFICATION,
+        userId: userId
+      });
       
       if (result.success) {
         return {
@@ -308,7 +311,7 @@ export class VerificationService {
       }
 
       // Verify OTP using Twilio service
-      const result = await TwilioService.verifyOTP(user.phone, otp);
+      const result = await verifyOtpByType(user.phone, otp, "PHONE_VERIFICATION");
       
       if (result.success) {
         // Update user phone verification status

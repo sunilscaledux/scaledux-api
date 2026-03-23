@@ -27,7 +27,7 @@ export interface UserDetail {
 
 export interface UnifiedOtpRequest {
   identifier: string;
-  type: "registration" | "login" | "forgot-password";
+  type: "registration" | "login" | "forgot";
 }
 
 export interface VerifyOtpInput {

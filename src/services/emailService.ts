@@ -73,14 +73,15 @@ class EmailService {
   async sendOtpEmail(
     email: string,
     otp: string,
-    firstName?: string
+    firstName?: string,
+    subject?: string,
   ): Promise<boolean> {
     try {
       const template = await templateService.getOtpTemplate({
         firstName,
         otpCode: otp,
-        companyName: mailConfig.COMPANY_NAME,
-        otpValidity: mailConfig.OTP_VALIDITY_MINUTES
+        otpValidity: mailConfig.OTP_VALIDITY_MINUTES,
+        subject,
       });
 
       return await this.sendEmail({
@@ -98,7 +99,6 @@ class EmailService {
     try {
       const template = await templateService.getWelcomeTemplate({
         firstName,
-        companyName: mailConfig.COMPANY_NAME
       });
 
       return await this.sendEmail({
@@ -116,22 +116,7 @@ class EmailService {
     email: string,
     otp: string,
   ): Promise<boolean> {
-    try {
-      const template = await templateService.getPasswordResetTemplate({
-        OTP_CODE: otp,
-        companyName: mailConfig.COMPANY_NAME,
-        linkValidity: mailConfig.OTP_VALIDITY_MINUTES
-      });
-
-      return await this.sendEmail({
-        to: email,
-        subject: template.subject,
-        html: template.html,
-      });
-    } catch (error) {
-      Log.error("Failed to generate password reset email template", { error });
-      return false;
-    }
+    return this.sendOtpEmail(email, otp, undefined, 'Reset Your Password');
   }
 
   async sendCustomEmail(

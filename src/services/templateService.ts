@@ -7,12 +7,10 @@ export interface TemplateVariables {
   [key: string]: string | number | boolean;
 }
 
-/** Layout variables filled from env when using base layout (so {{HEADER_TITLE}}, {{FOOTER_MESSAGE}}, etc. are never raw) */
-function getLayoutDefaultsFromEnv(variables: TemplateVariables): TemplateVariables {
+/** Layout variables filled when using base layout (so {{HEADER_TITLE}} is never raw) */
+function getLayoutDefaults(variables: TemplateVariables): TemplateVariables {
   return {
     COMPANY_NAME: mailConfig.COMPANY_NAME,
-    FOOTER_MESSAGE: mailConfig.FOOTER_MESSAGE,
-    FOOTER_NOTE: mailConfig.FOOTER_NOTE,
     HEADER_TITLE: variables.HEADER_TITLE ?? variables.TITLE ?? 'Notification',
   };
 }
@@ -55,7 +53,7 @@ class TemplateService {
       // If using layout, wrap content in base layout (layout vars from env so {{HEADER_TITLE}}, {{FOOTER_MESSAGE}}, etc. are always replaced)
       if (useLayout) {
         const layoutContent = fs.readFileSync(this.baseLayoutPath, 'utf8');
-        const layoutDefaults = getLayoutDefaultsFromEnv(variables);
+        const layoutDefaults = getLayoutDefaults(variables);
         const layoutVariables = {
           ...layoutDefaults,
           ...variables,
@@ -95,26 +93,21 @@ class TemplateService {
   async getOtpTemplate(variables: {
     firstName?: string;
     otpCode: string;
-    companyName?: string;
     otpValidity?: number;
+    subject?: string;
   }): Promise<EmailTemplate> {
+    const subject = variables.subject || 'Your Verification Code';
     const templateVariables: TemplateVariables = {
-      TITLE: 'Verify Your Email Address',
-      HEADER_TITLE: '📧 Verify Your Email Address',
+      TITLE: subject,
+      HEADER_TITLE: subject,
       FIRST_NAME: variables.firstName || 'there',
       OTP_CODE: variables.otpCode,
-      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
       OTP_VALIDITY: variables.otpValidity || 10,
-      FOOTER_MESSAGE: 'Best regards,',
-      FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
     };
 
     const html = await this.compileTemplate('otp-verification', templateVariables);
-    
-    return {
-      subject: 'Verify Your Email Address',
-      html
-    };
+
+    return { subject, html };
   }
 
   /**
@@ -122,50 +115,22 @@ class TemplateService {
    */
   async getWelcomeTemplate(variables: {
     firstName: string;
-    companyName?: string;
   }): Promise<EmailTemplate> {
     const templateVariables: TemplateVariables = {
-      TITLE: `Welcome to ${variables.companyName || mailConfig.APP_NAME}`,
-      HEADER_TITLE: `🎉 Welcome to ${variables.companyName || mailConfig.APP_NAME}!`,
+      TITLE: `Welcome to ${mailConfig.APP_NAME}`,
+      HEADER_TITLE: `Welcome to ${mailConfig.APP_NAME}!`,
       FIRST_NAME: variables.firstName,
-      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
-      FOOTER_MESSAGE: 'Welcome aboard!',
-      FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
     };
 
     const html = await this.compileTemplate('welcome', templateVariables);
-    
+
     return {
-      subject: `Welcome to ${variables.companyName || 'ScaleDux'}!`,
+      subject: `Welcome to ${mailConfig.APP_NAME}!`,
       html
     };
   }
 
-  /**
-   * Get password reset email template
-   */
-  async getPasswordResetTemplate(variables: {
-    OTP_CODE: string;
-    companyName?: string;
-    linkValidity?: number;
-  }): Promise<EmailTemplate> {
-    const templateVariables: TemplateVariables = {
-      TITLE: 'Reset Your Password',
-      HEADER_TITLE: '🔐 Reset Your Password',
-      OTP_CODE: variables.OTP_CODE,
-      COMPANY_NAME: variables.companyName || mailConfig.APP_NAME,
-      LINK_VALIDITY: variables.linkValidity || 10,
-      FOOTER_MESSAGE: 'Best regards,',
-      FOOTER_NOTE: 'This is an automated email. Please do not reply to this message.'
-    };
 
-    const html = await this.compileTemplate('password-reset', templateVariables);
-    
-    return {
-      subject: 'Reset Your Password',
-      html
-    };
-  }
 
   /**
    * Get custom template with variables

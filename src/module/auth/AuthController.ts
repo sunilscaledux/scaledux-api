@@ -272,10 +272,10 @@ export async function resendOtp(req: Request, res: Response) {
     const contactInfo = normalizeContact(identifier);
 
     // Resend OTP using AuthService
-    const resendResult = await AuthService.resendOtp({
+    const resendResult = await AuthService.resendOtpByType({
       email: contactInfo.email || undefined,
       phone: contactInfo.phone || undefined,
-    });
+    }, "REGISTRATION_VERIFICATION");
 
     if (!resendResult.success) {
       return ApiResponse.error(res, resendResult.message);
@@ -334,7 +334,7 @@ export async function requestOtp(req: Request, res: Response) {
         break;
 
       case "login":
-      case "forgot-password":
+      case "forgot":
         if (!isUserExist) {
           return ApiResponse.error(
             res,
@@ -344,18 +344,11 @@ export async function requestOtp(req: Request, res: Response) {
         break;
     }
 
-    // Map frontend types to backend OTP types
-    const otpTypeMap = {
-      registration: "REGISTRATION_VERIFICATION" as const,
-      login: "LOGIN_VERIFICATION" as const,
-      "forgot-password": "FORGOT_PASSWORD_VERIFICATION" as const,
-    };
-
     // Generate and send OTP
     const otpResult = await AuthService.generateAndSendOtp({
       email: contactInfo.email || undefined,
       phone: contactInfo.phone || undefined,
-      otpType: otpTypeMap[type],
+      otpType: AuthService.OTP_TYPE_MAP[type],
     });
 
     if (!otpResult.success) {
@@ -366,7 +359,7 @@ export async function requestOtp(req: Request, res: Response) {
     const successMessages = {
       registration: `Registration initiated. Please check your ${contactMethod} for OTP.`,
       login: `Login OTP sent successfully. Please check your ${contactMethod}.`,
-      "forgot-password": `Password reset OTP sent successfully. Please check your ${contactMethod}.`,
+      forgot: `Password reset OTP sent successfully. Please check your ${contactMethod}.`,
     };
 
     return ApiResponse.success(
@@ -395,18 +388,11 @@ export async function verifyOtp(req: Request, res: Response) {
   try {
     const { identifier, otp, type }: UnifiedVerifyOtpRequest = value;
 
-    // Map frontend types to backend OTP types
-    const otpTypeMap = {
-      registration: "REGISTRATION_VERIFICATION" as const,
-      login: "LOGIN_VERIFICATION" as const,
-      "forgot-password": "FORGOT_PASSWORD_VERIFICATION" as const,
-    };
-
     // Verify OTP using AuthService
     const response = await AuthService.verifyOtpByType(
       identifier,
       otp,
-      otpTypeMap[type]
+      AuthService.OTP_TYPE_MAP[type]
     );
 
     if (!response.success) {
@@ -461,7 +447,7 @@ export async function verifyOtp(req: Request, res: Response) {
         break;
       }
 
-      case "forgot-password":
+      case "forgot":
         responseData.message =
           "Password reset OTP verified successfully. You can now reset your password.";
         break;
@@ -493,20 +479,13 @@ export async function resendOtpUnified(req: Request, res: Response) {
       return ApiResponse.error(res, "Invalid email or phone format");
     }
 
-    // Map frontend types to backend OTP types
-    const otpTypeMap = {
-      registration: "REGISTRATION_VERIFICATION" as const,
-      login: "LOGIN_VERIFICATION" as const,
-      "forgot-password": "FORGOT_PASSWORD_VERIFICATION" as const,
-    };
-
     // Resend OTP using AuthService
     const resendResult = await AuthService.resendOtpByType(
       {
         email: contactInfo.email || undefined,
         phone: contactInfo.phone || undefined,
       },
-      otpTypeMap[type]
+      AuthService.OTP_TYPE_MAP[type]
     );
 
     if (!resendResult.success) {

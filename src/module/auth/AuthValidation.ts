@@ -66,11 +66,11 @@ export const unifiedOtpRequestSchema = Joi.object({
     "any.required": "Email or phone number is required",
   }),
   type: Joi.string()
-    .valid("registration", "login", "forgot-password")
+    .valid("registration", "login", "forgot")
     .required()
     .messages({
       "any.required": "OTP type is required",
-      "any.only": "OTP type must be: registration, login, or forgot-password",
+      "any.only": "OTP type must be: registration, login, or forgot",
     }),
 });
 
@@ -88,11 +88,11 @@ export const unifiedVerifyOtpSchema = Joi.object({
       "string.pattern.base": "OTP must contain only numbers",
     }),
   type: Joi.string()
-    .valid("registration", "login", "forgot-password")
+    .valid("registration", "login", "forgot")
     .required()
     .messages({
       "any.required": "OTP type is required",
-      "any.only": "OTP type must be: registration, login, or forgot-password",
+      "any.only": "OTP type must be: registration, login, or forgot",
     }),
 });
 

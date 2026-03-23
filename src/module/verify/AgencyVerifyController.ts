@@ -8,7 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import { Log } from '@services/loggerService';
 import { appConfig } from '@config/app';
-import { getResubmitWindow } from '@utils/verificationPolicy';
+import { getResubmitWindow } from '@utils/General';
 
 
 
@@ -20,9 +20,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     const userId = req.user?.id
     const { agencyName, cin, documents } = req.body
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
+
 
     // Validate required fields
     if (!agencyName || !cin) {
@@ -31,15 +29,6 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
     if (!documents || !Array.isArray(documents) || documents.length === 0) {
       return ApiResponse.error(res, "At least one document is required", 400)
-    }
-
-    // Check if user exists
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    })
-
-    if (!user) {
-      return ApiResponse.error(res, "User not found", 404)
     }
 
     // Check for existing verification (any status)
@@ -128,9 +117,7 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
   try {
     const userId = req.user?.id
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
+
 
     const agencyVerification = await prisma.agencyVerification.findFirst({
       where: { user_id: userId },
@@ -146,6 +133,8 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
       ? await resolveAttachmentUrls(agencyVerification.document_urls as string[], { entityType: 'agencyVerification', fieldName: 'document_urls' })
       : []
 
+    const cooldown = getResubmitWindow(agencyVerification.verified_at, appConfig.verification.agencyCooldownDays)
+
     return ApiResponse.success(res, {
       id: agencyVerification.id,
       agencyName: agencyVerification.agency_name,
@@ -156,7 +145,8 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
       verifiedAt: agencyVerification.verified_at,
       rejectionReason: agencyVerification.rejection_reason,
       cooldownDays: appConfig.verification.agencyCooldownDays,
-      cansubmit: getResubmitWindow(agencyVerification.verified_at, appConfig.verification.agencyCooldownDays).canSubmit
+      canSubmit: cooldown.canSubmit,
+      nextSubmitAllowedAt: cooldown.nextSubmitAllowedAt
     }, "Agency verification details retrieved successfully")
 
   } catch (error: any) {

@@ -7,7 +7,7 @@ import { resolveAttachmentUrl, createAttachment } from '@services/attachmentServ
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { updateCompletionSection } from './ProfileCompletionService';
-import { getResubmitWindow } from '@utils/verificationPolicy';
+import { getResubmitWindow } from '@utils/General';
 import { appConfig } from '@config/app';
 
 /**
@@ -134,11 +134,9 @@ export class PersonalInfoService {
         available_hours_per_week: profile.available_hours_per_week,
         links: profile.links,
         languages: profile.languages,
-        // Relations
         country: profile.country,
         state: profile.state,
         currency: profile.user.currency,
-        // User account data (from User table)
         role: profile.user.role, // User's role from backend
         ...getDisplayName(
           profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },

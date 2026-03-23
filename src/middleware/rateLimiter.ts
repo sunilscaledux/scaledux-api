@@ -3,57 +3,36 @@ import RedisStore from 'rate-limit-redis';
 import { Request, Response } from 'express';
 import redisClient from "@services/redisService";
 
-
-
-export const otpRateLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args: string[]) => {
-      const [command, ...commandArgs] = args;
-      return (redisClient as any)[command.toLowerCase()](...commandArgs);
-    },
-  }),
-  windowMs: 15 * 60 * 1000, // 10 minutes
-  max: 50,
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    res.status(429).json({
-      success: false,
-      message:
-        "Too many OTP resend attempts. Please try again after 15 minutes.",
-      data: {
-        retryAfter: 900, // 15 minutes in seconds
-        limit: 5,
-        windowMs: 15 * 60 * 1000,
-      },
-    });
-  },
-});
-
 /**
- * General API rate limiter
- * Allows 100 requests per 15 minutes per IP
+ * Create a rate limiter with custom window and limit.
+ * @param windowSeconds - Time window in seconds
+ * @param max - Max requests per window
  */
-export const generalRateLimiter = rateLimit({
-  store: new RedisStore({
-    sendCommand: (...args: string[]) => {
-      const [command, ...commandArgs] = args;
-      return (redisClient as any)[command.toLowerCase()](...commandArgs);
-    },
-  }),
-  windowMs: 5 * 60 * 1000, // 15 minutes
-  max: 50, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    res.status(429).json({
-      success: false,
-      message: "Too many requests. Please try again after 15 minutes.",
-      data: {
-        retryAfter: 900, // 15 minutes in seconds
-        limit: 100,
-        windowMs: 15 * 60 * 1000,
+export function createRateLimiter(windowSeconds: number, max: number) {
+  const windowMs = windowSeconds * 1000;
+
+  return rateLimit({
+    store: new RedisStore({
+      sendCommand: (...args: string[]) => {
+        const [command, ...commandArgs] = args;
+        return (redisClient as any)[command.toLowerCase()](...commandArgs);
       },
-    });
-  },
-});
+    }),
+    windowMs,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req: Request, res: Response) => {
+      res.status(429).json({
+        success: false,
+        message: `Too many requests. Please try again after sometime`,
+        data: {
+          retryAfter: windowSeconds,
+          limit: max,
+          windowMs,
+        },
+      });
+    },
+  });
+}
+
