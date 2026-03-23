@@ -4,19 +4,23 @@ import { Log } from '@services/loggerService';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
-/** Generate an obfuscated short code (e.g., "sX9k2-Qm7pR4") */
-function generateCode(): string {
-  const bytes = crypto.randomBytes(9);
-  const base64 = bytes.toString('base64url');
-  // Format as xxxx-xxxxxx (12 chars with dash)
-  return `${base64.slice(0, 5)}-${base64.slice(5, 12)}`;
+/** Generate a short 6-8 char alphanumeric code */
+function shortId(len: number): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(len);
+  return Array.from(bytes).map(b => chars[b % chars.length]).join('');
 }
 
-/**
- * Create a redirect link for an external URL.
- * Returns the ScaleDux redirect URL: {FRONTEND_URL}/r/{code}
- * If a redirect already exists for the same entity + target_url, reuses it.
- */
+function generateCode(): string {
+  return shortId(7); // e.g. "kQ3xB9m"
+}
+
+/** Build the full redirect path: /r/{code}/redirect?t={token}&ref=sd */
+function buildRedirectPath(code: string): string {
+  const token = shortId(6);
+  return `/r/${code}/redirect?t=${token}&ref=sd`;
+}
+
 export async function createRedirectLink(
   targetUrl: string,
   options?: { entityType?: string; entityId?: number; createdBy?: number }
@@ -36,7 +40,7 @@ export async function createRedirectLink(
           entity_id: options.entityId
         }
       });
-      if (existing) return `${FRONTEND_URL}/r/${existing.code}`;
+      if (existing) return `${FRONTEND_URL}${buildRedirectPath(existing.code)}`;
     }
 
     const link = await prisma.redirectLink.create({
@@ -49,17 +53,14 @@ export async function createRedirectLink(
       }
     });
 
-    return `${FRONTEND_URL}/r/${link.code}`;
+    return `${FRONTEND_URL}${buildRedirectPath(link.code)}`;
   } catch (error) {
     Log.error('Failed to create redirect link', { error });
     return targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
   }
 }
 
-/**
- * Create redirect links for an array of URLs (e.g., references).
- * Returns array of ScaleDux redirect URLs in same order.
- */
+
 export async function createRedirectLinks(
   urls: string[],
   options?: { entityType?: string; entityId?: number; createdBy?: number }
@@ -70,9 +71,7 @@ export async function createRedirectLinks(
   );
 }
 
-/**
- * Resolve a redirect code to its target URL and increment click count.
- */
+
 export async function resolveRedirectLink(code: string): Promise<string | null> {
   try {
     const link = await prisma.redirectLink.findUnique({
@@ -93,9 +92,6 @@ export async function resolveRedirectLink(code: string): Promise<string | null> 
   }
 }
 
-/**
- * Delete redirect links for an entity (e.g., when portfolio is deleted).
- */
 export async function deleteRedirectLinksForEntity(entityType: string, entityId: number): Promise<void> {
   try {
     await prisma.redirectLink.deleteMany({

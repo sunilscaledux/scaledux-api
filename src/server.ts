@@ -71,7 +71,13 @@ app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 
-// Public redirect endpoint — /r/:code → redirects to target URL
+// Public redirect endpoint — /r/:code/redirect → redirects to target URL
+app.get("/r/:code/redirect", async (req, res) => {
+  const targetUrl = await resolveRedirectLink(req.params.code);
+  if (!targetUrl) return res.status(404).send('Link not found');
+  return res.redirect(302, targetUrl);
+});
+// Also support old /r/:code format
 app.get("/r/:code", async (req, res) => {
   const targetUrl = await resolveRedirectLink(req.params.code);
   if (!targetUrl) return res.status(404).send('Link not found');
