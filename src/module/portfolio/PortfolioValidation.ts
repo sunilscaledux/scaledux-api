@@ -68,18 +68,18 @@ export const createPortfolioSchema = Joi.object({
         if (!value || value.trim() === '') {
           return value
         }
-        
+
         // Validate URL format (example.com or www.example.com)
         const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
         if (!urlPattern.test(value.trim())) {
           return helpers.error('string.pattern.base')
         }
-        
+
         return value.trim()
       }).messages({
         'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
       })
-    })
+    }).options({ stripUnknown: true })
   ).optional().allow(null).messages({
     'array.base': 'References must be an array'
   }),
@@ -151,18 +151,18 @@ export const updatePortfolioSchema = Joi.object({
         if (!value || value.trim() === '') {
           return value
         }
-        
+
         // Validate URL format (example.com or www.example.com)
         const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
         if (!urlPattern.test(value.trim())) {
           return helpers.error('string.pattern.base')
         }
-        
+
         return value.trim()
       }).messages({
         'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
       })
-    })
+    }).options({ stripUnknown: true })
   ).optional().allow(null).messages({
     'array.base': 'References must be an array'
   }),
@@ -189,7 +189,7 @@ export const createDraftPortfolioSchema = Joi.object({
   references: Joi.array().items(
     Joi.object({
       url: Joi.string().optional().allow('')
-    })
+    }).options({ stripUnknown: true })
   ).optional().allow(null),
   status: Joi.string().valid('DRAFT', 'PUBLISHED').optional().default('DRAFT')
 })
@@ -210,7 +210,7 @@ export const updateDraftPortfolioSchema = Joi.object({
   references: Joi.array().items(
     Joi.object({
       url: Joi.string().optional().allow('')
-    })
+    }).options({ stripUnknown: true })
   ).optional().allow(null),
   status: Joi.string().valid('DRAFT', 'PUBLISHED').optional()
 })

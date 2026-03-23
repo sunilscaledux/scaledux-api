@@ -1,7 +1,16 @@
+import crypto from 'crypto';
 import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+/** Generate an obfuscated short code (e.g., "sX9k2-Qm7pR4") */
+function generateCode(): string {
+  const bytes = crypto.randomBytes(9);
+  const base64 = bytes.toString('base64url');
+  // Format as xxxx-xxxxxx (12 chars with dash)
+  return `${base64.slice(0, 5)}-${base64.slice(5, 12)}`;
+}
 
 /**
  * Create a redirect link for an external URL.
@@ -32,6 +41,7 @@ export async function createRedirectLink(
 
     const link = await prisma.redirectLink.create({
       data: {
+        code: generateCode(),
         target_url: normalizedUrl,
         entity_type: options?.entityType,
         entity_id: options?.entityId,
