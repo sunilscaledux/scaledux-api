@@ -18,10 +18,10 @@ async function parseServicePackageJsonAsync(pkg: any) {
   const videoArr = typeof pkgRow.video === "string" ? JSON.parse(pkgRow.video) : (pkgRow.video || []);
   const documentsArr = typeof pkgRow.documents === "string" ? JSON.parse(pkgRow.documents) : (pkgRow.documents || []);
   const [thumbnail, images, video, documents] = await Promise.all([
-    thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, { entityType: 'servicePackage', fieldName: 'thumbnail' }) : Promise.resolve(null),
-    resolveAttachmentUrls(imagesArr, { entityType: 'servicePackage', fieldName: 'documents' }),
-    resolveAttachmentUrls(videoArr, { entityType: 'servicePackage', fieldName: 'documents' }),
-    resolveAttachmentUrls(documentsArr, { entityType: 'servicePackage', fieldName: 'documents' }),
+    thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, 'thumbnail') : Promise.resolve(null),
+    resolveAttachmentUrls(imagesArr, 'documents'),
+    resolveAttachmentUrls(videoArr, 'documents'),
+    resolveAttachmentUrls(documentsArr, 'documents'),
   ]);
   return {
     ...pkgRow,

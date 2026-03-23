@@ -86,15 +86,14 @@ export async function getByUniqueId(uniqueId: string) {
 
 export async function resolveAttachmentUrl(
   value: string | null,
-  options?: { entityType?: string; fieldName?: string; baseUrl?: string }
+  fieldName: string = 'attachment'
 ): Promise<string> {
   if (!value) return '';
-  const baseUrl = (options?.baseUrl || process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
+  const baseUrl = (process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
 
   const att = await getByUniqueId(value);
   if (!att) return '';
 
-  const fieldName = options?.fieldName ?? 'attachment';
   const allowed = att.visibility === 'public' && isPublicField(fieldName);
 
   if (allowed) {
@@ -109,7 +108,7 @@ export async function resolveAttachmentUrl(
  */
 export async function resolveAttachmentUrls(
   values: (string | null)[],
-  options?: { entityType?: string; fieldName?: string; baseUrl?: string }
+  fieldName: string = 'attachment'
 ): Promise<string[]> {
   if (!values?.length) return [];
   const ids = values.filter((v): v is string => !!v && isAttachmentId(v));
@@ -125,8 +124,7 @@ export async function resolveAttachmentUrls(
   const map = new Map<string, AttUrlRow>(
     (attachments as AttUrlRow[]).map((a) => [a.unique_id, a])
   );
-  const baseUrl = (options?.baseUrl || process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
-  const fieldName = options?.fieldName ?? 'attachment';
+  const baseUrl = (process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
 
   return values.map((v) => {
     if (!v) return '';

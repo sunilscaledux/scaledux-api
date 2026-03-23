@@ -111,7 +111,7 @@ export class VerificationService {
         const pathOrId = file.path;
         return {
           url: pathOrId,
-          fullUrl: await resolveAttachmentUrl(pathOrId, { entityType: 'agencyVerification', fieldName: 'document_urls' }),
+          fullUrl: await resolveAttachmentUrl(pathOrId, 'document_urls'),
           name: file.originalname,
           size: file.size
         };
@@ -471,7 +471,7 @@ export class VerificationService {
         const fieldName = documentType === 'id_documents' ? 'id_documents' : documentType === 'selfie' ? 'selfie' : 'address_proof';
         return {
           url: pathOrId,
-          fullUrl: await resolveAttachmentUrl(pathOrId, { entityType: 'identityVerification', fieldName }),
+          fullUrl: await resolveAttachmentUrl(pathOrId, fieldName),
           name: file.originalname,
           type: documentType,
           size: file.size

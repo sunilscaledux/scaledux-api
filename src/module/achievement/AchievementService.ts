@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateAchievementInput, UpdateAchievementInput } from "./AchievementType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrls } from "@services/attachmentService";
+import { resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -27,7 +27,7 @@ export class AchievementService {
       const achievementsWithUrls = await Promise.all(achievements.map(async achievement => ({
         ...achievement,
         media_files: Array.isArray(achievement.media_files)
-          ? await resolveAttachmentUrls(achievement.media_files as string[], { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrls(achievement.media_files as string[], 'achievement_media')
           : []
       })));
 
@@ -59,14 +59,19 @@ export class AchievementService {
           completed_month: achievementData.completed_month,
           completed_year: achievementData.completed_year,
           achievement_link: achievementData.achievement_link || undefined,
-          media_files: Array.isArray(achievementData.media_files) ? achievementData.media_files : undefined
+          media_files: Array.isArray(achievementData.media_files) ? urlsOrPathsToAttachmentIds(achievementData.media_files) : undefined
         }
       });
       await updateCompletionSection(userId, 'achievements', true);
       return {
         success: true,
         message: 'Achievement created successfully',
-        data: achievement
+        data: {
+          ...achievement,
+          media_files: Array.isArray(achievement.media_files)
+            ? await resolveAttachmentUrls(achievement.media_files as string[], 'achievement_media')
+            : []
+        }
       };
     } catch (error) {
       Log.error("Error", { error });
@@ -108,14 +113,19 @@ export class AchievementService {
           completed_month: achievementData.completed_month,
           completed_year: achievementData.completed_year,
           achievement_link: achievementData.achievement_link || undefined,
-          media_files: Array.isArray(achievementData.media_files) ? achievementData.media_files : undefined
+          media_files: Array.isArray(achievementData.media_files) ? urlsOrPathsToAttachmentIds(achievementData.media_files) : undefined
         }
       });
 
       return {
         success: true,
         message: 'Achievement updated successfully',
-        data: updatedAchievement
+        data: {
+          ...updatedAchievement,
+          media_files: Array.isArray(updatedAchievement.media_files)
+            ? await resolveAttachmentUrls(updatedAchievement.media_files as string[], 'achievement_media')
+            : []
+        }
       };
     } catch (error) {
       Log.error("Error", { error });

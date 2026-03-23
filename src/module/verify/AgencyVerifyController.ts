@@ -130,7 +130,7 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
 
     // Convert relative paths or attachment ids to full URLs for documents
     const documentUrls = Array.isArray(agencyVerification.document_urls)
-      ? await resolveAttachmentUrls(agencyVerification.document_urls as string[], { entityType: 'agencyVerification', fieldName: 'document_urls' })
+      ? await resolveAttachmentUrls(agencyVerification.document_urls as string[], 'document_urls')
       : []
 
     const cooldown = getResubmitWindow(agencyVerification.verified_at, appConfig.verification.agencyCooldownDays)

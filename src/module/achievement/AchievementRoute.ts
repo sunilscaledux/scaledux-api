@@ -22,7 +22,7 @@ router.post(
   '/upload-media',
   FileUpload({
     uploadPath: 'achievements',
-    fileFilter: 'any',
+    fileFilter: 'image',
     maxSize: 10,
     maxFiles: 5,
     fieldName: 'achievement_media'

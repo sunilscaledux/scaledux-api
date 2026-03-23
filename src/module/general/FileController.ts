@@ -51,7 +51,7 @@ export async function uploadFile(req: Request, res: Response) {
         })
         if (created) {
           uniqueIds.push(created.unique_id)
-          const url = await resolveAttachmentUrl(created.unique_id, { fieldName })
+          const url = await resolveAttachmentUrl(created.unique_id, fieldName)
           urls.push(url)
         }
       }

@@ -37,7 +37,7 @@ export class InvestmentPortfolioService {
       const transformed = await Promise.all(portfolios.map(async (p) => ({
         ...p,
         company_logo_url: p.company_logo
-          ? await resolveAttachmentUrl(p.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(p.company_logo, 'attachment')
           : null
       })));
 
@@ -83,7 +83,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null
       };
 
@@ -130,7 +130,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null
       };
 
@@ -191,7 +191,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null
       };
 
@@ -274,7 +274,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null
       };
 
@@ -376,7 +376,7 @@ export class InvestmentPortfolioService {
       const transformed = {
         ...portfolio,
         company_logo_url: portfolio.company_logo
-          ? await resolveAttachmentUrl(portfolio.company_logo, { entityType: 'generic', fieldName: 'attachment' })
+          ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
           : null
       };
 

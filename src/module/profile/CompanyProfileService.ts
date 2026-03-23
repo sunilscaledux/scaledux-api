@@ -57,8 +57,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
         
         // Company info
         company_name: profile.company_name,
@@ -87,7 +87,7 @@ export class CompanyProfileService {
         
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -180,8 +180,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
@@ -202,7 +202,7 @@ export class CompanyProfileService {
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
         funding_status: profile.funding_status,
         total_funding: totalFundingNum,
         fundingRounds,
@@ -270,7 +270,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profileImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'profile_image' }),
+          profileImage: await resolveAttachmentUrl(valueToStore, 'profile_image'),
         },
       };
     } catch (error: any) {
@@ -317,7 +317,7 @@ export class CompanyProfileService {
         success: true,
         message: 'Cover image uploaded successfully',
         data: {
-          coverImage: await resolveAttachmentUrl(valueToStore, { entityType: 'companyProfile', fieldName: 'cover_image' }),
+          coverImage: await resolveAttachmentUrl(valueToStore, 'cover_image'),
         },
       };
     } catch (error: any) {
@@ -400,8 +400,8 @@ export class CompanyProfileService {
         id: profile.id,
         unique_id: profile.unique_id,
         profile_type: 'founder',
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, { entityType: 'companyProfile', fieldName: 'profile_image' }) : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, { entityType: 'companyProfile', fieldName: 'cover_image' }) : null,
+        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
+        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
         
         // Company info
         company_name: profile.company_name,
@@ -426,7 +426,7 @@ export class CompanyProfileService {
         
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
+        traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -804,7 +804,7 @@ export class CompanyProfileService {
         message: 'Traction updated successfully',
         data: {
           traction_title: profile.traction_title,
-          traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, { entityType: 'companyProfile', fieldName: 'traction_document' }) : null,
+          traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
         },
       };
     } catch (error: any) {

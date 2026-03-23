@@ -91,8 +91,8 @@ async function flattenNdaToProposal(proposal: any): Promise<any> {
     offer_expires_at = expires.toISOString();
   }
   const [ndaFileLinkUrl, ndaSignedFileLinkUrl] = await Promise.all([
-    nda?.nda_file_link ? resolveAttachmentUrl(nda.nda_file_link, { entityType: 'proposal', fieldName: 'nda_file_link' }) : Promise.resolve(null),
-    nda?.nda_signed_file_link ? resolveAttachmentUrl(nda.nda_signed_file_link, { entityType: 'proposal', fieldName: 'nda_signed_file_link' }) : Promise.resolve(null),
+    nda?.nda_file_link ? resolveAttachmentUrl(nda.nda_file_link, 'nda_file_link') : Promise.resolve(null),
+    nda?.nda_signed_file_link ? resolveAttachmentUrl(nda.nda_signed_file_link, 'nda_signed_file_link') : Promise.resolve(null),
   ]);
   return {
     ...proposal,
@@ -149,7 +149,7 @@ async function buildDeliverablesFromRow(row: any): Promise<any[]> {
           submitted_remark: d.submitted_remark ?? null,
           submitted_file: Array.isArray(d.submitted_file)
             ? await Promise.all((d.submitted_file as any[]).map(async (f: any) => ({
-                url: typeof f?.url === 'string' ? await resolveAttachmentUrl(f.url, { entityType: 'proposal', fieldName: 'attachments' }) : f?.url,
+                url: typeof f?.url === 'string' ? await resolveAttachmentUrl(f.url, 'attachments') : f?.url,
                 name: f?.name ?? (typeof f?.url === 'string' ? f.url.split('/').pop() : 'file')
               })))
             : [],
@@ -616,7 +616,7 @@ export class ProposalService {
         await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
-          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
           project: proposal.project ? {
             ...proposal.project,
             budget_currency: proposal.project.user?.currency?.symbol || '₹'
@@ -744,12 +744,12 @@ export class ProposalService {
       // Transform proposals: milestones from Milestone table; file URLs; flatten nda
       const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
-          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : null;
         return await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
-          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
           provider: proposal.provider ? {
             ...proposal.provider,
             personalInfo: proposal.provider.personalInfo ? {
@@ -852,12 +852,12 @@ export class ProposalService {
 
       const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
-          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
+          ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : null;
         return await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
-          attachments: await resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
+          attachments: await resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
           provider: proposal.provider ? {
             ...proposal.provider,
             personalInfo: proposal.provider.personalInfo ? {
@@ -1005,12 +1005,12 @@ export class ProposalService {
       const projectUser = proposal.project?.user;
       const [milestones, attachments, projectUserProfileImage, providerProfileImage] = await Promise.all([
         milestonesFromRowsWithDocuments(proposal.milestonesRows),
-        resolveAttachmentUrls(proposal.attachments || [], { entityType: 'proposal', fieldName: 'attachments' }),
+        resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
         projectUser?.personalInfo?.profileImage
-          ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
+          ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, 'profile_image')
           : Promise.resolve(null),
         proposal.provider?.personalInfo?.profileImage
-          ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' })
+          ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : Promise.resolve(null),
       ]);
       const transformedProposal: any = {

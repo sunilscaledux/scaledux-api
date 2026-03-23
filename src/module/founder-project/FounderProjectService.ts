@@ -182,7 +182,7 @@ export class FounderProjectService {
         subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
+          ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
           : []
       };
       }));
@@ -252,12 +252,6 @@ export class FounderProjectService {
           { project_description: { contains: search, mode: 'insensitive' } }
         ];
       }
-
-      // Skills filter is applied in JavaScript after fetch (skills_required is Json, no hasSome for Json in Prisma)
-
-      // Note: Budget filtering is done in JavaScript after fetch
-      // because budget_amount is stored as string and string comparison
-      // doesn't work correctly for numeric values (e.g., "7000" > "17000" in string comparison)
 
       // Experience level filter
       if (experienceLevel) {
@@ -381,7 +375,7 @@ export class FounderProjectService {
           subCategory: subcategory,
           budget_currency: currencySymbol,
           project_files: project.project_files
-            ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
+            ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
             : [],
           is_saved: userId ? (savedByUsers?.length > 0) : false,
           is_invited: userId ? (invites?.length > 0) : false
@@ -536,7 +530,7 @@ export class FounderProjectService {
         subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? await resolveAttachmentUrls(project.project_files as string[], { entityType: 'founderProject', fieldName: 'project_files' })
+          ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
           : [],
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
@@ -598,7 +592,7 @@ export class FounderProjectService {
       // Transform file URLs for response
       const transformedProject = {
         ...project,
-        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
+        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], 'project_files')
       };
 
       return {
@@ -684,7 +678,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...updatedProject,
-        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
+        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], 'project_files')
       };
 
       return {
@@ -783,7 +777,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...duplicatedProject,
-        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], { entityType: 'founderProject', fieldName: 'project_files' })
+        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], 'project_files')
       };
 
       return {
@@ -935,7 +929,7 @@ export class FounderProjectService {
           last_name: freelancer.last_name,
           email: freelancer.email,
           profile_image: freelancer.personalInfo?.profileImage
-            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' }) 
+            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, 'profile_image') 
             : null,
           title: freelancer.personalInfo?.title || null,
           about: freelancer.personalInfo?.about || null,

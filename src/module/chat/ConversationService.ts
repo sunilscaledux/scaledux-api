@@ -8,7 +8,7 @@ import { getDisplayName } from '@utils/General';
 
 async function toProfileImageUrl(profileImage: string | null | undefined): Promise<string | null> {
   if (!profileImage) return null;
-  const url = await resolveAttachmentUrl(profileImage, { entityType: 'personalInfo', fieldName: 'profile_image' });
+  const url = await resolveAttachmentUrl(profileImage, 'profile_image');
   return url || null;
 }
 
@@ -17,7 +17,7 @@ async function metadataWithAttachmentUrls(metadata: any): Promise<any> {
   if (!metadata || typeof metadata !== "object") return metadata;
   const attachments = metadata.attachments;
   if (!Array.isArray(attachments) || attachments.length === 0) return metadata;
-  const urls = await resolveAttachmentUrls(attachments, { entityType: 'message', fieldName: 'attachments' });
+  const urls = await resolveAttachmentUrls(attachments, 'attachments');
   return {
     ...metadata,
     attachments: urls,

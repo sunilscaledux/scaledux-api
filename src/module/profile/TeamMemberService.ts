@@ -40,7 +40,7 @@ export class TeamMemberService {
       // Transform profile images to full URLs
       const transformedMembers = await Promise.all(teamMembers.map(async member => ({
         ...member,
-        profile_image: member.profile_image ? await resolveAttachmentUrl(member.profile_image, { entityType: 'teamMember', fieldName: 'profile_image' }) : null
+        profile_image: member.profile_image ? await resolveAttachmentUrl(member.profile_image, 'profile_image') : null
       })));
 
       return {
@@ -92,7 +92,7 @@ export class TeamMemberService {
 
       const transformedMember = {
         ...teamMember,
-        profile_image: teamMember.profile_image ? await resolveAttachmentUrl(teamMember.profile_image, { entityType: 'teamMember', fieldName: 'profile_image' }) : null
+        profile_image: teamMember.profile_image ? await resolveAttachmentUrl(teamMember.profile_image, 'profile_image') : null
       };
 
       return {
@@ -269,7 +269,7 @@ export class TeamMemberService {
         success: true,
         message: 'Profile image uploaded successfully',
         data: {
-          profile_image: await resolveAttachmentUrl(valueToStore, { entityType: 'teamMember', fieldName: 'profile_image' })
+          profile_image: await resolveAttachmentUrl(valueToStore, 'profile_image')
         }
       };
     } catch (error: any) {

@@ -265,10 +265,10 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         idNumber: verification.id_number,
         idExpiryDate: verification.id_expiry_date,
         issuingCountry: verification.issuing_country,
-        idImage: await resolveAttachmentUrls(idDocumentPaths, { entityType: 'identityVerification', fieldName: 'id_documents' })
+        idImage: await resolveAttachmentUrls(idDocumentPaths, 'id_documents')
       },
       keycodeVerification: {
-        picture: await resolveAttachmentUrls(selfiePaths, { entityType: 'identityVerification', fieldName: 'selfie' })
+        picture: await resolveAttachmentUrls(selfiePaths, 'selfie')
       },
       proofOfAddress: {
         address1: verification.address_line_1,
@@ -278,7 +278,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
         zipCode: verification.postal_code,
         country: verification.address_country,
         proofConcent: verification.proof_of_address_consent,
-        uploadedAddressProofs: await resolveAttachmentUrls(addressProofPaths, { entityType: 'identityVerification', fieldName: 'address_proof' }),
+        uploadedAddressProofs: await resolveAttachmentUrls(addressProofPaths, 'address_proof'),
         documentType: verification.document_type,
         institutionName: verification.institution_name,
         dateIssued: verification.document_date_issued
