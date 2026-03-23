@@ -31,6 +31,7 @@ import { corsMiddleware } from "@middleware/cors";
 import { privateFileAccess } from "@middleware/auth";
 import { viewProtectedFile } from "@module/general/FileController";
 import { Log } from '@services/loggerService';
+import { resolveRedirectLink } from '@services/redirectLinkService';
 
 // Bull Board for queue monitoring
 import { serverAdapter } from './config/bullBoard';
@@ -69,6 +70,13 @@ app.use("/api/v1", chatRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
+
+// Public redirect endpoint — /r/:code → redirects to target URL
+app.get("/r/:code", async (req, res) => {
+  const targetUrl = await resolveRedirectLink(req.params.code);
+  if (!targetUrl) return res.status(404).send('Link not found');
+  return res.redirect(302, targetUrl);
+});
 
 // Bull Board UI for queue monitoring (only in development)
 if (process.env.NODE_ENV !== 'production') {

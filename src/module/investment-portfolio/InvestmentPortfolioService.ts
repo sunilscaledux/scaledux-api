@@ -5,7 +5,10 @@ import {
 } from "./InvestmentPortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
+import { createRedirectLink } from "@services/redirectLinkService";
 import { Log } from '@services/loggerService';
+
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
 export class InvestmentPortfolioService {
   static async getUserInvestmentPortfolios(
@@ -38,7 +41,11 @@ export class InvestmentPortfolioService {
         ...p,
         company_logo_url: p.company_logo
           ? await resolveAttachmentUrl(p.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: p.company_website
+          ? await createRedirectLink(p.company_website, { entityType: 'investor_portfolio', entityId: p.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${p.unique_id}`
       })));
 
       return {
@@ -84,7 +91,11 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: portfolio.company_website
+          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
       return {
@@ -131,7 +142,11 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: portfolio.company_website
+          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
       return {
@@ -192,7 +207,11 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: portfolio.company_website
+          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
       return {
@@ -275,7 +294,11 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: portfolio.company_website
+          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
       return {
@@ -377,7 +400,11 @@ export class InvestmentPortfolioService {
         ...portfolio,
         company_logo_url: portfolio.company_logo
           ? await resolveAttachmentUrl(portfolio.company_logo, 'attachment')
-          : null
+          : null,
+        company_website_redirect: portfolio.company_website
+          ? await createRedirectLink(portfolio.company_website, { entityType: 'investor_portfolio', entityId: portfolio.id })
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${portfolio.unique_id}`
       };
 
       return {

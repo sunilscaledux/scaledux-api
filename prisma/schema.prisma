@@ -1461,3 +1461,18 @@ model Attachment {
   @@index([status])
   @@map("scd_attachments")
 }
+
+model RedirectLink {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @default(cuid())
+  target_url  String
+  entity_type String?  // portfolio, founder_project, investor_portfolio
+  entity_id   Int?
+  created_by  Int?
+  click_count Int      @default(0)
+  created_at  DateTime @default(now())
+
+  @@index([code])
+  @@index([entity_type, entity_id])
+  @@map("scd_redirect_links")
+}

@@ -10,6 +10,8 @@ import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
 
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 // Force server restart to pick up database changes
 
 /**
@@ -183,7 +185,8 @@ export class FounderProjectService {
         budget_currency: currencySymbol,
         project_files: project.project_files
           ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
-          : []
+          : [],
+        scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`
       };
       }));
 
@@ -377,6 +380,7 @@ export class FounderProjectService {
           project_files: project.project_files
             ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
             : [],
+          scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`,
           is_saved: userId ? (savedByUsers?.length > 0) : false,
           is_invited: userId ? (invites?.length > 0) : false
         };
@@ -532,6 +536,7 @@ export class FounderProjectService {
         project_files: project.project_files
           ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
           : [],
+        scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`,
         is_saved: isSavedByUser,
         is_invited: isInvitedUser,
         invite_status: inviteStatus,
@@ -592,7 +597,8 @@ export class FounderProjectService {
       // Transform file URLs for response
       const transformedProject = {
         ...project,
-        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], 'project_files')
+        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], 'project_files'),
+        scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`
       };
 
       return {
@@ -678,7 +684,8 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...updatedProject,
-        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], 'project_files')
+        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], 'project_files'),
+        scaledux_url: `${FRONTEND_URL}/project/${updatedProject.unique_id}`
       };
 
       return {
@@ -777,7 +784,8 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...duplicatedProject,
-        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], 'project_files')
+        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], 'project_files'),
+        scaledux_url: `${FRONTEND_URL}/project/${duplicatedProject.unique_id}`
       };
 
       return {

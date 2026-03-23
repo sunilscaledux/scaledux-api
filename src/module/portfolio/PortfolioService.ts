@@ -2,9 +2,54 @@ import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { createRedirectLink, createRedirectLinks } from '@services/redirectLinkService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
+
+const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+/** Transform a portfolio record: resolve attachment URLs + wrap external links in redirects */
+async function transformPortfolio(portfolio: any): Promise<any> {
+  const entityOpts = { entityType: 'portfolio', entityId: portfolio.id };
+
+  const [thumbnailUrl, mediaUrls] = await Promise.all([
+    portfolio.thumbnail_url
+      ? resolveAttachmentUrl(portfolio.thumbnail_url as string, 'portfolio_thumbnail')
+      : Promise.resolve(null),
+    portfolio.media_urls
+      ? resolveAttachmentUrls(portfolio.media_urls as string[], 'portfolio_files')
+      : Promise.resolve([])
+  ]);
+
+  // Wrap project_link in redirect
+  let projectLinkRedirect: string | null = null;
+  if (portfolio.project_link) {
+    projectLinkRedirect = await createRedirectLink(portfolio.project_link, entityOpts);
+  }
+
+  // Wrap reference URLs in redirects
+  let references = portfolio.references;
+  if (Array.isArray(references) && references.length > 0) {
+    references = await Promise.all(
+      references.map(async (ref: any) => {
+        if (ref?.url) {
+          return { ...ref, redirect_url: await createRedirectLink(ref.url, entityOpts) };
+        }
+        return ref;
+      })
+    );
+  }
+
+  return {
+    ...portfolio,
+    thumbnail_url: thumbnailUrl,
+    media_urls: mediaUrls,
+    project_link_redirect: projectLinkRedirect,
+    scaledux_url: `${FRONTEND_URL}/portfolio/${portfolio.unique_id}`,
+    references
+  };
+}
 
 export class PortfolioService {
   /**
@@ -34,16 +79,7 @@ export class PortfolioService {
         orderBy: { created_at: 'desc' }
       });
 
-      // Transform URLs to full URLs
-      const transformedPortfolios = await Promise.all(portfolios.map(async portfolio => ({
-        ...portfolio,
-        thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, 'portfolio_thumbnail')
-          : null,
-        media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], 'portfolio_files')
-          : []
-      })));
+      const transformedPortfolios = await Promise.all(portfolios.map(transformPortfolio));
 
       return {
         success: true,
@@ -98,16 +134,7 @@ export class PortfolioService {
         };
       }
 
-      // Transform URLs to full URLs
-      const transformedPortfolio = {
-        ...portfolio,
-        thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, 'portfolio_thumbnail')
-          : null,
-        media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], 'portfolio_files')
-          : []
-      };
+      const transformedPortfolio = await transformPortfolio(portfolio);
 
       return {
         success: true,
@@ -166,16 +193,7 @@ export class PortfolioService {
       });
       await updateCompletionSection(userId, 'portfolio', true);
 
-      // Transform URLs to full URLs
-      const transformedPortfolio = {
-        ...portfolio,
-        thumbnail_url: (portfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((portfolio as any).thumbnail_url as string, 'portfolio_thumbnail')
-          : null,
-        media_urls: portfolio.media_urls
-          ? await resolveAttachmentUrls(portfolio.media_urls as string[], 'portfolio_files')
-          : []
-      };
+      const transformedPortfolio = await transformPortfolio(portfolio);
 
       return {
         success: true,
@@ -244,16 +262,7 @@ export class PortfolioService {
         }
       });
 
-      // Transform URLs to full URLs
-      const transformedPortfolio = {
-        ...updatedPortfolio,
-        thumbnail_url: updatedPortfolio.thumbnail_url
-          ? await resolveAttachmentUrl(updatedPortfolio.thumbnail_url as string, 'portfolio_thumbnail')
-          : null,
-        media_urls: updatedPortfolio.media_urls
-          ? await resolveAttachmentUrls(updatedPortfolio.media_urls as string[], 'portfolio_files')
-          : []
-      };
+      const transformedPortfolio = await transformPortfolio(updatedPortfolio);
 
       return {
         success: true,
@@ -363,20 +372,11 @@ export class PortfolioService {
         }
       });
 
-      // Transform URLs to full URLs
-      const transformedPortfolio = {
-        ...duplicatedPortfolio,
-        thumbnail_url: (duplicatedPortfolio as any).thumbnail_url
-          ? await resolveAttachmentUrl((duplicatedPortfolio as any).thumbnail_url as string, 'portfolio_thumbnail')
-          : null,
-        media_urls: duplicatedPortfolio.media_urls
-          ? await resolveAttachmentUrls(duplicatedPortfolio.media_urls as string[], 'portfolio_files')
-          : []
-      };
+      const transformedPortfolio = await transformPortfolio(duplicatedPortfolio);
 
       return {
         success: true,
-        message: "Portfolio duplicated successfully",
+        message: "Portfolio duplicated and saved in Drafts",
         data: transformedPortfolio
       };
     } catch (error: any) {
