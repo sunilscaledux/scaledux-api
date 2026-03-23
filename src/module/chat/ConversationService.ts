@@ -208,7 +208,7 @@ export class ConversationService {
   }
 
   /**
-   * Search users by name or email for starting a chat. Excludes current user. Returns at most 15.
+   * Search users from existing conversations only. Excludes current user. Returns at most 15.
    */
   static async searchUsersForChat(
     currentUserId: number,
@@ -219,9 +219,37 @@ export class ConversationService {
       if (q.length === 0) {
         return { success: true, message: "OK", data: { users: [] } };
       }
+
+      // Find user IDs that the current user has conversations with
+      const conversations = await (prisma as any).conversationParticipant.findMany({
+        where: { user_id: currentUserId },
+        select: { conversation_id: true }
+      });
+      const conversationIds = conversations.map((c: any) => c.conversation_id);
+
+      if (conversationIds.length === 0) {
+        return { success: true, message: "OK", data: { users: [] } };
+      }
+
+      // Get other participant IDs from those conversations
+      const otherParticipants = await (prisma as any).conversationParticipant.findMany({
+        where: {
+          conversation_id: { in: conversationIds },
+          user_id: { not: currentUserId }
+        },
+        select: { user_id: true },
+        distinct: ['user_id']
+      });
+      const otherUserIds = otherParticipants.map((p: any) => p.user_id);
+
+      if (otherUserIds.length === 0) {
+        return { success: true, message: "OK", data: { users: [] } };
+      }
+
+      // Search only among conversation users
       const users = await (prisma as any).user.findMany({
         where: {
-          id: { not: currentUserId },
+          id: { in: otherUserIds },
           OR: [
             { first_name: { contains: q, mode: "insensitive" } },
             { last_name: { contains: q, mode: "insensitive" } },
