@@ -169,7 +169,7 @@ export class PersonalInfoService {
       const [lastApprovedIdentity, lastApprovedAgency] = await Promise.all([
         prisma.identityVerification.findFirst({
           where: { user_id: userId, status: 'APPROVED' },
-          orderBy: { reviewed_at: 'desc' },
+          orderBy: { verified_at: 'desc' },
         }),
         prisma.agencyVerification.findFirst({
           where: { user_id: userId, status: 'APPROVED' },
@@ -177,7 +177,7 @@ export class PersonalInfoService {
         }),
       ]);
       const identityAnchor =
-        lastApprovedIdentity?.reviewed_at ?? profile.user.identity_verified_at ?? null;
+        lastApprovedIdentity?.verified_at ?? profile.user.identity_verified_at ?? null;
       const identityCooldown = getResubmitWindow(identityAnchor, appConfig.verification.identityCooldownDays);
       const agencyAnchor =
         lastApprovedAgency?.verified_at ?? profile.user.agency_verified_at ?? null;

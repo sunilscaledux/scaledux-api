@@ -57,6 +57,22 @@ const chatFileFilter = (req: any, file: any, cb: any) => {
   }
 };
 
+// File filter for identity documents: images + PDF
+const identityDocumentFileFilter = (req: any, file: any, cb: any) => {
+  const allowedMimeTypes = [
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+    'image/webp',
+    'application/pdf',
+  ];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only PNG, JPG, JPEG, WebP, and PDF files are allowed.'), false);
+  }
+};
+
 // File filter for milestone deliverable: images (png, jpg, jpeg, webp, gif), video, audio, zip, documents
 const milestoneDeliverableFileFilter = (req: any, file: any, cb: any) => {
   const allowedMimeTypes = [
@@ -156,7 +172,7 @@ const createStorage = (uploadPath: string, visibility: 'public' | 'private') => 
 // Multer configurations for different use cases. Visibility is derived from fieldName via file policy.
 export const FileUpload = (options: {
   uploadPath: string;
-  fileFilter?: 'image' | 'document' | 'chat' | 'milestoneDeliverable' | 'any';
+  fileFilter?: 'image' | 'document' | 'chat' | 'identityDocument' | 'milestoneDeliverable' | 'any';
   maxSize?: number; // in MB
   maxFiles?: number;
   /** Flat field name for policy/URL resolution and visibility (e.g. founder_project_files, profile_image). Default: 'attachment'. */
@@ -180,6 +196,9 @@ export const FileUpload = (options: {
       break;
     case 'chat':
       filter = chatFileFilter;
+      break;
+    case 'identityDocument':
+      filter = identityDocumentFileFilter;
       break;
     case 'milestoneDeliverable':
       filter = milestoneDeliverableFileFilter;

@@ -8,6 +8,7 @@ import { Log } from '@services/loggerService';
 import { getPublicUrl } from "@services/bunnyStorageService"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
+import { ID_TYPES } from "../../constants/idTypes"
 
 // Cache invalidation helper function
 export async function invalidateLocationCache(countryId?: string) {
@@ -726,6 +727,19 @@ export async function getContractEndReasons(req: Request, res: Response) {
   } catch (error: any) {
     Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve contract end reasons")
+  }
+}
+
+/**
+ * Get accepted ID types for identity verification
+ * GET /api/v1/id-types
+ */
+export async function getIdTypes(req: Request, res: Response) {
+  try {
+    return ApiResponse.success(res, ID_TYPES, "ID types retrieved successfully")
+  } catch (error: any) {
+    Log.error("Error", { error })
+    return ApiResponse.error(res, "Failed to retrieve ID types")
   }
 }
 

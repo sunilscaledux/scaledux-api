@@ -208,7 +208,7 @@ export async function updateAgencyVerificationStatus(req: Request, res: Response
       data: {
         status: status,
         verified_at: status === 'APPROVED' ? currentTime : null,
-        reviewed_by: adminId,
+        verified_by: adminId,
         rejection_reason: status === 'REJECTED' ? rejectionReason : null
       }
     })

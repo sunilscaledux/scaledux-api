@@ -1,19 +1,33 @@
 
 import { appConfig } from '@config/app'
 
-/** Display name for API: "Scaledux user" when deactivated, else first + last name. */
+/** Display name for API: "Scaledux user" when deactivated, else first + middle + last name.
+ *  When maskLastName is true, last name is masked (e.g. "S.") and middle name is hidden. */
 export function getDisplayName(
-  user: { first_name: string; last_name?: string | null; is_deactivated?: boolean },
+  user: { first_name: string; middle_name?: string | null; last_name?: string | null; is_deactivated?: boolean },
   options?: { maskLastName?: boolean }
 ): { firstName: string; lastName: string | null } {
   if ((user as { is_deactivated?: boolean }).is_deactivated) {
     return { firstName: "Scaledux user", lastName: null };
   }
   const maskLastName = !!options?.maskLastName;
+  const firstName = [user.first_name, maskLastName ? null : user.middle_name]
+    .filter(Boolean)
+    .join(' ');
   return {
-    firstName: user.first_name,
+    firstName,
     lastName: user.last_name ? (maskLastName ? `${user.last_name.charAt(0)}.` : user.last_name) : null,
   };
+}
+
+/** Generate a unique 8-char alphanumeric keycode for identity verification (e.g. "6E4E904W"). */
+export function generateKeycode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }
 
 export const normalizePath = (path: string): string => {

@@ -376,7 +376,7 @@ export class VerificationService {
         data: {
           isVerified: identityVerification.status === 'APPROVED',
           status: identityVerification.status,
-          verifiedAt: identityVerification.reviewed_at,
+          verifiedAt: identityVerification.verified_at,
           rejectionReason: identityVerification.rejection_reason
         }
       };

@@ -11,6 +11,7 @@ model User {
   id                Int       @id @default(autoincrement())
   unique_id         String?   @unique
   first_name        String
+  middle_name       String?
   last_name         String?
   email             String?   @unique
   phone             String?   @unique
@@ -131,6 +132,7 @@ model PersonalInfo {
   links                 Json?     // Social media links
   languages             Json?
   show_as_agency        Boolean   @default(false)
+  keycode               String?   @unique // Unique keycode for identity verification
   // Relations
   country_id            Int?
   state_id              Int?
@@ -554,6 +556,7 @@ model IdentityVerification {
   id                        Int       @id @default(autoincrement())
   user_id                   Int
   first_name                String
+  middle_name               String?
   last_name                 String
   date_of_birth             DateTime
   nationality               String?
@@ -562,6 +565,7 @@ model IdentityVerification {
   id_expiry_date            DateTime?
   issuing_country           String
   id_document_urls          Json      // Array of document image URLs
+  keycode                   String?   // Keycode used for this verification
   selfie_urls               Json      // Array of selfie image URLs
   address_line_1            String
   address_line_2            String?
@@ -576,8 +580,8 @@ model IdentityVerification {
   document_date_issued      DateTime? // Date when document was issued
   status                    String    @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   submitted_at              DateTime?
-  reviewed_at               DateTime?
-  reviewed_by               Int?
+  verified_at               DateTime?
+  verified_by               Int?
   rejection_reason          String?
   created_at                DateTime  @default(now())
   updated_at                DateTime  @updatedAt
@@ -597,7 +601,7 @@ model AgencyVerification {
   status            String    @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
   submitted_at      DateTime?
   verified_at       DateTime?
-  reviewed_by       Int?
+  verified_by       Int?
   rejection_reason  String?
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt

@@ -33,7 +33,7 @@ import {
 import { ApiResponse } from "@utils/ApiResponse";
 import * as AuthService from "@module/auth/AuthService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
-import { normalizeContact } from '@utils/General';
+import { normalizeContact, generateKeycode } from '@utils/General';
 import { Log } from '@services/loggerService';
 import { NotificationService } from '@module/notification/NotificationService';
 import { emailService } from '@services/emailService';
@@ -754,7 +754,7 @@ export async function updateUserRole(req: Request, res: Response) {
     await setProfileSectionsForRole(userId, role);
     await prisma.personalInfo.upsert({
       where: { user_id: userId },
-      create: { user_id: userId },
+      create: { user_id: userId, keycode: generateKeycode() },
       update: {},
     });
 

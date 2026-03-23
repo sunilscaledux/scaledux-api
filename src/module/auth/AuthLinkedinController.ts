@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from '../../utils/jwtUtils';
+import { generateKeycode } from '@utils/General';
 import { prisma } from '../../services/prismaService';
 import { createLoginDevice } from './AuthService';
 import { reactivateOnLogin } from '../profile/DeactivationService';
@@ -255,6 +256,7 @@ const linkedinCallback = async (req: Request, res: Response) => {
       await prisma.personalInfo.create({
         data: {
           user_id: user.id,
+          keycode: generateKeycode(),
         },
       });
 

@@ -3,63 +3,41 @@ import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import { resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService'
 import { updateCompletionSection } from '../profile/ProfileCompletionService'
-import { uploadFile } from '@module/general/FileController'
-import fs from 'fs'
-import path from 'path'
 import { Log } from '@services/loggerService';
 import { appConfig } from '@config/app';
-import { getResubmitWindow } from '@utils/General';
+import { getResubmitWindow, generateKeycode } from '@utils/General';
+import { isValidIdType } from '@constants/idTypes';
 
 /**
- * Get identity verification status
+ * Get user's keycode for identity verification
  */
-export async function getIdentityVerificationStatus(req: Request, res: Response) {
+export async function getKeycode(req: Request, res: Response) {
   try {
     const userId = req.user?.id
 
-
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        identity_verified_at: true,
-        identity_verification_status: true,
-        identityVerifications: {
-          orderBy: { created_at: 'desc' },
-          take: 1,
-          select: {
-            rejection_reason: true,
-            status: true
-          }
-        }
-      }
+    let personalInfo = await prisma.personalInfo.findUnique({
+      where: { user_id: userId },
+      select: { keycode: true }
     })
 
-    const isVerified = !!user!.identity_verified_at
-    const status = user!.identity_verification_status || 'PENDING'
-    const latestVerification = user!.identityVerifications[0]
+    if (!personalInfo) {
+      return ApiResponse.error(res, "Profile not found", 404)
+    }
 
-    const lastApproved = await prisma.identityVerification.findFirst({
-      where: { user_id: userId, status: 'APPROVED' },
-      orderBy: { reviewed_at: 'desc' }
-    })
-    const anchor = lastApproved?.reviewed_at ?? user!.identity_verified_at ?? null
-    const cooldown = getResubmitWindow(anchor, appConfig.verification.identityCooldownDays)
+    // Generate keycode if missing (for existing users)
+    if (!personalInfo.keycode) {
+      const updated = await prisma.personalInfo.update({
+        where: { user_id: userId },
+        data: { keycode: generateKeycode() },
+        select: { keycode: true }
+      })
+      personalInfo = updated
+    }
 
-    return ApiResponse.success(res, {
-      isVerified,
-      status, // PENDING, UNDER_REVIEW, APPROVED, REJECTED
-      verifiedAt: user!.identity_verified_at,
-      rejectionReason: latestVerification?.rejection_reason || null,
-      cooldownDays: appConfig.verification.identityCooldownDays,
-      nextSubmitAllowedAt: cooldown.nextSubmitAllowedAt?.toISOString() ?? null,
-      canSubmitIdentity: cooldown.canSubmit
-    }, "Identity verification status retrieved successfully")
-
+    return ApiResponse.success(res, { keycode: personalInfo.keycode }, "Keycode retrieved successfully")
   } catch (error: any) {
-    Log.error("Error", { error })
-    return ApiResponse.error(res, "Failed to get identity verification status")
+    Log.error("Error getting keycode", { error })
+    return ApiResponse.error(res, "Failed to get keycode")
   }
 }
 
@@ -87,6 +65,10 @@ export async function submitIdentityVerification(req: Request, res: Response) {
       return ApiResponse.error(res, "ID information and documents are required", 400)
     }
 
+    if (!isValidIdType(idInformation.idType)) {
+      return ApiResponse.error(res, "Invalid ID type", 400)
+    }
+
     if (!keycodeVerification?.picture?.length) {
       return ApiResponse.error(res, "Selfie verification is required", 400)
     }
@@ -110,9 +92,9 @@ export async function submitIdentityVerification(req: Request, res: Response) {
 
     const lastApproved = await prisma.identityVerification.findFirst({
       where: { user_id: userId, status: 'APPROVED' },
-      orderBy: { reviewed_at: 'desc' }
+      orderBy: { verified_at: 'desc' }
     })
-    const anchor = lastApproved?.reviewed_at ?? null
+    const anchor = lastApproved?.verified_at ?? null
     const cooldown = getResubmitWindow(anchor, appConfig.verification.identityCooldownDays)
     if (!cooldown.canSubmit && cooldown.nextSubmitAllowedAt) {
       return ApiResponse.error(
@@ -128,6 +110,13 @@ export async function submitIdentityVerification(req: Request, res: Response) {
     const selfiePaths = urlsOrPathsToAttachmentIds(keycodeVerification?.picture || [])
     const addressProofPaths = urlsOrPathsToAttachmentIds(proofOfAddress?.uploadedAddressProofs || [])
 
+    // Get user's keycode to store with the verification
+    const personalInfo = await prisma.personalInfo.findUnique({
+      where: { user_id: userId },
+      select: { keycode: true }
+    })
+    const userKeycode = personalInfo?.keycode || null
+
     if (existingVerification) {
       // Update existing verification (for rejected or any other status)
       identityVerification = await prisma.identityVerification.update({
@@ -136,10 +125,11 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         user_id: userId,
         // Customer Information
         first_name: customerInformation.firstName,
+        middle_name: customerInformation.middleName || null,
         last_name: customerInformation.lastName,
         date_of_birth: new Date(customerInformation.dob),
         nationality: customerInformation.country,
-        
+
         // ID Information
         id_type: idInformation.idType,
         id_number: idInformation.idNumber,
@@ -148,6 +138,7 @@ export async function submitIdentityVerification(req: Request, res: Response) {
         id_document_urls: idDocumentPaths as any,
         
         // Selfie/Keycode Verification
+        keycode: userKeycode,
         selfie_urls: selfiePaths as any,
         
         // Proof of Address
@@ -176,10 +167,11 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           user_id: userId,
           // Customer Information
           first_name: customerInformation.firstName,
+          middle_name: customerInformation.middleName || null,
           last_name: customerInformation.lastName,
           date_of_birth: new Date(customerInformation.dob),
           nationality: customerInformation.country,
-          
+
           // ID Information
           id_type: idInformation.idType,
           id_number: idInformation.idNumber,
@@ -188,7 +180,8 @@ export async function submitIdentityVerification(req: Request, res: Response) {
           id_document_urls: idDocumentPaths as any,
           
           // Selfie/Keycode Verification
-          selfie_urls: selfiePaths as any,
+          keycode: userKeycode,
+        selfie_urls: selfiePaths as any,
           
           // Proof of Address
           address_line_1: proofOfAddress.address1,
@@ -258,10 +251,11 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
       id: verification.id,
       status: verification.status,
       submittedAt: verification.submitted_at,
-      reviewedAt: verification.reviewed_at,
+      verifiedAt: verification.verified_at,
       rejectionReason: verification.rejection_reason,
       customerInformation: {
         firstName: verification.first_name,
+        middleName: verification.middle_name,
         lastName: verification.last_name,
         dob: verification.date_of_birth,
         country: verification.nationality
@@ -297,104 +291,3 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
   }
 }
 
-/**
- * Upload ID document images
- */
-export async function uploadIdDocuments(req: Request, res: Response) {
-  return uploadFile(req, res);
-}
-
-/**
- * Upload selfie images for keycode verification
- */
-export async function uploadSelfieImages(req: Request, res: Response) {
-  return uploadFile(req, res);
-}
-
-/**
- * Upload address proof documents
- */
-export async function uploadAddressProof(req: Request, res: Response) {
-  return uploadFile(req, res);
-}
-
-/**
- * Approve or reject identity verification (admin / internal review).
- * On APPROVED: syncs legal name to User (first_name, last_name) and identity_verified_at.
- */
-export async function updateIdentityVerificationStatus(req: Request, res: Response) {
-  try {
-    const { verificationId, status, rejectionReason } = req.body
-    const adminId = req.user?.id
-
-    if (!adminId) {
-      return ApiResponse.error(res, "Admin not authenticated", 401)
-    }
-
-    if (!verificationId || !status) {
-      return ApiResponse.error(res, "Verification ID and status are required", 400)
-    }
-
-    if (!['APPROVED', 'REJECTED'].includes(status)) {
-      return ApiResponse.error(res, "Status must be APPROVED or REJECTED", 400)
-    }
-
-    if (status === 'REJECTED' && !rejectionReason) {
-      return ApiResponse.error(res, "Rejection reason is required when rejecting", 400)
-    }
-
-    const identityVerification = await prisma.identityVerification.findUnique({
-      where: { id: Number(verificationId) },
-      include: { user: true }
-    })
-
-    if (!identityVerification) {
-      return ApiResponse.error(res, "Identity verification not found", 404)
-    }
-
-    const currentTime = new Date()
-
-    const updatedVerification = await prisma.identityVerification.update({
-      where: { id: identityVerification.id },
-      data: {
-        status,
-        reviewed_at: currentTime,
-        reviewed_by: adminId,
-        rejection_reason: status === 'REJECTED' ? rejectionReason : null
-      }
-    })
-
-    if (status === 'APPROVED') {
-      await prisma.user.update({
-        where: { id: identityVerification.user_id },
-        data: {
-          first_name: identityVerification.first_name,
-          last_name: identityVerification.last_name ?? '',
-          identity_verification_status: 'APPROVED',
-          identity_verified_at: currentTime
-        }
-      })
-      await updateCompletionSection(identityVerification.user_id, 'identityVerification', true)
-    } else {
-      await prisma.user.update({
-        where: { id: identityVerification.user_id },
-        data: {
-          identity_verification_status: 'REJECTED'
-        }
-      })
-      await updateCompletionSection(identityVerification.user_id, 'identityVerification', false)
-    }
-
-    return ApiResponse.success(res, {
-      verificationId: updatedVerification.id,
-      status: updatedVerification.status,
-      reviewedAt: updatedVerification.reviewed_at,
-      reviewedBy: adminId,
-      message: `Identity verification ${status.toLowerCase()} successfully`
-    }, `Identity verification ${status.toLowerCase()} successfully`)
-
-  } catch (error: any) {
-    Log.error("Error", { error })
-    return ApiResponse.error(res, "Failed to update identity verification status")
-  }
-}

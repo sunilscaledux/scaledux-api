@@ -4,7 +4,7 @@ import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { ulid } from "ulid";
 import { emailService } from "@services/emailService";
-import { generateOtpCode, normalizeContact } from "@utils/General";
+import { generateOtpCode, generateKeycode, normalizeContact } from "@utils/General";
 import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
@@ -299,7 +299,7 @@ export async function createUserAfterOtpVerification(
       data: userData,
     });
     await prisma.personalInfo.create({
-      data: { user_id: user.id },
+      data: { user_id: user.id, keycode: generateKeycode() },
     });
     const { password, ...safeUser } = user;
     return {
