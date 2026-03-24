@@ -8,6 +8,23 @@ import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 
 /**
+ * Fetch revenue models with is_primary/is_secondary flags
+ */
+async function fetchRevenueModelsWithFlags(
+  ids: number[],
+  primaryId: number | null,
+  secondaryIds: number[]
+) {
+  if (ids.length === 0) return null;
+  const models = await prisma.revenueModel.findMany({ where: { id: { in: ids } } });
+  return models.map((m) => ({
+    ...m,
+    is_primary: m.id === primaryId,
+    is_secondary: secondaryIds.includes(m.id),
+  }));
+}
+
+/**
  * CompanyProfileService
  * Handles all company/founder-specific profile operations
  */
@@ -77,11 +94,13 @@ export class CompanyProfileService {
         
         // Business model
         revenue_description: profile.revenue_description,
-        revenueModels: profile.revenue_model_ids.length > 0 
-          ? await prisma.revenueModel.findMany({
-              where: { id: { in: profile.revenue_model_ids } },
-            })
-          : null,
+        revenueModels: await fetchRevenueModelsWithFlags(
+          profile.revenue_model_ids,
+          profile.primary_revenue_model_id,
+          profile.secondary_revenue_model_ids
+        ),
+        primary_revenue_model_id: profile.primary_revenue_model_id,
+        secondary_revenue_model_ids: profile.secondary_revenue_model_ids,
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
@@ -200,9 +219,13 @@ export class CompanyProfileService {
         company_stage: profile.company_stage,
         team_size: profile.team_size,
         revenue_description: profile.revenue_description,
-        revenueModels: profile.revenue_model_ids.length > 0
-          ? await prisma.revenueModel.findMany({ where: { id: { in: profile.revenue_model_ids } } })
-          : null,
+        revenueModels: await fetchRevenueModelsWithFlags(
+          profile.revenue_model_ids,
+          profile.primary_revenue_model_id,
+          profile.secondary_revenue_model_ids
+        ),
+        primary_revenue_model_id: profile.primary_revenue_model_id,
+        secondary_revenue_model_ids: profile.secondary_revenue_model_ids,
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
@@ -398,11 +421,11 @@ export class CompanyProfileService {
 
 
       // Fetch revenue models if they exist
-      const revenueModels = profile.revenue_model_ids.length > 0 
-        ? await prisma.revenueModel.findMany({
-            where: { id: { in: profile.revenue_model_ids } },
-          })
-        : null;
+      const revenueModels = await fetchRevenueModelsWithFlags(
+        profile.revenue_model_ids,
+        profile.primary_revenue_model_id,
+        profile.secondary_revenue_model_ids
+      );
 
       // Transform data for response (same structure as getMyProfile)
       const companyDetail = {
@@ -707,11 +730,11 @@ export class CompanyProfileService {
       });
 
       // Fetch revenue models if any
-      const revenueModels = updatedProfile.revenue_model_ids.length > 0
-        ? await prisma.revenueModel.findMany({
-            where: { id: { in: updatedProfile.revenue_model_ids } },
-          })
-        : [];
+      const revenueModels = await fetchRevenueModelsWithFlags(
+        updatedProfile.revenue_model_ids,
+        updatedProfile.primary_revenue_model_id,
+        updatedProfile.secondary_revenue_model_ids
+      ) || [];
 
       return {
         success: true,
