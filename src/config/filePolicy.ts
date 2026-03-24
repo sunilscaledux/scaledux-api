@@ -22,7 +22,7 @@ const policy: Record<string, FileVisibility> = {
   team_member_profile_image: 'public',
   investment_portfolio_logo: 'public',
   target_market_document: 'private',
-  traction_document: 'private',
+  traction_document: 'public',
   service_package_thumbnail: 'public',
   service_package_documents: 'public',
   service_package_media: 'public',
