@@ -167,8 +167,10 @@ model CompanyProfile {
   team_size             Int?
   
   // Business model
-  revenue_model_ids     Int[]     @default([])
-  revenue_description   String?   @db.Text
+  revenue_model_ids           Int[]     @default([])
+  primary_revenue_model_id    Int?
+  secondary_revenue_model_ids Int[]     @default([])
+  revenue_description         String?   @db.Text
   target_market         String?
   problem_statement     String?
   solution_statement    String?

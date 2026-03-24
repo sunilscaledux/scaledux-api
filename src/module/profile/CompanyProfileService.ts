@@ -660,18 +660,28 @@ export class CompanyProfileService {
    */
   static async updateRevenueModel(userId: number, data: {
     revenue_model_ids?: number[] | null;
+    primary_revenue_model_id?: number | null;
+    secondary_revenue_model_ids?: number[] | null;
     revenue_description?: string | null;
   }): Promise<ServiceResponse> {
     try {
       // Prepare update data
       const updateData: any = {};
-      
+
       if (data.revenue_description !== undefined) {
         updateData.revenue_description = data.revenue_description;
       }
-      
+
       if (data.revenue_model_ids !== undefined) {
         updateData.revenue_model_ids = data.revenue_model_ids || [];
+      }
+
+      if (data.primary_revenue_model_id !== undefined) {
+        updateData.primary_revenue_model_id = data.primary_revenue_model_id;
+      }
+
+      if (data.secondary_revenue_model_ids !== undefined) {
+        updateData.secondary_revenue_model_ids = data.secondary_revenue_model_ids || [];
       }
 
       // Update or create profile

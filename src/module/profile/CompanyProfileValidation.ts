@@ -191,6 +191,8 @@ export const updateRevenueModelSchema = Joi.object({
     'array.base': 'Revenue models must be an array',
     'number.base': 'Each revenue model ID must be a valid number'
   }),
+  primary_revenue_model_id: Joi.number().integer().optional().allow(null),
+  secondary_revenue_model_ids: Joi.array().items(Joi.number().integer()).max(2).optional().allow(null),
   revenue_description: Joi.string().optional().allow('', null).max(5000).messages({
     'string.max': 'Revenue description must not exceed 5000 characters'
   })
