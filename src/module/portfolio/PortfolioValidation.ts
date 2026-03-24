@@ -1,11 +1,11 @@
 import Joi from 'joi'
 
 export const createPortfolioSchema = Joi.object({
-  title: Joi.string().required().min(1).max(50).messages({
+  title: Joi.string().required().min(1).max(125).messages({
     'string.base': 'Project title must be a string',
     'string.empty': 'Project title is required',
     'string.min': 'Project title is required',
-    'string.max': 'Project title is too long (max 50 characters)',
+    'string.max': 'Project title is too long (max 125 characters)',
     'any.required': 'Project title is required'
   }),
   description: Joi.string().required().min(1).messages({
@@ -90,10 +90,10 @@ export const createPortfolioSchema = Joi.object({
 })
 
 export const updatePortfolioSchema = Joi.object({
-  title: Joi.string().optional().min(1).max(50).messages({
+  title: Joi.string().optional().min(1).max(125).messages({
     'string.base': 'Project title must be a string',
     'string.min': 'Project title is required',
-    'string.max': 'Project title is too long (max 50 characters)'
+    'string.max': 'Project title is too long (max 125 characters)'
   }),
   description: Joi.string().optional().min(1).messages({
     'string.base': 'Description must be a string',
@@ -174,7 +174,7 @@ export const updatePortfolioSchema = Joi.object({
 
 // Draft schema - no validation required for drafts
 export const createDraftPortfolioSchema = Joi.object({
-  title: Joi.string().optional().allow('').max(50),
+  title: Joi.string().optional().allow('').max(125),
   description: Joi.string().optional().allow(''),
   companyName: Joi.string().optional().allow('').max(50),
   hideCompanyName: Joi.boolean().optional().default(false),
@@ -195,7 +195,7 @@ export const createDraftPortfolioSchema = Joi.object({
 })
 
 export const updateDraftPortfolioSchema = Joi.object({
-  title: Joi.string().optional().allow('').max(50),
+  title: Joi.string().optional().allow('').max(125),
   description: Joi.string().optional().allow(''),
   companyName: Joi.string().optional().allow('').max(50),
   hideCompanyName: Joi.boolean().optional(),
