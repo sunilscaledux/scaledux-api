@@ -58,8 +58,15 @@ export class RaisingFundService {
    */
   static async updateRaisingFund(userId: number, data: {
     is_raising: boolean;
+    funding_stage?: string;
     round_type?: string;
     target_amount?: number;
+    expected_close_date?: string;
+    valuation_min?: number;
+    valuation_max?: number;
+    has_committed?: boolean;
+    committed_amount?: number;
+    committed_investor?: string;
     uses_of_fund?: any;
   }): Promise<ServiceResponse> {
     try {

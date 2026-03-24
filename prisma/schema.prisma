@@ -232,8 +232,15 @@ model RaisingFund {
   id                    Int       @id @default(autoincrement())
   company_profile_id    Int       @unique
   is_raising            Boolean   @default(false)
+  funding_stage         String?                          // Exploring, Preparing, Actively raising, etc.
   round_type            String?
   target_amount         Decimal?  @db.Decimal(15, 2)
+  expected_close_date   String?                          // ISO date string
+  valuation_min         Decimal?  @db.Decimal(15, 2)
+  valuation_max         Decimal?  @db.Decimal(15, 2)
+  has_committed         Boolean?  @default(false)
+  committed_amount      Decimal?  @db.Decimal(15, 2)
+  committed_investor    String?                          // Investor/firm name
   uses_of_fund          Json?
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
