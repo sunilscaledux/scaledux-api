@@ -691,7 +691,7 @@ export class CompanyProfileService {
         message: 'Revenue model updated successfully',
         data: {
           ...updatedProfile,
-          revenueModels: revenueModels.length > 0 ? revenueModels : null,
+          revenueModels: Array.isArray(revenueModels) && revenueModels.length > 0 ? revenueModels : null,
         },
       };
     } catch (error: any) {
