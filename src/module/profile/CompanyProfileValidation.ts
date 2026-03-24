@@ -225,10 +225,12 @@ export const createTeamMemberSchema = Joi.object({
   email: Joi.string().email({ tlds: { allow: false } }).optional().allow('', null).messages({
     'string.email': 'Please provide a valid email address'
   }),
-  role_id: Joi.number().integer().required().messages({
-    'number.base': 'Role is required',
+  role: Joi.string().required().max(255).messages({
+    'string.empty': 'Role is required',
+    'string.max': 'Role must not exceed 255 characters',
     'any.required': 'Role is required'
   }),
+  is_cofounder: Joi.boolean().optional().default(false),
   bio: Joi.string().optional().allow('', null).max(1000).messages({
     'string.max': 'Bio must not exceed 1000 characters'
   }),
@@ -251,9 +253,10 @@ export const updateTeamMemberSchema = Joi.object({
   email: Joi.string().email({ tlds: { allow: false } }).optional().allow('', null).messages({
     'string.email': 'Please provide a valid email address'
   }),
-  role_id: Joi.number().integer().optional().messages({
-    'number.base': 'Role must be a valid number'
+  role: Joi.string().optional().max(255).messages({
+    'string.max': 'Role must not exceed 255 characters'
   }),
+  is_cofounder: Joi.boolean().optional(),
   bio: Joi.string().optional().allow('', null).max(1000).messages({
     'string.max': 'Bio must not exceed 1000 characters'
   }),

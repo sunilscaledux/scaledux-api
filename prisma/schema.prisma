@@ -385,18 +385,7 @@ model BusinessModel {
   @@map("scd_business_models")
 }
 
-model TeamRole {
-  id          Int          @id @default(autoincrement())
-  name        String       @unique
-  code        String       @unique
-  description String?
-  is_active   Boolean      @default(true)
-  created_at  DateTime     @default(now())
-  updated_at  DateTime     @updatedAt
-  teamMembers TeamMember[]
 
-  @@map("scd_team_roles")
-}
 
 model TeamMember {
   id                Int       @id @default(autoincrement())
@@ -404,7 +393,8 @@ model TeamMember {
   company_profile_id Int
   name              String
   email             String?
-  role_id           Int
+  role              String
+  is_cofounder      Boolean   @default(false)
   bio               String?
   profile_image     String?
   linkedin_url      String?
@@ -412,7 +402,6 @@ model TeamMember {
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
   companyProfile    CompanyProfile @relation(fields: [company_profile_id], references: [id], onDelete: Cascade)
-  role              TeamRole  @relation(fields: [role_id], references: [id])
 
   @@index([company_profile_id])
   @@index([unique_id])

@@ -5,7 +5,6 @@ import { seedLanguages } from "./seeds/languages-seed";
 import { seedExpertise } from "./seeds/expertise-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
-import { seedTeamRoles } from "./seeds/team-roles-seed";
 import { seedRevenueModels } from "./seeds/revenue-models-seed";
 import { seedBillingData } from "./seeds/billing-seed";
 
@@ -32,10 +31,7 @@ async function main() {
   // 6. Seed Sub-Industries and Business Models
   await seedSubIndustriesAndBusinessModels(prisma);
 
-  // 7. Seed Team Roles
-  await seedTeamRoles(prisma);
-
-  // 8. Seed Revenue Models
+  // 7. Seed Revenue Models
   await seedRevenueModels(prisma);
 
   // await seedBillingData(prisma);

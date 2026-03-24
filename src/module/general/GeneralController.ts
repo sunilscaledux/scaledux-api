@@ -652,41 +652,6 @@ export async function getRevenueModels(req: Request, res: Response) {
   }
 }
 
-/**
- * Get all team roles
- * GET /api/v1/team-roles
- */
-export async function getTeamRoles(req: Request, res: Response) {
-  try {
-    const cacheKey = 'team-roles'
-    
-    // Try to get from Redis cache first
-    const cachedRoles = await redisClient.get(cacheKey)
-    if (cachedRoles) {
-      return ApiResponse.success(res, JSON.parse(cachedRoles), "Team roles retrieved successfully")
-    }
-
-    // If not in cache, fetch from database
-    const teamRoles = await prisma.teamRole.findMany({
-      where: { is_active: true },
-      orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true
-      }
-    })
-
-    // Cache for 24 hours
-    await redisClient.setex(cacheKey, 86400, JSON.stringify(teamRoles))
-
-    return ApiResponse.success(res, teamRoles, "Team roles retrieved successfully")
-  } catch (error: any) {
-    Log.error("Error", { error })
-    return ApiResponse.error(res, "Failed to retrieve team roles")
-  }
-}
 
 /**
  * Get all funding stages

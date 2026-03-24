@@ -31,9 +31,6 @@ export class TeamMemberService {
           company_profile_id: companyProfile.id,
           is_active: true
         },
-        include: {
-          role: true
-        },
         orderBy: { created_at: 'desc' }
       });
 
@@ -78,9 +75,6 @@ export class TeamMemberService {
           unique_id: uniqueId,
           company_profile_id: companyProfile.id
         },
-        include: {
-          role: true
-        }
       });
 
       if (!teamMember) {
@@ -115,7 +109,8 @@ export class TeamMemberService {
   static async createTeamMember(userId: number, data: {
     name: string;
     email?: string;
-    role_id: number;
+    role: string;
+    is_cofounder?: boolean;
     bio?: string;
     linkedin_url?: string;
   }): Promise<ServiceResponse> {
@@ -136,9 +131,6 @@ export class TeamMemberService {
           company_profile_id: companyProfile.id,
           ...data
         },
-        include: {
-          role: true
-        }
       });
 
       return {
@@ -161,7 +153,8 @@ export class TeamMemberService {
   static async updateTeamMember(userId: number, uniqueId: string, data: {
     name?: string;
     email?: string;
-    role_id?: number;
+    role?: string;
+    is_cofounder?: boolean;
     bio?: string;
     linkedin_url?: string;
   }): Promise<ServiceResponse> {
@@ -195,9 +188,6 @@ export class TeamMemberService {
       const teamMember = await prisma.teamMember.update({
         where: { id: existingMember.id },
         data,
-        include: {
-          role: true
-        }
       });
 
       return {

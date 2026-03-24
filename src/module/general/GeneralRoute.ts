@@ -17,7 +17,6 @@ import {
   getSubIndustriesByIndustry,
   getBusinessModels,
   getRevenueModels,
-  getTeamRoles,
   getFundingStages,
   getInvestorTypes,
   getInvestmentProfileOptions,
@@ -47,7 +46,6 @@ router.get("/industries", getIndustries)
 router.get("/industries/:industryId/sub-industries", getSubIndustriesByIndustry)
 router.get("/business-models", getBusinessModels)
 router.get("/revenue-models", getRevenueModels)
-router.get("/team-roles", getTeamRoles)
 router.get("/funding-stages", getFundingStages)
 router.get("/investor-types", getInvestorTypes)
 router.get("/investment-profile-options", getInvestmentProfileOptions)
