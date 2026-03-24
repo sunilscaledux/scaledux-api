@@ -144,12 +144,19 @@ export const raisingFundSchema = Joi.object({
   is_raising: Joi.boolean().required().messages({
     'any.required': 'Raising status is required'
   }),
+  funding_stage: Joi.string().optional().max(100).allow(null, ''),
   round_type: Joi.string().optional().max(100).allow(null, '').messages({
     'string.max': 'Round type must not exceed 100 characters'
   }),
   target_amount: Joi.number().optional().min(0).allow(null).messages({
     'number.min': 'Target amount cannot be negative'
   }),
+  expected_close_date: Joi.string().optional().allow(null, ''),
+  valuation_min: Joi.number().optional().min(0).allow(null),
+  valuation_max: Joi.number().optional().min(0).allow(null),
+  has_committed: Joi.boolean().optional().allow(null),
+  committed_amount: Joi.number().optional().min(0).allow(null),
+  committed_investor: Joi.string().optional().max(200).allow(null, ''),
   uses_of_fund: Joi.object().optional().allow(null).messages({
     'object.base': 'Uses of fund must be a valid object'
   })
