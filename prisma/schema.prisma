@@ -187,6 +187,12 @@ model CompanyProfile {
   city                  String?
   zipCode               String?
   
+  // Pitch deck
+  founders_video_url    String?
+  cap_table_url         String?
+  cap_table_file        String?               // Attachment unique_id
+  product_demo_url      String?
+
   // Social links
   links                 Json?
   

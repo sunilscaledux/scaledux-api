@@ -79,6 +79,9 @@ router.patch(
   handleMulterError
 );
 
+router.get('/company/pitch-deck', authenticateToken, CompanyProfileController.getPitchDeck);
+router.patch('/company/pitch-deck', authenticateToken, CompanyProfileController.updatePitchDeck);
+
 router.get('/company/funding-rounds', authenticateToken, FundingRoundController.getFundingRounds);
 router.post('/company/funding-rounds', authenticateToken, FundingRoundController.createFundingRound);
 router.patch('/company/funding-rounds/:id', authenticateToken, FundingRoundController.updateFundingRound);

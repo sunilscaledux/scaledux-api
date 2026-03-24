@@ -270,6 +270,40 @@ export class CompanyProfileController {
   }
 
   /**
+   * Get pitch deck
+   */
+  static async getPitchDeck(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const result = await CompanyProfileService.getPitchDeck(userId);
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to get pitch deck');
+    }
+  }
+
+  /**
+   * Update pitch deck
+   */
+  static async updatePitchDeck(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const result = await CompanyProfileService.updatePitchDeck(userId, req.body);
+      if (result.success) {
+        return ApiResponse.success(res, result.data, result.message);
+      } else {
+        return ApiResponse.error(res, result.message);
+      }
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to update pitch deck');
+    }
+  }
+
+  /**
    * Upload traction document with title
    */
   static async uploadTractionDocument(req: Request, res: Response) {

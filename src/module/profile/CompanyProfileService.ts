@@ -760,6 +760,95 @@ export class CompanyProfileService {
     }
   }
 
+  /**
+   * Get pitch deck data
+   */
+  static async getPitchDeck(userId: number): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.companyProfile.findUnique({
+        where: { user_id: userId },
+        select: {
+          founders_video_url: true,
+          cap_table_url: true,
+          cap_table_file: true,
+          product_demo_url: true
+        }
+      });
+
+      if (!profile) {
+        return { success: false, message: 'Company profile not found' };
+      }
+
+      const capTableFileUrl = profile.cap_table_file
+        ? await resolveAttachmentUrl(profile.cap_table_file, 'company_traction_document')
+        : null;
+
+      return {
+        success: true,
+        message: 'Pitch deck retrieved successfully',
+        data: {
+          founders_video_url: profile.founders_video_url,
+          cap_table_url: profile.cap_table_url,
+          cap_table_file: capTableFileUrl,
+          cap_table_file_id: profile.cap_table_file,
+          product_demo_url: profile.product_demo_url
+        }
+      };
+    } catch (error: any) {
+      Log.error("Error", { error });
+      return { success: false, message: 'Failed to retrieve pitch deck' };
+    }
+  }
+
+  /**
+   * Update pitch deck
+   */
+  static async updatePitchDeck(userId: number, data: {
+    founders_video_url?: string;
+    cap_table_url?: string;
+    cap_table_file?: string;
+    product_demo_url?: string;
+  }): Promise<ServiceResponse> {
+    try {
+      const profile = await prisma.companyProfile.upsert({
+        where: { user_id: userId },
+        update: {
+          founders_video_url: data.founders_video_url ?? null,
+          cap_table_url: data.cap_table_url ?? null,
+          cap_table_file: data.cap_table_file ?? null,
+          product_demo_url: data.product_demo_url ?? null
+        },
+        create: {
+          user_id: userId,
+          unique_id: ulid(),
+          founders_video_url: data.founders_video_url ?? null,
+          cap_table_url: data.cap_table_url ?? null,
+          cap_table_file: data.cap_table_file ?? null,
+          product_demo_url: data.product_demo_url ?? null
+        }
+      });
+
+      const capTableFileUrl = profile.cap_table_file
+        ? await resolveAttachmentUrl(profile.cap_table_file, 'company_traction_document')
+        : null;
+
+      return {
+        success: true,
+        message: 'Pitch deck updated successfully',
+        data: {
+          founders_video_url: profile.founders_video_url,
+          cap_table_url: profile.cap_table_url,
+          cap_table_file: capTableFileUrl,
+          cap_table_file_id: profile.cap_table_file,
+          product_demo_url: profile.product_demo_url
+        }
+      };
+    } catch (error: any) {
+      Log.error("Error", { error });
+      return { success: false, message: 'Failed to update pitch deck' };
+    }
+  }
+
   static async uploadTractionDocument(userId: number, file: any, traction_title?: string, attachmentMeta?: AttachmentMetaItem): Promise<ServiceResponse> {
     try {
       const updateData: any = {};
