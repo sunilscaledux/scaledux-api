@@ -2,6 +2,7 @@ import { Router } from "express"
 import {
   getUserServicePackages,
   getServicePackageById,
+  getPublicServicePackage,
   createServicePackage,
   updateServicePackage,
   deleteServicePackage
@@ -11,6 +12,9 @@ import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
+
+// Public route - no auth required
+router.get("/public/:id", getPublicServicePackage)
 
 router.use(authenticateToken)
 

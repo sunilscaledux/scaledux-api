@@ -1074,10 +1074,10 @@ model ServicePackage {
   unique_id           String   @unique @default(cuid())
   user_id             Int
   title               String   @db.VarChar(200)
-  expertise_category_id Int
-  specialty_id        Int?
+  category_id         Int      @map("category_id")
+  sub_category_id     Int?     @map("sub_category_id")
   package_description String?  @db.Text       // Rich text description from Tiptap editor
-  
+
   // JSON columns for dynamic data
   features            Json     @default("[]")     // Array of feature strings
   industries          Json     @default("[]")     // Array of industry IDs
@@ -1088,32 +1088,35 @@ model ServicePackage {
   faqs                Json     @default("[]")     // Array of {question, answer}
   links               Json     @default("[]")     // Array of {url}
   requirements        Json     @default("[]")     // Array of {requirement}
-  
+
   // Media fields from Gallery form
   thumbnail           String?                   // Single thumbnail URL
   images              Json     @default("[]")     // Array of image URLs
   video               Json     @default("[]")     // Array of video URLs
   documents           Json     @default("[]")     // Array of document URLs
-  
-  // Boolean flags for pricing tiers
+
+  // Boolean flags and labels for pricing tiers
   has_basic           Boolean  @default(false)
   has_standard        Boolean  @default(false)
   has_premium         Boolean  @default(false)
-  
+  basic_label         String?  @default("Basic") @db.VarChar(50)
+  standard_label      String?  @default("Standard") @db.VarChar(50)
+  premium_label       String?  @default("Premium") @db.VarChar(50)
+
   // Status and timestamps
   status              String   @default("DRAFT") @db.VarChar(20) // DRAFT, PUBLISHED, PAUSED
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
-  
+
   // Relations
   user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  category      Category     @relation(fields: [expertise_category_id], references: [id], onDelete: Restrict)
-  subcategory   Subcategory? @relation(fields: [specialty_id], references: [id], onDelete: SetNull)
-  
+  category      Category     @relation(fields: [category_id], references: [id], onDelete: Restrict)
+  subcategory   Subcategory? @relation(fields: [sub_category_id], references: [id], onDelete: SetNull)
+
   // Indexes
   @@index([user_id])
-  @@index([expertise_category_id])
-  @@index([specialty_id])
+  @@index([category_id])
+  @@index([sub_category_id])
   @@index([status])
   @@map("scd_service_packages")
 }

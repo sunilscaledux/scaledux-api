@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from '@services/loggerService';
 import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { createRedirectLink } from '@services/redirectLinkService';
 
 /**
  * Helper to parse JSON fields and resolve file URLs (async).
@@ -18,10 +19,10 @@ async function parseServicePackageJsonAsync(pkg: any) {
   const videoArr = typeof pkgRow.video === "string" ? JSON.parse(pkgRow.video) : (pkgRow.video || []);
   const documentsArr = typeof pkgRow.documents === "string" ? JSON.parse(pkgRow.documents) : (pkgRow.documents || []);
   const [thumbnail, images, video, documents] = await Promise.all([
-    thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, 'thumbnail') : Promise.resolve(null),
-    resolveAttachmentUrls(imagesArr, 'documents'),
-    resolveAttachmentUrls(videoArr, 'documents'),
-    resolveAttachmentUrls(documentsArr, 'documents'),
+    thumbnailNorm ? resolveAttachmentUrl(thumbnailNorm, 'service_package_thumbnail') : Promise.resolve(null),
+    resolveAttachmentUrls(imagesArr, 'service_package_media'),
+    resolveAttachmentUrls(videoArr, 'service_package_media'),
+    resolveAttachmentUrls(documentsArr, 'service_package_documents'),
   ]);
   return {
     ...pkgRow,
@@ -36,7 +37,22 @@ async function parseServicePackageJsonAsync(pkg: any) {
     packageDescription: pkgRow.package_description || pkgRow.packageDescription || "",
     deliverables: typeof pkgRow.deliverables === "string" ? JSON.parse(pkgRow.deliverables) : pkgRow.deliverables,
     faqs: typeof pkgRow.faqs === "string" ? JSON.parse(pkgRow.faqs) : pkgRow.faqs,
-    links: typeof pkgRow.links === "string" ? JSON.parse(pkgRow.links) : pkgRow.links,
+    links: await (async () => {
+      const raw = typeof pkgRow.links === "string" ? JSON.parse(pkgRow.links) : pkgRow.links;
+      if (!Array.isArray(raw) || raw.length === 0) return raw || [];
+      // Generate redirect URLs for links that don't have one
+      return Promise.all(raw.map(async (link: any) => {
+        if (link?.url && !link.redirect_url) {
+          const redirectUrl = await createRedirectLink(link.url, {
+            entityType: 'service_package',
+            entityId: pkgRow.id,
+            createdBy: pkgRow.user_id
+          });
+          return { url: link.url, redirect_url: redirectUrl };
+        }
+        return link;
+      }));
+    })(),
     requirements: typeof pkgRow.requirements === "string" ? JSON.parse(pkgRow.requirements) : pkgRow.requirements,
     thumbnail,
     images,
@@ -115,6 +131,85 @@ export class ServicePackageService {
   }
 
   /**
+   * Get published service package by ID (public - no auth required)
+   */
+  static async getPublicServicePackage(uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const servicePackage = await prisma.servicePackage.findFirst({
+        where: {
+          unique_id: uniqueId,
+          status: "PUBLISHED",
+        },
+        include: {
+          ...packageRelationInclude,
+          user: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              personalInfo: { select: { profileImage: true } }
+            }
+          },
+        },
+      });
+
+      if (!servicePackage) {
+        return {
+          success: false,
+          message: "Service package not found"
+        };
+      }
+
+      const { user, ...rest } = servicePackage as any;
+      const transformedPackage = await parseServicePackageJsonAsync(rest);
+
+      return {
+        success: true,
+        message: "Service package retrieved successfully",
+        data: {
+          ...transformedPackage,
+          user: {
+            id: user.id,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            profileImage: user.personalInfo?.profileImage || null
+          }
+        }
+      };
+    } catch (error: any) {
+      Log.error("Error", { error });
+      return {
+        success: false,
+        message: "Failed to retrieve service package"
+      };
+    }
+  }
+
+  /**
+   * Process links — create redirect URLs for each link
+   */
+  private static async processLinks(
+    links: any[],
+    entityId?: number,
+    createdBy?: number
+  ): Promise<any[]> {
+    if (!Array.isArray(links) || links.length === 0) return [];
+    return Promise.all(
+      links.map(async (link: any) => {
+        if (link?.url && !link.url.includes('/r/')) {
+          const redirectUrl = await createRedirectLink(link.url, {
+            entityType: 'service_package',
+            entityId,
+            createdBy
+          });
+          return { url: link.url, redirect_url: redirectUrl };
+        }
+        return link;
+      })
+    );
+  }
+
+  /**
    * Create new service package
    */
   static async createServicePackage(userId: number, packageData: any): Promise<ServiceResponse> {
@@ -123,27 +218,34 @@ export class ServicePackageService {
       const normalizedImages = urlsOrPathsToAttachmentIds(packageData.images || [])
       const normalizedVideo = urlsOrPathsToAttachmentIds(packageData.video || [])
       const normalizedDocuments = urlsOrPathsToAttachmentIds(packageData.documents || [])
+      const processedLinks = await this.processLinks(packageData.links || [], undefined, userId)
 
       const newPackage = await prisma.servicePackage.create({
         data: {
           user_id: userId,
           title: packageData.title,
           package_description: packageData.packageDescription || "",
-          expertise_category_id: packageData.categoryId,
-          specialty_id: packageData.subCategoryId,
+          category_id: packageData.categoryId,
+          sub_category_id: packageData.subCategoryId,
           industries: packageData.industry || [],
           skill_ids: packageData.keywords || packageData.skill_ids || [],
           scope: packageData.scope || {},
           deliverables: packageData.deliverables || [],
           requirements: packageData.requirements || [],
           faqs: packageData.faqs || [],
-          links: packageData.links || [],
+          links: processedLinks,
           features: packageData.features || [],
           extra_add_ons: packageData.extraAddOns ?? [],
           thumbnail: normalizedThumbnail,
           images: normalizedImages,
           video: normalizedVideo,
           documents: normalizedDocuments,
+          has_basic: packageData.hasBasic || false,
+          has_standard: packageData.hasStandard || false,
+          has_premium: packageData.hasPremium || false,
+          basic_label: packageData.basicLabel || "Basic",
+          standard_label: packageData.standardLabel || "Standard",
+          premium_label: packageData.premiumLabel || "Premium",
           status: packageData.status || "DRAFT",
         },
         include: packageRelationInclude,
@@ -189,27 +291,34 @@ export class ServicePackageService {
       const normalizedImages = urlsOrPathsToAttachmentIds(packageData.images || [])
       const normalizedVideo = urlsOrPathsToAttachmentIds(packageData.video || [])
       const normalizedDocuments = urlsOrPathsToAttachmentIds(packageData.documents || [])
+      const processedLinks = await this.processLinks(packageData.links || [], existingPackage.id, userId)
 
       const updatedPackage = await prisma.servicePackage.update({
         where: { id: existingPackage.id },
         data: {
           title: packageData.title,
           package_description: packageData.packageDescription || "",
-          expertise_category_id: packageData.categoryId,
-          specialty_id: packageData.subCategoryId,
+          category_id: packageData.categoryId,
+          sub_category_id: packageData.subCategoryId,
           industries: packageData.industry || [],
           skill_ids: packageData.keywords || packageData.skill_ids || [],
           scope: packageData.scope || {},
           deliverables: packageData.deliverables || [],
           requirements: packageData.requirements || [],
           faqs: packageData.faqs || [],
-          links: packageData.links || [],
+          links: processedLinks,
           features: packageData.features || [],
           extra_add_ons: packageData.extraAddOns ?? [],
           thumbnail: normalizedThumbnail,
           images: normalizedImages,
           video: normalizedVideo,
           documents: normalizedDocuments,
+          has_basic: packageData.hasBasic ?? existingPackage.has_basic,
+          has_standard: packageData.hasStandard ?? existingPackage.has_standard,
+          has_premium: packageData.hasPremium ?? existingPackage.has_premium,
+          basic_label: packageData.basicLabel || existingPackage.basic_label || "Basic",
+          standard_label: packageData.standardLabel || existingPackage.standard_label || "Standard",
+          premium_label: packageData.premiumLabel || existingPackage.premium_label || "Premium",
           status: packageData.status || existingPackage.status,
         },
         include: packageRelationInclude,

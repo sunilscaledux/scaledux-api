@@ -6,23 +6,31 @@ export const createServicePackageSchema = Joi.object({
     'string.min': 'Title must be at least 1 character',
     'string.max': 'Title must not exceed 200 characters'
   }),
-  category: Joi.string().required().messages({
-    'string.empty': 'Category is required'
+  categoryId: Joi.number().integer().positive().required().messages({
+    'number.base': 'Category is required',
+    'any.required': 'Category is required'
   }),
-  subCategory: Joi.string().required().messages({
-    'string.empty': 'Sub-category is required'
-  }),
+  subCategoryId: Joi.number().integer().positive().optional().allow(null),
   features: Joi.array().items(Joi.string()).default([]),
   industry: Joi.array().items(Joi.string()).default([]),
   keywords: Joi.array().items(Joi.string()).default([]),
   scope: Joi.object().default({}),
+  extraAddOns: Joi.alternatives().try(Joi.array(), Joi.any()).optional().allow(null),
   hasBasic: Joi.boolean().default(false),
   hasStandard: Joi.boolean().default(false),
   hasPremium: Joi.boolean().default(false),
+  basicLabel: Joi.string().optional().allow('').max(50).default('Basic'),
+  standardLabel: Joi.string().optional().allow('').max(50).default('Standard'),
+  premiumLabel: Joi.string().optional().allow('').max(50).default('Premium'),
+  packageDescription: Joi.string().optional().allow('').default(''),
   deliverables: Joi.array().default([]),
   faqs: Joi.array().default([]),
   links: Joi.array().default([]),
   requirements: Joi.array().default([]),
+  thumbnail: Joi.alternatives().try(Joi.string().allow(null, ''), Joi.array()).optional().allow(null),
+  images: Joi.array().items(Joi.string()).optional().default([]),
+  video: Joi.array().items(Joi.string()).optional().default([]),
+  documents: Joi.array().items(Joi.string()).optional().default([]),
   status: Joi.string().valid('DRAFT', 'PUBLISHED', 'PAUSED').default('DRAFT')
 })
 
@@ -31,18 +39,27 @@ export const updateServicePackageSchema = Joi.object({
     'string.min': 'Title must be at least 1 character',
     'string.max': 'Title must not exceed 200 characters'
   }),
-  category: Joi.string(),
-  subCategory: Joi.string(),
+  categoryId: Joi.number().integer().positive().optional(),
+  subCategoryId: Joi.number().integer().positive().optional().allow(null),
   features: Joi.array().items(Joi.string()),
   industry: Joi.array().items(Joi.string()),
   keywords: Joi.array().items(Joi.string()),
   scope: Joi.object(),
+  extraAddOns: Joi.alternatives().try(Joi.array(), Joi.any()).optional().allow(null),
   hasBasic: Joi.boolean(),
   hasStandard: Joi.boolean(),
   hasPremium: Joi.boolean(),
+  basicLabel: Joi.string().optional().allow('').max(50),
+  standardLabel: Joi.string().optional().allow('').max(50),
+  premiumLabel: Joi.string().optional().allow('').max(50),
+  packageDescription: Joi.string().optional().allow(''),
   deliverables: Joi.array(),
   faqs: Joi.array(),
   links: Joi.array(),
   requirements: Joi.array(),
+  thumbnail: Joi.alternatives().try(Joi.string().allow(null, ''), Joi.array()).optional().allow(null),
+  images: Joi.array().items(Joi.string()).optional(),
+  video: Joi.array().items(Joi.string()).optional(),
+  documents: Joi.array().items(Joi.string()).optional(),
   status: Joi.string().valid('DRAFT', 'PUBLISHED', 'PAUSED')
 })

@@ -50,6 +50,26 @@ export async function getServicePackageById(req: Request, res: Response) {
 }
 
 /**
+ * Get published service package by ID (public)
+ */
+export async function getPublicServicePackage(req: Request, res: Response) {
+  const id = getStringParam(req.params.id);
+
+  if (!id) {
+    return ApiResponse.error(res, "Service package ID is required", 400);
+  }
+
+  const result = await ServicePackageService.getPublicServicePackage(id);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message === "Service package not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Create new service package
  */
 export async function createServicePackage(req: Request, res: Response) {

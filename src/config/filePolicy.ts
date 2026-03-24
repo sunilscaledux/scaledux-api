@@ -23,7 +23,7 @@ const policy: Record<string, FileVisibility> = {
   target_market_document: 'private',
   traction_document: 'private',
   service_package_thumbnail: 'public',
-  service_package_documents: 'private',
+  service_package_documents: 'public',
   service_package_media: 'public',
   proposal_attachments: 'private',
   proposal_nda: 'private',
