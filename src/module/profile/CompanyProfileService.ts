@@ -4,6 +4,7 @@ import { ulid } from 'ulid';
 import { getDisplayName } from '@utils/General';
 import { Log } from '@services/loggerService';
 import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 
 /**
@@ -779,25 +780,40 @@ export class CompanyProfileService {
         return { success: false, message: 'Company profile not found' };
       }
 
-      const capTableFileUrl = profile.cap_table_file
-        ? await resolveAttachmentUrl(profile.cap_table_file, 'company_traction_document')
-        : null;
+      const [capTableFileUrl, foundersVideoRedirect, capTableUrlRedirect, productDemoRedirect] = await Promise.all([
+        profile.cap_table_file ? resolveAttachmentUrl(profile.cap_table_file, 'company_cap_table') : Promise.resolve(null),
+        this.createPitchDeckRedirect(profile.founders_video_url, 'pitch_deck_video', userId),
+        this.createPitchDeckRedirect(profile.cap_table_url, 'pitch_deck_cap_table', userId),
+        this.createPitchDeckRedirect(profile.product_demo_url, 'pitch_deck_demo', userId),
+      ]);
 
       return {
         success: true,
         message: 'Pitch deck retrieved successfully',
         data: {
           founders_video_url: profile.founders_video_url,
+          founders_video_redirect: foundersVideoRedirect,
           cap_table_url: profile.cap_table_url,
+          cap_table_url_redirect: capTableUrlRedirect,
           cap_table_file: capTableFileUrl,
           cap_table_file_id: profile.cap_table_file,
-          product_demo_url: profile.product_demo_url
+          product_demo_url: profile.product_demo_url,
+          product_demo_redirect: productDemoRedirect
         }
       };
     } catch (error: any) {
       Log.error("Error", { error });
       return { success: false, message: 'Failed to retrieve pitch deck' };
     }
+  }
+
+  /**
+   * Helper to create redirect link for a URL if it doesn't already have one
+   */
+  private static async createPitchDeckRedirect(url: string | null | undefined, entityType: string, userId: number): Promise<string | null> {
+    if (!url?.trim()) return null;
+    if (url.includes('/r/')) return url; // Already a redirect link
+    return createRedirectLink(url, { entityType, createdBy: userId });
   }
 
   /**
@@ -810,6 +826,13 @@ export class CompanyProfileService {
     product_demo_url?: string;
   }): Promise<ServiceResponse> {
     try {
+      // Create redirect links for URLs
+      const [foundersVideoRedirect, capTableUrlRedirect, productDemoRedirect] = await Promise.all([
+        this.createPitchDeckRedirect(data.founders_video_url, 'pitch_deck_video', userId),
+        this.createPitchDeckRedirect(data.cap_table_url, 'pitch_deck_cap_table', userId),
+        this.createPitchDeckRedirect(data.product_demo_url, 'pitch_deck_demo', userId),
+      ]);
+
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
         update: {
@@ -829,7 +852,7 @@ export class CompanyProfileService {
       });
 
       const capTableFileUrl = profile.cap_table_file
-        ? await resolveAttachmentUrl(profile.cap_table_file, 'company_traction_document')
+        ? await resolveAttachmentUrl(profile.cap_table_file, 'company_cap_table')
         : null;
 
       return {
@@ -837,10 +860,13 @@ export class CompanyProfileService {
         message: 'Pitch deck updated successfully',
         data: {
           founders_video_url: profile.founders_video_url,
+          founders_video_redirect: foundersVideoRedirect,
           cap_table_url: profile.cap_table_url,
+          cap_table_url_redirect: capTableUrlRedirect,
           cap_table_file: capTableFileUrl,
           cap_table_file_id: profile.cap_table_file,
-          product_demo_url: profile.product_demo_url
+          product_demo_url: profile.product_demo_url,
+          product_demo_redirect: productDemoRedirect
         }
       };
     } catch (error: any) {

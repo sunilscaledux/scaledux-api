@@ -18,6 +18,7 @@ const policy: Record<string, FileVisibility> = {
   company_profile_image: 'public',
   company_cover_image: 'public',
   company_traction_document: 'private',
+  company_cap_table: 'public',
   team_member_profile_image: 'public',
   investment_portfolio_logo: 'public',
   target_market_document: 'private',
