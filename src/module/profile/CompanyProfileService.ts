@@ -810,18 +810,13 @@ export class CompanyProfileService {
     }
   }
 
-  /**
-   * Helper to create redirect link for a URL if it doesn't already have one
-   */
+
   private static async createPitchDeckRedirect(url: string | null | undefined, entityType: string, userId: number): Promise<string | null> {
     if (!url?.trim()) return null;
     if (url.includes('/r/')) return url; // Already a redirect link
     return createRedirectLink(url, { entityType, createdBy: userId });
   }
 
-  /**
-   * Update pitch deck
-   */
   static async updatePitchDeck(userId: number, data: {
     founders_video_url?: string;
     cap_table_url?: string;
