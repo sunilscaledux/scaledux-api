@@ -89,6 +89,7 @@ export class CompanyProfileService {
         // Traction
         traction_title: profile.traction_title,
         traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
+        traction_document_id: profile.traction_document || null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -204,6 +205,7 @@ export class CompanyProfileService {
         solution_statement: profile.solution_statement,
         traction_title: profile.traction_title,
         traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
+        traction_document_id: profile.traction_document || null,
         funding_status: profile.funding_status,
         total_funding: totalFundingNum,
         fundingRounds,
@@ -428,6 +430,7 @@ export class CompanyProfileService {
         // Traction
         traction_title: profile.traction_title,
         traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
+        traction_document_id: profile.traction_document || null,
         
         // Funding
         funding_status: profile.funding_status,
@@ -919,6 +922,7 @@ export class CompanyProfileService {
         data: {
           traction_title: profile.traction_title,
           traction_document: profile.traction_document ? await resolveAttachmentUrl(profile.traction_document, 'traction_document') : null,
+        traction_document_id: profile.traction_document || null,
         },
       };
     } catch (error: any) {
