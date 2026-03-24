@@ -780,12 +780,15 @@ export class CompanyProfileService {
         return { success: false, message: 'Company profile not found' };
       }
 
-      const [capTableFileUrl, foundersVideoRedirect, capTableUrlRedirect, productDemoRedirect] = await Promise.all([
+      const [capTableFileResolved, foundersVideoRedirect, capTableUrlRedirect, productDemoRedirect] = await Promise.all([
         profile.cap_table_file ? resolveAttachmentUrl(profile.cap_table_file, 'company_cap_table') : Promise.resolve(null),
         this.createPitchDeckRedirect(profile.founders_video_url, 'pitch_deck_video', userId),
         this.createPitchDeckRedirect(profile.cap_table_url, 'pitch_deck_cap_table', userId),
         this.createPitchDeckRedirect(profile.product_demo_url, 'pitch_deck_demo', userId),
       ]);
+
+      // If attachment resolution failed but we have the raw value, keep it
+      const capTableFileUrl = capTableFileResolved || (profile.cap_table_file?.startsWith('http') ? profile.cap_table_file : null);
 
       return {
         success: true,
@@ -851,9 +854,10 @@ export class CompanyProfileService {
         }
       });
 
-      const capTableFileUrl = profile.cap_table_file
+      const capTableFileResolved = profile.cap_table_file
         ? await resolveAttachmentUrl(profile.cap_table_file, 'company_cap_table')
         : null;
+      const capTableFileUrl = capTableFileResolved || (profile.cap_table_file?.startsWith('http') ? profile.cap_table_file : null);
 
       return {
         success: true,
