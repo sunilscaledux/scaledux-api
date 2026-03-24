@@ -63,7 +63,7 @@ async function parseServicePackageJsonAsync(pkg: any) {
 
 export class ServicePackageService {
   /**
-   * Get all service packages for authenticated user
+   * Get all service packages for authenticated user (card-level data only)
    */
   static async getUserServicePackages(userId: number, status?: string): Promise<ServiceResponse> {
     try {
@@ -75,10 +75,65 @@ export class ServicePackageService {
       const packages = await prisma.servicePackage.findMany({
         where: whereClause,
         orderBy: { created_at: "desc" },
-        include: packageRelationInclude,
+        select: {
+          id: true,
+          unique_id: true,
+          title: true,
+          thumbnail: true,
+          images: true,
+          scope: true,
+          skill_ids: true,
+          has_basic: true,
+          has_standard: true,
+          has_premium: true,
+          status: true,
+          created_at: true,
+          category: { select: { id: true, name: true } },
+          subcategory: { select: { id: true, name: true } },
+          user: {
+            select: {
+              id: true,
+              unique_id: true,
+              first_name: true,
+              last_name: true,
+              personalInfo: { select: { profileImage: true } }
+            }
+          }
+        },
       });
 
-      const transformedPackages = await Promise.all(packages.map(parseServicePackageJsonAsync));
+      const transformedPackages = await Promise.all(packages.map(async (pkg: any) => {
+        const thumbnailId = Array.isArray(pkg.thumbnail) ? pkg.thumbnail[0] : pkg.thumbnail;
+        const imagesArr = typeof pkg.images === "string" ? JSON.parse(pkg.images) : (pkg.images || []);
+        const [thumbnail, images] = await Promise.all([
+          thumbnailId ? resolveAttachmentUrl(thumbnailId, 'service_package_thumbnail') : Promise.resolve(null),
+          resolveAttachmentUrls(imagesArr.slice(0, 1), 'service_package_media'),
+        ]);
+
+        return {
+          id: pkg.id,
+          unique_id: pkg.unique_id,
+          title: pkg.title,
+          thumbnail,
+          images,
+          scope: typeof pkg.scope === "string" ? JSON.parse(pkg.scope) : pkg.scope,
+          keywords: Array.isArray(pkg.skill_ids) ? pkg.skill_ids : (typeof pkg.skill_ids === "string" ? JSON.parse(pkg.skill_ids || "[]") : []),
+          has_basic: pkg.has_basic,
+          has_standard: pkg.has_standard,
+          has_premium: pkg.has_premium,
+          status: pkg.status,
+          created_at: pkg.created_at,
+          category: pkg.category ?? null,
+          subCategory: pkg.subcategory ?? null,
+          user: {
+            id: pkg.user.id,
+            uniqueId: pkg.user.unique_id,
+            firstName: pkg.user.first_name,
+            lastName: pkg.user.last_name,
+            profileImage: pkg.user.personalInfo?.profileImage || null
+          }
+        };
+      }));
 
       return {
         success: true,
@@ -343,6 +398,43 @@ export class ServicePackageService {
   /**
    * Delete service package
    */
+  /**
+   * Duplicate service package
+   */
+  static async duplicateServicePackage(userId: number, uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const existing = await prisma.servicePackage.findFirst({
+        where: { unique_id: uniqueId, user_id: userId },
+      });
+
+      if (!existing) {
+        return { success: false, message: "Service package not found" };
+      }
+
+      const { id, unique_id, created_at, updated_at, ...data } = existing as any;
+
+      const duplicate = await prisma.servicePackage.create({
+        data: {
+          ...data,
+          title: `${data.title} (Copy)`,
+          status: "DRAFT",
+        },
+        include: packageRelationInclude,
+      });
+
+      const transformedPackage = await parseServicePackageJsonAsync(duplicate);
+
+      return {
+        success: true,
+        message: "Service package duplicated successfully",
+        data: transformedPackage
+      };
+    } catch (error: any) {
+      Log.error("Error", { error });
+      return { success: false, message: "Failed to duplicate service package" };
+    }
+  }
+
   static async deleteServicePackage(userId: number, uniqueId: string): Promise<ServiceResponse> {
     try {
       Log.info("🗑️ DELETE SERVICE PACKAGE REQUEST");

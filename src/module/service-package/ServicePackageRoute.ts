@@ -5,7 +5,8 @@ import {
   getPublicServicePackage,
   createServicePackage,
   updateServicePackage,
-  deleteServicePackage
+  deleteServicePackage,
+  duplicateServicePackage
 } from "./ServicePackageController"
 import { uploadFile } from "@module/general/FileController"
 import { authenticateToken } from "@middleware/auth"
@@ -42,6 +43,7 @@ router.post(
 )
 
 router.get("/:id", getServicePackageById)
+router.post("/:id/duplicate", duplicateServicePackage)
 router.put("/:id", updateServicePackage)
 router.delete("/:id", deleteServicePackage)
 

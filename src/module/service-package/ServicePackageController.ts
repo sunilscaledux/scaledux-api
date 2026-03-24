@@ -114,6 +114,31 @@ export async function updateServicePackage(req: Request, res: Response) {
 }
 
 /**
+ * Duplicate service package
+ */
+export async function duplicateServicePackage(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const id = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!id) {
+    return ApiResponse.error(res, "Service package ID is required", 400);
+  }
+
+  const result = await ServicePackageService.duplicateServicePackage(userId, id);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message, 201);
+  } else {
+    const statusCode = result.message === "Service package not found" ? 404 : 500;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Delete service package
  */
 export async function deleteServicePackage(req: Request, res: Response) {
