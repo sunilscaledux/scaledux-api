@@ -309,12 +309,25 @@ export class CompanyProfileController {
   static async uploadTractionDocument(req: Request, res: Response) {
     try {
       const userId = req.user.id;
-      const { traction_title } = req.body;
+      const { traction_title, traction_document } = req.body;
       const file = req.file;
 
-      // Validate that we have at least a file or title
-      if (!file && !traction_title) {
-        return ApiResponse.error(res, 'Either file or title is required', 400);
+      // Validate that we have at least a file, document ID, or title
+      if (!file && !traction_title && !traction_document) {
+        return ApiResponse.error(res, 'Either file, document ID, or title is required', 400);
+      }
+
+      // If attachment ID is provided directly (from MediaUploadV2), update it directly
+      if (traction_document && !file) {
+        const result = await CompanyProfileService.updateTraction(userId, {
+          traction_title: traction_title || undefined,
+          traction_document: traction_document
+        });
+        if (result.success) {
+          return ApiResponse.success(res, result.data, result.message);
+        } else {
+          return ApiResponse.error(res, result.message);
+        }
       }
 
       const attachmentMeta = (req as any).attachmentMeta?.[0];
