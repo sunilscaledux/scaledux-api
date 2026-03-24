@@ -644,30 +644,8 @@ export async function getBusinessModels(req: Request, res: Response) {
 
 export async function getRevenueModels(req: Request, res: Response) {
   try {
-    const cacheKey = "revenue-models";
-    
-    // Try to get from Redis cache first
-    const cachedModels = await redisClient.get(cacheKey)
-    if (cachedModels) {
-      return ApiResponse.success(res, JSON.parse(cachedModels), "Revenue models retrieved successfully")
-    }
-
-    // If not in cache, fetch from database
-    const revenueModels = await prisma.revenueModel.findMany({
-      where: { is_active: true },
-      select: {
-        id: true,
-        name: true,
-        code: true,
-        description: true
-      },
-      orderBy: { name: 'asc' }
-    })
-
-    // Cache for 24 hours
-    await redisClient.setex(cacheKey, 864000, JSON.stringify(revenueModels))
-
-    return ApiResponse.success(res, revenueModels, "Revenue models retrieved successfully")
+    const { REVENUE_MODELS } = await import("../../constants/revenueModels");
+    return ApiResponse.success(res, REVENUE_MODELS, "Revenue models retrieved successfully")
   } catch (error: any) {
     Log.error("Error", { error })
     return ApiResponse.error(res, "Failed to retrieve revenue models")

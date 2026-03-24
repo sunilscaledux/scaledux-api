@@ -8,23 +8,6 @@ import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 
 /**
- * Fetch revenue models with is_primary/is_secondary flags
- */
-async function fetchRevenueModelsWithFlags(
-  ids: number[],
-  primaryId: number | null,
-  secondaryIds: number[]
-) {
-  if (ids.length === 0) return null;
-  const models = await prisma.revenueModel.findMany({ where: { id: { in: ids } } });
-  return models.map((m) => ({
-    ...m,
-    is_primary: m.id === primaryId,
-    is_secondary: secondaryIds.includes(m.id),
-  }));
-}
-
-/**
  * CompanyProfileService
  * Handles all company/founder-specific profile operations
  */
@@ -94,13 +77,7 @@ export class CompanyProfileService {
         
         // Business model
         revenue_description: profile.revenue_description,
-        revenueModels: await fetchRevenueModelsWithFlags(
-          profile.revenue_model_ids,
-          profile.primary_revenue_model_id,
-          profile.secondary_revenue_model_ids
-        ),
-        primary_revenue_model_id: profile.primary_revenue_model_id,
-        secondary_revenue_model_ids: profile.secondary_revenue_model_ids,
+        revenueModels: profile.revenue_models || [],
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
@@ -219,13 +196,7 @@ export class CompanyProfileService {
         company_stage: profile.company_stage,
         team_size: profile.team_size,
         revenue_description: profile.revenue_description,
-        revenueModels: await fetchRevenueModelsWithFlags(
-          profile.revenue_model_ids,
-          profile.primary_revenue_model_id,
-          profile.secondary_revenue_model_ids
-        ),
-        primary_revenue_model_id: profile.primary_revenue_model_id,
-        secondary_revenue_model_ids: profile.secondary_revenue_model_ids,
+        revenueModels: profile.revenue_models || [],
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
@@ -420,12 +391,7 @@ export class CompanyProfileService {
       });
 
 
-      // Fetch revenue models if they exist
-      const revenueModels = await fetchRevenueModelsWithFlags(
-        profile.revenue_model_ids,
-        profile.primary_revenue_model_id,
-        profile.secondary_revenue_model_ids
-      );
+      const revenueModels = profile.revenue_models || [];
 
       // Transform data for response (same structure as getMyProfile)
       const companyDetail = {
@@ -682,29 +648,18 @@ export class CompanyProfileService {
    * Update revenue model
    */
   static async updateRevenueModel(userId: number, data: {
-    revenue_model_ids?: number[] | null;
-    primary_revenue_model_id?: number | null;
-    secondary_revenue_model_ids?: number[] | null;
+    revenue_models?: any[];
     revenue_description?: string | null;
   }): Promise<ServiceResponse> {
     try {
-      // Prepare update data
       const updateData: any = {};
 
       if (data.revenue_description !== undefined) {
         updateData.revenue_description = data.revenue_description;
       }
 
-      if (data.revenue_model_ids !== undefined) {
-        updateData.revenue_model_ids = data.revenue_model_ids || [];
-      }
-
-      if (data.primary_revenue_model_id !== undefined) {
-        updateData.primary_revenue_model_id = data.primary_revenue_model_id;
-      }
-
-      if (data.secondary_revenue_model_ids !== undefined) {
-        updateData.secondary_revenue_model_ids = data.secondary_revenue_model_ids || [];
+      if (data.revenue_models !== undefined) {
+        updateData.revenue_models = data.revenue_models || [];
       }
 
       // Update or create profile
@@ -729,12 +684,7 @@ export class CompanyProfileService {
         },
       });
 
-      // Fetch revenue models if any
-      const revenueModels = await fetchRevenueModelsWithFlags(
-        updatedProfile.revenue_model_ids,
-        updatedProfile.primary_revenue_model_id,
-        updatedProfile.secondary_revenue_model_ids
-      ) || [];
+      const revenueModels = updatedProfile.revenue_models || [];
 
       return {
         success: true,

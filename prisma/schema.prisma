@@ -167,10 +167,8 @@ model CompanyProfile {
   team_size             Int?
   
   // Business model
-  revenue_model_ids           Int[]     @default([])
-  primary_revenue_model_id    Int?
-  secondary_revenue_model_ids Int[]     @default([])
-  revenue_description         String?   @db.Text
+  revenue_models        Json?     // [{ name, is_primary, is_secondary }]
+  revenue_description   String?   @db.Text
   target_market         String?
   problem_statement     String?
   solution_statement    String?
@@ -385,18 +383,6 @@ model BusinessModel {
   updated_at  DateTime @updatedAt
 
   @@map("scd_business_models")
-}
-
-model RevenueModel {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  code        String   @unique
-  description String?
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  @@map("scd_revenue_models")
 }
 
 model TeamRole {
