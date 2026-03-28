@@ -72,8 +72,8 @@ export const createFounderProjectSchema = Joi.object({
   }),
   screeningQuestions: Joi.array().optional().allow(null).items(
     Joi.object({
-      question: Joi.string().required().max(255).messages({
-        'string.max': 'Question must be 255 characters or less'
+      question: Joi.string().required().max(120).messages({
+        'string.max': 'Question must be 120 characters or less'
       })
     })
   ).max(10).optional().allow(null).messages({

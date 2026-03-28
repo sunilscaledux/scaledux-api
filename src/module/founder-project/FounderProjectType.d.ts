@@ -20,6 +20,7 @@ export interface CreateFounderProjectInput {
     earnedAmount: string
     loccation: string
     estimatedHours?: number | null
+    serviceProviderType?: string
   }
   status?: 'DRAFT' | 'PUBLISHED'
 }
@@ -46,6 +47,7 @@ export interface UpdateFounderProjectInput {
     earnedAmount: string
     loccation: string
     estimatedHours?: number | null
+    serviceProviderType?: string
   }
   status?: 'DRAFT' | 'PUBLISHED'
 }

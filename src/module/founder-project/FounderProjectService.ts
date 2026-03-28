@@ -184,7 +184,7 @@ export class FounderProjectService {
         subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
+          ? await resolveAttachmentUrls(project.project_files as string[], 'founder_project_files')
           : [],
         scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`
       };
@@ -378,7 +378,7 @@ export class FounderProjectService {
           subCategory: subcategory,
           budget_currency: currencySymbol,
           project_files: project.project_files
-            ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
+            ? await resolveAttachmentUrls(project.project_files as string[], 'founder_project_files')
             : [],
           scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`,
           is_saved: userId ? (savedByUsers?.length > 0) : false,
@@ -526,15 +526,18 @@ export class FounderProjectService {
       const invitationMessageForViewer = !isOwner && inviteStatus === ProposalStatus.REJECTED ? null : (inviteData?.message || null);
 
       // Transform file URLs and remove relation data from response
-      const { invites, savedByUsers, subcategory, ...projectData } = project as any;
+      const { invites, savedByUsers, subcategory, category: cat, ...projectData } = project as any;
       // Use user's currency symbol if available
       const currencySymbol = (project as any).user?.currency?.symbol || '₹';
       const transformedProject = {
         ...projectData,
+        category_id: projectData.expertise_category_id,
+        sub_category_id: projectData.specialty_id,
+        category: cat,
         subCategory: subcategory,
         budget_currency: currencySymbol,
         project_files: project.project_files
-          ? await resolveAttachmentUrls(project.project_files as string[], 'project_files')
+          ? await resolveAttachmentUrls(project.project_files as string[], 'founder_project_files')
           : [],
         scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`,
         is_saved: isSavedByUser,
@@ -588,7 +591,8 @@ export class FounderProjectService {
             time_requirement: data.advancedPreferences.timeRequirement,
             earned_amount: data.advancedPreferences.earnedAmount,
             location: data.advancedPreferences.loccation,
-            estimated_hours: data.advancedPreferences.estimatedHours ?? null
+            estimated_hours: data.advancedPreferences.estimatedHours ?? null,
+            service_provider_type: data.advancedPreferences.serviceProviderType ?? ''
           },
           status: data.status || 'DRAFT'
         }
@@ -597,13 +601,13 @@ export class FounderProjectService {
       // Transform file URLs for response
       const transformedProject = {
         ...project,
-        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], 'project_files'),
+        project_files: await resolveAttachmentUrls((project.project_files as string[]) || [], 'founder_project_files'),
         scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`
       };
 
       return {
         success: true,
-        message: "Project created successfully",
+        message: data.status === 'DRAFT' ? "Draft saved successfully" : "Project created successfully",
         data: transformedProject
       };
     } catch (error: any) {
@@ -672,7 +676,8 @@ export class FounderProjectService {
           time_requirement: data.advancedPreferences.timeRequirement ?? currentPrefs.time_requirement,
           earned_amount: data.advancedPreferences.earnedAmount ?? currentPrefs.earned_amount,
           location: data.advancedPreferences.loccation ?? currentPrefs.location,
-          estimated_hours: data.advancedPreferences.estimatedHours ?? currentPrefs.estimated_hours ?? null
+          estimated_hours: data.advancedPreferences.estimatedHours ?? currentPrefs.estimated_hours ?? null,
+          service_provider_type: data.advancedPreferences.serviceProviderType ?? currentPrefs.service_provider_type ?? ''
         };
       }
 
@@ -684,7 +689,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...updatedProject,
-        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], 'project_files'),
+        project_files: await resolveAttachmentUrls((updatedProject.project_files as string[]) || [], 'founder_project_files'),
         scaledux_url: `${FRONTEND_URL}/project/${updatedProject.unique_id}`
       };
 
@@ -784,7 +789,7 @@ export class FounderProjectService {
       // Transform file URLs
       const transformedProject = {
         ...duplicatedProject,
-        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], 'project_files'),
+        project_files: await resolveAttachmentUrls((duplicatedProject.project_files as string[]) || [], 'founder_project_files'),
         scaledux_url: `${FRONTEND_URL}/project/${duplicatedProject.unique_id}`
       };
 
