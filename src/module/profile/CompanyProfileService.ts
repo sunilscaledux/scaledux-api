@@ -17,19 +17,23 @@ export class CompanyProfileService {
    */
   static async getMyProfile(userId: number): Promise<ServiceResponse> {
     try {
+      const profileInclude = {
+        user: {
+          include: {
+            currency: true,
+          },
+        },
+        country: true,
+        state: true,
+        branchCountry: true,
+        branchState: true,
+        industry: true,
+        subIndustry: true,
+      };
+
       let profile = await prisma.companyProfile.findUnique({
         where: { user_id: userId },
-        include: {
-          user: {
-            include: {
-              currency: true,
-            },
-          },
-          country: true,
-          state: true,
-          industry: true,
-          subIndustry: true,
-        },
+        include: profileInclude,
       });
 
       // Auto-create profile if it doesn't exist
@@ -39,17 +43,7 @@ export class CompanyProfileService {
             user_id: userId,
             unique_id: ulid(),
           },
-          include: {
-            user: {
-              include: {
-                currency: true,
-              },
-            },
-            country: true,
-            state: true,
-            industry: true,
-            subIndustry: true,
-          },
+          include: profileInclude,
         });
       }
 
@@ -66,6 +60,7 @@ export class CompanyProfileService {
         company_description: profile.company_description,
         company_website: profile.company_website,
         cin: profile.cin ?? null,
+        is_registered: profile.is_registered,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,
@@ -74,14 +69,14 @@ export class CompanyProfileService {
         subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
         team_size: profile.team_size,
-        
+
         // Business model
         revenue_description: profile.revenue_description,
         revenueModels: profile.revenue_models || [],
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
-        
+
         // Traction
         traction_title: profile.traction_title,
         traction_document: profile.traction_document
@@ -89,25 +84,34 @@ export class CompanyProfileService {
             ? profile.traction_document
             : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
           : null,
-        
+
         // Funding
         funding_status: profile.funding_status,
         total_funding: profile.total_funding,
-        
-        // Location
+
+        // Headquarters location
         address: profile.address,
         address_line_2: profile.address_line_2,
         city: profile.city,
         zipCode: profile.zipCode,
-        
-        // Social links
-        links: profile.links,
-        
-        // Relations
         country: profile.country,
         state: profile.state,
+
+        // Branch office
+        is_branch_same_as_hq: profile.is_branch_same_as_hq,
+        branch_address: profile.branch_address,
+        branch_address_line_2: profile.branch_address_line_2,
+        branch_city: profile.branch_city,
+        branch_zipCode: profile.branch_zipCode,
+        branch_country: profile.branchCountry,
+        branch_state: profile.branchState,
+
+        // Social links
+        links: profile.links,
+
+        // Relations
         currency: profile.user.currency,
-        
+
         // User data
         ...getDisplayName(
           profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
@@ -154,6 +158,8 @@ export class CompanyProfileService {
           user: { include: { currency: true } },
           country: true,
           state: true,
+          branchCountry: true,
+          branchState: true,
           industry: true,
           subIndustry: true,
           fundingRounds: {
@@ -187,6 +193,7 @@ export class CompanyProfileService {
         company_description: profile.company_description,
         company_website: profile.company_website,
         cin: profile.cin ?? null,
+        is_registered: profile.is_registered,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,
@@ -209,13 +216,22 @@ export class CompanyProfileService {
         funding_status: profile.funding_status,
         total_funding: totalFundingNum,
         fundingRounds,
+        // Headquarters location
         address: profile.address,
         address_line_2: profile.address_line_2,
         city: profile.city,
         zipCode: profile.zipCode,
-        links: profile.links,
         country: profile.country,
         state: profile.state,
+        // Branch office
+        is_branch_same_as_hq: profile.is_branch_same_as_hq,
+        branch_address: profile.branch_address,
+        branch_address_line_2: profile.branch_address_line_2,
+        branch_city: profile.branch_city,
+        branch_zipCode: profile.branch_zipCode,
+        branch_country: profile.branchCountry,
+        branch_state: profile.branchState,
+        links: profile.links,
         currency: profile.user.currency,
         ...getDisplayName(
           profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
@@ -339,6 +355,7 @@ export class CompanyProfileService {
     company_name?: string;
     company_description?: string;
     cin?: string;
+    is_registered?: boolean;
     company_website?: string;
     founded_year?: number;
     company_size?: string;
@@ -348,6 +365,13 @@ export class CompanyProfileService {
     zipCode?: string;
     country_id?: number;
     state_id?: number;
+    is_branch_same_as_hq?: boolean;
+    branch_address?: string;
+    branch_address_line_2?: string;
+    branch_city?: string;
+    branch_zipCode?: string;
+    branch_country_id?: number;
+    branch_state_id?: number;
   }): Promise<ServiceResponse> {
     try {
       // Normalize company_website: if it doesn't have protocol, prepend https://
@@ -357,6 +381,16 @@ export class CompanyProfileService {
         if (!/^https?:\/\//i.test(website)) {
           profileData.company_website = `https://${website}`;
         }
+      }
+
+      // If branch is same as HQ, copy HQ location to branch fields
+      if (profileData.is_branch_same_as_hq === true) {
+        profileData.branch_address = profileData.address ?? undefined;
+        profileData.branch_address_line_2 = profileData.address_line_2 ?? undefined;
+        profileData.branch_city = profileData.city ?? undefined;
+        profileData.branch_zipCode = profileData.zipCode ?? undefined;
+        profileData.branch_country_id = profileData.country_id ?? undefined;
+        profileData.branch_state_id = profileData.state_id ?? undefined;
       }
 
       // Filter out undefined and NaN so we don't overwrite with invalid values
@@ -385,6 +419,8 @@ export class CompanyProfileService {
           },
           country: true,
           state: true,
+          branchCountry: true,
+          branchState: true,
           industry: true,
           subIndustry: true,
         },
@@ -400,12 +436,13 @@ export class CompanyProfileService {
         profile_type: 'founder',
         profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
         coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
-        
+
         // Company info
         company_name: profile.company_name,
         company_description: profile.company_description,
         company_website: profile.company_website,
         cin: profile.cin ?? null,
+        is_registered: profile.is_registered,
         company_size: profile.company_size,
         founded_year: profile.founded_year,
         industry_id: profile.industry_id,
@@ -414,14 +451,14 @@ export class CompanyProfileService {
         subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
         team_size: profile.team_size,
-        
+
         // Business model
         revenue_description: profile.revenue_description,
         revenueModels: revenueModels,
         target_market: profile.target_market,
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
-        
+
         // Traction
         traction_title: profile.traction_title,
         traction_document: profile.traction_document
@@ -429,25 +466,34 @@ export class CompanyProfileService {
             ? profile.traction_document
             : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
           : null,
-        
+
         // Funding
         funding_status: profile.funding_status,
         total_funding: profile.total_funding,
-        
-        // Location
+
+        // Headquarters location
         address: profile.address,
         address_line_2: profile.address_line_2,
         city: profile.city,
         zipCode: profile.zipCode,
-        
-        // Social links
-        links: profile.links,
-        
-        // Relations
         country: profile.country,
         state: profile.state,
+
+        // Branch office
+        is_branch_same_as_hq: profile.is_branch_same_as_hq,
+        branch_address: profile.branch_address,
+        branch_address_line_2: profile.branch_address_line_2,
+        branch_city: profile.branch_city,
+        branch_zipCode: profile.branch_zipCode,
+        branch_country: profile.branchCountry,
+        branch_state: profile.branchState,
+
+        // Social links
+        links: profile.links,
+
+        // Relations
         currency: profile.user.currency,
-        
+
         // User data
         ...getDisplayName(
           profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },

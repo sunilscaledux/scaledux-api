@@ -181,11 +181,19 @@ model CompanyProfile {
   funding_status        String?
   total_funding         Decimal?  @db.Decimal(15, 2)
   
-  // Location
+  // Location (Headquarters)
+  is_registered         Boolean   @default(false)
   address               String?
   address_line_2        String?
   city                  String?
   zipCode               String?
+
+  // Branch Office
+  is_branch_same_as_hq  Boolean   @default(false)
+  branch_address        String?
+  branch_address_line_2 String?
+  branch_city           String?
+  branch_zipCode        String?
   
   // Pitch deck
   founders_video_url    String?
@@ -199,13 +207,17 @@ model CompanyProfile {
   // Relations
   country_id            Int?
   state_id              Int?
+  branch_country_id     Int?
+  branch_state_id       Int?
   industry_id           Int?
   sub_industry_id       Int?
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
   user                  User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  country               Country?  @relation(fields: [country_id], references: [id])
-  state                 State?    @relation(fields: [state_id], references: [id])
+  country               Country?  @relation("hq_country", fields: [country_id], references: [id])
+  state                 State?    @relation("hq_state", fields: [state_id], references: [id])
+  branchCountry         Country?  @relation("branch_country", fields: [branch_country_id], references: [id])
+  branchState           State?    @relation("branch_state", fields: [branch_state_id], references: [id])
   industry              Industry? @relation(fields: [industry_id], references: [id])
   subIndustry           SubIndustry? @relation(fields: [sub_industry_id], references: [id])
   teamMembers           TeamMember[]
@@ -454,7 +466,8 @@ model Country {
   currency           Currency?           @relation(fields: [currency_id], references: [id])
   states             State[]
   personalInfos      PersonalInfo[]
-  companyProfiles    CompanyProfile[]
+  companyProfiles    CompanyProfile[]    @relation("hq_country")
+  companyBranchProfiles CompanyProfile[] @relation("branch_country")
   investmentProfileGeoPreferences InvestmentProfileGeoPreference[]
 
   @@map("scd_countries")
@@ -469,7 +482,8 @@ model State {
   updated_at         DateTime            @updatedAt
   country            Country             @relation(fields: [country_id], references: [id], onDelete: Cascade)
   personalInfos      PersonalInfo[]
-  companyProfiles    CompanyProfile[]
+  companyProfiles    CompanyProfile[]    @relation("hq_state")
+  companyBranchProfiles CompanyProfile[] @relation("branch_state")
   investmentProfileGeoPreferences InvestmentProfileGeoPreference[]
 
   @@unique([name, country_id])

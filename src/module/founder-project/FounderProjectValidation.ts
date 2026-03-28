@@ -35,9 +35,9 @@ export const createFounderProjectSchema = Joi.object({
     'string.empty': 'Scope of work is required',
     'any.required': 'Scope of work is required'
   }),
-  skillsRequired: Joi.array().items(Joi.string()).min(3).messages({
+  skillsRequired: Joi.array().items(Joi.string()).min(5).messages({
     'array.base': 'Skills required must be an array',
-    'array.min': 'At least 3 skills are required'
+    'array.min': 'At least 5 skills are required'
   }),
   experienceNeeded: Joi.string().required().min(1).messages({
     'string.base': 'Experience needed must be a string',
@@ -50,10 +50,17 @@ export const createFounderProjectSchema = Joi.object({
       'string.empty': 'Currency is required',
       'any.required': 'Currency is required'
     }),
-    amount: Joi.string().required().messages({
+    amount: Joi.string().required().custom((value, helpers) => {
+      const num = parseFloat(value);
+      if (isNaN(num) || num < 500) {
+        return helpers.error('any.invalid');
+      }
+      return value;
+    }).messages({
       'string.base': 'Amount must be a string',
       'string.empty': 'Amount is required',
-      'any.required': 'Amount is required'
+      'any.required': 'Amount is required',
+      'any.invalid': 'Minimum budget should be ₹500'
     })
   }).required().messages({
     'any.required': 'Budget is required'
@@ -65,7 +72,9 @@ export const createFounderProjectSchema = Joi.object({
   }),
   screeningQuestions: Joi.array().optional().allow(null).items(
     Joi.object({
-      question: Joi.string().required()
+      question: Joi.string().required().max(255).messages({
+        'string.max': 'Question must be 255 characters or less'
+      })
     })
   ).max(10).optional().allow(null).messages({
     'array.base': 'Screening questions must be an array',
@@ -94,6 +103,9 @@ export const createFounderProjectSchema = Joi.object({
     }),
     estimatedHours: Joi.number().integer().min(0).optional().allow(null).messages({
       'number.min': 'Estimated hours must be 0 or more'
+    }),
+    serviceProviderType: Joi.string().optional().allow(null).allow('').messages({
+      'string.empty': 'Service provider type is required'
     })
   }).required().messages({
     'any.required': 'Advanced preferences are required'
@@ -143,7 +155,8 @@ export const saveDraftProjectSchema = Joi.object({
     timeRequirement: Joi.string().optional().allow(''),
     earnedAmount: Joi.string().optional().allow(''),
     loccation: Joi.string().optional().allow(''),
-    estimatedHours: Joi.number().integer().min(0).optional().allow(null)
+    estimatedHours: Joi.number().integer().min(0).optional().allow(null),
+    serviceProviderType: Joi.string().optional().allow('')
   }).optional(),
   status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED')
 })
@@ -185,7 +198,7 @@ export const updateFounderProjectSchema = Joi.object({
   }),
   screeningQuestions: Joi.array().items(
     Joi.object({
-      question: Joi.string().required()
+      question: Joi.string().optional().allow('')
     })
   ).optional().allow(null),
   advancedPreferences: Joi.object({
@@ -194,7 +207,8 @@ export const updateFounderProjectSchema = Joi.object({
     timeRequirement: Joi.string().optional().allow(''),
     earnedAmount: Joi.string().optional().allow(''),
     loccation: Joi.string().optional().allow(''),
-    estimatedHours: Joi.number().integer().min(0).optional().allow(null)
+    estimatedHours: Joi.number().integer().min(0).optional().allow(null),
+    serviceProviderType: Joi.string().optional().allow('')
   }).optional(),
   status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED').messages({
     'any.only': 'Status must be either DRAFT or PUBLISHED'

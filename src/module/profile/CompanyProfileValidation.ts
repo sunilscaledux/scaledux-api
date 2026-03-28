@@ -13,6 +13,7 @@ export const updateOverviewSchema = Joi.object({
   cin: Joi.string().optional().allow('', null).max(50).messages({
     'string.max': 'CIN must not exceed 50 characters'
   }),
+  is_registered: Joi.boolean().optional(),
   company_website: Joi.string()
     .optional()
     .allow('', null)
@@ -26,6 +27,7 @@ export const updateOverviewSchema = Joi.object({
     'number.max': 'Founded year cannot be in the future'
   }),
   company_size: Joi.string().optional().allow('', null),
+  // Headquarters location
   address: Joi.string().optional().allow('', null).max(500).messages({
     'string.max': 'Address must not exceed 500 characters'
   }),
@@ -43,6 +45,26 @@ export const updateOverviewSchema = Joi.object({
   }),
   state_id: Joi.number().integer().optional().messages({
     'number.base': 'State must be a valid number'
+  }),
+  // Branch office
+  is_branch_same_as_hq: Joi.boolean().optional(),
+  branch_address: Joi.string().optional().allow('', null).max(500).messages({
+    'string.max': 'Branch address must not exceed 500 characters'
+  }),
+  branch_address_line_2: Joi.string().optional().allow('', null).max(500).messages({
+    'string.max': 'Branch address line 2 must not exceed 500 characters'
+  }),
+  branch_city: Joi.string().optional().allow('', null).max(100).messages({
+    'string.max': 'Branch city must not exceed 100 characters'
+  }),
+  branch_zipCode: Joi.string().optional().allow('', null).max(20).messages({
+    'string.max': 'Branch zip code must not exceed 20 characters'
+  }),
+  branch_country_id: Joi.number().integer().optional().allow(null).messages({
+    'number.base': 'Branch country must be a valid number'
+  }),
+  branch_state_id: Joi.number().integer().optional().allow(null).messages({
+    'number.base': 'Branch state must be a valid number'
   })
 });
 
