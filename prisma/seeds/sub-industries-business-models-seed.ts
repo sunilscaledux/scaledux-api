@@ -434,6 +434,15 @@ export async function seedSubIndustriesAndBusinessModels(prisma: PrismaClient) {
       }
     }
 
+    // Delete sub-industries that are no longer in the new list
+    const allNewSubNames: string[] = Object.values(subIndustriesData).flat()
+    const deletedOldSubs = await prisma.subIndustry.deleteMany({
+      where: { name: { notIn: allNewSubNames } }
+    })
+    if (deletedOldSubs.count > 0) {
+      console.log(`  Deleted ${deletedOldSubs.count} old sub-industries`)
+    }
+
     console.log(`Seeded ${totalSubIndustries} sub-industries across ${industries.length} industries`)
     console.log('Sub-Industries and Business Models seeding completed!')
 

@@ -37,10 +37,55 @@ const industries = [
 export async function seedIndustries(prisma: PrismaClient) {
   console.log('Starting Industries seeding...')
 
+  const newNames = industries.map(i => i.name)
+
+  // Get IDs of old industries to clean up FK references
+  const oldIndustries = await prisma.industry.findMany({
+    where: { name: { notIn: newNames } },
+    select: { id: true }
+  })
+  const oldIds = oldIndustries.map(i => i.id)
+
+  if (oldIds.length > 0) {
+    // Nullify FK references on related tables
+    await prisma.companyProfile.updateMany({
+      where: { industry_id: { in: oldIds } },
+      data: { industry_id: null, sub_industry_id: null }
+    })
+    await (prisma as any).portfolio.updateMany({
+      where: { industry_id: { in: oldIds } },
+      data: { industry_id: null }
+    })
+    await (prisma as any).investorPortfolio.updateMany({
+      where: { industry_id: { in: oldIds } },
+      data: { industry_id: null, sub_industry_id: null }
+    })
+    await (prisma as any).investmentProfilePreferredIndustry.deleteMany({
+      where: { industry_id: { in: oldIds } }
+    })
+
+    // Delete sub-industries of old industries (FK constraint)
+    const deletedSubs = await prisma.subIndustry.deleteMany({
+      where: { industry_id: { in: oldIds } }
+    })
+    if (deletedSubs.count > 0) {
+      console.log(`  Deleted ${deletedSubs.count} old sub-industries`)
+    }
+
+    // Delete old industries
+    const deleted = await prisma.industry.deleteMany({
+      where: { id: { in: oldIds } }
+    })
+    if (deleted.count > 0) {
+      console.log(`  Deleted ${deleted.count} old industries`)
+    }
+  }
+
+  // Upsert new industries
   for (const industry of industries) {
     await prisma.industry.upsert({
       where: { name: industry.name },
-      update: { description: industry.description },
+      update: { description: industry.description, is_active: true },
       create: industry
     })
     console.log(`  Created/Updated industry: ${industry.name}`)
