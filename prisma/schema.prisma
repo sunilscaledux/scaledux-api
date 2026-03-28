@@ -784,15 +784,15 @@ model FounderProject {
   unique_id             String    @unique @default(cuid())
   user_id               Int
   project_title         String    @db.VarChar(50)
-  project_description   String    @db.Text
-  expertise_category_id Int
+  project_description   String?   @db.Text
+  expertise_category_id Int?
   specialty_id          Int?
   project_files         Json      @default("[]")
-  scope_of_work         String    @db.Text
-  skills_required       Json
-  experience_needed     String    @db.VarChar(50)
-  budget_currency       String    @db.VarChar(10)
-  budget_amount         String    @db.VarChar(20)
+  scope_of_work         String?   @db.Text
+  skills_required       Json      @default("[]")
+  experience_needed     String?   @db.VarChar(50)
+  budget_currency       String?   @db.VarChar(10)
+  budget_amount         String?   @db.VarChar(20)
   is_nda_required       Boolean   @default(false)
   screening_questions   Json      @default("[]")
   advanced_preferences  Json
@@ -806,7 +806,7 @@ model FounderProject {
   updated_at            DateTime  @updatedAt
   
   user        User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  category    Category     @relation(fields: [expertise_category_id], references: [id], onDelete: Restrict)
+  category    Category?    @relation(fields: [expertise_category_id], references: [id], onDelete: Restrict)
   subcategory Subcategory? @relation(fields: [specialty_id], references: [id], onDelete: SetNull)
   invites               ProjectInvite[]
   savedByUsers          SavedProject[]

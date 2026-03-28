@@ -153,11 +153,11 @@ export async function saveDraft(req: Request, res: Response) {
     return ApiResponse.joiValidationError(res, error);
   }
 
-  // Draft requires title, description, category, subcategory (validated by schema); fill defaults for other fields
+  // Draft only requires title; fill defaults for other fields
   const draftData: CreateFounderProjectInput = {
     projectTitle: value.projectTitle,
-    projectDescription: value.projectDescription,
-    categoryId: value.categoryId,
+    projectDescription: value.projectDescription || '',
+    categoryId: value.categoryId || null,
     subCategoryId: value.subCategoryId ?? null,
     projectFiles: value.projectFiles ?? [],
     scopeOfWork: value.scopeOfWork ?? '',

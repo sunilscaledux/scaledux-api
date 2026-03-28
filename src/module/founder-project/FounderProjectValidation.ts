@@ -115,24 +115,16 @@ export const createFounderProjectSchema = Joi.object({
   })
 })
 
-// Draft: title, description, category and subcategory required; rest optional
+// Draft: only title required; everything else optional
 export const saveDraftProjectSchema = Joi.object({
   projectTitle: Joi.string().required().min(1).max(50).messages({
     'string.empty': 'Project title is required',
     'string.min': 'Project title is required',
     'any.required': 'Project title is required'
   }),
-  projectDescription: Joi.string().required().min(1).max(3000).messages({
-    'string.empty': 'Description is required',
-    'string.min': 'Description is required',
-    'any.required': 'Description is required'
-  }),
-  categoryId: Joi.number().integer().positive().required().messages({
-    'any.required': 'Category is required'
-  }),
-  subCategoryId: Joi.number().integer().positive().required().messages({
-    'any.required': 'Sub-category is required'
-  }),
+  projectDescription: Joi.string().optional().allow('').max(3000),
+  categoryId: Joi.number().integer().positive().optional().allow(null),
+  subCategoryId: Joi.number().integer().positive().optional().allow(null),
   projectFiles: Joi.array()
     .items(Joi.alternatives().try(Joi.string(), Joi.object({ url: Joi.string().optional().allow('') })))
     .optional()

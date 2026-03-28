@@ -1,19 +1,19 @@
 export interface CreateFounderProjectInput {
   projectTitle: string
-  projectDescription: string
-  categoryId: number
+  projectDescription?: string
+  categoryId?: number | null
   subCategoryId?: number | null
   projectFiles?: (string | { url: string })[]
-  scopeOfWork: string
-  skillsRequired: string[]
-  experienceNeeded: string
-  budget: {
+  scopeOfWork?: string
+  skillsRequired?: string[]
+  experienceNeeded?: string
+  budget?: {
     currency: string
     amount: string
   }
-  isNdaRequired: string
+  isNdaRequired?: string
   screeningQuestions?: Array<{ question: string }>
-  advancedPreferences: {
+  advancedPreferences?: {
     englishLevel: string
     hireWithin: string
     timeRequirement: string

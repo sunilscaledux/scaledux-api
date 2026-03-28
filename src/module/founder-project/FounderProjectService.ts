@@ -574,18 +574,18 @@ export class FounderProjectService {
         data: {
           user_id: userId,
           project_title: data.projectTitle,
-          project_description: data.projectDescription,
-          expertise_category_id: data.categoryId,
+          project_description: data.projectDescription || null,
+          expertise_category_id: data.categoryId || null,
           specialty_id: data.subCategoryId || null,
           project_files: projectFiles,
-          scope_of_work: data.scopeOfWork,
-          skills_required: data.skillsRequired,
-          experience_needed: data.experienceNeeded,
-          budget_currency: data.budget.currency,
-          budget_amount: data.budget.amount,
+          scope_of_work: data.scopeOfWork || null,
+          skills_required: data.skillsRequired || [],
+          experience_needed: data.experienceNeeded || null,
+          budget_currency: data.budget?.currency || null,
+          budget_amount: data.budget?.amount || null,
           is_nda_required: data.isNdaRequired === 'yes',
           screening_questions: data.screeningQuestions || [],
-          advanced_preferences: {
+          advanced_preferences: data.advancedPreferences ? {
             english_level: data.advancedPreferences.englishLevel,
             hire_within: data.advancedPreferences.hireWithin,
             time_requirement: data.advancedPreferences.timeRequirement,
@@ -593,7 +593,7 @@ export class FounderProjectService {
             location: data.advancedPreferences.loccation,
             estimated_hours: data.advancedPreferences.estimatedHours ?? null,
             service_provider_type: data.advancedPreferences.serviceProviderType ?? ''
-          },
+          } : {},
           status: data.status || 'DRAFT'
         }
       });
