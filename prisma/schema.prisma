@@ -1226,6 +1226,15 @@ model TaxInformation {
   agency_gstin   String?  @db.VarChar(15)
   has_gstin      Boolean  @default(false)
   gstin          String?  @db.VarChar(15)
+  // GSTIN verification
+  individual_gstin_status         String?  @default("PENDING") @db.VarChar(20) // PENDING | IN_REVIEW | VERIFIED | FAILED
+  individual_gstin_verified_at    DateTime?
+  individual_gstin_failure_reason String?  @db.VarChar(500)
+  individual_gstin_api_response   Json?
+  agency_gstin_status             String?  @default("PENDING") @db.VarChar(20)
+  agency_gstin_verified_at        DateTime?
+  agency_gstin_failure_reason     String?  @db.VarChar(500)
+  agency_gstin_api_response       Json?
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 

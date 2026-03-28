@@ -1,6 +1,7 @@
 import * as scheduledTermination from "./scheduledTermination";
 import * as processWithdrawals from "./processWithdrawals";
 import * as verifyBankAccounts from "./verifyBankAccounts";
+import * as verifyGSTIN from "./verifyGSTIN";
 
 export type ScheduledTaskDef = {
   /** Cron expression (e.g. "0 2 * * *" = daily at 2:00 AM) */
@@ -27,5 +28,10 @@ export const tasks: ScheduledTaskDef[] = [
     name: verifyBankAccounts.name,
     schedule: verifyBankAccounts.schedule,
     handle: verifyBankAccounts.handle,
+  },
+  {
+    name: verifyGSTIN.name,
+    schedule: verifyGSTIN.schedule,
+    handle: verifyGSTIN.handle,
   },
 ];

@@ -1,4 +1,5 @@
 import { prisma } from "@services/prismaService";
+import { Prisma } from "@prisma/client";
 import { PaymentMethodInput, TaxInformationInput, RazorpayVerificationInput } from "./BillingType";
 import crypto from "crypto";
 import Razorpay from "razorpay";
@@ -7,6 +8,7 @@ import { appConfig } from "@config/app";
 import { Log } from "@services/loggerService";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
+import { verifyGSTIN, matchAddress } from "@services/idtoaiService";
 import {
   BillingTransactionType,
   BillingTransactionStatus,
@@ -902,6 +904,11 @@ export class BillingService {
       }
     }
 
+    // Check if GSTIN values changed to reset verification status
+    const existing = await prisma.taxInformation.findUnique({ where: { user_id: userIdNum } });
+    const individualGstinChanged = individualGSTIN && individualGSTIN !== existing?.individual_gstin;
+    const agencyGstinChanged = agencyGSTIN && agencyGSTIN !== existing?.agency_gstin;
+
     const taxInfo = await prisma.taxInformation.upsert({
       where: { user_id: userIdNum },
       update: {
@@ -914,6 +921,19 @@ export class BillingService {
         agency_gstin: agencyGSTIN,
         has_gstin: activeHasGSTIN,
         gstin: activeGSTIN,
+        // Set GSTIN verification to IN_REVIEW when a new GSTIN is submitted
+        ...(individualGstinChanged ? {
+          individual_gstin_status: individualGSTIN ? 'IN_REVIEW' : 'PENDING',
+          individual_gstin_verified_at: null,
+          individual_gstin_failure_reason: null,
+          individual_gstin_api_response: Prisma.DbNull,
+        } : {}),
+        ...(agencyGstinChanged ? {
+          agency_gstin_status: agencyGSTIN ? 'IN_REVIEW' : 'PENDING',
+          agency_gstin_verified_at: null,
+          agency_gstin_failure_reason: null,
+          agency_gstin_api_response: Prisma.DbNull,
+        } : {}),
         updated_at: new Date()
       },
       create: {
@@ -926,7 +946,9 @@ export class BillingService {
         agency_pan: agencyPAN,
         agency_gstin: agencyGSTIN,
         has_gstin: activeHasGSTIN,
-        gstin: activeGSTIN
+        gstin: activeGSTIN,
+        individual_gstin_status: individualGSTIN ? 'IN_REVIEW' : 'PENDING',
+        agency_gstin_status: agencyGSTIN ? 'IN_REVIEW' : 'PENDING',
       }
     });
 
@@ -940,9 +962,13 @@ export class BillingService {
         individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
         individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
         individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
+        individualGstinStatus: taxInfo.individual_gstin_status || 'PENDING',
+        individualGstinFailureReason: taxInfo.individual_gstin_failure_reason || null,
         agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
         agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
-        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : '')
+        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : ''),
+        agencyGstinStatus: taxInfo.agency_gstin_status || 'PENDING',
+        agencyGstinFailureReason: taxInfo.agency_gstin_failure_reason || null,
       }
     };
   }
@@ -970,9 +996,13 @@ export class BillingService {
         individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
         individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
         individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
+        individualGstinStatus: taxInfo.individual_gstin_status || 'PENDING',
+        individualGstinFailureReason: taxInfo.individual_gstin_failure_reason || null,
         agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
         agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
-        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : '')
+        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : ''),
+        agencyGstinStatus: taxInfo.agency_gstin_status || 'PENDING',
+        agencyGstinFailureReason: taxInfo.agency_gstin_failure_reason || null,
       }
     };
   }
@@ -1756,6 +1786,161 @@ export class BillingService {
     }
 
     return { success: true, data: base };
+  }
+
+  /**
+   * Cron job: Verify pending GSTIN numbers via IDtoAI API.
+   * Picks up TaxInformation rows with individual_gstin_status or agency_gstin_status = 'IN_REVIEW',
+   * calls the IDtoAI API, checks address match, and updates status.
+   */
+  static async verifyPendingGSTINs(): Promise<{ verified: number; failed: number; errors: string[] }> {
+    const result = { verified: 0, failed: 0, errors: [] as string[] };
+
+    try {
+      // Find all tax records with GSTIN pending verification
+      const pendingRecords = await prisma.taxInformation.findMany({
+        where: {
+          OR: [
+            { individual_gstin_status: 'IN_REVIEW', individual_gstin: { not: null } },
+            { agency_gstin_status: 'IN_REVIEW', agency_gstin: { not: null } },
+          ]
+        }
+      });
+
+      for (const record of pendingRecords) {
+        const taxResidence = record.tax_residence as { city?: string; zipCode?: string; state?: string } | null;
+
+        // Verify individual GSTIN
+        if (record.individual_gstin_status === 'IN_REVIEW' && record.individual_gstin) {
+          try {
+            const apiResult = await verifyGSTIN(record.individual_gstin);
+
+            if (!apiResult.success) {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  individual_gstin_status: 'FAILED',
+                  individual_gstin_failure_reason: apiResult.error || 'Verification API error',
+                  individual_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            // Check registration status
+            if (apiResult.current_registration_status !== 'Active') {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  individual_gstin_status: 'FAILED',
+                  individual_gstin_failure_reason: `GSTIN registration is not active (status: ${apiResult.current_registration_status})`,
+                  individual_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            // Check address match
+            const addressCheck = matchAddress(apiResult.primary_business_address, taxResidence || {});
+            if (!addressCheck.matches) {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  individual_gstin_status: 'FAILED',
+                  individual_gstin_failure_reason: `Address mismatch: ${addressCheck.reason}`,
+                  individual_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            // All checks passed
+            await prisma.taxInformation.update({
+              where: { id: record.id },
+              data: {
+                individual_gstin_status: 'VERIFIED',
+                individual_gstin_verified_at: new Date(),
+                individual_gstin_failure_reason: null,
+                individual_gstin_api_response: apiResult.raw || null,
+              }
+            });
+            result.verified++;
+          } catch (err: any) {
+            result.errors.push(`Individual GSTIN ${record.individual_gstin}: ${err.message}`);
+            result.failed++;
+          }
+        }
+
+        // Verify agency GSTIN
+        if (record.agency_gstin_status === 'IN_REVIEW' && record.agency_gstin) {
+          try {
+            const apiResult = await verifyGSTIN(record.agency_gstin);
+
+            if (!apiResult.success) {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  agency_gstin_status: 'FAILED',
+                  agency_gstin_failure_reason: apiResult.error || 'Verification API error',
+                  agency_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            if (apiResult.current_registration_status !== 'Active') {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  agency_gstin_status: 'FAILED',
+                  agency_gstin_failure_reason: `GSTIN registration is not active (status: ${apiResult.current_registration_status})`,
+                  agency_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            const addressCheck = matchAddress(apiResult.primary_business_address, taxResidence || {});
+            if (!addressCheck.matches) {
+              await prisma.taxInformation.update({
+                where: { id: record.id },
+                data: {
+                  agency_gstin_status: 'FAILED',
+                  agency_gstin_failure_reason: `Address mismatch: ${addressCheck.reason}`,
+                  agency_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+                }
+              });
+              result.failed++;
+              continue;
+            }
+
+            await prisma.taxInformation.update({
+              where: { id: record.id },
+              data: {
+                agency_gstin_status: 'VERIFIED',
+                agency_gstin_verified_at: new Date(),
+                agency_gstin_failure_reason: null,
+                agency_gstin_api_response: apiResult.raw ?? Prisma.DbNull,
+              }
+            });
+            result.verified++;
+          } catch (err: any) {
+            result.errors.push(`Agency GSTIN ${record.agency_gstin}: ${err.message}`);
+            result.failed++;
+          }
+        }
+      }
+    } catch (error: any) {
+      Log.error("[verify-gstin] Fatal error", { error: error.message });
+      result.errors.push(error.message);
+    }
+
+    return result;
   }
 
 }
