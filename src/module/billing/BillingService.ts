@@ -8,7 +8,7 @@ import { appConfig } from "@config/app";
 import { Log } from "@services/loggerService";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
-import { verifyGSTIN, matchAddress } from "@services/idtoaiService";
+import { verifyGSTIN, matchAddress, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 import {
   BillingTransactionType,
   BillingTransactionStatus,
@@ -1795,6 +1795,11 @@ export class BillingService {
    */
   static async verifyPendingGSTINs(): Promise<{ verified: number; failed: number; errors: string[] }> {
     const result = { verified: 0, failed: 0, errors: [] as string[] };
+
+    // Skip entirely if IDtoAI API is not configured — leave records as IN_REVIEW
+    if (!isIdtoaiConfigured()) {
+      return result;
+    }
 
     try {
       // Find all tax records with GSTIN pending verification

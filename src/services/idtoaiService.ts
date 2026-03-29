@@ -36,9 +36,14 @@ export interface GSTVerificationResponse {
 /**
  * Verify a GSTIN number using IDtoAI basic GST verification API.
  */
+/** Returns true if IDtoAI API credentials are configured. */
+export function isConfigured(): boolean {
+  return !!(IDTOAI_API_KEY && IDTOAI_CLIENT_ID);
+}
+
 export async function verifyGSTIN(gstNumber: string): Promise<GSTVerificationResponse> {
-  if (!IDTOAI_API_KEY || !IDTOAI_CLIENT_ID) {
-    Log.warn("[idtoai] Missing IDTOAI_API_KEY or IDTOAI_CLIENT_ID env vars");
+  if (!isConfigured()) {
+    Log.warn("[idtoai] Missing IDTOAI_API_KEY or IDTOAI_CLIENT_ID env vars — skipping");
     return { success: false, error: "GSTIN verification service not configured" };
   }
 
@@ -94,14 +99,12 @@ export function matchAddress(
 
   const reasons: string[] = [];
 
-  // Compare PIN code (most reliable)
   const gstPin = (gstAddress.pin || "").trim();
   const userPin = (taxResidence.zipCode || "").trim();
   if (gstPin && userPin && gstPin !== userPin) {
     reasons.push(`PIN code mismatch: GSTIN has ${gstPin}, user entered ${userPin}`);
   }
 
-  // Compare city (case-insensitive, fuzzy)
   const gstCity = (gstAddress.city || gstAddress.district || "").trim().toLowerCase();
   const userCity = (taxResidence.city || "").trim().toLowerCase();
   if (gstCity && userCity && !gstCity.includes(userCity) && !userCity.includes(gstCity)) {

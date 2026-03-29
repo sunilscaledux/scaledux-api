@@ -7,9 +7,6 @@ import {
   getLanguagesByCountry,
   getCurrencies,
   getCountriesWithCurrencies,
-  warmLocationCache,
-  invalidateLocationCache,
-  invalidateCache,
   getExpertiseCategories,
   getSpecialtiesByCategory,
   getSkillsByCategory,
@@ -54,8 +51,5 @@ router.get("/id-types", getIdTypes)
 
 router.get("/skills/search", searchSkills)
 router.get("/skills", getAllSkills)
-
-router.post("/cache/warm", warmLocationCache)
-router.get("/cache/invalidate", invalidateCache)
 
 export default router
