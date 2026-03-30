@@ -7,7 +7,7 @@ services:
     container_name: scaledux-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5430:5432"
     environment:
       POSTGRES_PASSWORD: 12345678
       POSTGRES_USER: postgres
@@ -101,6 +101,8 @@ services:
       - scaledux_api_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      LOG_CHANNEL: stack
     depends_on:
       app: { condition: service_started }
 

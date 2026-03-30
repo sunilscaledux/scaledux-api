@@ -60,16 +60,21 @@ export const saveTaxInformationSchema = Joi.object<TaxInformationInput>({
     zipCode: Joi.string().required()
   }).required(),
   activeTab: Joi.string().valid('INDIVIDUAL', 'AGENCY').required(),
+  individualName: Joi.string().max(200).optional().allow(''),
   individualPAN: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i).optional().allow(''),
   individualHasGSTIN: Joi.boolean().required(),
   individualGSTIN: Joi.string().pattern(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i).optional().allow(''),
   individualGSTConsent: Joi.boolean().optional(),
+  agencyName: Joi.string().max(200).optional().allow(''),
   agencyPAN: Joi.string().pattern(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i).optional().allow(''),
   agencyHasGSTIN: Joi.boolean().required(),
   agencyGSTIN: Joi.string().pattern(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i).optional().allow(''),
   agencyGSTConsent: Joi.boolean().optional()
 }).custom((value, helpers) => {
   if (value.activeTab === 'INDIVIDUAL') {
+    if (!value.individualName?.trim()) {
+      return helpers.message({ custom: 'Full name is required' });
+    }
     if (!value.individualPAN) {
       return helpers.message({ custom: 'Individual PAN number is required' });
     }
@@ -79,6 +84,9 @@ export const saveTaxInformationSchema = Joi.object<TaxInformationInput>({
   }
 
   if (value.activeTab === 'AGENCY') {
+    if (!value.agencyName?.trim()) {
+      return helpers.message({ custom: 'Company / Agency name is required' });
+    }
     if (!value.agencyPAN) {
       return helpers.message({ custom: 'Agency PAN number is required' });
     }

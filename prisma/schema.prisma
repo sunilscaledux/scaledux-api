@@ -1220,8 +1220,10 @@ model TaxInformation {
   tax_residence  Json
   entity_type    String   @default("INDIVIDUAL")
   pan_number     String?  @db.VarChar(10)
+  individual_name String? @db.VarChar(200)
   individual_pan String?  @db.VarChar(10)
   individual_gstin String? @db.VarChar(15)
+  agency_name    String?  @db.VarChar(200)
   agency_pan     String?  @db.VarChar(10)
   agency_gstin   String?  @db.VarChar(15)
   has_gstin      Boolean  @default(false)

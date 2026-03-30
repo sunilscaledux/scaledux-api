@@ -15,41 +15,32 @@ export interface LogChannelConfig {
   driver: 'single' | 'daily' | 'console' | 'stack';
   level?: LogLevel;
   path?: string;
-  /** For daily: max days to keep (e.g. 14). */
   days?: number;
-  /** For stack: channel names to combine. */
   channels?: string[];
 }
 
 export const loggingConfig = {
-  /** Default channel name (e.g. 'stack', 'single', 'daily'). */
   default: LOG_CHANNEL,
 
-  /** Default minimum level. */
   level: LOG_LEVEL as LogLevel,
 
-  /** Directory for log files. */
   path: LOG_PATH,
 
-  /** Days to keep when using daily channel. */
   days: LOG_DAYS,
 
   channels: {
-    /** Combine multiple channels (e.g. write to file + console). */
     stack: {
       driver: 'stack' as const,
-      channels: ['single', 'console'],
+      channels: ['daily', 'console'],
       level: LOG_LEVEL as LogLevel
     },
 
-    /** Single file (e.g. storage/logs/app.log). */
     single: {
       driver: 'single' as const,
       path: path.join(LOG_PATH, 'app.log'),
       level: LOG_LEVEL as LogLevel
     },
 
-    /** Daily rotating file (Laravel-style). */
     daily: {
       driver: 'daily' as const,
       path: path.join(LOG_PATH, 'app'),
@@ -66,7 +57,7 @@ export const loggingConfig = {
     /** Worker daily log (separate from app). */
     worker: {
       driver: 'daily' as const,
-      path: path.join(LOG_PATH+'/worker'),
+      path: path.join('/logs/worker'),
       level: LOG_LEVEL as LogLevel,
       days: LOG_DAYS
     }
