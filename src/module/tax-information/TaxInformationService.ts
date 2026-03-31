@@ -29,15 +29,74 @@ export class TaxInformationService {
       }
     }
 
-    const existing = await prisma.taxInformation.findUnique({ where: { user_id: userIdNum } });
-    const individualChanged = (individualPAN && individualPAN !== existing?.individual_pan)
-      || (individualGSTIN && individualGSTIN !== existing?.individual_gstin)
-      || (individualName && individualName !== existing?.individual_name)
-      || existing?.individual_gstin_status === 'FAILED';
-    const agencyChanged = (agencyPAN && agencyPAN !== existing?.agency_pan)
-      || (agencyGSTIN && agencyGSTIN !== existing?.agency_gstin)
-      || (agencyName && agencyName !== existing?.agency_name)
-      || existing?.agency_gstin_status === 'FAILED';
+    // ── Real-time verification for active tab ──
+    const activeName = activeTab === 'AGENCY' ? agencyName : individualName;
+    const activePAN = activeTab === 'AGENCY' ? agencyPAN : individualPAN;
+    const activeGSTINValue = activeTab === 'AGENCY' ? agencyGSTIN : individualGSTIN;
+
+    let verificationStatus = 'PENDING';
+    let verificationFailureReason: string | null = null;
+    let verificationApiResponse: any = Prisma.DbNull;
+
+    if (activePAN && isIdtoaiConfigured()) {
+      // Verify PAN
+      const panResult = await verifyPAN(activePAN, String(userIdNum));
+      if (!panResult.success) {
+        return { success: false, message: panResult.error || 'PAN verification failed' };
+      }
+
+      // Match name
+      if (panResult.full_name && activeName) {
+        const panName = panResult.full_name.trim().toLowerCase();
+        const userName = activeName.trim().toLowerCase();
+        if (panName && userName && !panName.includes(userName) && !userName.includes(panName)) {
+          return { success: false, message: `Name mismatch: PAN registered to "${panResult.full_name}", you entered "${activeName}"` };
+        }
+      }
+
+      verificationStatus = 'VERIFIED';
+      verificationApiResponse = panResult.raw || Prisma.DbNull;
+
+      // If GSTIN provided, verify that too
+      if (activeGSTINValue) {
+        const panGstinCheck = validatePanWithGSTIN(activePAN, activeGSTINValue);
+        if (!panGstinCheck.matches) {
+          return { success: false, message: panGstinCheck.reason || 'PAN does not match GSTIN' };
+        }
+
+        const gstResult = await verifyGSTIN(activeGSTINValue, String(userIdNum));
+        if (!gstResult.success) {
+          return { success: false, message: gstResult.error || 'GSTIN verification failed' };
+        }
+
+        if (gstResult.current_registration_status !== 'Active') {
+          return { success: false, message: `GSTIN registration is not active (status: ${gstResult.current_registration_status})` };
+        }
+
+        // Match GSTIN legal name
+        if (gstResult.legal_name_of_business && activeName) {
+          const gstName = gstResult.legal_name_of_business.trim().toLowerCase();
+          const userName = activeName.trim().toLowerCase();
+          if (gstName && userName && !gstName.includes(userName) && !userName.includes(gstName)) {
+            return { success: false, message: `GSTIN name mismatch: registered to "${gstResult.legal_name_of_business}", you entered "${activeName}"` };
+          }
+        }
+
+        verificationApiResponse = gstResult.raw || panResult.raw || Prisma.DbNull;
+      }
+    }
+
+    const statusField = activeTab === 'AGENCY' ? 'agency_gstin_status' : 'individual_gstin_status';
+    const verifiedAtField = activeTab === 'AGENCY' ? 'agency_gstin_verified_at' : 'individual_gstin_verified_at';
+    const failureField = activeTab === 'AGENCY' ? 'agency_gstin_failure_reason' : 'individual_gstin_failure_reason';
+    const apiResponseField = activeTab === 'AGENCY' ? 'agency_gstin_api_response' : 'individual_gstin_api_response';
+
+    const verificationData = {
+      [statusField]: verificationStatus,
+      [verifiedAtField]: verificationStatus === 'VERIFIED' ? new Date() : null,
+      [failureField]: verificationFailureReason,
+      [apiResponseField]: verificationApiResponse,
+    };
 
     const taxInfo = await prisma.taxInformation.upsert({
       where: { user_id: userIdNum },
@@ -53,18 +112,7 @@ export class TaxInformationService {
         agency_gstin: agencyGSTIN,
         has_gstin: activeHasGSTIN,
         gstin: activeGSTIN,
-        ...(individualChanged ? {
-          individual_gstin_status: individualPAN ? 'IN_REVIEW' : 'PENDING',
-          individual_gstin_verified_at: null,
-          individual_gstin_failure_reason: null,
-          individual_gstin_api_response: Prisma.DbNull,
-        } : {}),
-        ...(agencyChanged ? {
-          agency_gstin_status: agencyPAN ? 'IN_REVIEW' : 'PENDING',
-          agency_gstin_verified_at: null,
-          agency_gstin_failure_reason: null,
-          agency_gstin_api_response: Prisma.DbNull,
-        } : {}),
+        ...verificationData,
         updated_at: new Date()
       },
       create: {
@@ -80,14 +128,17 @@ export class TaxInformationService {
         agency_gstin: agencyGSTIN,
         has_gstin: activeHasGSTIN,
         gstin: activeGSTIN,
-        individual_gstin_status: individualPAN ? 'IN_REVIEW' : 'PENDING',
-        agency_gstin_status: agencyPAN ? 'IN_REVIEW' : 'PENDING',
+        individual_gstin_status: 'PENDING',
+        agency_gstin_status: 'PENDING',
+        ...verificationData,
       }
     });
 
     return {
       success: true,
-      message: "Tax information saved successfully",
+      message: verificationStatus === 'VERIFIED'
+        ? "Tax information verified and saved successfully"
+        : "Tax information saved successfully",
       data: TaxInformationService.mapTaxInfo(taxInfo)
     };
   }

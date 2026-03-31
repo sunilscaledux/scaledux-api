@@ -243,6 +243,59 @@ export function validatePanWithGSTIN(
   return { matches: true };
 }
 
+// ─── CIN / MCA Verification ─────────────────────────────────────────────────
+
+export interface CINVerificationResponse {
+  success: boolean;
+  companyName?: string;
+  cin?: string;
+  companyStatus?: string;
+  dateOfIncorporation?: string;
+  registeredAddress?: string;
+  directors?: { name: string; din: string }[];
+  error?: string;
+  raw?: any;
+}
+
+export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<CINVerificationResponse> {
+  const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
+  if (!isConfigured()) {
+    return { success: false, error: "CIN verification is temporarily unavailable." };
+  }
+
+  try {
+    const response = await axios.post(idtoaiConfig.cinUrl, { id_number: cinNumber.toUpperCase() }, {
+      headers: idtoaiConfig.headers,
+    });
+
+    const data = response.data;
+    const info = data.company_info || data.result?.company_info || data;
+
+    return {
+      success: true,
+      companyName: info.company_name || info.companyName,
+      cin: info.cin || cinNumber,
+      companyStatus: info.company_status || info.status,
+      dateOfIncorporation: info.date_of_incorporation,
+      registeredAddress: info.registered_address,
+      directors: (data.directors || data.result?.directors || []).map((d: any) => ({
+        name: d.director_name || d.name,
+        din: d.din_number || d.din,
+      })),
+      raw: data,
+    };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const errData = error.response?.data;
+    if (status) {
+      Log.error(`${tag} CIN API error`, { status, data: errData });
+      return { success: false, error: errData?.detail || errData?.message || `API returned ${status}`, raw: errData };
+    }
+    Log.error(`${tag} CIN request failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
 // ─── DigiLocker — Aadhaar Verification ──────────────────────────────────────
 
 export interface DigilockerAadhaarResponse {
@@ -291,7 +344,7 @@ export async function digilockerInitiateSession(
       consent_purpose: "KYC verification",
       redirect_url: redirectUrl,
       redirect_to_signup: true,
-      documents_for_consent: ["AADHAAR"],
+      documents_for_consent: ["ADHAR","DRVLC"],
     }, { headers: idtoaiConfig.headers });
 
     const data = response.data;
@@ -381,7 +434,7 @@ export async function digilockerFetchAadhaar(
 
     Log.info(`${tag} fetch_aadhaar raw type: ${typeof rawData}, isXML: ${xmlStr.includes('<KycRes')}`);
 
-    // Parse the Aadhaar XML
+    // Parse the Aadhaar XML.g
     const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
     const parsed = parser.parse(xmlStr);
 

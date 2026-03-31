@@ -9,6 +9,7 @@ import path from 'path'
 import { Log } from '@services/loggerService';
 import { appConfig } from '@config/app';
 import { getResubmitWindow } from '@utils/General';
+import { verifyCIN, isConfigured as isIdtoaiConfigured } from '@services/idtoaiService';
 
 
 
@@ -59,33 +60,66 @@ export async function submitAgencyVerification(req: Request, res: Response) {
       }
     }
 
-    let agencyVerification
-
     const normalizedDocumentUrls = urlsOrPathsToAttachmentIds(documents)
 
+    // ── Real-time CIN verification ──
+    let status = 'UNDER_REVIEW'
+    let rejectionReason: string | null = null
+    let verifiedAt: Date | null = null
+
+    if (isIdtoaiConfigured()) {
+      const cinResult = await verifyCIN(cin, String(userId))
+
+      if (!cinResult.success) {
+        return ApiResponse.error(res, cinResult.error || "CIN verification failed. Please check and try again.", 400)
+      }
+
+      // Check company is active
+      const companyStatus = (cinResult.companyStatus || '').toLowerCase()
+      if (companyStatus && companyStatus !== 'active') {
+        return ApiResponse.error(res, `Company status is "${cinResult.companyStatus}". Only active companies can be verified.`, 400)
+      }
+
+      // Match company name
+      if (cinResult.companyName) {
+        const cinName = cinResult.companyName.trim().toLowerCase()
+        const submittedName = agencyName.trim().toLowerCase()
+        if (!cinName.includes(submittedName) && !submittedName.includes(cinName)) {
+          return ApiResponse.error(res, `Company name mismatch: CIN registered to "${cinResult.companyName}", you entered "${agencyName}"`, 400)
+        }
+      }
+
+      // CIN verified — auto-approve
+      status = 'APPROVED'
+      verifiedAt = new Date()
+      Log.info(`[agency-verify] CIN ${cin} verified — company: ${cinResult.companyName}, status: ${cinResult.companyStatus}`)
+    }
+
+    let agencyVerification
+
     if (existingVerification) {
-      // Update existing verification (for rejected or any other status)
       agencyVerification = await prisma.agencyVerification.update({
         where: { id: existingVerification.id },
         data: {
           agency_name: agencyName,
           cin: cin,
           document_urls: normalizedDocumentUrls,
-          status: 'UNDER_REVIEW',
+          status,
           submitted_at: new Date(),
-          rejection_reason: null // Clear previous rejection reason
+          verified_at: verifiedAt,
+          rejection_reason: rejectionReason
         }
       })
     } else {
-      // Create new verification
       agencyVerification = await prisma.agencyVerification.create({
         data: {
           user_id: userId,
           agency_name: agencyName,
           cin: cin,
           document_urls: normalizedDocumentUrls,
-          status: 'UNDER_REVIEW',
-          submitted_at: new Date()
+          status,
+          submitted_at: new Date(),
+          verified_at: verifiedAt,
         }
       })
     }
@@ -94,15 +128,20 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     await prisma.user.update({
       where: { id: userId },
       data: {
-        agency_verification_status: 'UNDER_REVIEW'
+        agency_verification_status: status,
+        ...(verifiedAt ? { agency_verified_at: verifiedAt } : {}),
       }
     })
 
+    const message = status === 'APPROVED'
+      ? "Agency verified successfully"
+      : "Agency verification submitted for review"
+
     return ApiResponse.success(res, {
       verificationId: agencyVerification.id,
-      status: 'UNDER_REVIEW',
-      message: "Agency verification submitted successfully"
-    }, "Agency verification submitted for review")
+      status,
+      message
+    }, message)
 
   } catch (error: any) {
     Log.error("Error", { error })

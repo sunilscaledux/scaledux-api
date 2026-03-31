@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { TaxInformationController } from "./TaxInformationController";
 import { authenticateToken } from "@middleware/auth";
+import { createRateLimiter } from "@middleware/rateLimiter";
 
 const router = Router();
 
@@ -8,6 +9,7 @@ router.use(authenticateToken);
 
 router.post(
   "/tax-information",
+  createRateLimiter(24 * 60 * 60, 2),
   TaxInformationController.saveTaxInformation
 );
 
