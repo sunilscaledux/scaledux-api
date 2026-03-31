@@ -4,6 +4,7 @@
  * GST docs:  https://idtoai.readme.io/reference/post_gst-verification-basic
  */
 import axios from "axios";
+import { XMLParser } from "fast-xml-parser";
 import { Log } from "@services/loggerService";
 import idtoaiConfig from "@config/idtoai";
 
@@ -287,23 +288,22 @@ export async function digilockerInitiateSession(
   try {
     const response = await axios.post(idtoaiConfig.digilocker.initiateSession, {
       consent: true,
-      consent_purpose: "Identity verification (Aadhaar KYC)",
+      consent_purpose: "KYC verification",
       redirect_url: redirectUrl,
-      redirect_to_signup: false,
+      redirect_to_signup: true,
       documents_for_consent: ["AADHAAR"],
-      state,
-      user_id: userId,
     }, { headers: idtoaiConfig.headers });
 
     const data = response.data;
-    const result = data.result || data;
+    const authUrl = data.url || data.auth_url || data.result?.auth_url || data.result?.url;
 
-    if (result.auth_url) {
-      return { success: true, authUrl: result.auth_url, raw: data };
+    if (authUrl) {
+      Log.info(`${tag} DigiLocker session initiated`);
+      return { success: true, authUrl, raw: data };
     }
 
     Log.error(`${tag} DigiLocker initiate — no auth_url`, { data });
-    return { success: false, error: result.message || "Failed to initiate DigiLocker session", raw: data };
+    return { success: false, error: data.message || "Failed to initiate DigiLocker session", raw: data };
   } catch (error: any) {
     const status = error.response?.status;
     const data = error.response?.data;
@@ -367,32 +367,62 @@ export async function digilockerFetchAadhaar(
       reference_key: referenceKey,
     }, { headers: idtoaiConfig.headers });
 
-    const data = response.data;
-    const result = data.result || data;
+    const rawData = response.data;
+    let xmlStr = typeof rawData === 'string' ? rawData : JSON.stringify(rawData);
+
+    // IDtoAI may return XML as a string directly or wrapped in JSON
+    if (typeof rawData === 'object' && !Array.isArray(rawData)) {
+      // Find the XML string in the response — could be the whole thing or a nested field
+      const possibleXml = rawData.xml || rawData.data || rawData.result || rawData;
+      if (typeof possibleXml === 'string' && possibleXml.includes('<')) {
+        xmlStr = possibleXml;
+      }
+    }
+
+    Log.info(`${tag} fetch_aadhaar raw type: ${typeof rawData}, isXML: ${xmlStr.includes('<KycRes')}`);
+
+    // Parse the Aadhaar XML
+    const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+    const parsed = parser.parse(xmlStr);
+
+    // Navigate XML structure: Certificate > CertificateData > KycRes > UidData
+    const kycRes = parsed?.Certificate?.CertificateData?.KycRes || parsed?.KycRes || parsed;
+    const uidData = kycRes?.UidData || {};
+    const poi = uidData?.Poi || {}; // Proof of Identity
+    const poa = uidData?.Poa || {}; // Proof of Address
+    const pht = uidData?.Pht || ''; // Photo (base64)
+    const aadhaarUid = uidData?.uid || '';
+
+    const name = poi.name || '';
+    const dob = poi.dob || '';
+    const gender = poi.gender || '';
+
+    const address = {
+      careOf: poa.co || '',
+      house: poa.house || '',
+      street: poa.street || '',
+      landmark: poa.lm || '',
+      locality: poa.loc || '',
+      vtc: poa.vtc || '',
+      district: poa.dist || '',
+      subDistrict: poa.subdist || '',
+      state: poa.state || '',
+      country: poa.country || 'India',
+      pincode: poa.pc || '',
+      postOffice: poa.po || '',
+    };
+
+    Log.info(`${tag} Parsed: name=${name}, dob=${dob}, gender=${gender}, uid=${aadhaarUid}, state=${address.state}, district=${address.district}`);
 
     return {
       success: true,
-      name: result.name,
-      dob: result.dob,
-      gender: result.gender,
-      aadhaarUid: result.aadhaarUid,
-      aadhaarReferenceNumber: result.aadhaarReferenceNumber,
-      address: result.address || {
-        careOf: result.careOf,
-        house: result.house,
-        street: result.street,
-        landmark: result.landmark,
-        locality: result.locality,
-        vtc: result.vtc,
-        district: result.district,
-        subDistrict: result.subDistrict,
-        state: result.state,
-        country: result.country,
-        pincode: result.pincode,
-        postOffice: result.postOffice,
-      },
-      image: result.image,
-      raw: data,
+      name,
+      dob,
+      gender,
+      aadhaarUid,
+      address,
+      image: typeof pht === 'string' ? pht : '',
+      raw: rawData,
     };
   } catch (error: any) {
     const status = error.response?.status;

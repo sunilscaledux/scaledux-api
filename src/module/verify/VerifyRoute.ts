@@ -64,7 +64,7 @@ router.post(
 
 
 // DigiLocker (Aadhaar via IDtoAI)
-router.post("/digilocker/initiate", authenticateToken, initiateDigilocker)
+router.post("/digilocker/initiate", authenticateToken, createRateLimiter(5 * 60, 15), initiateDigilocker)
 router.post("/digilocker/complete", authenticateToken, completeDigilocker)
 
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)

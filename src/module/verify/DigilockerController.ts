@@ -111,6 +111,7 @@ export async function completeDigilocker(req: Request, res: Response) {
       aadhaarUid: aadhaar.aadhaarUid,
       address: aadhaar.address,
       image: aadhaar.image,
+      _raw: aadhaar.raw, // temporary: for debugging response structure
     }, "Aadhaar data retrieved successfully");
   } catch (error: any) {
     Log.error("[digilocker] complete error", { error: error.message });
