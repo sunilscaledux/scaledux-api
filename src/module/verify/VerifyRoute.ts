@@ -17,6 +17,10 @@ import {
   getAgencyVerificationDetails,
   updateAgencyVerificationStatus
 } from "./AgencyVerifyController"
+import {
+  initiateDigilocker,
+  completeDigilocker
+} from "./DigilockerController"
 import { authenticateToken } from "@middleware/auth"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 import { uploadFile } from "@module/general/FileController"
@@ -58,6 +62,10 @@ router.post(
   handleMulterError
 )
 
+
+// DigiLocker (Aadhaar via IDtoAI)
+router.post("/digilocker/initiate", authenticateToken, initiateDigilocker)
+router.post("/digilocker/complete", authenticateToken, completeDigilocker)
 
 router.post("/agency/submit", authenticateToken, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)

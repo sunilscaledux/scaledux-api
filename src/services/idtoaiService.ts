@@ -241,3 +241,167 @@ export function validatePanWithGSTIN(
 
   return { matches: true };
 }
+
+// ─── DigiLocker — Aadhaar Verification ──────────────────────────────────────
+
+export interface DigilockerAadhaarResponse {
+  success: boolean;
+  name?: string;
+  dob?: string;
+  gender?: string;
+  aadhaarUid?: string;
+  aadhaarReferenceNumber?: string;
+  address?: {
+    careOf?: string;
+    house?: string;
+    street?: string;
+    landmark?: string;
+    locality?: string;
+    vtc?: string;
+    district?: string;
+    subDistrict?: string;
+    state?: string;
+    country?: string;
+    pincode?: string;
+    postOffice?: string;
+  };
+  image?: string; // base64 photo
+  error?: string;
+  raw?: any;
+}
+
+/**
+ * Initiate DigiLocker session — returns auth_url to redirect user to.
+ */
+export async function digilockerInitiateSession(
+  redirectUrl: string,
+  state: string,
+  userId?: string,
+): Promise<{ success: boolean; authUrl?: string; error?: string; raw?: any }> {
+  const tag = userId ? `[digilocker][${userId}]` : "[digilocker]";
+  if (!isConfigured()) {
+    Log.warn(`${tag} IDtoAI not configured — skipping DigiLocker`);
+    return { success: false, error: "DigiLocker verification is temporarily unavailable." };
+  }
+
+  try {
+    const response = await axios.post(idtoaiConfig.digilocker.initiateSession, {
+      consent: true,
+      consent_purpose: "Identity verification (Aadhaar KYC)",
+      redirect_url: redirectUrl,
+      redirect_to_signup: false,
+      documents_for_consent: ["AADHAAR"],
+      state,
+      user_id: userId,
+    }, { headers: idtoaiConfig.headers });
+
+    const data = response.data;
+    const result = data.result || data;
+
+    if (result.auth_url) {
+      return { success: true, authUrl: result.auth_url, raw: data };
+    }
+
+    Log.error(`${tag} DigiLocker initiate — no auth_url`, { data });
+    return { success: false, error: result.message || "Failed to initiate DigiLocker session", raw: data };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status) {
+      Log.error(`${tag} DigiLocker initiate error`, { status, data });
+      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+    }
+    Log.error(`${tag} DigiLocker initiate failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Exchange DigiLocker callback code for reference_key.
+ */
+export async function digilockerGetReference(
+  code: string,
+  codeVerifier: string,
+  uniqueId?: string,
+): Promise<{ success: boolean; referenceKey?: string; error?: string; raw?: any }> {
+  const tag = uniqueId ? `[digilocker][${uniqueId}]` : "[digilocker]";
+
+  try {
+    const response = await axios.post(idtoaiConfig.digilocker.getReference, {
+      code,
+      code_verifier: codeVerifier,
+    }, { headers: idtoaiConfig.headers });
+
+    const data = response.data;
+    const result = data.result || data;
+
+    if (result.reference_key) {
+      return { success: true, referenceKey: result.reference_key, raw: data };
+    }
+
+    Log.error(`${tag} DigiLocker get_reference — no reference_key`, { data });
+    return { success: false, error: result.message || "Failed to get reference key", raw: data };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status) {
+      Log.error(`${tag} DigiLocker get_reference error`, { status, data });
+      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+    }
+    Log.error(`${tag} DigiLocker get_reference failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Fetch Aadhaar data using reference_key from DigiLocker.
+ */
+export async function digilockerFetchAadhaar(
+  referenceKey: string,
+  uniqueId?: string,
+): Promise<DigilockerAadhaarResponse> {
+  const tag = uniqueId ? `[digilocker][${uniqueId}]` : "[digilocker]";
+
+  try {
+    const response = await axios.post(idtoaiConfig.digilocker.fetchAadhaar, {
+      reference_key: referenceKey,
+    }, { headers: idtoaiConfig.headers });
+
+    const data = response.data;
+    const result = data.result || data;
+
+    return {
+      success: true,
+      name: result.name,
+      dob: result.dob,
+      gender: result.gender,
+      aadhaarUid: result.aadhaarUid,
+      aadhaarReferenceNumber: result.aadhaarReferenceNumber,
+      address: result.address || {
+        careOf: result.careOf,
+        house: result.house,
+        street: result.street,
+        landmark: result.landmark,
+        locality: result.locality,
+        vtc: result.vtc,
+        district: result.district,
+        subDistrict: result.subDistrict,
+        state: result.state,
+        country: result.country,
+        pincode: result.pincode,
+        postOffice: result.postOffice,
+      },
+      image: result.image,
+      raw: data,
+    };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status) {
+      Log.error(`${tag} DigiLocker fetch_aadhaar error`, { status, data });
+      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+    }
+    Log.error(`${tag} DigiLocker fetch_aadhaar failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}

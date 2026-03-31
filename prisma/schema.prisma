@@ -74,6 +74,8 @@ model User {
   razorpay_account_id          String?   @db.VarChar(64)
   attachmentsOwned              Attachment[] @relation("AttachmentOwner")
   attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
+  /** Temporary state token for DigiLocker OAuth callback validation */
+  digilocker_state             String?      @db.VarChar(64)
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])

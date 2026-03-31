@@ -1,9 +1,9 @@
 export const ID_TYPES = [
-  { value: 'passport', label: 'Passport' },
-  { value: 'driving-license', label: "Driver's License" },
+  // { value: 'passport', label: 'Passport' },
+  // { value: 'driving-license', label: "Driver's License" },
   { value: 'aadhaar-card', label: 'Aadhaar Card' },
   { value: 'pan-card', label: 'PAN Card' },
-  { value: 'citizen-card', label: 'Citizenship Card' },
+  // { value: 'citizen-card', label: 'Citizenship Card' },
   // { value: 'other-government-id', label: 'Other Government-Issued ID' },
 ] as const;
 
