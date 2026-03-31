@@ -19,6 +19,9 @@ export class TaxInformationController {
       }
 
       const result = await TaxInformationService.saveTaxInformation(userId.toString(), value);
+      if (!result.success) {
+        return ApiResponse.error(res, result.message || "Verification failed", 400);
+      }
       return ApiResponse.success(res, result.data, result.message);
     } catch (error: any) {
       Log.error("Error saving tax information", { error });

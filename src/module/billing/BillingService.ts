@@ -887,11 +887,6 @@ export class BillingService {
     const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
     return TaxInformationService.getTaxInformation(userId);
   }
-  static async verifyPendingGSTINs() {
-    const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
-    return TaxInformationService.verifyPendingGSTINs();
-  }
-
   // Bank information — delegated to BankInformationService
   static async getBankInformation(userId: string) {
     const { BankInformationService } = require("@module/bank-information/BankInformationService");
@@ -1437,8 +1432,6 @@ export class BillingService {
 
     return { success: true, data: base };
   }
-
-  // verifyPendingGSTINs moved to TaxInformationService
 
 }
 

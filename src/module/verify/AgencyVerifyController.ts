@@ -85,7 +85,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
         const cinName = cinResult.companyName.trim().toLowerCase()
         const submittedName = agencyName.trim().toLowerCase()
         if (!cinName.includes(submittedName) && !submittedName.includes(cinName)) {
-          return ApiResponse.error(res, `Company name mismatch: CIN registered to "${cinResult.companyName}", you entered "${agencyName}"`, 400)
+          return ApiResponse.error(res, `Company name does not match CIN. Please ensure your agency name matches your CIN registration.`, 400)
         }
       }
 

@@ -67,7 +67,7 @@ router.post(
 router.post("/digilocker/initiate", authenticateToken, createRateLimiter(5 * 60, 15), initiateDigilocker)
 router.post("/digilocker/complete", authenticateToken, completeDigilocker)
 
-router.post("/agency/submit", authenticateToken, createRateLimiter(24 * 60 * 60, 2), submitAgencyVerification)
+router.post("/agency/submit", authenticateToken, createRateLimiter(24 * 60 * 60, 20), submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
 
 
