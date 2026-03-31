@@ -1,19 +1,15 @@
 /**
  * IDtoAI Verification Service — PAN & GSTIN
- * PAN docs:  https://idtoai.readme.io/reference/post_pan-all-in-one
+ * PAN docs:  https://idtoai.readme.io/reference/post_pan-verification
  * GST docs:  https://idtoai.readme.io/reference/post_gst-verification-basic
  */
+import axios from "axios";
 import { Log } from "@services/loggerService";
-
-const IDTOAI_API_KEY = process.env.IDTOAI_API_KEY || "";
-const IDTOAI_CLIENT_ID = process.env.IDTOAI_CLIENT_ID || "";
-
-const IDTOAI_PAN_URL = "https://dev.idto.ai/verify/pan_all_in_one";
-const IDTOAI_GST_URL = "https://dev.idto.ai/verify/gst_verification_basic";
+import idtoaiConfig from "@config/idtoai";
 
 /** Returns true if IDtoAI API credentials are configured. */
 export function isConfigured(): boolean {
-  return !!(IDTOAI_API_KEY && IDTOAI_CLIENT_ID);
+  return !!(idtoaiConfig.apiKey && idtoaiConfig.clientId);
 }
 
 // ─── PAN Verification ────────────────────────────────────────────────────────
@@ -26,51 +22,27 @@ export interface PANVerificationResponse {
   gender?: string | null;
   category?: string; // "person" | "business"
   status?: string;   // "success" | "failure" | "partial"
-  address?: {
-    value?: string;
-    first_line?: string;
-    second_line?: string;
-    locality?: string;
-    city?: string;
-    district?: string;
-    state?: string;
-    country?: string;
-    zip?: string;
-  };
-  email?: string | null;
-  phone_number?: string | null;
-  aadhaar_linked?: boolean;
   error?: string;
   raw?: any;
 }
 
 /**
- * Verify a PAN number using IDtoAI pan_all_in_one API.
- * Returns full_name, address, category etc.
+ * Verify a PAN number using IDtoAI basic PAN verification API.
+ * Returns full_name, dob, gender, category.
  */
-export async function verifyPAN(panNumber: string): Promise<PANVerificationResponse> {
+export async function verifyPAN(panNumber: string, uniqueId?: string): Promise<PANVerificationResponse> {
+  const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
   if (!isConfigured()) {
-    Log.warn("[idtoai] Missing IDTOAI_API_KEY or IDTOAI_CLIENT_ID env vars — skipping PAN verification");
+    Log.warn(`${tag} Missing idtoaiConfig.apiKey or idtoaiConfig.clientId env vars — skipping PAN verification`);
     return { success: false, error: "PAN verification is temporarily unavailable. Please try again later." };
   }
 
   try {
-    const response = await fetch(IDTOAI_PAN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-KEY": IDTOAI_API_KEY,
-        "X-Client-ID": IDTOAI_CLIENT_ID,
-      },
-      body: JSON.stringify({ pan_number: panNumber.toUpperCase() }),
+    const response = await axios.post(idtoaiConfig.panUrl, { pan_number: panNumber.toUpperCase() }, {
+      headers: idtoaiConfig.headers,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      Log.error("[idtoai] PAN API error", { status: response.status, data });
-      return { success: false, error: data?.message || `API returned ${response.status}`, raw: data };
-    }
+    const data = response.data;
 
     if (data.status === "failure") {
       return { success: false, error: "Invalid PAN number or not found", raw: data };
@@ -84,54 +56,33 @@ export async function verifyPAN(panNumber: string): Promise<PANVerificationRespo
       gender: data.gender,
       category: data.category,
       status: data.status,
-      address: data.address,
-      email: data.email,
-      phone_number: data.phone_number,
-      aadhaar_linked: data.aadhaar_linked,
       raw: data,
     };
   } catch (error: any) {
-    Log.error("[idtoai] PAN request failed", { error: error.message });
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status) {
+      Log.error(`${tag} PAN API error`, { status, data });
+      return { success: false, error: data?.message || data?.detail || `API returned ${status}`, raw: data };
+    }
+    Log.error(`${tag} PAN request failed`, { error: error.message });
     return { success: false, error: error.message };
   }
 }
 
 /**
- * Match PAN API response (name + address) against user-provided details.
+ * Match PAN API response name against user-provided name.
  */
 export function matchPANDetails(
   apiResult: PANVerificationResponse,
-  taxResidence: { city?: string; zipCode?: string; state?: string },
   options: { userName?: string }
 ): { matches: boolean; reason?: string } {
-  const reasons: string[] = [];
-
-  // Name match
   if (apiResult.full_name && options.userName) {
     const panName = apiResult.full_name.trim().toLowerCase();
     const userNameNorm = options.userName.trim().toLowerCase();
     if (panName && userNameNorm && !panName.includes(userNameNorm) && !userNameNorm.includes(panName)) {
-      reasons.push(`Name mismatch: PAN registered to "${apiResult.full_name}", you entered "${options.userName}"`);
+      return { matches: false, reason: `Name mismatch: PAN registered to "${apiResult.full_name}", you entered "${options.userName}"` };
     }
-  }
-
-  // Address match
-  if (apiResult.address) {
-    const panZip = (apiResult.address.zip || "").trim();
-    const userPin = (taxResidence.zipCode || "").trim();
-    if (panZip && userPin && panZip !== userPin) {
-      reasons.push(`PIN code mismatch: PAN has ${panZip}, you entered ${userPin}`);
-    }
-
-    const panCity = (apiResult.address.city || apiResult.address.district || "").trim().toLowerCase();
-    const userCity = (taxResidence.city || "").trim().toLowerCase();
-    if (panCity && userCity && !panCity.includes(userCity) && !userCity.includes(panCity)) {
-      reasons.push(`City mismatch: PAN has "${apiResult.address.city || apiResult.address.district}", you entered "${taxResidence.city}"`);
-    }
-  }
-
-  if (reasons.length > 0) {
-    return { matches: false, reason: reasons.join("; ") };
   }
 
   return { matches: true };
@@ -167,29 +118,19 @@ export interface GSTVerificationResponse {
 /**
  * Verify a GSTIN number using IDtoAI basic GST verification API.
  */
-export async function verifyGSTIN(gstNumber: string): Promise<GSTVerificationResponse> {
+export async function verifyGSTIN(gstNumber: string, uniqueId?: string): Promise<GSTVerificationResponse> {
+  const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
   if (!isConfigured()) {
-    Log.warn("[idtoai] Missing IDTOAI_API_KEY or IDTOAI_CLIENT_ID env vars — skipping GSTIN verification");
+    Log.warn(`${tag} Missing idtoaiConfig.apiKey or idtoaiConfig.clientId env vars — skipping GSTIN verification`);
     return { success: false, error: "GSTIN verification is temporarily unavailable. Please try again later." };
   }
 
   try {
-    const response = await fetch(IDTOAI_GST_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-KEY": IDTOAI_API_KEY,
-        "X-Client-ID": IDTOAI_CLIENT_ID,
-      },
-      body: JSON.stringify({ gst_number: gstNumber.toUpperCase() }),
+    const response = await axios.post(idtoaiConfig.gstUrl, { gst_number: gstNumber.toUpperCase() }, {
+      headers: idtoaiConfig.headers,
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      Log.error("[idtoai] GST API error", { status: response.status, data });
-      return { success: false, error: data?.message || `API returned ${response.status}`, raw: data };
-    }
+    const data = response.data;
 
     return {
       success: true,
@@ -205,7 +146,13 @@ export async function verifyGSTIN(gstNumber: string): Promise<GSTVerificationRes
       raw: data,
     };
   } catch (error: any) {
-    Log.error("[idtoai] GST request failed", { error: error.message });
+    const status = error.response?.status;
+    const data = error.response?.data;
+    if (status) {
+      Log.error(`${tag} GST API error`, { status, data });
+      return { success: false, error: data?.message || data?.detail || `API returned ${status}`, raw: data };
+    }
+    Log.error(`${tag} GST request failed`, { error: error.message });
     return { success: false, error: error.message };
   }
 }

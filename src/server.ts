@@ -24,6 +24,8 @@ import proposalRoutes from './module/proposal/ProposalRoute';
 import chatRoutes from './module/chat/ChatRoute';
 import servicePackageRoutes from './module/service-package/ServicePackageRoute';
 import billingRoutes from './module/billing/BillingRoute';
+import bankInformationRoutes from './module/bank-information/BankInformationRoute';
+import taxInformationRoutes from './module/tax-information/TaxInformationRoute';
 import reviewRoutes from './module/review/ReviewRoute';
 
 import path from "path";
@@ -69,6 +71,8 @@ app.use("/api/v1/proposals", proposalRoutes);
 app.use("/api/v1", chatRoutes);
 app.use("/api/v1/service-packages", servicePackageRoutes);
 app.use("/api/v1/billing", billingRoutes);
+app.use("/api/v1/billing", bankInformationRoutes);
+app.use("/api/v1/billing", taxInformationRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 
 // Public redirect endpoint — /r/:code/redirect → redirects to target URL

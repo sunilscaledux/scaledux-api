@@ -8,7 +8,6 @@ import { createProposalActivity } from "@module/proposal/ProposalActivityService
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
-import { saveTaxInformationSchema } from "./BillingValidation";
 
 export class BillingController {
   // Get payment breakdown (platform fee only on first milestone, gst, service fee) for display and Razorpay total
@@ -351,43 +350,6 @@ export class BillingController {
     }
   }
 
-  // Save tax information
-  static async saveTaxInformation(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const { error, value } = saveTaxInformationSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.error(res, error.details.map(detail => detail.message).join(', '), 400);
-      }
-
-      const result = await BillingService.saveTaxInformation(userId.toString(), value);
-      return ApiResponse.success(res, result.data, result.message);
-    } catch (error: any) {
-      Log.error("Error saving tax information", { error });
-      return ApiResponse.error(res, error.message || "Failed to save tax information");
-    }
-  }
-
-  // Get user's tax information
-  static async getTaxInformation(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const result = await BillingService.getTaxInformation(userId.toString());
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching tax information", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch tax information");
-    }
-  }
-
   // Get billing history/transactions
   static async getBillingHistory(req: Request, res: Response) {
     try {
@@ -477,124 +439,44 @@ export class BillingController {
     }
   }
 
-  // ----- Withdrawal (freelancer only) -----
-
-  private static isFreelancer(req: Request): boolean {
-    const user = req.user as { id?: number; role?: string; profile_type?: string } | undefined;
-    if (!user) return false;
-    const role = user.role?.toLowerCase();
-    const profileType = (user as any).profile_type?.toLowerCase();
-    return role === 'freelancer' || role === 'service-provider' || profileType === 'freelancer';
-  }
-
-  /** If JWT has no role, fetch from DB so old tokens / missing payload still work. */
   private static async ensureFreelancer(req: Request): Promise<boolean> {
-    if (BillingController.isFreelancer(req)) return true;
-    const userId = req.user?.id;
+    const user = req.user as any;
+    if (!user) return false;
+    const role = (user.role || "").toLowerCase();
+    const profileType = (user.profile_type || "").toLowerCase();
+    if (role === "freelancer" || role === "service-provider" || profileType === "freelancer") return true;
+    const userId = user.id;
     if (!userId) return false;
-    const dbUser = await prisma.user.findUnique({
-      where: { id: Number(userId) },
-      select: { role: true }
-    });
+    const dbUser = await prisma.user.findUnique({ where: { id: Number(userId) }, select: { role: true } });
     if (!dbUser) return false;
-    const role = (dbUser.role || '').toLowerCase();
-    const ok = role === 'freelancer' || role === 'service-provider';
+    const dbRole = (dbUser.role || "").toLowerCase();
+    const ok = dbRole === "freelancer" || dbRole === "service-provider";
     if (ok && req.user) (req.user as any).role = dbUser.role;
     return ok;
   }
 
-  static async getWithdrawalMethods(req: Request, res: Response) {
+  /** Request payout for a specific payment to bank. POST /transaction/:uniqueId/request-payout (also /request-withdraw for compat). */
+  static async requestPayout(req: Request, res: Response) {
     try {
       const userId = req.user?.id;
       if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can manage withdrawal methods", 403);
-      const result = await BillingService.getWithdrawalMethods(userId.toString());
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching withdrawal methods", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch withdrawal methods");
-    }
-  }
-
-  static async createWithdrawalMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can add withdrawal methods", 403);
-      const result = await BillingService.createWithdrawalMethod(userId.toString(), req.body);
-      return ApiResponse.success(res, result.data, result.message);
-    } catch (error: any) {
-      Log.error("Error creating withdrawal method", { error });
-      return ApiResponse.error(res, error.message || "Failed to create withdrawal method");
-    }
-  }
-
-  static async deleteWithdrawalMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can remove withdrawal methods", 403);
-      const methodId = getStringParam(req.params.withdrawalMethodId);
-      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
-      await BillingService.deleteWithdrawalMethod(userId.toString(), methodId);
-      return ApiResponse.success(res, null, "Withdrawal method removed");
-    } catch (error: any) {
-      Log.error("Error deleting withdrawal method", { error });
-      return ApiResponse.error(res, error.message || "Failed to delete withdrawal method");
-    }
-  }
-
-  static async resubmitForVerification(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can resubmit bank verification", 403);
-      const result = await BillingService.resubmitForVerification(userId.toString());
-      if (!result.success) return ApiResponse.error(res, result.message, 400);
-      return ApiResponse.success(res, result.data, result.message);
-    } catch (error: any) {
-      Log.error("Error resubmitting for verification", { error });
-      return ApiResponse.error(res, error.message || "Failed to resubmit for verification");
-    }
-  }
-
-  static async updateWithdrawalMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can edit bank details", 403);
-      const methodId = getStringParam(req.params.withdrawalMethodId);
-      if (!methodId) return ApiResponse.error(res, "Withdrawal method ID is required", 400);
-      const result = await BillingService.updateWithdrawalMethod(userId.toString(), methodId, req.body);
-      if (!result.success) return ApiResponse.error(res, result.message, 400);
-      return ApiResponse.success(res, result.data, result.message);
-    } catch (error: any) {
-      Log.error("Error updating withdrawal method", { error });
-      return ApiResponse.error(res, error.message || "Failed to update bank details");
-    }
-  }
-
-  /** Withdraw a specific payment (this transaction’s amount) to bank: used from transaction detail (POST /transaction/:uniqueId/request-withdraw). */
-  static async requestWithdrawForPayment(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request withdraw for a payment", 403);
+      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request payout", 403);
       const uniqueId = getStringParam(req.params.uniqueId);
       if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
-      const withdrawalMethodId = req.body?.withdrawalMethodId != null ? parseInt(String(req.body.withdrawalMethodId), 10) : undefined;
-      if (withdrawalMethodId == null || !Number.isFinite(withdrawalMethodId)) {
-        return ApiResponse.error(res, "Withdrawal method is required", 400);
+      const bankInformationId = req.body?.bankInformationId ?? req.body?.withdrawalMethodId;
+      const bankInfoIdNum = bankInformationId != null ? parseInt(String(bankInformationId), 10) : undefined;
+      if (bankInfoIdNum == null || !Number.isFinite(bankInfoIdNum)) {
+        return ApiResponse.error(res, "Bank information is required", 400);
       }
-      const result = await BillingService.setReceiverWithdrawInProcess(uniqueId, userId, withdrawalMethodId);
+      const result = await BillingService.setReceiverWithdrawInProcess(uniqueId, userId, bankInfoIdNum);
       if (!result.success) {
         const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
-        return ApiResponse.error(res, result.message ?? "Failed to request withdraw", code);
+        return ApiResponse.error(res, result.message ?? "Failed to request payout", code);
       }
-      return ApiResponse.success(res, null, "Withdraw requested");
+      return ApiResponse.success(res, null, "Payout requested");
     } catch (error: any) {
-      Log.error("Error requesting withdraw for payment", { error });
-      return ApiResponse.error(res, error.message || "Failed to request withdraw");
+      Log.error("Error requesting payout", { error });
+      return ApiResponse.error(res, error.message || "Failed to request payout");
     }
   }
 

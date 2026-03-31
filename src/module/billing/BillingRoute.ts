@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { BillingController } from "./BillingController";
 import { authenticateToken } from "@middleware/auth";
-import { savePaymentMethodSchema, saveTaxInformationSchema } from "./BillingValidation";
 
 const router = Router();
 
@@ -16,7 +15,6 @@ router.post(
   "/initiate-verification-order",
   BillingController.createVerificationOrder
 );
-
 
 router.post(
   "/verify-payment",
@@ -38,16 +36,6 @@ router.delete(
   BillingController.deletePaymentMethod
 );
 
-router.post(
-  "/tax-information",
-  BillingController.saveTaxInformation
-);
-
-router.get(
-  "/tax-information",
-  BillingController.getTaxInformation
-);
-
 router.get(
   "/billing-history",
   BillingController.getBillingHistory
@@ -63,8 +51,13 @@ router.post(
   BillingController.releasePayment
 );
 router.post(
+  "/transaction/:uniqueId/request-payout",
+  BillingController.requestPayout
+);
+// Backward compat
+router.post(
   "/transaction/:uniqueId/request-withdraw",
-  BillingController.requestWithdrawForPayment
+  BillingController.requestPayout
 );
 router.post(
   "/transaction/:uniqueId/receiver-released",
@@ -74,27 +67,6 @@ router.post(
 router.get(
   "/balance",
   BillingController.getUserBalance
-);
-
-router.get(
-  "/withdrawal-methods",
-  BillingController.getWithdrawalMethods
-);
-router.post(
-  "/withdrawal-methods",
-  BillingController.createWithdrawalMethod
-);
-router.delete(
-  "/withdrawal-method/:withdrawalMethodId",
-  BillingController.deleteWithdrawalMethod
-);
-router.post(
-  "/withdrawal-methods/resubmit-verification",
-  BillingController.resubmitForVerification
-);
-router.patch(
-  "/withdrawal-method/:withdrawalMethodId",
-  BillingController.updateWithdrawalMethod
 );
 
 router.get(

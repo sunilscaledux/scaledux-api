@@ -48,7 +48,7 @@ model User {
   investmentProfile            InvestmentProfile?
   servicePackages              ServicePackage[]
   paymentMethods               PaymentMethod[]
-  withdrawalMethods            WithdrawalMethod[]
+  bankInformation              BankInformation[]
   withdrawal_requests          WithdrawalRequest[]
   taxInformation               TaxInformation?
   currency_id                  Int?
@@ -1164,14 +1164,16 @@ model PaymentMethod {
   @@map("scd_payment_methods")
 }
 
-// Bank information for freelancer payouts (one per user). Verified by cron → razorpay_fund_account_id.
-model WithdrawalMethod {
+// Bank information for payouts. One per user per entity_type (INDIVIDUAL / AGENCY).
+model BankInformation {
   id                    Int      @id @default(autoincrement())
   unique_id             String   @unique @default(cuid())
-  user_id               Int      @unique
+  user_id               Int
   type                  String   @db.VarChar(20)   @default("bank_account")
+  entity_type           String   @db.VarChar(20)   @default("INDIVIDUAL")
   display_label         String   @db.VarChar(255)
   bank_name             String?  @db.VarChar(100)
+  account_holder_name   String?  @db.VarChar(200)
   account_number        String?  @db.VarChar(34)
   account_number_last4  String?  @db.VarChar(4)
   ifsc                  String?  @db.VarChar(11)
@@ -1180,16 +1182,18 @@ model WithdrawalMethod {
   verification_status   String   @db.VarChar(20)   @default("pending")
   /** Reason for failure when verification_status = failed; shown to user so they can fix and resubmit. */
   verification_failure_reason String? @db.VarChar(500)
+  verified_at           DateTime?
   created_at            DateTime @default(now())
   updated_at            DateTime @updatedAt
 
   user                  User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
   withdrawal_requests    WithdrawalRequest[]
 
+  @@unique([user_id, entity_type])
   @@index([user_id])
   @@index([unique_id])
   @@index([verification_status])
-  @@map("scd_withdrawal_methods")
+  @@map("scd_bank_information")
 }
 
 // Withdrawal request: one row per "request withdraw" for a payment; cron processes these (status: pending → completed/failed)
@@ -1206,7 +1210,7 @@ model WithdrawalRequest {
   updated_at             DateTime  @updatedAt
 
   user                  User                  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  withdrawal_method     WithdrawalMethod      @relation(fields: [withdrawal_method_id], references: [id], onDelete: Restrict)
+  withdrawal_method     BankInformation       @relation(fields: [withdrawal_method_id], references: [id], onDelete: Restrict)
   billing_transaction   BillingTransaction   @relation(fields: [billing_transaction_id], references: [id], onDelete: Cascade)
 
   @@index([status])

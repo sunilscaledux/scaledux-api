@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { Prisma } from "@prisma/client";
-import { PaymentMethodInput, TaxInformationInput, RazorpayVerificationInput } from "./BillingType";
+import { PaymentMethodInput, RazorpayVerificationInput } from "./BillingType";
 import crypto from "crypto";
 import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
@@ -8,7 +8,6 @@ import { appConfig } from "@config/app";
 import { Log } from "@services/loggerService";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
-import { verifyPAN, matchPANDetails, verifyGSTIN, validatePanWithGSTIN, matchGSTINDetails, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 import {
   BillingTransactionType,
   BillingTransactionStatus,
@@ -649,28 +648,28 @@ export class BillingService {
     return { success: true };
   }
 
-  /** Receiver (freelancer) requests withdraw: create WithdrawalRequest (status pending) and set transaction to withdraw_in_process. Cron will process. */
-  static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number, withdrawalMethodId: number): Promise<{ success: boolean; message?: string }> {
+  /** Receiver requests payout: create WithdrawalRequest (status pending) and set transaction to withdraw_in_process. Cron will process. */
+  static async setReceiverWithdrawInProcess(transactionUniqueId: string, userId: number, bankInformationId: number): Promise<{ success: boolean; message?: string }> {
     const tx = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: transactionUniqueId },
       include: { withdrawal_request: true }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
     if (tx.type !== BillingTransactionType.PAYMENT) return { success: false, message: 'Not a payment transaction' };
-    if (tx.to_id !== userId) return { success: false, message: 'Only the receiver can request withdraw for this payment' };
+    if (tx.to_id !== userId) return { success: false, message: 'Only the receiver can request payout for this payment' };
     const current = (tx as any).receiver_status ?? tx.status;
     if (current !== BillingTransactionReceiverStatus.COMPLETED && current !== BillingTransactionReceiverStatus.RELEASED) {
-      return { success: false, message: 'Withdraw can only be requested when receiver status is completed or released' };
+      return { success: false, message: 'Payout can only be requested when receiver status is completed or released' };
     }
-    const method = await (prisma as any).withdrawalMethod.findFirst({
-      where: { id: withdrawalMethodId, user_id: tx.to_id }
+    const method = await (prisma as any).bankInformation.findFirst({
+      where: { id: bankInformationId, user_id: tx.to_id }
     });
-    if (!method) return { success: false, message: 'Withdrawal method not found or does not belong to you' };
-    if ((tx as any).withdrawal_request) return { success: false, message: 'Withdrawal already requested for this payment' };
+    if (!method) return { success: false, message: 'Bank information not found or does not belong to you' };
+    if ((tx as any).withdrawal_request) return { success: false, message: 'Payout already requested for this payment' };
     await (prisma as any).withdrawalRequest.create({
       data: {
         user_id: tx.to_id,
-        withdrawal_method_id: withdrawalMethodId,
+        withdrawal_method_id: bankInformationId,
         billing_transaction_id: tx.id,
         status: WithdrawalRequestStatus.PENDING
       }
@@ -879,152 +878,50 @@ export class BillingService {
     };
   }
 
-  // Save or update tax information
-  static async saveTaxInformation(userId: string, data: TaxInformationInput) {
-    const userIdNum = parseInt(userId);
-    const activeTab = data.activeTab;
-    const individualName = data.individualName?.trim() || null;
-    const individualPAN = data.individualPAN?.trim().toUpperCase() || null;
-    const individualGSTIN = data.individualHasGSTIN ? data.individualGSTIN?.trim().toUpperCase() || null : null;
-    const agencyName = data.agencyName?.trim() || null;
-    const agencyPAN = data.agencyPAN?.trim().toUpperCase() || null;
-    const agencyGSTIN = data.agencyHasGSTIN ? data.agencyGSTIN?.trim().toUpperCase() || null : null;
-    const activePanNumber = activeTab === 'AGENCY' ? agencyPAN : individualPAN;
-    const activeGSTIN = activeTab === 'AGENCY' ? agencyGSTIN : individualGSTIN;
-    const activeHasGSTIN = activeTab === 'AGENCY' ? !!agencyGSTIN : !!individualGSTIN;
-
-    if (activeTab === 'AGENCY') {
-      const user = await prisma.user.findUnique({
-        where: { id: userIdNum },
-        select: {
-          agency_verification_status: true
-        }
-      });
-
-      if (user?.agency_verification_status !== 'APPROVED') {
-        throw new Error("You need to verify your agency before saving agency tax details");
-      }
-    }
-
-    // Check if PAN/GSTIN values changed to reset verification status
-    const existing = await prisma.taxInformation.findUnique({ where: { user_id: userIdNum } });
-    const individualChanged = (individualPAN && individualPAN !== existing?.individual_pan)
-      || (individualGSTIN && individualGSTIN !== existing?.individual_gstin)
-      || (individualName && individualName !== existing?.individual_name);
-    const agencyChanged = (agencyPAN && agencyPAN !== existing?.agency_pan)
-      || (agencyGSTIN && agencyGSTIN !== existing?.agency_gstin)
-      || (agencyName && agencyName !== existing?.agency_name);
-
-    const taxInfo = await prisma.taxInformation.upsert({
-      where: { user_id: userIdNum },
-      update: {
-        tax_residence: data.taxResidence,
-        entity_type: activeTab,
-        pan_number: activePanNumber,
-        individual_name: individualName,
-        individual_pan: individualPAN,
-        individual_gstin: individualGSTIN,
-        agency_name: agencyName,
-        agency_pan: agencyPAN,
-        agency_gstin: agencyGSTIN,
-        has_gstin: activeHasGSTIN,
-        gstin: activeGSTIN,
-        // Set to IN_REVIEW when PAN or GSTIN details changed — cron will verify
-        ...(individualChanged ? {
-          individual_gstin_status: individualPAN ? 'IN_REVIEW' : 'PENDING',
-          individual_gstin_verified_at: null,
-          individual_gstin_failure_reason: null,
-          individual_gstin_api_response: Prisma.DbNull,
-        } : {}),
-        ...(agencyChanged ? {
-          agency_gstin_status: agencyPAN ? 'IN_REVIEW' : 'PENDING',
-          agency_gstin_verified_at: null,
-          agency_gstin_failure_reason: null,
-          agency_gstin_api_response: Prisma.DbNull,
-        } : {}),
-        updated_at: new Date()
-      },
-      create: {
-        user_id: userIdNum,
-        tax_residence: data.taxResidence,
-        entity_type: activeTab,
-        pan_number: activePanNumber,
-        individual_name: individualName,
-        individual_pan: individualPAN,
-        individual_gstin: individualGSTIN,
-        agency_name: agencyName,
-        agency_pan: agencyPAN,
-        agency_gstin: agencyGSTIN,
-        has_gstin: activeHasGSTIN,
-        gstin: activeGSTIN,
-        individual_gstin_status: individualPAN ? 'IN_REVIEW' : 'PENDING',
-        agency_gstin_status: agencyPAN ? 'IN_REVIEW' : 'PENDING',
-      }
-    });
-
-    return {
-      success: true,
-      message: "Tax information saved successfully",
-      data: {
-        id: taxInfo.id,
-        taxResidence: taxInfo.tax_residence,
-        activeTab: taxInfo.entity_type === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL',
-        individualName: taxInfo.individual_name || '',
-        individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
-        individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
-        individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
-        individualGstinStatus: taxInfo.individual_gstin_status || 'PENDING',
-        individualGstinFailureReason: taxInfo.individual_gstin_failure_reason || null,
-        agencyName: taxInfo.agency_name || '',
-        agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
-        agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
-        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : ''),
-        agencyGstinStatus: taxInfo.agency_gstin_status || 'PENDING',
-        agencyGstinFailureReason: taxInfo.agency_gstin_failure_reason || null,
-      }
-    };
+  // Tax information — delegated to TaxInformationService
+  static async saveTaxInformation(userId: string, data: any) {
+    const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
+    return TaxInformationService.saveTaxInformation(userId, data);
+  }
+  static async getTaxInformation(userId: string) {
+    const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
+    return TaxInformationService.getTaxInformation(userId);
+  }
+  static async verifyPendingGSTINs() {
+    const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
+    return TaxInformationService.verifyPendingGSTINs();
   }
 
-  // Get user's tax information
-  static async getTaxInformation(userId: string) {
-    const userIdNum = parseInt(userId);
-    const taxInfo = await prisma.taxInformation.findUnique({
-      where: { user_id: userIdNum }
-    });
-
-    if (!taxInfo) {
-      return {
-        success: true,
-        data: null
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        id: taxInfo.id,
-        taxResidence: taxInfo.tax_residence,
-        activeTab: taxInfo.entity_type === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL',
-        individualName: taxInfo.individual_name || '',
-        individualPAN: taxInfo.individual_pan || taxInfo.pan_number || '',
-        individualHasGSTIN: !!(taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' && taxInfo.gstin)),
-        individualGSTIN: taxInfo.individual_gstin || (taxInfo.entity_type !== 'AGENCY' ? taxInfo.gstin || '' : ''),
-        individualGstinStatus: taxInfo.individual_gstin_status || 'PENDING',
-        individualGstinFailureReason: taxInfo.individual_gstin_failure_reason || null,
-        agencyName: taxInfo.agency_name || '',
-        agencyPAN: taxInfo.agency_pan || (taxInfo.entity_type === 'AGENCY' ? taxInfo.pan_number || '' : ''),
-        agencyHasGSTIN: !!(taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' && taxInfo.gstin)),
-        agencyGSTIN: taxInfo.agency_gstin || (taxInfo.entity_type === 'AGENCY' ? taxInfo.gstin || '' : ''),
-        agencyGstinStatus: taxInfo.agency_gstin_status || 'PENDING',
-        agencyGstinFailureReason: taxInfo.agency_gstin_failure_reason || null,
-      }
-    };
+  // Bank information — delegated to BankInformationService
+  static async getBankInformation(userId: string) {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.getBankInformation(userId);
+  }
+  static async createBankInformation(userId: string, data: any) {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.createBankInformation(userId, data);
+  }
+  static async deleteBankInformation(userId: string, recordId: string) {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.deleteBankInformation(userId, recordId);
+  }
+  static async resubmitBankVerification(userId: string) {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.resubmitForVerification(userId);
+  }
+  static async updateBankInformation(userId: string, recordId: string, data: any) {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.updateBankInformation(userId, recordId, data);
+  }
+  static async verifyPendingBankAccounts() {
+    const { BankInformationService } = require("@module/bank-information/BankInformationService");
+    return BankInformationService.verifyPendingBankAccounts();
   }
 
   // Get billing history/transactions
   static async getBillingHistory(
-    userId: string, 
-    page: number = 1, 
+    userId: string,
+    page: number = 1,
     limit: number = 10,
     fromDate?: string,
     toDate?: string,
@@ -1231,267 +1128,6 @@ export class BillingService {
         pendingBalance: convertedPending
       }
     };
-  }
-
-  // ----- Withdrawal methods (freelancer only): single bank account per user -----
-
-  static async getWithdrawalMethods(userId: string) {
-    const userIdNum = parseInt(userId);
-    const methods = await (prisma as any).withdrawalMethod.findMany({
-      where: { user_id: userIdNum },
-      orderBy: { created_at: 'desc' }
-    });
-    return {
-      success: true,
-      data: methods.map((m: any) => ({
-        id: m.id,
-        uniqueId: m.unique_id,
-        type: m.type,
-        displayLabel: m.display_label,
-        bankName: m.bank_name,
-        accountNumberLast4: m.account_number_last4,
-        ifsc: m.ifsc,
-        verificationStatus: m.verification_status ?? 'pending',
-        verificationFailureReason: m.verification_failure_reason ?? null,
-        createdAt: m.created_at
-      }))
-    };
-  }
-
-  static async createWithdrawalMethod(
-    userId: string,
-    data: { type?: string; displayLabel: string; bankName?: string; accountNumber?: string; accountNumberLast4?: string; ifsc?: string; isDefault?: boolean }
-  ) {
-    const userIdNum = parseInt(userId);
-    if (data.type && data.type !== 'bank_account') {
-      return { success: false, message: 'Only bank account is supported. UPI is not available.' };
-    }
-    if (!data.accountNumber?.trim()) {
-      return { success: false, message: 'Bank account number is required' };
-    }
-    const ifsc = (data.ifsc || '').trim().toUpperCase();
-    if (!ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-      return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
-    }
-    const existing = await (prisma as any).withdrawalMethod.findFirst({
-      where: { user_id: userIdNum }
-    });
-    if (existing) {
-      return { success: false, message: 'You already have bank information. Remove it first to add new details.' };
-    }
-    const accountNumber = data.accountNumber.replace(/\D/g, '').trim() || null;
-    const accountNumberLast4 = accountNumber ? accountNumber.slice(-4) : (data.accountNumberLast4?.replace(/\D/g, '').slice(-4) || null);
-    const method = await (prisma as any).withdrawalMethod.create({
-      data: {
-        user_id: userIdNum,
-        type: 'bank_account',
-        display_label: data.displayLabel,
-        bank_name: data.bankName ?? null,
-        account_number: accountNumber,
-        account_number_last4: accountNumberLast4,
-        ifsc,
-        verification_status: 'pending'
-      }
-    });
-    return {
-      success: true,
-      message: 'Bank details submitted. Verification is in process.',
-      data: {
-        id: method.id,
-        uniqueId: method.unique_id,
-        type: method.type,
-        displayLabel: method.display_label,
-        bankName: method.bank_name,
-        accountNumberLast4: method.account_number_last4,
-        ifsc: method.ifsc,
-        verificationStatus: 'pending',
-        createdAt: method.created_at
-      }
-    };
-  }
-
-  static async deleteWithdrawalMethod(userId: string, methodId: string) {
-    const userIdNum = parseInt(userId);
-    const methodIdNum = parseInt(methodId);
-    const method = await (prisma as any).withdrawalMethod.findFirst({
-      where: { id: methodIdNum, user_id: userIdNum }
-    });
-    if (method) {
-      await (prisma as any).user.update({
-        where: { id: userIdNum },
-        data: { razorpay_account_id: null }
-      });
-    }
-    await (prisma as any).withdrawalMethod.deleteMany({
-      where: { id: methodIdNum, user_id: userIdNum }
-    });
-    return { success: true, message: 'Withdrawal method removed' };
-  }
-
-  /** Resubmit bank for verification after a failed attempt. Clears failure reason and sets status to pending. */
-  static async resubmitForVerification(userId: string): Promise<{ success: boolean; message: string; data?: any }> {
-    const userIdNum = parseInt(userId);
-    const method = await (prisma as any).withdrawalMethod.findFirst({
-      where: { user_id: userIdNum }
-    });
-    if (!method) {
-      return { success: false, message: 'No bank account found. Add bank details first.' };
-    }
-    if (method.verification_status !== 'failed') {
-      return { success: false, message: 'Only failed verification can be resubmitted.' };
-    }
-    await prisma.$executeRaw`
-      UPDATE scd_withdrawal_methods
-      SET verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
-      WHERE id = ${method.id} AND user_id = ${userIdNum}
-    `;
-    return {
-      success: true,
-      message: 'Resubmitted for verification. We will verify your bank account shortly.',
-      data: {
-        id: method.id,
-        verificationStatus: 'pending',
-        verificationFailureReason: null,
-      }
-    };
-  }
-
-  /** Update bank details when verification failed; sets status back to pending so cron can re-verify. */
-  static async updateWithdrawalMethod(
-    userId: string,
-    methodId: string,
-    data: { displayLabel?: string; bankName?: string; accountNumber?: string; ifsc?: string }
-  ): Promise<{ success: boolean; message: string; data?: any }> {
-    const userIdNum = parseInt(userId);
-    const methodIdNum = parseInt(methodId);
-    const method = await (prisma as any).withdrawalMethod.findFirst({
-      where: { id: methodIdNum, user_id: userIdNum }
-    });
-    if (!method) {
-      return { success: false, message: 'Withdrawal method not found.' };
-    }
-    if (method.verification_status !== 'failed') {
-      return { success: false, message: 'Only failed bank details can be edited. Remove and add again to change verified method.' };
-    }
-    const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : method.ifsc;
-    if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-      return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
-    }
-    const accountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : method.account_number;
-    if (!accountNumber || accountNumber.length < 9) {
-      return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
-    }
-    const accountNumberLast4 = accountNumber.slice(-4);
-    const displayLabel = data.displayLabel?.trim() ?? method.display_label;
-    const bankName = data.bankName?.trim() ?? method.bank_name;
-    await prisma.$executeRaw`
-      UPDATE scd_withdrawal_methods
-      SET display_label = ${displayLabel}, bank_name = ${bankName}, account_number = ${accountNumber},
-          account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
-          verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
-      WHERE id = ${methodIdNum} AND user_id = ${userIdNum}
-    `;
-    const updated = await (prisma as any).withdrawalMethod.findUnique({
-      where: { id: methodIdNum }
-    });
-    return {
-      success: true,
-      message: 'Bank details updated. Verification is in process.',
-      data: updated ? {
-        id: updated.id,
-        type: updated.type,
-        displayLabel: updated.display_label,
-        bankName: updated.bank_name,
-        accountNumberLast4: updated.account_number_last4,
-        ifsc: updated.ifsc,
-        verificationStatus: 'pending',
-        verificationFailureReason: null,
-        createdAt: updated.created_at
-      } : undefined
-    };
-  }
-
-  /**
-   * Cron: verify pending bank accounts via Razorpay X (contact + fund account).
-   * Updates WithdrawalMethod.razorpay_fund_account_id and verification_status; User.razorpay_account_id.
-   */
-  static async verifyPendingBankAccounts(): Promise<{ verified: number; failed: number; errors: string[] }> {
-    const result = { verified: 0, failed: 0, errors: [] as string[] };
-    if (!isRazorpayConfigured()) {
-      result.errors.push("Razorpay not configured");
-      return result;
-    }
-    const pending = await (prisma as any).withdrawalMethod.findMany({
-      where: { verification_status: "pending", type: "bank_account" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-            phone: true,
-            razorpay_contact_id: true,
-          },
-        },
-      }
-    });
-    for (const method of pending) {
-      const accountNumber = (method.account_number || "").trim();
-      const ifsc = (method.ifsc || "").trim().toUpperCase();
-      if (!accountNumber || accountNumber.length < 9 || !ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-        const reason = "Missing or invalid account number or IFSC. Please check and resubmit.";
-        await (prisma as any).withdrawalMethod.update({
-          where: { id: method.id },
-          data: { verification_status: "failed", verification_failure_reason: reason }
-        });
-        result.failed++;
-        result.errors.push(`WithdrawalMethod ${method.id}: missing or invalid account_number/ifsc`);
-        continue;
-      }
-      const u = method.user;
-      const name = [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim() || method.display_label || "Account Holder";
-      const email = (u?.email || "").trim() || `user-${method.user_id}@scaledux.placeholder`;
-      const contact = (u?.phone || "").replace(/\D/g, "").slice(-10) || "0000000000";
-      try {
-        const existingContactId = (u as any).razorpay_contact_id ?? null;
-        const { contactId, fundAccountId } = await createContactAndFundAccount({
-          name,
-          email,
-          contact,
-          ifsc,
-          accountNumber,
-          existingContactId: existingContactId || undefined,
-          validateBeneficiaryName: true,
-        });
-        await (prisma as any).withdrawalMethod.update({
-          where: { id: method.id },
-          data: {
-            razorpay_fund_account_id: fundAccountId,
-            verification_status: "verified",
-            verification_failure_reason: null,
-          }
-        });
-        await (prisma as any).user.update({
-          where: { id: method.user_id },
-          data: {
-            razorpay_account_id: fundAccountId,
-            ...(contactId && !existingContactId ? { razorpay_contact_id: contactId } : {}),
-          }
-        });
-        result.verified++;
-      } catch (err: any) {
-        const msg = err?.response?.data?.error?.description || err?.message || "Unknown error";
-        const reason = String(msg).slice(0, 500);
-        await (prisma as any).withdrawalMethod.update({
-          where: { id: method.id },
-          data: { verification_status: "failed", verification_failure_reason: reason }
-        }).catch(() => {});
-        result.failed++;
-        result.errors.push(`WithdrawalMethod ${method.id}: ${msg}`);
-      }
-    }
-    return result;
   }
 
   // Refund verification amount if needed
@@ -1802,174 +1438,7 @@ export class BillingService {
     return { success: true, data: base };
   }
 
-  
-  static async verifyPendingGSTINs(): Promise<{ verified: number; failed: number; errors: string[] }> {
-    const result = { verified: 0, failed: 0, errors: [] as string[] };
-    if (!isIdtoaiConfigured()) return result;
-
-    try {
-      const pendingRecords = await prisma.taxInformation.findMany({
-        where: {
-          OR: [
-            { individual_gstin_status: 'IN_REVIEW' },
-            { agency_gstin_status: 'IN_REVIEW' },
-          ]
-        },
-        take: 100,
-      });
-
-      for (const record of pendingRecords) {
-        const taxResidence = record.tax_residence as { city?: string; zipCode?: string; state?: string } | null;
-
-        // ── Verify individual ──
-        if (record.individual_gstin_status === 'IN_REVIEW' && record.individual_pan) {
-          try {
-            // Step 1: Verify PAN via API — returns name, address
-            const panResult = await verifyPAN(record.individual_pan);
-            if (!panResult.success) {
-              await prisma.taxInformation.update({
-                where: { id: record.id },
-                data: { individual_gstin_status: 'FAILED', individual_gstin_failure_reason: panResult.error || 'PAN verification failed', individual_gstin_api_response: panResult.raw ?? Prisma.DbNull }
-              });
-              result.failed++;
-              continue;
-            }
-
-            // Step 2: Match name + address from PAN API response
-            const panDetailCheck = matchPANDetails(panResult, taxResidence || {}, { userName: record.individual_name || undefined });
-            if (!panDetailCheck.matches) {
-              await prisma.taxInformation.update({
-                where: { id: record.id },
-                data: { individual_gstin_status: 'FAILED', individual_gstin_failure_reason: `Verification failed: ${panDetailCheck.reason}`, individual_gstin_api_response: panResult.raw ?? Prisma.DbNull }
-              });
-              result.failed++;
-              continue;
-            }
-
-            // Step 3: If GSTIN provided → verify GSTIN too
-            if (record.individual_gstin) {
-              // 3a: PAN inside GSTIN (positions 3-12) must match user's PAN
-              const panGstinCheck = validatePanWithGSTIN(record.individual_pan, record.individual_gstin);
-              if (!panGstinCheck.matches) {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { individual_gstin_status: 'FAILED', individual_gstin_failure_reason: panGstinCheck.reason || 'PAN does not match GSTIN' }
-                });
-                result.failed++;
-                continue;
-              }
-
-              // 3b: Verify GSTIN via API
-              const gstResult = await verifyGSTIN(record.individual_gstin);
-              if (!gstResult.success) {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { individual_gstin_status: 'FAILED', individual_gstin_failure_reason: gstResult.error || 'GSTIN verification failed', individual_gstin_api_response: gstResult.raw ?? Prisma.DbNull }
-                });
-                result.failed++;
-                continue;
-              }
-
-              // 3c: GSTIN registration must be active
-              if (gstResult.current_registration_status !== 'Active') {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { individual_gstin_status: 'FAILED', individual_gstin_failure_reason: `GSTIN registration is not active (status: ${gstResult.current_registration_status})`, individual_gstin_api_response: gstResult.raw ?? Prisma.DbNull }
-                });
-                result.failed++;
-                continue;
-              }
-            }
-
-            // All checks passed
-            await prisma.taxInformation.update({
-              where: { id: record.id },
-              data: { individual_gstin_status: 'VERIFIED', individual_gstin_verified_at: new Date(), individual_gstin_failure_reason: null, individual_gstin_api_response: panResult.raw || null }
-            });
-            result.verified++;
-          } catch (err: any) {
-            result.errors.push(`Individual PAN/GSTIN (id ${record.id}): ${err.message}`);
-            result.failed++;
-          }
-        }
-
-        // ── Verify agency ──
-        if (record.agency_gstin_status === 'IN_REVIEW' && record.agency_pan) {
-          try {
-            // Step 1: Verify PAN via API
-            const panResult = await verifyPAN(record.agency_pan);
-            if (!panResult.success) {
-              await prisma.taxInformation.update({
-                where: { id: record.id },
-                data: { agency_gstin_status: 'FAILED', agency_gstin_failure_reason: panResult.error || 'PAN verification failed', agency_gstin_api_response: panResult.raw ?? Prisma.DbNull }
-              });
-              result.failed++;
-              continue;
-            }
-
-            // Step 2: Match name + address from PAN API
-            const panDetailCheck = matchPANDetails(panResult, taxResidence || {}, { userName: record.agency_name || undefined });
-            if (!panDetailCheck.matches) {
-              await prisma.taxInformation.update({
-                where: { id: record.id },
-                data: { agency_gstin_status: 'FAILED', agency_gstin_failure_reason: `Verification failed: ${panDetailCheck.reason}`, agency_gstin_api_response: panResult.raw ?? Prisma.DbNull }
-              });
-              result.failed++;
-              continue;
-            }
-
-            // Step 3: If GSTIN provided → verify GSTIN too
-            if (record.agency_gstin) {
-              const panGstinCheck = validatePanWithGSTIN(record.agency_pan, record.agency_gstin);
-              if (!panGstinCheck.matches) {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { agency_gstin_status: 'FAILED', agency_gstin_failure_reason: panGstinCheck.reason || 'PAN does not match GSTIN' }
-                });
-                result.failed++;
-                continue;
-              }
-
-              const gstResult = await verifyGSTIN(record.agency_gstin);
-              if (!gstResult.success) {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { agency_gstin_status: 'FAILED', agency_gstin_failure_reason: gstResult.error || 'GSTIN verification failed', agency_gstin_api_response: gstResult.raw ?? Prisma.DbNull }
-                });
-                result.failed++;
-                continue;
-              }
-
-              if (gstResult.current_registration_status !== 'Active') {
-                await prisma.taxInformation.update({
-                  where: { id: record.id },
-                  data: { agency_gstin_status: 'FAILED', agency_gstin_failure_reason: `GSTIN registration is not active (status: ${gstResult.current_registration_status})`, agency_gstin_api_response: gstResult.raw ?? Prisma.DbNull }
-                });
-                result.failed++;
-                continue;
-              }
-
-            }
-
-            // All checks passed
-            await prisma.taxInformation.update({
-              where: { id: record.id },
-              data: { agency_gstin_status: 'VERIFIED', agency_gstin_verified_at: new Date(), agency_gstin_failure_reason: null, agency_gstin_api_response: panResult.raw || null }
-            });
-            result.verified++;
-          } catch (err: any) {
-            result.errors.push(`Agency PAN/GSTIN (id ${record.id}): ${err.message}`);
-            result.failed++;
-          }
-        }
-      }
-    } catch (error: any) {
-      Log.error("[verify-gstin] Fatal error", { error: error.message });
-      result.errors.push(error.message);
-    }
-
-    return result;
-  }
+  // verifyPendingGSTINs moved to TaxInformationService
 
 }
 
