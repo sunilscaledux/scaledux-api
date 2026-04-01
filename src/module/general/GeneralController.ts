@@ -578,13 +578,14 @@ export async function getIdTypes(req: Request, res: Response) {
 // Skills search function for large datasets
 export async function searchSkills(req: Request, res: Response) {
   try {
-    const { q: query, limit = 20 } = req.query
-    
+    const { q: query, limit = 20, categoryId } = req.query
+
     if (!query || typeof query !== 'string' || query.trim().length < 2) {
       return ApiResponse.error(res, "Search query must be at least 2 characters", 400)
     }
 
     const searchLimit = Math.min(parseInt(limit as string) || 20, 100) // Max 100 results
+    const catId = categoryId ? parseInt(categoryId as string) : null
 
     // Search skills with case-insensitive partial matching
     const skills = await prisma.skill.findMany({
@@ -593,7 +594,8 @@ export async function searchSkills(req: Request, res: Response) {
         name: {
           contains: query.trim(),
           mode: 'insensitive'
-        }
+        },
+        ...(catId ? { category_id: catId } : {}),
       },
       select: {
         id: true,
