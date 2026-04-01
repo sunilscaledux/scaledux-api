@@ -559,33 +559,11 @@ model Achievement {
 model IdentityVerification {
   id                        Int       @id @default(autoincrement())
   user_id                   Int
-  first_name                String
-  middle_name               String?
-  last_name                 String
-  date_of_birth             DateTime
-  nationality               String?
-  id_type                   String    // passport, driver_license, national_id, etc.
-  id_number                 String
-  id_expiry_date            DateTime?
-  issuing_country           String
-  id_document_urls          Json      // Array of document image URLs
-  keycode                   String?   // Keycode used for this verification
-  selfie_urls               Json      // Array of selfie image URLs
-  address_line_1            String
-  address_line_2            String?
-  city                      String
-  state                     String?
-  postal_code               String?
-  address_country           String
-  proof_of_address_consent  String?
-  address_proof_urls        Json?     // Array of address proof document URLs
-  document_type             String?   // bank-statement, utility-bill
-  institution_name          String?   // Bank or utility company name
-  document_date_issued      DateTime? // Date when document was issued
-  status                    String    @default("PENDING") // PENDING, UNDER_REVIEW, APPROVED, REJECTED
+  verification_type         String    // "aadhaar" | "driving-license" — document verified via DigiLocker
+  status                    String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  meta_data                 Json?     // All details received from DigiLocker after verification (name, dob, gender, address, uid, image, etc.)
   submitted_at              DateTime?
   verified_at               DateTime?
-  verified_by               Int?
   rejection_reason          String?
   created_at                DateTime  @default(now())
   updated_at                DateTime  @updatedAt

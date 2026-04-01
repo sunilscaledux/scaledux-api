@@ -32,69 +32,43 @@ export async function submitAgencyVerification(req: Request, res: Response) {
       return ApiResponse.error(res, "At least one document is required", 400)
     }
 
-    // Check for existing verification (any status)
+    const normalizedDocumentUrls = urlsOrPathsToAttachmentIds(documents)
+
+    // ── Real-time CIN verification — only save if verified ──
+    if (!isIdtoaiConfigured()) {
+      return ApiResponse.error(res, "CIN verification service is temporarily unavailable. Please try again later.", 503)
+    }
+
+    const cinResult = await verifyCIN(cin, String(userId))
+
+    if (!cinResult.success) {
+      return ApiResponse.error(res, cinResult.error || "CIN verification failed. Please check your CIN and try again.", 400)
+    }
+
+    // Check company is active
+    const companyStatus = (cinResult.companyStatus || '').toLowerCase()
+    if (companyStatus && companyStatus !== 'active') {
+      return ApiResponse.error(res, `Company is not active. Only active companies can be verified.`, 400)
+    }
+
+    // Match company name
+    if (cinResult.companyName) {
+      const cinName = cinResult.companyName.trim().toLowerCase()
+      const submittedName = agencyName.trim().toLowerCase()
+      if (!cinName.includes(submittedName) && !submittedName.includes(cinName)) {
+        return ApiResponse.error(res, `Company name does not match CIN. Please ensure your agency name matches your CIN registration.`, 400)
+      }
+    }
+
+    Log.info(`[agency-verify] CIN ${cin} verified for user ${userId}`)
+
+    // Verified — save
     const existingVerification = await prisma.agencyVerification.findFirst({
-      where: { 
-        user_id: userId
-      },
+      where: { user_id: userId },
       orderBy: { created_at: 'desc' }
     })
 
-    // If there's a pending submission, don't allow new submission
-    if (existingVerification && ['PENDING', 'UNDER_REVIEW'].includes(existingVerification.status)) {
-      return ApiResponse.error(res, "You already have a pending agency verification submission", 400)
-    }
-
-    const lastApprovedAgency = await prisma.agencyVerification.findFirst({
-      where: { user_id: userId, status: 'APPROVED' },
-      orderBy: { verified_at: 'desc' }
-    })
-    if (lastApprovedAgency?.verified_at) {
-      const cooldown = getResubmitWindow(lastApprovedAgency.verified_at, appConfig.verification.agencyCooldownDays)
-      if (!cooldown.canSubmit && cooldown.nextSubmitAllowedAt) {
-        return ApiResponse.error(
-          res,
-          `Agency verification can be updated at most once every ${appConfig.verification.agencyCooldownDays} days after approval. You can submit again after ${cooldown.nextSubmitAllowedAt.toISOString()}.`,
-          429
-        )
-      }
-    }
-
-    const normalizedDocumentUrls = urlsOrPathsToAttachmentIds(documents)
-
-    // ── Real-time CIN verification ──
-    let status = 'UNDER_REVIEW'
-    let rejectionReason: string | null = null
-    let verifiedAt: Date | null = null
-
-    if (isIdtoaiConfigured()) {
-      const cinResult = await verifyCIN(cin, String(userId))
-
-      if (!cinResult.success) {
-        return ApiResponse.error(res, cinResult.error || "CIN verification failed. Please check and try again.", 400)
-      }
-
-      // Check company is active
-      const companyStatus = (cinResult.companyStatus || '').toLowerCase()
-      if (companyStatus && companyStatus !== 'active') {
-        return ApiResponse.error(res, `Company status is "${cinResult.companyStatus}". Only active companies can be verified.`, 400)
-      }
-
-      // Match company name
-      if (cinResult.companyName) {
-        const cinName = cinResult.companyName.trim().toLowerCase()
-        const submittedName = agencyName.trim().toLowerCase()
-        if (!cinName.includes(submittedName) && !submittedName.includes(cinName)) {
-          return ApiResponse.error(res, `Company name does not match CIN. Please ensure your agency name matches your CIN registration.`, 400)
-        }
-      }
-
-      // CIN verified — auto-approve
-      status = 'APPROVED'
-      verifiedAt = new Date()
-      Log.info(`[agency-verify] CIN ${cin} verified — company: ${cinResult.companyName}, status: ${cinResult.companyStatus}`)
-    }
-
+    const verifiedAt = new Date()
     let agencyVerification
 
     if (existingVerification) {
@@ -104,10 +78,10 @@ export async function submitAgencyVerification(req: Request, res: Response) {
           agency_name: agencyName,
           cin: cin,
           document_urls: normalizedDocumentUrls,
-          status,
-          submitted_at: new Date(),
+          status: 'APPROVED',
+          submitted_at: verifiedAt,
           verified_at: verifiedAt,
-          rejection_reason: rejectionReason
+          rejection_reason: null
         }
       })
     } else {
@@ -117,31 +91,25 @@ export async function submitAgencyVerification(req: Request, res: Response) {
           agency_name: agencyName,
           cin: cin,
           document_urls: normalizedDocumentUrls,
-          status,
-          submitted_at: new Date(),
+          status: 'APPROVED',
+          submitted_at: verifiedAt,
           verified_at: verifiedAt,
         }
       })
     }
 
-    // Update user status
     await prisma.user.update({
       where: { id: userId },
       data: {
-        agency_verification_status: status,
-        ...(verifiedAt ? { agency_verified_at: verifiedAt } : {}),
+        agency_verification_status: 'APPROVED',
+        agency_verified_at: verifiedAt,
       }
     })
 
-    const message = status === 'APPROVED'
-      ? "Agency verified successfully"
-      : "Agency verification submitted for review"
-
     return ApiResponse.success(res, {
       verificationId: agencyVerification.id,
-      status,
-      message
-    }, message)
+      status: 'APPROVED',
+    }, "Agency verified and saved successfully")
 
   } catch (error: any) {
     Log.error("Error", { error })

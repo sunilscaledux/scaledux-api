@@ -34,13 +34,20 @@ export class TaxInformationService {
     const activePAN = activeTab === 'AGENCY' ? agencyPAN : individualPAN;
     const activeGSTINValue = activeTab === 'AGENCY' ? agencyGSTIN : individualGSTIN;
 
-    let verificationStatus = 'PENDING';
-    let verificationFailureReason: string | null = null;
     let verificationApiResponse: any = Prisma.DbNull;
 
     const entityLabel = activeTab === 'AGENCY' ? 'company/agency' : 'individual';
 
-    if (activePAN && isIdtoaiConfigured()) {
+    // Real-time verification — must pass to save
+    if (!activePAN) {
+      return { success: false, message: `${entityLabel === 'company/agency' ? 'Company/Agency' : 'Individual'} PAN number is required.` };
+    }
+
+    if (!isIdtoaiConfigured()) {
+      return { success: false, message: 'PAN verification service is temporarily unavailable. Please try again later.' };
+    }
+
+    if (activePAN) {
       // Verify PAN
       const panResult = await verifyPAN(activePAN, String(userIdNum));
       if (!panResult.success) {
@@ -56,7 +63,6 @@ export class TaxInformationService {
         }
       }
 
-      verificationStatus = 'VERIFIED';
       verificationApiResponse = panResult.raw || Prisma.DbNull;
 
       // If GSTIN provided, verify that too
@@ -93,10 +99,11 @@ export class TaxInformationService {
     const failureField = activeTab === 'AGENCY' ? 'agency_gstin_failure_reason' : 'individual_gstin_failure_reason';
     const apiResponseField = activeTab === 'AGENCY' ? 'agency_gstin_api_response' : 'individual_gstin_api_response';
 
+    // If we reach here, verification passed
     const verificationData = {
-      [statusField]: verificationStatus,
-      [verifiedAtField]: verificationStatus === 'VERIFIED' ? new Date() : null,
-      [failureField]: verificationFailureReason,
+      [statusField]: 'VERIFIED',
+      [verifiedAtField]: new Date(),
+      [failureField]: null,
       [apiResponseField]: verificationApiResponse,
     };
 
@@ -130,17 +137,13 @@ export class TaxInformationService {
         agency_gstin: agencyGSTIN,
         has_gstin: activeHasGSTIN,
         gstin: activeGSTIN,
-        individual_gstin_status: 'PENDING',
-        agency_gstin_status: 'PENDING',
         ...verificationData,
       }
     });
 
     return {
       success: true,
-      message: verificationStatus === 'VERIFIED'
-        ? "Tax information verified and saved successfully"
-        : "Tax information saved successfully",
+      message: "Tax information verified and saved successfully",
       data: TaxInformationService.mapTaxInfo(taxInfo)
     };
   }

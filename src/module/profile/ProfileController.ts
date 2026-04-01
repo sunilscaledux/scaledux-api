@@ -348,4 +348,18 @@ export class ProfileController {
       return ApiResponse.error(res, error.message || 'Failed to fetch public profile');
     }
   }
+
+  static async verifyPassword(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+      const { password } = req.body;
+      if (!password) return ApiResponse.error(res, 'Password is required', 400);
+      const result = await PersonalInfoService.verifyPassword(userId, password);
+      if (!result.success) return ApiResponse.error(res, result.message, 400);
+      return ApiResponse.success(res, null, 'Password verified');
+    } catch (error: any) {
+      return ApiResponse.error(res, error.message || 'Failed to verify password');
+    }
+  }
 }
