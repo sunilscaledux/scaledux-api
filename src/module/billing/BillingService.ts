@@ -908,11 +908,6 @@ export class BillingService {
     const { BankInformationService } = require("@module/bank-information/BankInformationService");
     return BankInformationService.updateBankInformation(userId, recordId, data);
   }
-  static async verifyPendingBankAccounts() {
-    const { BankInformationService } = require("@module/bank-information/BankInformationService");
-    return BankInformationService.verifyPendingBankAccounts();
-  }
-
   // Get billing history/transactions
   static async getBillingHistory(
     userId: string,

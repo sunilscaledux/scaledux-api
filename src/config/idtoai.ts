@@ -6,10 +6,12 @@ const idtoaiConfig = {
   panUrl: process.env.IDTOAI_PAN_URL || `${IDTOAI_BASE}/pan_verification`,
   gstUrl: process.env.IDTOAI_GST_URL || `${IDTOAI_BASE}/gst_verification_basic`,
   cinUrl: `${IDTOAI_BASE}/cin_mca_verification`,
+  bankVerificationUrl: `${IDTOAI_BASE}/bank_verification/pennyless`,
   digilocker: {
     initiateSession: `${IDTOAI_BASE}/digilocker/initiate_session`,
     getReference: `${IDTOAI_BASE}/digilocker/get_reference`,
     fetchAadhaar: `${IDTOAI_BASE}/digilocker/fetch_aadhaar`,
+    fetchDrivingLicence: `${IDTOAI_BASE}/digilocker/fetch_driving_licence`,
   },
   get headers() {
     return {

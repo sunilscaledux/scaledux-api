@@ -31,20 +31,6 @@ export class BankInformationController {
     }
   }
 
-  static async deleteBankInformation(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      const recordId = getStringParam(req.params.bankInformationId);
-      if (!recordId) return ApiResponse.error(res, "Bank information ID is required", 400);
-      await BankInformationService.deleteBankInformation(userId.toString(), recordId);
-      return ApiResponse.success(res, null, "Bank information removed");
-    } catch (error: any) {
-      Log.error("Error deleting bank information", { error });
-      return ApiResponse.error(res, error.message || "Failed to delete bank information");
-    }
-  }
-
   static async resubmitForVerification(req: Request, res: Response) {
     try {
       const userId = req.user?.id;

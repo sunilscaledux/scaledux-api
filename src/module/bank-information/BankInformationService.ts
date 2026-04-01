@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
-import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
+import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 
 export class BankInformationService {
@@ -42,6 +42,9 @@ export class BankInformationService {
     };
   }
 
+  /**
+   * Verify bank account via IDtoAI pennyless verification, then save on success.
+   */
   static async createBankInformation(userId: string, data: CreateBankInformationInput) {
     const userIdNum = parseInt(userId);
     if (data.type && data.type !== 'bank_account') {
@@ -71,11 +74,14 @@ export class BankInformationService {
       where: { user_id: userIdNum, entity_type: entityType }
     });
     if (existing) {
-      return { success: false, message: `You already have ${entityType.toLowerCase()} bank information. Remove it first to add new details.` };
+      return { success: false, message: `You already have ${entityType.toLowerCase()} bank information. Please edit the existing details instead.` };
     }
 
     const accountNumber = data.accountNumber.replace(/\D/g, '').trim() || null;
-    const accountNumberLast4 = accountNumber ? accountNumber.slice(-4) : (data.accountNumberLast4?.replace(/\D/g, '').slice(-4) || null);
+    if (!accountNumber || accountNumber.length < 9) {
+      return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
+    }
+    const accountNumberLast4 = accountNumber.slice(-4);
 
     let accountHolderName = data.accountHolderName?.trim() || null;
     if (!accountHolderName) {
@@ -86,43 +92,42 @@ export class BankInformationService {
       accountHolderName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() || data.displayLabel;
     }
 
+    // Verify via IDtoAI pennyless bank verification
+    if (!isIdtoaiConfigured()) {
+      return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
+    }
+
+    const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
+    if (!verification.success) {
+      Log.error(`Bank verification failed for user ${userIdNum}`, { error: verification.error, raw: JSON.stringify(verification.raw) });
+      return { success: false, message: verification.error || 'Bank account verification failed. Please check your details.' };
+    }
+
+    // Use verified account holder name from bank if available
+    const verifiedName = verification.accountHolderName || accountHolderName;
+    const verifiedBankName = verification.bankName || data.bankName || null;
+
     const record = await (prisma as any).bankInformation.create({
       data: {
         user_id: userIdNum,
         type: 'bank_account',
         entity_type: entityType,
         display_label: data.displayLabel,
-        bank_name: data.bankName ?? null,
+        bank_name: verifiedBankName,
         account_number: accountNumber,
         account_number_last4: accountNumberLast4,
-        account_holder_name: accountHolderName,
+        account_holder_name: verifiedName,
         ifsc,
-        verification_status: 'pending'
+        verification_status: 'verified',
+        verified_at: new Date(),
       }
     });
+
     return {
       success: true,
-      message: 'Bank details submitted. Verification is in process.',
+      message: 'Bank account verified and saved successfully.',
       data: BankInformationService.mapRecord(record)
     };
-  }
-
-  static async deleteBankInformation(userId: string, recordId: string) {
-    const userIdNum = parseInt(userId);
-    const recordIdNum = parseInt(recordId);
-    const record = await (prisma as any).bankInformation.findFirst({
-      where: { id: recordIdNum, user_id: userIdNum }
-    });
-    if (record) {
-      await (prisma as any).user.update({
-        where: { id: userIdNum },
-        data: { razorpay_account_id: null }
-      });
-    }
-    await (prisma as any).bankInformation.deleteMany({
-      where: { id: recordIdNum, user_id: userIdNum }
-    });
-    return { success: true, message: 'Bank information removed' };
   }
 
   static async resubmitForVerification(userId: string, entityType?: string): Promise<{ success: boolean; message: string; data?: any }> {
@@ -136,19 +141,42 @@ export class BankInformationService {
     if (record.verification_status !== 'failed') {
       return { success: false, message: 'Only failed verification can be resubmitted.' };
     }
-    await prisma.$executeRaw`
-      UPDATE scd_bank_information
-      SET verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
-      WHERE id = ${record.id} AND user_id = ${userIdNum}
-    `;
+
+    if (!isIdtoaiConfigured()) {
+      return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
+    }
+
+    const accountNumber = (record.account_number || '').trim();
+    const ifsc = (record.ifsc || '').trim().toUpperCase();
+    if (!accountNumber || accountNumber.length < 9 || !ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      return { success: false, message: 'Missing or invalid account number or IFSC. Please edit your bank details and try again.' };
+    }
+
+    const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
+    if (!verification.success) {
+      const reason = String(verification.error || 'Verification failed').slice(0, 500);
+      await (prisma as any).bankInformation.update({
+        where: { id: record.id },
+        data: { verification_status: 'failed', verification_failure_reason: reason }
+      }).catch(() => {});
+      return { success: false, message: reason };
+    }
+
+    await (prisma as any).bankInformation.update({
+      where: { id: record.id },
+      data: {
+        account_holder_name: verification.accountHolderName || record.account_holder_name,
+        bank_name: verification.bankName || record.bank_name,
+        verification_status: 'verified',
+        verification_failure_reason: null,
+        verified_at: new Date(),
+      }
+    });
+
     return {
       success: true,
-      message: 'Resubmitted for verification. We will verify your bank account shortly.',
-      data: {
-        id: record.id,
-        verificationStatus: 'pending',
-        verificationFailureReason: null,
-      }
+      message: 'Bank account verified successfully.',
+      data: { id: record.id, verificationStatus: 'verified', verificationFailureReason: null }
     };
   }
 
@@ -166,7 +194,7 @@ export class BankInformationService {
       return { success: false, message: 'Bank information not found.' };
     }
     if (record.verification_status !== 'failed') {
-      return { success: false, message: 'Only failed bank details can be edited. Remove and add again to change verified details.' };
+      return { success: false, message: 'Only failed bank details can be edited.' };
     }
     const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : record.ifsc;
     if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
@@ -178,110 +206,42 @@ export class BankInformationService {
     }
     const accountNumberLast4 = accountNumber.slice(-4);
     const displayLabel = data.displayLabel?.trim() ?? record.display_label;
-    const bankName = data.bankName?.trim() ?? record.bank_name;
     const accountHolderName = data.accountHolderName?.trim() ?? record.account_holder_name;
+
+    if (!isIdtoaiConfigured()) {
+      return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
+    }
+
+    const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
+    if (!verification.success) {
+      const reason = String(verification.error || 'Verification failed').slice(0, 500);
+      await (prisma as any).bankInformation.update({
+        where: { id: recordIdNum },
+        data: { verification_status: 'failed', verification_failure_reason: reason }
+      }).catch(() => {});
+      return { success: false, message: reason };
+    }
+
+    const verifiedName = verification.accountHolderName || accountHolderName;
+    const verifiedBankName = verification.bankName || data.bankName?.trim() || record.bank_name;
+
     await prisma.$executeRaw`
       UPDATE scd_bank_information
-      SET display_label = ${displayLabel}, bank_name = ${bankName}, account_number = ${accountNumber},
+      SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
           account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
-          account_holder_name = ${accountHolderName},
-          verification_status = 'pending', verification_failure_reason = NULL, updated_at = NOW()
+          account_holder_name = ${verifiedName},
+          verification_status = 'verified', verification_failure_reason = NULL,
+          verified_at = NOW(), updated_at = NOW()
       WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
     `;
+
     const updated = await (prisma as any).bankInformation.findUnique({
       where: { id: recordIdNum }
     });
     return {
       success: true,
-      message: 'Bank details updated. Verification is in process.',
+      message: 'Bank account verified and updated successfully.',
       data: updated ? BankInformationService.mapRecord(updated) : undefined
     };
-  }
-
-  /**
-   * Cron: verify pending bank accounts via Razorpay X (contact + fund account).
-   */
-  static async verifyPendingBankAccounts(): Promise<{ verified: number; failed: number; errors: string[] }> {
-    const result = { verified: 0, failed: 0, errors: [] as string[] };
-    if (!isRazorpayConfigured()) {
-      result.errors.push("Razorpay not configured");
-      return result;
-    }
-    const pending = await (prisma as any).bankInformation.findMany({
-      where: { verification_status: "pending", type: "bank_account" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            email: true,
-            phone: true,
-            razorpay_contact_id: true,
-          },
-        },
-      },
-      take: 20,
-    });
-    for (const record of pending) {
-      const accountNumber = (record.account_number || "").trim();
-      const ifsc = (record.ifsc || "").trim().toUpperCase();
-      if (!accountNumber || accountNumber.length < 9 || !ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-        const reason = "Missing or invalid account number or IFSC. Please check and resubmit.";
-        await (prisma as any).bankInformation.update({
-          where: { id: record.id },
-          data: { verification_status: "failed", verification_failure_reason: reason }
-        });
-        result.failed++;
-        result.errors.push(`BankInformation ${record.id}: missing or invalid account_number/ifsc`);
-        continue;
-      }
-      const u = record.user;
-      const name = record.account_holder_name
-        || [u?.first_name, u?.last_name].filter(Boolean).join(" ").trim()
-        || record.display_label
-        || "Account Holder";
-      const email = (u?.email || "").trim() || `user-${record.user_id}@scaledux.placeholder`;
-      const contact = (u?.phone || "").replace(/\D/g, "").slice(-10) || "0000000000";
-      try {
-        const existingContactId = (u as any).razorpay_contact_id ?? null;
-        const { contactId, fundAccountId } = await createContactAndFundAccount({
-          name,
-          email,
-          contact,
-          ifsc,
-          accountNumber,
-          existingContactId: existingContactId || undefined,
-          validateBeneficiaryName: true,
-        });
-        await (prisma as any).bankInformation.update({
-          where: { id: record.id },
-          data: {
-            razorpay_fund_account_id: fundAccountId,
-            verification_status: "verified",
-            verification_failure_reason: null,
-            verified_at: new Date(),
-          }
-        });
-        await (prisma as any).user.update({
-          where: { id: record.user_id },
-          data: {
-            razorpay_account_id: fundAccountId,
-            ...(contactId && !existingContactId ? { razorpay_contact_id: contactId } : {}),
-          }
-        });
-        result.verified++;
-      } catch (err: any) {
-        const msg = err?.response?.data?.error?.description || err?.message || "Unknown error";
-        const reason = String(msg).slice(0, 500);
-        await (prisma as any).bankInformation.update({
-          where: { id: record.id },
-          data: { verification_status: "failed", verification_failure_reason: reason }
-        }).catch(() => {});
-        result.failed++;
-        result.errors.push(`BankInformation ${record.id}: ${msg}`);
-      }
-    }
-    return result;
   }
 }

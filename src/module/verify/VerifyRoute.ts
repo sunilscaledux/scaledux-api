@@ -8,9 +8,7 @@ import {
   verifyEmailOTP,
 } from "./EmailVerifyController"
 import {
-  submitIdentityVerification,
   getIdentityVerificationDetails,
-  getKeycode,
 } from "./IdentityVerifyController"
 import {
   submitAgencyVerification,
@@ -34,34 +32,7 @@ router.post("/phone/verify-otp",createRateLimiter(5 * 60, 10), authenticateToken
 router.post("/email/send-otp",createRateLimiter(5 * 60, 15), authenticateToken, sendEmailOTP)
 router.post("/email/verify-otp", createRateLimiter(5 * 60, 10),authenticateToken, verifyEmailOTP)
 
-router.get("/identity/keycode", authenticateToken, getKeycode)
-router.post("/identity/submit", authenticateToken, submitIdentityVerification)
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
-
-router.post(
-  "/identity/upload-id-documents",
-  authenticateToken,
-  FileUpload({ uploadPath: "identity/documents", fileFilter: "identityDocument", maxSize: 10, maxFiles: 2, fieldName: "identity_documents" }).array("idDocuments"),
-  uploadFile,
-  handleMulterError
-)
-
-router.post(
-  "/identity/upload-selfie",
-  authenticateToken,
-  FileUpload({ uploadPath: "identity/selfie", fileFilter: "image", maxSize: 10, maxFiles: 1, fieldName: "identity_selfie" }).array("selfieImages"),
-  uploadFile,
-  handleMulterError
-)
-
-router.post(
-  "/identity/upload-address-proof",
-  authenticateToken,
-  FileUpload({ uploadPath: "identity/address-proof", fileFilter: "image", maxSize: 10, maxFiles: 2, fieldName: "identity_address_proof" }).array("addressProof"),
-  uploadFile,
-  handleMulterError
-)
-
 
 // DigiLocker (Aadhaar via IDtoAI)
 router.post("/digilocker/initiate", authenticateToken, createRateLimiter(5 * 60, 15), initiateDigilocker)

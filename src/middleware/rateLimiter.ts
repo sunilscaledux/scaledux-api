@@ -20,6 +20,11 @@ export function createRateLimiter(windowSeconds: number, max: number) {
     }),
     windowMs,
     max,
+    keyGenerator: (req: Request) => {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+      const userId = (req as any).user?.id;
+      return userId ? `${ip}:uid:${userId}` : ip;
+    },
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req: Request, res: Response) => {

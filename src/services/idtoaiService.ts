@@ -8,6 +8,19 @@ import { XMLParser } from "fast-xml-parser";
 import { Log } from "@services/loggerService";
 import idtoaiConfig from "@config/idtoai";
 
+/** Extract a human-readable error string from IDtoAI error responses.
+ *  `detail` can be a string, an object with `msg`, or an array of `{msg}` objects. */
+function parseApiError(data: any, fallback: string): string {
+  const detail = data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail.map((d: any) => d?.msg || JSON.stringify(d)).join('; ');
+  }
+  if (detail && typeof detail === 'object' && detail.msg) return detail.msg;
+  if (typeof data?.message === 'string') return data.message;
+  return fallback;
+}
+
 /** Returns true if IDtoAI API credentials are configured. */
 export function isConfigured(): boolean {
   return !!(idtoaiConfig.apiKey && idtoaiConfig.clientId);
@@ -64,7 +77,7 @@ export async function verifyPAN(panNumber: string, uniqueId?: string): Promise<P
     const data = error.response?.data;
     if (status) {
       Log.error(`${tag} PAN API error`, { status, data });
-      return { success: false, error: data?.message || data?.detail || `API returned ${status}`, raw: data };
+      return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} PAN request failed`, { error: error.message });
     return { success: false, error: error.message };
@@ -151,7 +164,7 @@ export async function verifyGSTIN(gstNumber: string, uniqueId?: string): Promise
     const data = error.response?.data;
     if (status) {
       Log.error(`${tag} GST API error`, { status, data });
-      return { success: false, error: data?.message || data?.detail || `API returned ${status}`, raw: data };
+      return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} GST request failed`, { error: error.message });
     return { success: false, error: error.message };
@@ -289,9 +302,85 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
     const errData = error.response?.data;
     if (status) {
       Log.error(`${tag} CIN API error`, { status, data: errData });
-      return { success: false, error: errData?.detail || errData?.message || `API returned ${status}`, raw: errData };
+      return { success: false, error: parseApiError(errData, `API returned ${status}`), raw: errData };
     }
     Log.error(`${tag} CIN request failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── Pennyless Bank Account Verification ────────────────────────────────────
+
+export interface BankVerificationResponse {
+  success: boolean;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
+  branch?: string;
+  accountStatus?: string;
+  error?: string;
+  raw?: any;
+}
+
+/**
+ * Verify a bank account using IDtoAI pennyless verification.
+ * No monetary transaction — validates via banking networks.
+ */
+export async function verifyBankAccount(
+  accountNumber: string,
+  ifsc: string,
+  uniqueId?: string,
+): Promise<BankVerificationResponse> {
+  const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
+  if (!isConfigured()) {
+    Log.warn(`${tag} IDtoAI not configured — skipping bank verification`);
+    return { success: false, error: "Bank verification is temporarily unavailable. Please try again later." };
+  }
+
+  try {
+    const payload = {
+      account_number: accountNumber,
+      ifsc_code: ifsc.toUpperCase(),
+    };
+    Log.info(`${tag} Bank verification request`, { url: idtoaiConfig.bankVerificationUrl, payload });
+    const response = await axios.post(idtoaiConfig.bankVerificationUrl, payload, { headers: idtoaiConfig.headers });
+    Log.info(`${tag} Bank verification response`, { data: JSON.stringify(response.data) });
+
+    const data = response.data;
+    const result = data.result || data;
+
+    const status = (result.account_status || result.status || data.status || "").toLowerCase();
+
+    if (status === "failure" || status === "invalid" || status === "inactive") {
+      return {
+        success: false,
+        error: result.message || "Bank account is invalid or inactive. Please check your details.",
+        accountStatus: status,
+        raw: data,
+      };
+    }
+
+    Log.info(`${tag} Bank verified: holder=${result.account_holder_name || result.full_name}, status=${status}`);
+
+    return {
+      success: true,
+      accountHolderName: result.account_holder_name || result.full_name || result.beneficiary_name || "",
+      accountNumber: result.account_number || accountNumber,
+      ifsc: result.ifsc || ifsc,
+      bankName: result.bank_name || result.bank || "",
+      branch: result.branch || "",
+      accountStatus: status,
+      raw: data,
+    };
+  } catch (error: any) {
+    const errStatus = error.response?.status;
+    const errData = error.response?.data;
+    if (errStatus) {
+      Log.error(`${tag} Bank verification error`, { status: errStatus, data: JSON.stringify(errData) });
+      return { success: false, error: parseApiError(errData, `API returned ${errStatus}`), raw: errData };
+    }
+    Log.error(`${tag} Bank verification failed`, { error: error.message });
     return { success: false, error: error.message };
   }
 }
@@ -362,7 +451,7 @@ export async function digilockerInitiateSession(
     const data = error.response?.data;
     if (status) {
       Log.error(`${tag} DigiLocker initiate error`, { status, data });
-      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+      return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker initiate failed`, { error: error.message });
     return { success: false, error: error.message };
@@ -399,7 +488,7 @@ export async function digilockerGetReference(
     const data = error.response?.data;
     if (status) {
       Log.error(`${tag} DigiLocker get_reference error`, { status, data });
-      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+      return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker get_reference failed`, { error: error.message });
     return { success: false, error: error.message };
@@ -482,9 +571,78 @@ export async function digilockerFetchAadhaar(
     const data = error.response?.data;
     if (status) {
       Log.error(`${tag} DigiLocker fetch_aadhaar error`, { status, data });
-      return { success: false, error: data?.detail || data?.message || `API returned ${status}`, raw: data };
+      return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker fetch_aadhaar failed`, { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── DigiLocker — Driving Licence ───────────────────────────────────────────
+
+export interface DigilockerDrivingLicenceResponse {
+  success: boolean;
+  name?: string;
+  dob?: string;
+  dlNumber?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  vehicleClasses?: string[];
+  address?: Record<string, string>;
+  image?: string;
+  error?: string;
+  raw?: any;
+}
+
+/**
+ * Fetch Driving Licence data using reference_key from DigiLocker.
+ * Uses the same reference_key obtained after DigiLocker OAuth.
+ */
+export async function digilockerFetchDrivingLicence(
+  referenceKey: string,
+  uniqueId?: string,
+): Promise<DigilockerDrivingLicenceResponse> {
+  const tag = uniqueId ? `[digilocker][${uniqueId}]` : "[digilocker]";
+
+  try {
+    const response = await axios.post(idtoaiConfig.digilocker.fetchDrivingLicence, {
+      reference_key: referenceKey,
+    }, { headers: idtoaiConfig.headers });
+
+    const data = response.data;
+    const result = data.result || data;
+
+    const name = result.name || result.full_name || '';
+    const dob = result.dob || result.date_of_birth || '';
+    const dlNumber = result.dl_number || result.licence_number || '';
+    const issueDate = result.issue_date || '';
+    const expiryDate = result.expiry_date || result.validity || '';
+    const vehicleClasses = result.vehicle_classes || result.cov || [];
+    const image = result.image || result.photo || '';
+    const address = result.address || {};
+
+    Log.info(`${tag} DL fetched: name=${name}, dlNumber=${dlNumber}, expiry=${expiryDate}`);
+
+    return {
+      success: true,
+      name,
+      dob,
+      dlNumber,
+      issueDate,
+      expiryDate,
+      vehicleClasses: Array.isArray(vehicleClasses) ? vehicleClasses : [vehicleClasses].filter(Boolean),
+      address: typeof address === 'object' ? address : {},
+      image: typeof image === 'string' ? image : '',
+      raw: data,
+    };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const errData = error.response?.data;
+    if (status) {
+      Log.error(`${tag} DigiLocker fetch_driving_licence error`, { status, data: errData });
+      return { success: false, error: parseApiError(errData, `API returned ${status}`), raw: errData };
+    }
+    Log.error(`${tag} DigiLocker fetch_driving_licence failed`, { error: error.message });
     return { success: false, error: error.message };
   }
 }

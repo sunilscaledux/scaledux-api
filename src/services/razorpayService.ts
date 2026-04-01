@@ -142,8 +142,8 @@ export async function createFundAccount(params: {
 }
 
 /**
- * Verify bank (penny drop) → create or reuse contact → create fund account.
- * Use existingContactId to reuse contact and avoid duplicates.
+ * Create or reuse contact → create fund account → penny-drop validation.
+ * Fund account must exist before Razorpay can validate it.
  */
 export async function createContactAndFundAccount(params: {
   name: string;
@@ -153,38 +153,10 @@ export async function createContactAndFundAccount(params: {
   accountNumber: string;
   /** Reuse existing Razorpay contact (e.g. User.razorpay_contact_id) to avoid duplicate contacts. */
   existingContactId?: string;
-  /** If true, compare beneficiary name from penny drop with params.name and throw on mismatch. */
+  /** If true, run penny-drop validation after creating fund account. */
   validateBeneficiaryName?: boolean;
 }): Promise<{ contactId: string; fundAccountId: string }> {
-  // 1. Verify bank account (₹1 penny drop)
-  const verification = await verifyBankAccount({
-    accountNumber: params.accountNumber,
-    ifsc: params.ifsc,
-  });
-
-  if (verification.status !== "completed") {
-    throw new Error(
-      `Bank account verification failed (status: ${verification.status}). Please check account number and IFSC.`
-    );
-  }
-
-  // Optional: compare beneficiary name with provided name (normalize spaces and case)
-  if (params.validateBeneficiaryName && verification.beneficiaryName && params.name) {
-    const normalize = (s: string) =>
-      s
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, " ");
-    const a = normalize(verification.beneficiaryName);
-    const b = normalize(params.name);
-    if (a !== b) {
-      throw new Error(
-        `Bank account name mismatch. Bank returned: "${verification.beneficiaryName}". Please use the exact account holder name.`
-      );
-    }
-  }
-
-  // 2. Create contact or reuse existing
+  // 1. Create contact or reuse existing
   let contactId: string;
   if (params.existingContactId?.trim()) {
     contactId = params.existingContactId.trim();
@@ -197,7 +169,7 @@ export async function createContactAndFundAccount(params: {
     contactId = contact.id;
   }
 
-  // 3. Create fund account
+  // 2. Create fund account
   const fundAccount = await createFundAccount({
     contactId,
     accountType: "bank_account",
@@ -207,6 +179,31 @@ export async function createContactAndFundAccount(params: {
       account_number: params.accountNumber,
     },
   });
+
+  // 3. Penny-drop validation (requires fund_account.id + platform account number)
+  if (params.validateBeneficiaryName) {
+    const platformAccount = process.env.RAZORPAY_X_ACCOUNT_NUMBER;
+    if (platformAccount) {
+      try {
+        const validation = await validateFundAccount({
+          fundAccountId: fundAccount.id,
+        });
+        if (validation.status === "failed") {
+          throw new Error(
+            "Bank account validation failed. Please check your account number and IFSC."
+          );
+        }
+      } catch (err: any) {
+        // If validation endpoint is not available, log and continue — fund account is still created
+        const msg = err?.response?.data?.error?.description || err?.message || "";
+        if (msg.includes("Access to requested resource") || msg.includes("not available")) {
+          // Validation API not enabled on this Razorpay account — skip
+        } else {
+          throw err;
+        }
+      }
+    }
+  }
 
   return { contactId, fundAccountId: fundAccount.id };
 }
