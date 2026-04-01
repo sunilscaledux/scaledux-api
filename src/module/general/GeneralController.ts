@@ -595,7 +595,7 @@ export async function searchSkills(req: Request, res: Response) {
           contains: query.trim(),
           mode: 'insensitive'
         },
-        ...(catId ? { category_id: catId } : {}),
+        ...(catId ? { categoryId: catId } : {}),
       },
       select: {
         id: true,

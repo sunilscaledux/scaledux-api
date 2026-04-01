@@ -611,10 +611,11 @@ export class FounderProjectService {
         data: transformedProject
       };
     } catch (error: any) {
-      Log.error("Create Project Error", { error });
+      Log.error("Create Project Error", { error: error.message, stack: error.stack });
+      const msg = error?.meta?.cause || error?.message || "Failed to create project";
       return {
         success: false,
-        message: "Failed to create project"
+        message: typeof msg === 'string' ? msg : "Failed to create project"
       };
     }
   }
