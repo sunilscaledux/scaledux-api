@@ -34,6 +34,7 @@ import { privateFileAccess } from "@middleware/auth";
 import { viewProtectedFile } from "@module/general/FileController";
 import { Log } from '@services/loggerService';
 import { resolveRedirectLink } from '@services/redirectLinkService';
+import { globalErrorHandler } from '@middleware/errorHandler';
 
 // Bull Board for queue monitoring
 import { serverAdapter } from './config/bullBoard';
@@ -93,6 +94,9 @@ if (process.env.NODE_ENV !== 'production') {
   app.use('/admin/queues', serverAdapter.getRouter());
   Log.info('Bull Board available at: http://localhost:4000/admin/queues');
 }
+
+// Global error handler — catches all unhandled errors from controllers
+app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 4000;
 

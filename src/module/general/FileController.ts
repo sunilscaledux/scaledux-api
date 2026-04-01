@@ -12,108 +12,96 @@ import type { AttachmentMetaItem } from '@middleware/fileupload'
  */
 
 export async function uploadFile(req: Request, res: Response) {
-  try {
-    const userId = req.user?.id
-    const userUniqueId = req.user?.unique_id
+  const userId = req.user?.id
+  const userUniqueId = req.user?.unique_id
 
-    if (!userId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    const files = Array.isArray(req.files) ? req.files : (req.file ? [req.file] : [])
-    if (!files.length) {
-      return ApiResponse.error(res, "No files uploaded", 400)
-    }
-
-    const meta = (req as any).attachmentMeta as AttachmentMetaItem[] | undefined
-    if (meta?.length) {
-      const disk = 'bunny'
-      const visibility = (req as any).uploadVisibility as 'public' | 'private' | undefined ?? 'private'
-      const fieldName = (req as any).uploadFieldName as string | undefined ?? 'attachment'
-      const filesList = files as Express.Multer.File[]
-      const uniqueIds: string[] = []
-      const urls: string[] = []
-      for (let i = 0; i < meta.length; i++) {
-        const m = meta[i]
-        const file = filesList[i]
-        const size = file?.size ?? m.size
-        const created = await createAttachment({
-          ownerUserId: userId,
-          uploadedByUserId: userId,
-          path: m.path,
-          disk,
-          visibility,
-          mimeType: m.mimeType,
-          sizeBytes: size,
-          originalName: m.originalName,
-          status: 'temporary',
-          existingUniqueId: m.uniqueId,
-        })
-        if (created) {
-          uniqueIds.push(created.unique_id)
-          const url = await resolveAttachmentUrl(created.unique_id, fieldName)
-          urls.push(url)
-        }
-      }
-      return ApiResponse.success(res, { urls }, "Files uploaded successfully")
-    }
-
-    const urls = (files as any[]).map((file: any) => {
-      const relativePath = file.path ?? ''
-      return relativePath ? getPublicUrl(relativePath) : ''
-    }).filter(Boolean)
-
-    return ApiResponse.success(res, { urls }, "Files uploaded successfully")
-
-  } catch (error: any) {
-    Log.error("Error", { error })
-    return ApiResponse.error(res, "Failed to upload files", 500)
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401)
   }
+
+  const files = Array.isArray(req.files) ? req.files : (req.file ? [req.file] : [])
+  if (!files.length) {
+    return ApiResponse.error(res, "No files uploaded", 400)
+  }
+
+  const meta = (req as any).attachmentMeta as AttachmentMetaItem[] | undefined
+  if (meta?.length) {
+    const disk = 'bunny'
+    const visibility = (req as any).uploadVisibility as 'public' | 'private' | undefined ?? 'private'
+    const fieldName = (req as any).uploadFieldName as string | undefined ?? 'attachment'
+    const filesList = files as Express.Multer.File[]
+    const uniqueIds: string[] = []
+    const urls: string[] = []
+    for (let i = 0; i < meta.length; i++) {
+      const m = meta[i]
+      const file = filesList[i]
+      const size = file?.size ?? m.size
+      const created = await createAttachment({
+        ownerUserId: userId,
+        uploadedByUserId: userId,
+        path: m.path,
+        disk,
+        visibility,
+        mimeType: m.mimeType,
+        sizeBytes: size,
+        originalName: m.originalName,
+        status: 'temporary',
+        existingUniqueId: m.uniqueId,
+      })
+      if (created) {
+        uniqueIds.push(created.unique_id)
+        const url = await resolveAttachmentUrl(created.unique_id, fieldName)
+        urls.push(url)
+      }
+    }
+    return ApiResponse.success(res, { urls }, "Files uploaded successfully")
+  }
+
+  const urls = (files as any[]).map((file: any) => {
+    const relativePath = file.path ?? ''
+    return relativePath ? getPublicUrl(relativePath) : ''
+  }).filter(Boolean)
+
+  return ApiResponse.success(res, { urls }, "Files uploaded successfully")
 }
 
 export async function deleteFile(req: Request, res: Response) {
-  try {
-    const userId = req.user?.id
-    const userUniqueId = req.user?.unique_id
-    const { filePath } = req.body
+  const userId = req.user?.id
+  const userUniqueId = req.user?.unique_id
+  const { filePath } = req.body
 
-    Log.info("Unified delete request:", { userId, userUniqueId, filePath, body: req.body })
+  Log.info("Unified delete request:", { userId, userUniqueId, filePath, body: req.body })
 
-    // Validate authentication
-    if (!userId || !userUniqueId) {
-      return ApiResponse.error(res, "User not authenticated", 401)
-    }
-
-    const rawIdOrUrl = (req.body as any).uniqueId ?? filePath
-    if (!rawIdOrUrl) {
-      return ApiResponse.error(res, "uniqueId is required", 400)
-    }
-    const uniqueId = urlOrPathToAttachmentId(rawIdOrUrl)
-    if (!uniqueId) {
-      return ApiResponse.error(res, "Invalid attachment id", 400)
-    }
-
-    const att = await getByUniqueId(uniqueId)
-    if (!att) return ApiResponse.error(res, "File not found", 404)
-    if (att.owner_user_id !== userId) return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
-    const pathToDelete = att.path
-    await (prisma as any).attachment.update({
-      where: { id: att.id },
-      data: { deleted_at: new Date() }
-    })
-
-    const deleted = await deletePublic(pathToDelete)
-    if (!deleted) Log.info("Bunny delete returned false for:", pathToDelete)
-
-    return ApiResponse.success(res, {
-      message: "File deleted successfully",
-      filePath: pathToDelete
-    }, "File deleted successfully")
-
-  } catch (error: any) {
-    Log.error("Error", { error })
-    return ApiResponse.error(res, "Failed to delete file", 500)
+  // Validate authentication
+  if (!userId || !userUniqueId) {
+    return ApiResponse.error(res, "User not authenticated", 401)
   }
+
+  const rawIdOrUrl = (req.body as any).uniqueId ?? filePath
+  if (!rawIdOrUrl) {
+    return ApiResponse.error(res, "uniqueId is required", 400)
+  }
+  const uniqueId = urlOrPathToAttachmentId(rawIdOrUrl)
+  if (!uniqueId) {
+    return ApiResponse.error(res, "Invalid attachment id", 400)
+  }
+
+  const att = await getByUniqueId(uniqueId)
+  if (!att) return ApiResponse.error(res, "File not found", 404)
+  if (att.owner_user_id !== userId) return ApiResponse.error(res, "Unauthorized: You can only delete your own files", 403)
+  const pathToDelete = att.path
+  await (prisma as any).attachment.update({
+    where: { id: att.id },
+    data: { deleted_at: new Date() }
+  })
+
+  const deleted = await deletePublic(pathToDelete)
+  if (!deleted) Log.info("Bunny delete returned false for:", pathToDelete)
+
+  return ApiResponse.success(res, {
+    message: "File deleted successfully",
+    filePath: pathToDelete
+  }, "File deleted successfully")
 }
 
 const fileLostUrl = () =>

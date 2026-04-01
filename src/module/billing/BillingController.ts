@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { BillingService } from "./BillingService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { getStringParam } from "@utils/requestHelpers";
-import { Log } from "@services/loggerService";
 import { ConversationService } from "@module/chat/ConversationService";
 import { createProposalActivity } from "@module/proposal/ProposalActivityService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
@@ -12,108 +11,93 @@ import { prisma } from "@services/prismaService";
 export class BillingController {
   // Get payment breakdown (platform fee only on first milestone, gst, service fee) for display and Razorpay total
   static async getPaymentBreakdown(req: Request, res: Response) {
-    try {
-      const amountParam = req.query.amount ?? req.body?.amount;
-      const firstMilestoneParam = req.query.firstMilestone;
-      const milestoneAmount = amountParam != null ? Number(amountParam) : undefined;
-      const isFirstMilestone = firstMilestoneParam === undefined || firstMilestoneParam === 'true' || firstMilestoneParam === '';
-      const data = BillingService.getPaymentBreakdown(
-        Number.isFinite(milestoneAmount) ? milestoneAmount : undefined,
-        isFirstMilestone
-      );
-      return ApiResponse.success(res, data);
-    } catch (error: any) {
-      Log.error("Error getting payment breakdown", { error });
-      return ApiResponse.error(res, error.message || "Failed to get payment breakdown");
-    }
+    const amountParam = req.query.amount ?? req.body?.amount;
+    const firstMilestoneParam = req.query.firstMilestone;
+    const milestoneAmount = amountParam != null ? Number(amountParam) : undefined;
+    const isFirstMilestone = firstMilestoneParam === undefined || firstMilestoneParam === 'true' || firstMilestoneParam === '';
+    const data = BillingService.getPaymentBreakdown(
+      Number.isFinite(milestoneAmount) ? milestoneAmount : undefined,
+      isFirstMilestone
+    );
+    return ApiResponse.success(res, data);
   }
 
   // Create Razorpay order. For payment: send milestoneId (and optional milestoneIndex); amount is computed on server. For card verification: no body or { amount: 1 }.
   static async createVerificationOrder(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
+    }
 
-      const { milestoneId, milestoneIndex } = req.body;
-      const milestoneIdNum = milestoneId != null ? parseInt(String(milestoneId), 10) : NaN;
+    const { milestoneId, milestoneIndex } = req.body;
+    const milestoneIdNum = milestoneId != null ? parseInt(String(milestoneId), 10) : NaN;
 
-      if (Number.isFinite(milestoneIdNum) && milestoneIdNum > 0) {
-        const orderAmounts = await BillingService.getMilestoneOrderAmount(
-          userId,
-          milestoneIdNum,
-          milestoneIndex != null ? parseInt(String(milestoneIndex), 10) : undefined
-        );
-        if (!orderAmounts.success || orderAmounts.totalFounderPays == null) {
-          return ApiResponse.error(res, orderAmounts.message ?? "Invalid milestone", 400);
-        }
-        const platformTransferPaise =
-          orderAmounts.platformTransferAmountInr != null && orderAmounts.platformTransferAmountInr > 0
-            ? Math.round(orderAmounts.platformTransferAmountInr * 100)
-            : undefined;
-        const result = await BillingService.createVerificationOrder(userId.toString(), orderAmounts.totalFounderPays, {
-          platformTransferAmountPaise: platformTransferPaise,
-          receiptPrefix: "pay",
-          notes: { purpose: "milestone_payment", milestone_id: String(milestoneIdNum), user_id: userId.toString() }
-        });
-        if (!result.success) return ApiResponse.error(res, result.message);
-        return ApiResponse.success(res, result.data, "Order created successfully");
+    if (Number.isFinite(milestoneIdNum) && milestoneIdNum > 0) {
+      const orderAmounts = await BillingService.getMilestoneOrderAmount(
+        userId,
+        milestoneIdNum,
+        milestoneIndex != null ? parseInt(String(milestoneIndex), 10) : undefined
+      );
+      if (!orderAmounts.success || orderAmounts.totalFounderPays == null) {
+        return ApiResponse.error(res, orderAmounts.message ?? "Invalid milestone", 400);
       }
-
-      const { amount } = req.body;
-      const amountNum = amount != null ? Number(amount) : 1;
-      if (amountNum !== 1) {
-        return ApiResponse.error(res, "For card verification only amount 1 is allowed. For payment send milestoneId.", 400);
-      }
-      const result = await BillingService.createVerificationOrder(userId.toString(), 1);
+      const platformTransferPaise =
+        orderAmounts.platformTransferAmountInr != null && orderAmounts.platformTransferAmountInr > 0
+          ? Math.round(orderAmounts.platformTransferAmountInr * 100)
+          : undefined;
+      const result = await BillingService.createVerificationOrder(userId.toString(), orderAmounts.totalFounderPays, {
+        platformTransferAmountPaise: platformTransferPaise,
+        receiptPrefix: "pay",
+        notes: { purpose: "milestone_payment", milestone_id: String(milestoneIdNum), user_id: userId.toString() }
+      });
       if (!result.success) return ApiResponse.error(res, result.message);
       return ApiResponse.success(res, result.data, "Order created successfully");
-    } catch (error: any) {
-      Log.error("Error creating order", { error });
-      return ApiResponse.error(res, error.message || "Failed to create order");
     }
+
+    const { amount } = req.body;
+    const amountNum = amount != null ? Number(amount) : 1;
+    if (amountNum !== 1) {
+      return ApiResponse.error(res, "For card verification only amount 1 is allowed. For payment send milestoneId.", 400);
+    }
+    const result = await BillingService.createVerificationOrder(userId.toString(), 1);
+    if (!result.success) return ApiResponse.error(res, result.message);
+    return ApiResponse.success(res, result.data, "Order created successfully");
   }
 
   // Verify Razorpay payment and save payment method (or record subject-based payment when subjectType + subjectId sent)
   static async verifyPaymentSignature(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const { razorpayOrderId, razorpayPaymentId, razorpaySignature, milestoneId, milestoneIndex: milestoneIndexBody, subjectType, subjectId } = req.body;
-
-      // Verify Razorpay signature
-      const isValid = BillingService.verifyPaymentSignature({
-        razorpayOrderId,
-        razorpayPaymentId,
-        razorpaySignature
-      });
-
-      if (!isValid) {
-        return ApiResponse.error(res, "Invalid payment signature", 400);
-      }
-
-      // Proposal payment: pass milestoneId and milestoneIndex from frontend (same index used for breakdown)
-      const mid = milestoneId != null ? parseInt(milestoneId, 10) : NaN;
-      const milestoneIndexParam = milestoneIndexBody != null ? parseInt(milestoneIndexBody, 10) : undefined;
-      if (Number.isFinite(mid) && mid > 0) {
-        const handled = await BillingController.handleMilestonePayment(res, userId, mid, razorpayPaymentId, razorpayOrderId, Number.isFinite(milestoneIndexParam) ? milestoneIndexParam : undefined);
-        if (handled) return;
-      }
-      const subjType = (subjectType ?? null) as string | null;
-      if (subjType && subjectId != null) {
-        const handled = await BillingController.handlePaymentBySubjectType(res, userId, subjType, subjectId);
-        if (handled) return;
-      }
-
-      return ApiResponse.error(res, "Invalid or unsupported payment. Provide milestoneId or subjectType and subjectId.", 400);
-    } catch (error: any) {
-      Log.error("Error verifying payment", { error });
-      return ApiResponse.error(res, error.message || "Failed to verify payment");
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, milestoneId, milestoneIndex: milestoneIndexBody, subjectType, subjectId } = req.body;
+
+    // Verify Razorpay signature
+    const isValid = BillingService.verifyPaymentSignature({
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature
+    });
+
+    if (!isValid) {
+      return ApiResponse.error(res, "Invalid payment signature", 400);
+    }
+
+    // Proposal payment: pass milestoneId and milestoneIndex from frontend (same index used for breakdown)
+    const mid = milestoneId != null ? parseInt(milestoneId, 10) : NaN;
+    const milestoneIndexParam = milestoneIndexBody != null ? parseInt(milestoneIndexBody, 10) : undefined;
+    if (Number.isFinite(mid) && mid > 0) {
+      const handled = await BillingController.handleMilestonePayment(res, userId, mid, razorpayPaymentId, razorpayOrderId, Number.isFinite(milestoneIndexParam) ? milestoneIndexParam : undefined);
+      if (handled) return;
+    }
+    const subjType = (subjectType ?? null) as string | null;
+    if (subjType && subjectId != null) {
+      const handled = await BillingController.handlePaymentBySubjectType(res, userId, subjType, subjectId);
+      if (handled) return;
+    }
+
+    return ApiResponse.error(res, "Invalid or unsupported payment. Provide milestoneId or subjectType and subjectId.", 400);
   }
 
   /**
@@ -290,153 +274,118 @@ export class BillingController {
 
   // Get user's payment methods
   static async getPaymentMethods(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const result = await BillingService.getPaymentMethods(userId.toString());
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching payment methods", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch payment methods");
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const result = await BillingService.getPaymentMethods(userId.toString());
+    return ApiResponse.success(res, result.data);
   }
 
   // Set payment method as default
   static async setDefaultPaymentMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      const paymentMethodId = getStringParam(req.params.paymentMethodId);
+    const userId = req.user?.id;
+    const paymentMethodId = getStringParam(req.params.paymentMethodId);
 
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const result = await BillingService.setDefaultPaymentMethod(userId.toString(), paymentMethodId);
-      
-      if (!result.success) {
-        return ApiResponse.error(res, result.message);
-      }
-
-      return ApiResponse.success(res, null, result.message);
-    } catch (error: any) {
-      Log.error("Error setting default payment method", { error });
-      return ApiResponse.error(res, error.message || "Failed to set default payment method");
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const result = await BillingService.setDefaultPaymentMethod(userId.toString(), paymentMethodId);
+
+    if (!result.success) {
+      return ApiResponse.error(res, result.message);
+    }
+
+    return ApiResponse.success(res, null, result.message);
   }
 
   // Delete payment method
   static async deletePaymentMethod(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      const paymentMethodId = getStringParam(req.params.paymentMethodId);
+    const userId = req.user?.id;
+    const paymentMethodId = getStringParam(req.params.paymentMethodId);
 
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const result = await BillingService.deletePaymentMethod(userId.toString(), paymentMethodId);
-      
-      if (!result.success) {
-        return ApiResponse.error(res, result.message, (result as any).requiresDefaultReassignment ? 400 : 404);
-      }
-
-      return ApiResponse.success(res, null, result.message);
-    } catch (error: any) {
-      Log.error("Error deleting payment method", { error });
-      return ApiResponse.error(res, error.message || "Failed to delete payment method");
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const result = await BillingService.deletePaymentMethod(userId.toString(), paymentMethodId);
+
+    if (!result.success) {
+      return ApiResponse.error(res, result.message, (result as any).requiresDefaultReassignment ? 400 : 404);
+    }
+
+    return ApiResponse.success(res, null, result.message);
   }
 
   // Get billing history/transactions
   static async getBillingHistory(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const defaultBillingLimit = Number(process.env.BILLING_PAGE_LIMIT) || 10;
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || defaultBillingLimit;
-      const fromDate = req.query.fromDate as string | undefined;
-      const toDate = req.query.toDate as string | undefined;
-      const search = req.query.search as string | undefined;
-      const creditsOnly = req.query.creditsOnly === 'true' || req.query.creditsOnly === '1';
-
-      const result = await BillingService.getBillingHistory(
-        userId.toString(), 
-        page, 
-        limit,
-        fromDate,
-        toDate,
-        search,
-        creditsOnly
-      );
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching billing history", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch billing history");
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const defaultBillingLimit = Number(process.env.BILLING_PAGE_LIMIT) || 10;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || defaultBillingLimit;
+    const fromDate = req.query.fromDate as string | undefined;
+    const toDate = req.query.toDate as string | undefined;
+    const search = req.query.search as string | undefined;
+    const creditsOnly = req.query.creditsOnly === 'true' || req.query.creditsOnly === '1';
+
+    const result = await BillingService.getBillingHistory(
+      userId.toString(),
+      page,
+      limit,
+      fromDate,
+      toDate,
+      search,
+      creditsOnly
+    );
+    return ApiResponse.success(res, result.data);
   }
 
   // Get user's balance
   static async getUserBalance(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-
-      const result = await BillingService.getUserBalance(userId.toString());
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching user balance", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch user balance");
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+
+    const result = await BillingService.getUserBalance(userId.toString());
+    return ApiResponse.success(res, result.data);
   }
 
   // Release a pending payment (payer only). Sets transaction to completed and updates user totals.
   static async releasePayment(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      const uniqueId = getStringParam(req.params.uniqueId);
-      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
-      const result = await BillingService.releasePaymentTransaction(uniqueId, userId);
-      if (!result.success) {
-        const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
-        return ApiResponse.error(res, result.message ?? "Failed to release payment", code);
-      }
-      return ApiResponse.success(res, null, "Payment released successfully");
-    } catch (error: any) {
-      Log.error("Error releasing payment", { error });
-      return ApiResponse.error(res, error.message || "Failed to release payment");
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+    const uniqueId = getStringParam(req.params.uniqueId);
+    if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+    const result = await BillingService.releasePaymentTransaction(uniqueId, userId);
+    if (!result.success) {
+      const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+      return ApiResponse.error(res, result.message ?? "Failed to release payment", code);
     }
+    return ApiResponse.success(res, null, "Payment released successfully");
   }
 
   // Get transaction detail (for modal); if Proposal, includes milestone payments
   static async getTransactionDetail(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return ApiResponse.error(res, "User not authenticated", 401);
-      }
-      const { uniqueId } = req.params;
-      if (!uniqueId || Array.isArray(uniqueId)) {
-        return ApiResponse.error(res, "Transaction ID is required", 400);
-      }
-      const result = await BillingService.getTransactionDetail(uniqueId, userId.toString());
-      if (!result.success) {
-        return ApiResponse.error(res, result.message, 404);
-      }
-      return ApiResponse.success(res, result.data);
-    } catch (error: any) {
-      Log.error("Error fetching transaction detail", { error });
-      return ApiResponse.error(res, error.message || "Failed to fetch transaction detail");
+    const userId = req.user?.id;
+    if (!userId) {
+      return ApiResponse.error(res, "User not authenticated", 401);
     }
+    const { uniqueId } = req.params;
+    if (!uniqueId || Array.isArray(uniqueId)) {
+      return ApiResponse.error(res, "Transaction ID is required", 400);
+    }
+    const result = await BillingService.getTransactionDetail(uniqueId, userId.toString());
+    if (!result.success) {
+      return ApiResponse.error(res, result.message, 404);
+    }
+    return ApiResponse.success(res, result.data);
   }
 
   private static async ensureFreelancer(req: Request): Promise<boolean> {
@@ -457,62 +406,47 @@ export class BillingController {
 
   /** Request payout for a specific payment to bank. POST /transaction/:uniqueId/request-payout (also /request-withdraw for compat). */
   static async requestPayout(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-      if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request payout", 403);
-      const uniqueId = getStringParam(req.params.uniqueId);
-      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
-      const bankInformationId = req.body?.bankInformationId ?? req.body?.withdrawalMethodId;
-      const bankInfoIdNum = bankInformationId != null ? parseInt(String(bankInformationId), 10) : undefined;
-      if (bankInfoIdNum == null || !Number.isFinite(bankInfoIdNum)) {
-        return ApiResponse.error(res, "Bank information is required", 400);
-      }
-      const result = await BillingService.setReceiverWithdrawInProcess(uniqueId, userId, bankInfoIdNum);
-      if (!result.success) {
-        const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
-        return ApiResponse.error(res, result.message ?? "Failed to request payout", code);
-      }
-      return ApiResponse.success(res, null, "Payout requested");
-    } catch (error: any) {
-      Log.error("Error requesting payout", { error });
-      return ApiResponse.error(res, error.message || "Failed to request payout");
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+    if (!(await BillingController.ensureFreelancer(req))) return ApiResponse.error(res, "Only freelancers can request payout", 403);
+    const uniqueId = getStringParam(req.params.uniqueId);
+    if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+    const bankInformationId = req.body?.bankInformationId ?? req.body?.withdrawalMethodId;
+    const bankInfoIdNum = bankInformationId != null ? parseInt(String(bankInformationId), 10) : undefined;
+    if (bankInfoIdNum == null || !Number.isFinite(bankInfoIdNum)) {
+      return ApiResponse.error(res, "Bank information is required", 400);
     }
+    const result = await BillingService.setReceiverWithdrawInProcess(uniqueId, userId, bankInfoIdNum);
+    if (!result.success) {
+      const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+      return ApiResponse.error(res, result.message ?? "Failed to request payout", code);
+    }
+    return ApiResponse.success(res, null, "Payout requested");
   }
 
   /** Webhook: set receiver_status to released and create receiver invoice. */
   static async webhookReceiverReleased(req: Request, res: Response) {
-    try {
-      const uniqueId = getStringParam(req.params.uniqueId);
-      if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
-      const result = await BillingService.setReceiverReleased(uniqueId);
-      if (!result.success) {
-        return ApiResponse.error(res, result.message ?? "Failed to set released", 400);
-      }
-      return ApiResponse.success(res, null, "Receiver released");
-    } catch (error: any) {
-      Log.error("Error setting receiver released", { error });
-      return ApiResponse.error(res, error.message || "Failed to set receiver released");
+    const uniqueId = getStringParam(req.params.uniqueId);
+    if (!uniqueId) return ApiResponse.error(res, "Transaction ID is required", 400);
+    const result = await BillingService.setReceiverReleased(uniqueId);
+    if (!result.success) {
+      return ApiResponse.error(res, result.message ?? "Failed to set released", 400);
     }
+    return ApiResponse.success(res, null, "Receiver released");
   }
 
   /** Return invoice data as JSON for client-side PDF generation (realtime). */
   static async getInvoiceData(req: Request, res: Response) {
-    try {
-      const { uniqueId } = req.params;
-      if (!uniqueId || Array.isArray(uniqueId)) {
-        return ApiResponse.error(res, "Transaction ID is required", 400);
-      }
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
-      const result = await BillingService.getInvoiceData(uniqueId as string, userId);
-      if (!result.success) {
-        return ApiResponse.error(res, result.message, 404);
-      }
-      return ApiResponse.success(res, result.data, "OK");
-    } catch (error: any) {
-      Log.error("Error getting invoice data", { error });
-      return ApiResponse.error(res, error.message || "Failed to get invoice data");
+    const { uniqueId } = req.params;
+    if (!uniqueId || Array.isArray(uniqueId)) {
+      return ApiResponse.error(res, "Transaction ID is required", 400);
     }
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+    const result = await BillingService.getInvoiceData(uniqueId as string, userId);
+    if (!result.success) {
+      return ApiResponse.error(res, result.message, 404);
+    }
+    return ApiResponse.success(res, result.data, "OK");
   }
 }

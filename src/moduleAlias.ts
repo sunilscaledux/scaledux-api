@@ -12,3 +12,23 @@ moduleAlias.addAliases({
   '@services': path.join(__dirname, 'services'),
   '@queues': path.join(__dirname, 'queues'),
 });
+
+// Patch Router BEFORE any route files are imported.
+// Wraps all async route handlers so errors go to the global error handler.
+const { Router } = require('express');
+
+function wrapAsync(fn: any) {
+  if (typeof fn !== 'function' || fn.length === 4) return fn;
+  return (req: any, res: any, next: any) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
+const methods = ['get', 'post', 'put', 'patch', 'delete'] as const;
+for (const method of methods) {
+  const original = Router.prototype[method];
+  Router.prototype[method] = function (path: any, ...handlers: any[]) {
+    const wrapped = handlers.map((h: any) => typeof h === 'function' ? wrapAsync(h) : h);
+    return original.call(this, path, ...wrapped);
+  };
+}

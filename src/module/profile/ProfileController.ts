@@ -5,40 +5,31 @@ import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, 
 import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
 
 export class ProfileController {
-  
-  static async getMyProfile(req: Request, res: Response) {
-   
-    try {
-      const userId = req.user.id;
-      const result = await PersonalInfoService.getProfileByUserId(userId);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message, 404);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to fetch freelancer profile');
+  static async getMyProfile(req: Request, res: Response) {
+    const userId = req.user.id;
+    const result = await PersonalInfoService.getProfileByUserId(userId);
+
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message, 404);
     }
   }
 
   static async updateSummary(req: Request, res: Response) {
-    try {
-      const { value, error } = updateSummarySchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
+    const { value, error } = updateSummarySchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updateProfileSummary(userId, value);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updateProfileSummary(userId, value);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update summary');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -47,22 +38,18 @@ export class ProfileController {
    * PATCH /api/v1/profile/freelancer/personal-info
    */
   static async updatePersonalInfo(req: Request, res: Response) {
-    try {
-      const { value, error } = updatePersonalInfoSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
+    const { value, error } = updatePersonalInfoSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updatePersonalInfo(userId, value);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updatePersonalInfo(userId, value);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update personal info');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -71,22 +58,18 @@ export class ProfileController {
    * PATCH /api/v1/profile/freelancer/hourly-rate
    */
   static async updateHourlyRate(req: Request, res: Response) {
-    try {
-      const { value, error } = updateHourlyRateSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
+    const { value, error } = updateHourlyRateSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updateHourlyRate(userId, value);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updateHourlyRate(userId, value);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update hourly rate');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -95,22 +78,18 @@ export class ProfileController {
    * PATCH /api/v1/profile/available-hours-per-week
    */
   static async updateAvailableHoursPerWeek(req: Request, res: Response) {
-    try {
-      const { value, error } = updateAvailableHoursPerWeekSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
+    const { value, error } = updateAvailableHoursPerWeekSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updateAvailableHoursPerWeek(userId, value);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updateAvailableHoursPerWeek(userId, value);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update available hours per week');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -119,23 +98,19 @@ export class ProfileController {
    * PATCH /api/v1/profile/freelancer/languages
    */
   static async updateLanguages(req: Request, res: Response) {
-    try {
-      const { languages } = req.body;
+    const { languages } = req.body;
 
-      if (!Array.isArray(languages)) {
-        return ApiResponse.error(res, 'Languages must be an array', 400);
-      }
+    if (!Array.isArray(languages)) {
+      return ApiResponse.error(res, 'Languages must be an array', 400);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updateLanguages(userId, languages);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updateLanguages(userId, languages);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update languages');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -144,23 +119,19 @@ export class ProfileController {
    * POST /api/v1/profile/freelancer/profile-image
    */
   static async uploadProfileImage(req: Request, res: Response) {
-    try {
-      if (!req.file) {
-        return ApiResponse.error(res, 'No file uploaded', 400);
-      }
+    if (!req.file) {
+      return ApiResponse.error(res, 'No file uploaded', 400);
+    }
 
-      const userId = req.user.id;
-      const profileType = req.body.profile_type || 'freelancer';
-      const attachmentMeta = (req as any).attachmentMeta?.[0];
-      const result = await PersonalInfoService.uploadProfileImage(userId, req.file, profileType, attachmentMeta);
+    const userId = req.user.id;
+    const profileType = req.body.profile_type || 'freelancer';
+    const attachmentMeta = (req as any).attachmentMeta?.[0];
+    const result = await PersonalInfoService.uploadProfileImage(userId, req.file, profileType, attachmentMeta);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to upload profile image');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -169,23 +140,19 @@ export class ProfileController {
    * POST /api/v1/profile/freelancer/cover-image
    */
   static async uploadCoverImage(req: Request, res: Response) {
-    try {
-      if (!req.file) {
-        return ApiResponse.error(res, 'No file uploaded', 400);
-      }
+    if (!req.file) {
+      return ApiResponse.error(res, 'No file uploaded', 400);
+    }
 
-      const userId = req.user.id;
-      const profileType = req.body.profile_type || 'freelancer';
-      const attachmentMeta = (req as any).attachmentMeta?.[0];
-      const result = await PersonalInfoService.uploadCoverImage(userId, req.file, profileType, attachmentMeta);
+    const userId = req.user.id;
+    const profileType = req.body.profile_type || 'freelancer';
+    const attachmentMeta = (req as any).attachmentMeta?.[0];
+    const result = await PersonalInfoService.uploadCoverImage(userId, req.file, profileType, attachmentMeta);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to upload cover image');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -194,16 +161,12 @@ export class ProfileController {
    * GET /api/v1/profile/password-status
    */
   static async getPasswordStatus(req: Request, res: Response) {
-    try {
-      const userId = req.user.id;
-      const result = await PersonalInfoService.getPasswordStatus(userId);
-      if (result.success && result.data) {
-        return ApiResponse.success(res, result.data, result.message);
-      }
-      return ApiResponse.error(res, result.message || 'Failed to get password status', 400);
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to get password status');
+    const userId = req.user.id;
+    const result = await PersonalInfoService.getPasswordStatus(userId);
+    if (result.success && result.data) {
+      return ApiResponse.success(res, result.data, result.message);
     }
+    return ApiResponse.error(res, result.message || 'Failed to get password status', 400);
   }
 
   /**
@@ -211,20 +174,16 @@ export class ProfileController {
    * PATCH /api/v1/profile/set-password
    */
   static async setPassword(req: Request, res: Response) {
-    try {
-      const { value, error } = setPasswordSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
-      const userId = req.user.id;
-      const result = await PersonalInfoService.setPassword(userId, value.new_password);
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      }
-      return ApiResponse.error(res, result.message, 400);
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to set password');
+    const { value, error } = setPasswordSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
     }
+    const userId = req.user.id;
+    const result = await PersonalInfoService.setPassword(userId, value.new_password);
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    }
+    return ApiResponse.error(res, result.message, 400);
   }
 
   /**
@@ -232,24 +191,20 @@ export class ProfileController {
    * PATCH /api/v1/profile/password
    */
   static async updatePassword(req: Request, res: Response) {
-    try {
-      const { value, error } = updatePasswordSchema.validate(req.body, { abortEarly: false });
-      if (error) {
-        return ApiResponse.joiValidationError(res, error);
-      }
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updatePassword(
-        userId,
-        value.current_password,
-        value.new_password
-      );
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      }
-      return ApiResponse.error(res, result.message, 400);
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update password');
+    const { value, error } = updatePasswordSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
     }
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updatePassword(
+      userId,
+      value.current_password,
+      value.new_password
+    );
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    }
+    return ApiResponse.error(res, result.message, 400);
   }
 
   /**
@@ -257,27 +212,23 @@ export class ProfileController {
    * PATCH /api/v1/profile/freelancer/privacy
    */
   static async updatePrivacySettings(req: Request, res: Response) {
-    try {
-      const { hideEmail, hidePhone } = req.body;
+    const { hideEmail, hidePhone } = req.body;
 
-      if (hideEmail !== undefined && typeof hideEmail !== 'boolean') {
-        return ApiResponse.error(res, 'hideEmail must be a boolean', 400);
-      }
+    if (hideEmail !== undefined && typeof hideEmail !== 'boolean') {
+      return ApiResponse.error(res, 'hideEmail must be a boolean', 400);
+    }
 
-      if (hidePhone !== undefined && typeof hidePhone !== 'boolean') {
-        return ApiResponse.error(res, 'hidePhone must be a boolean', 400);
-      }
+    if (hidePhone !== undefined && typeof hidePhone !== 'boolean') {
+      return ApiResponse.error(res, 'hidePhone must be a boolean', 400);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updatePrivacySettings(userId, hideEmail, hidePhone);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updatePrivacySettings(userId, hideEmail, hidePhone);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update privacy settings');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -286,23 +237,19 @@ export class ProfileController {
    * PATCH /api/v1/profile/freelancer/agency-settings
    */
   static async updateAgencySettings(req: Request, res: Response) {
-    try {
-      const { show_as_agency } = req.body;
+    const { show_as_agency } = req.body;
 
-      if (show_as_agency !== undefined && typeof show_as_agency !== 'boolean') {
-        return ApiResponse.error(res, 'show_as_agency must be a boolean', 400);
-      }
+    if (show_as_agency !== undefined && typeof show_as_agency !== 'boolean') {
+      return ApiResponse.error(res, 'show_as_agency must be a boolean', 400);
+    }
 
-      const userId = req.user.id;
-      const result = await PersonalInfoService.updateAgencySettings(userId, show_as_agency);
+    const userId = req.user.id;
+    const result = await PersonalInfoService.updateAgencySettings(userId, show_as_agency);
 
-      if (result.success) {
-        return ApiResponse.success(res, result.data, result.message);
-      } else {
-        return ApiResponse.error(res, result.message);
-      }
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to update agency settings');
+    if (result.success) {
+      return ApiResponse.success(res, result.data, result.message);
+    } else {
+      return ApiResponse.error(res, result.message);
     }
   }
 
@@ -311,18 +258,14 @@ export class ProfileController {
    * GET /api/v1/profile/:uniqueId/reviews?limit=20&offset=0
    */
   static async getPublicProfileReviews(req: Request, res: Response) {
-    try {
-      const rawId = req.params.uniqueId;
-      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
-      if (!uniqueId) return ApiResponse.error(res, 'Unique ID is required', 400);
-      const limit = req.query.limit != null ? Number(req.query.limit) : 20;
-      const offset = req.query.offset != null ? Number(req.query.offset) : 0;
-      const result = await getPublicReviewsByProfileUniqueId(uniqueId, { limit, offset });
-      if (!result.success) return ApiResponse.error(res, result.message!, 404);
-      return ApiResponse.success(res, result.data, result.message!);
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to fetch reviews');
-    }
+    const rawId = req.params.uniqueId;
+    const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    if (!uniqueId) return ApiResponse.error(res, 'Unique ID is required', 400);
+    const limit = req.query.limit != null ? Number(req.query.limit) : 20;
+    const offset = req.query.offset != null ? Number(req.query.offset) : 0;
+    const result = await getPublicReviewsByProfileUniqueId(uniqueId, { limit, offset });
+    if (!result.success) return ApiResponse.error(res, result.message!, 404);
+    return ApiResponse.success(res, result.data, result.message!);
   }
 
   /**
@@ -330,36 +273,28 @@ export class ProfileController {
    * GET /api/v1/profile/:uniqueId
    */
   static async getPublicProfile(req: Request, res: Response) {
-    try {
-      const rawId = req.params.uniqueId;
-      const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
+    const rawId = req.params.uniqueId;
+    const uniqueId = typeof rawId === 'string' ? rawId : rawId?.[0];
 
-      if (!uniqueId) {
-        return ApiResponse.error(res, 'Unique ID is required', 400);
-      }
-
-      const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
-      
-      if (personalInfo.success) {
-        return ApiResponse.success(res, personalInfo.data, personalInfo.message);
-      }
-      return ApiResponse.error(res, 'Profile not found', 404);
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to fetch public profile');
+    if (!uniqueId) {
+      return ApiResponse.error(res, 'Unique ID is required', 400);
     }
+
+    const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
+
+    if (personalInfo.success) {
+      return ApiResponse.success(res, personalInfo.data, personalInfo.message);
+    }
+    return ApiResponse.error(res, 'Profile not found', 404);
   }
 
   static async verifyPassword(req: Request, res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
-      const { password } = req.body;
-      if (!password) return ApiResponse.error(res, 'Password is required', 400);
-      const result = await PersonalInfoService.verifyPassword(userId, password);
-      if (!result.success) return ApiResponse.error(res, result.message, 400);
-      return ApiResponse.success(res, null, 'Password verified');
-    } catch (error: any) {
-      return ApiResponse.error(res, error.message || 'Failed to verify password');
-    }
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+    const { password } = req.body;
+    if (!password) return ApiResponse.error(res, 'Password is required', 400);
+    const result = await PersonalInfoService.verifyPassword(userId, password);
+    if (!result.success) return ApiResponse.error(res, result.message, 400);
+    return ApiResponse.success(res, null, 'Password verified');
   }
 }
