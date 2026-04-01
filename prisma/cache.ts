@@ -1,6 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import Redis from 'ioredis'
-import { getPublicUrl } from '../src/services/bunnyStorageService'
+
+const CDN_HOST = (process.env.BUNNY_CDN_HOSTNAME || '').replace(/\/$/, '')
+
+function getPublicUrl(path: string): string {
+  const p = path.replace(/\\/g, '/').replace(/^\/+/, '')
+  return CDN_HOST ? `${CDN_HOST}/${p}` : p
+}
 
 const prisma = new PrismaClient()
 
