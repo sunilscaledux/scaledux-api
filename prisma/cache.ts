@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import Redis from 'ioredis'
-import { getPublicUrl } from '@services/bunnyStorageService'
+import { getPublicUrl } from '../src/services/bunnyStorageService'
 
 const prisma = new PrismaClient()
 
