@@ -146,8 +146,24 @@ const googleCallback = async (req: Request, res: Response) => {
     );
 
   } catch (error: any) {
-    Log.error("Error", { error });
-    return ApiResponse.error(res, 'Google authentication failed');
+    Log.error("Google OAuth error", { error });
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      const googleError = error.response?.data?.error;
+
+      if (status === 400 && googleError === 'invalid_grant') {
+        return ApiResponse.error(res, 'Authorization code has expired or already been used. Please try signing in again.');
+      }
+      if (status === 401 || status === 403) {
+        return ApiResponse.error(res, 'Google rejected the authentication request. Please try again.');
+      }
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+        return ApiResponse.error(res, 'Unable to reach Google servers. Please check your connection and try again.');
+      }
+    }
+
+    return ApiResponse.error(res, 'Google authentication failed. Please try again.');
   }
 }
 

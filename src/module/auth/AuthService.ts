@@ -20,6 +20,7 @@ export const OTP_TYPES: Record<string, OtpType> = {
   PHONE_VERIFICATION: "PHONE_VERIFICATION",
   EMAIL_VERIFICATION: "EMAIL_VERIFICATION",
   DEACTIVATE_ACCOUNT: "DEACTIVATE_ACCOUNT",
+  TWO_FA_VERIFICATION: "TWO_FA_VERIFICATION",
 };
 
 export { OtpType };
@@ -30,11 +31,12 @@ export const OTP_TYPE_MAP: Record<string, OtpType> = {
   forgot: OTP_TYPES.FORGOT_PASSWORD_VERIFICATION,
   phone: OTP_TYPES.PHONE_VERIFICATION,
   email: OTP_TYPES.EMAIL_VERIFICATION,
+  "2fa": OTP_TYPES.TWO_FA_VERIFICATION,
 };
 
 // ─── Device / refresh token helpers ─────────────────────────────────────────
 
-function parseUserAgent(ua: string = ""): {
+export function parseUserAgent(ua: string = ""): {
   browser: string;
   os: string;
   deviceType: string;
@@ -76,9 +78,9 @@ export async function createLoginDevice(
     data: { is_current: false },
   });
 
-  // Soft delete expired devices (keep rows for admin)
+  // Soft delete expired devices (keep rows for admin), but preserve trusted devices
   const expired = await prisma.loginDevice.findMany({
-    where: { user_id: userId, expires_at: { lt: new Date() }, deleted_at: null },
+    where: { user_id: userId, expires_at: { lt: new Date() }, deleted_at: null, is_trusted: false },
     select: { id: true },
   });
   if (expired.length > 0) {

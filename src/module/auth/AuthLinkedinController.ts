@@ -322,29 +322,21 @@ const linkedinCallback = async (req: Request, res: Response) => {
       Log.error("📋 General error:", error.message);
     }
 
-    // Return detailed error message for debugging
-    let errorMessage = "LinkedIn authentication failed. ";
-    if (error.response?.status === 400) {
-      errorMessage += `Bad Request: ${
-        error.response.data?.error_description || "Invalid request parameters"
-      }`;
-    } else if (error.response?.status === 401) {
-      errorMessage += `Unauthorized: ${
-        error.response.data?.error_description || "Invalid credentials"
-      }`;
-    } else if (error.response?.status === 403) {
-      errorMessage += `Forbidden: ${
-        error.response.data?.message || "Insufficient permissions"
-      }`;
-    } else if (error.response) {
-      errorMessage += `HTTP ${error.response.status}: ${
-        error.response.data?.message || error.response.statusText
-      }`;
-    } else {
-      errorMessage += error.message;
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 400) {
+        return ApiResponse.error(res, 'Authorization code has expired or already been used. Please try signing in again.');
+      }
+      if (status === 401 || status === 403) {
+        return ApiResponse.error(res, 'LinkedIn rejected the authentication request. Please try again.');
+      }
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+        return ApiResponse.error(res, 'Unable to reach LinkedIn servers. Please check your connection and try again.');
+      }
     }
 
-    return ApiResponse.error(res, errorMessage);
+    return ApiResponse.error(res, 'LinkedIn authentication failed. Please try again.');
   }
 }
 
