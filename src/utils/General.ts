@@ -1,4 +1,5 @@
 
+import crypto from 'crypto'
 import { appConfig } from '@config/app'
 
 /** Display name for API: "Scaledux user" when deactivated, else first + middle + last name.
@@ -105,4 +106,11 @@ export function getResubmitWindow(
     canSubmit,
     nextSubmitAllowedAt: canSubmit ? null : next
   }
+}
+
+/** Generate random backup codes for 2FA recovery. */
+export function generateBackupCodes(count = 8): string[] {
+  return Array.from({ length: count }, () =>
+    crypto.randomBytes(4).toString('hex')
+  )
 }

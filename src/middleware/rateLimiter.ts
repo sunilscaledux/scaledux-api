@@ -23,14 +23,17 @@ export function createRateLimiter(windowSeconds: number, max: number) {
     keyGenerator: (req: Request) => {
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
       const userId = (req as any).user?.id;
-      return userId ? `${ip}:uid:${userId}` : ip;
+      const route = req.originalUrl || req.path;
+      return userId ? `rl:${route}:${ip}:uid:${userId}` : `rl:${route}:${ip}`;
     },
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req: Request, res: Response) => {
+      const minutes = Math.ceil(windowSeconds / 60);
+      const retryText = minutes === 1 ? '1 minute' : `${minutes} minutes`;
       res.status(429).json({
         success: false,
-        message: `Too many requests. Please try again after sometime`,
+        message: `Too many requests. Please try again after ${retryText}.`,
         data: {
           retryAfter: windowSeconds,
           limit: max,

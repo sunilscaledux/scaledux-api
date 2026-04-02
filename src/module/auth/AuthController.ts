@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { prisma } from "@services/prismaService";
 import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions, baseCookieOptions } from "@utils/jwtUtils";
 import {
@@ -12,6 +13,9 @@ import {
   getLoginDevices,
   revokeLoginDevice,
   revokeAllOtherDevices,
+  generateAndSendOtp,
+  OTP_TYPES,
+  parseUserAgent,
 } from "./AuthService";
 import { setProfileSectionsForRole } from "../profile/ProfileCompletionService";
 import {
@@ -175,6 +179,57 @@ export async function login(req: Request, res: Response) {
   await reactivateOnLogin(loginResult.data.id);
 
   const rememberMe = body.rememberMe || false;
+
+  // Check if 2FA is enabled
+  const userFor2FA = await prisma.user.findUnique({
+    where: { id: loginResult.data.id },
+    select: { two_fa_enabled: true, two_fa_method: true, email: true, phone: true },
+  });
+
+  if (userFor2FA?.two_fa_enabled) {
+    // Check if this device is trusted — skip 2FA if so
+    // Trust survives logout (deleted_at), so we only check browser + os + ip
+    const { browser, os } = parseUserAgent(req.headers['user-agent'] as string);
+    const trustedDevice = await prisma.loginDevice.findFirst({
+      where: {
+        user_id: loginResult.data.id,
+        is_trusted: true,
+        expires_at: { gt: new Date() },
+        browser,
+        os,
+        ip_address: req.ip,
+      },
+    });
+
+    if (trustedDevice) {
+      // Trusted device — skip 2FA, update last_used and proceed with normal login
+      await prisma.loginDevice.update({
+        where: { id: trustedDevice.id },
+        data: { last_used_at: new Date() },
+      });
+    } else {
+      // Untrusted device — require 2FA
+      const twoFAToken = jwt.sign(
+        { userId: loginResult.data.id, purpose: '2fa', rememberMe },
+        process.env.JWT_SECRET || 'fallback-secret',
+        { expiresIn: '5m' }
+      );
+
+      await generateAndSendOtp({
+        email: userFor2FA.two_fa_method === 'email' ? userFor2FA.email : null,
+        phone: userFor2FA.two_fa_method === 'sms' ? userFor2FA.phone : null,
+        otpType: OTP_TYPES.TWO_FA_VERIFICATION,
+        userId: loginResult.data.id,
+      });
+
+      return ApiResponse.success(res, {
+        requires2FA: true,
+        twoFAToken,
+        method: userFor2FA.two_fa_method,
+      }, 'Verification code sent');
+    }
+  }
+
   const { token, cookieOptions, expiresIn } = generateTokenAndSetCookie(
     loginResult.data,
     rememberMe,

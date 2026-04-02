@@ -290,16 +290,21 @@ const importLinkedInProfile = async (req: Request, res: Response) => {
   } catch (error: any) {
     Log.error("Error", { error });
     
-    let errorMessage = "Failed to import LinkedIn profile. ";
-    if (error.response?.status === 401) {
-      errorMessage += "LinkedIn access token has expired. Please try again.";
-    } else if (error.response?.status === 403) {
-      errorMessage += "Insufficient LinkedIn permissions. Some data may not be available.";
-    } else {
-      errorMessage += error.message || "Unknown error occurred.";
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      if (status === 401) {
+        return ApiResponse.error(res, 'LinkedIn access token has expired. Please try signing in again.');
+      }
+      if (status === 403) {
+        return ApiResponse.error(res, 'Insufficient LinkedIn permissions. Please re-authorize and try again.');
+      }
+      if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') {
+        return ApiResponse.error(res, 'Unable to reach LinkedIn servers. Please check your connection and try again.');
+      }
     }
 
-    return ApiResponse.error(res, errorMessage);
+    return ApiResponse.error(res, 'Failed to import LinkedIn profile. Please try again.');
   }
 };
 
