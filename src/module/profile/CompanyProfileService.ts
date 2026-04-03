@@ -3,7 +3,7 @@ import { ServiceResponse } from '@utils/ApiResponse';
 import { ulid } from 'ulid';
 import { getDisplayName } from '@utils/General';
 import { Log } from '@services/loggerService';
-import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import { resolveAttachmentUrl, createAttachment, urlOrPathToAttachmentId } from '@services/attachmentService';
 import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 
@@ -79,12 +79,7 @@ export class CompanyProfileService {
 
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document
-          ? (profile.traction_document.startsWith('http')
-            ? profile.traction_document
-            : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
-          : null,
-
+        traction_document:  await resolveAttachmentUrl(profile.traction_document, 'traction_document'),
         // Funding
         funding_status: profile.funding_status,
         total_funding: profile.total_funding,
@@ -208,11 +203,7 @@ export class CompanyProfileService {
         problem_statement: profile.problem_statement,
         solution_statement: profile.solution_statement,
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document
-          ? (profile.traction_document.startsWith('http')
-            ? profile.traction_document
-            : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
-          : null,
+        traction_document: await resolveAttachmentUrl(profile.traction_document, 'traction_document'),
         funding_status: profile.funding_status,
         total_funding: totalFundingNum,
         fundingRounds,
@@ -461,11 +452,7 @@ export class CompanyProfileService {
 
         // Traction
         traction_title: profile.traction_title,
-        traction_document: profile.traction_document
-          ? (profile.traction_document.startsWith('http')
-            ? profile.traction_document
-            : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
-          : null,
+        traction_document: await resolveAttachmentUrl(profile.traction_document, 'traction_document'),
 
         // Funding
         funding_status: profile.funding_status,
@@ -765,7 +752,13 @@ export class CompanyProfileService {
       }
       
       if (data.traction_document !== undefined) {
-        updateData.traction_document = data.traction_document;
+        // Store only the attachment unique_id, not the full URL
+        const rawDoc = data.traction_document;
+        if (rawDoc) {
+          updateData.traction_document = urlOrPathToAttachmentId(rawDoc) || rawDoc;
+        } else {
+          updateData.traction_document = null;
+        }
       }
 
       // Update or create profile
@@ -959,11 +952,7 @@ export class CompanyProfileService {
         message: 'Traction updated successfully',
         data: {
           traction_title: profile.traction_title,
-          traction_document: profile.traction_document
-          ? (profile.traction_document.startsWith('http')
-            ? profile.traction_document
-            : (await resolveAttachmentUrl(profile.traction_document, 'traction_document') || profile.traction_document))
-          : null,
+          traction_document: await resolveAttachmentUrl(profile.traction_document, 'traction_document'),
         },
       };
     } catch (error: any) {

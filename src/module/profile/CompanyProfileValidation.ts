@@ -129,9 +129,10 @@ export const createFundingRoundSchema = Joi.object({
     'any.required': 'Funding amount is required',
     'number.min': 'Funding amount cannot be negative'
   }),
-  funding_date: Joi.date().required().messages({
+  funding_date: Joi.date().required().max('now').messages({
     'date.base': 'Funding date must be a valid date',
-    'any.required': 'Funding date is required'
+    'any.required': 'Funding date is required',
+    'date.max': 'Funding date cannot be in the future'
   }),
   funding_valuation: Joi.number().optional().min(0).allow(null).messages({
     'number.min': 'Funding valuation cannot be negative'
@@ -151,8 +152,9 @@ export const updateFundingRoundSchema = Joi.object({
   funding_amount: Joi.number().optional().min(0).messages({
     'number.min': 'Funding amount cannot be negative'
   }),
-  funding_date: Joi.date().optional().messages({
-    'date.base': 'Funding date must be a valid date'
+  funding_date: Joi.date().optional().max('now').messages({
+    'date.base': 'Funding date must be a valid date',
+    'date.max': 'Funding date cannot be in the future'
   }),
   funding_valuation: Joi.number().optional().min(0).allow(null).messages({
     'number.min': 'Funding valuation cannot be negative'
