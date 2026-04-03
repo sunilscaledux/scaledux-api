@@ -175,8 +175,21 @@ export const raisingFundSchema = Joi.object({
   target_amount: Joi.number().optional().min(0).allow(null).messages({
     'number.min': 'Target amount cannot be negative'
   }),
-  expected_close_date: Joi.string().optional().allow(null, ''),
-  valuation_min: Joi.number().optional().min(0).allow(null),
+  expected_close_date: Joi.string().optional().allow(null, '').custom((value, helpers) => {
+    if (!value) return value;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return helpers.error('string.dateInvalid');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) return helpers.error('string.datePast');
+    return value;
+  }).messages({
+    'string.dateInvalid': 'Expected close date must be a valid date',
+    'string.datePast': 'Expected close date must be a future date'
+  }),
+  valuation_min: Joi.number().optional().min(0).allow(null).messages({
+    'number.min': 'Minimum valuation cannot be negative'
+  }),
   valuation_max: Joi.number().optional().min(0).allow(null),
   has_committed: Joi.boolean().optional().allow(null),
   committed_amount: Joi.number().optional().min(0).allow(null),
