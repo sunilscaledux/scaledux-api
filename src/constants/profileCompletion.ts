@@ -33,32 +33,114 @@ export interface SectionConfig {
   roles: UserRole[];
 }
 
-/** All sections with weights and which roles include them. */
-export const PROFILE_COMPLETION_SECTIONS: SectionConfig[] = [
-  { key: 'profilePicture', weight: 3, label: 'Profile Picture', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'profileCover', weight: 3, label: 'Profile Cover', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'profileSummary', weight: 12, label: 'Profile Summary', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'personalInfo', weight: 6, label: 'Personal Info', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'skillsExpertise', weight: 16, label: 'Skills / Expertise', route: '/my-profile', roles: ['freelancer','founder', 'mentor', 'investor'] },
-  { key: 'workExperience', weight: 8, label: 'Work Experience', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'portfolio', weight: 14, label: 'Portfolio', route: '/portfolio', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'hourlyRate', weight: 6, label: 'Hourly Rate', route: '/my-profile', roles: ['freelancer', 'mentor', 'investor'] },
-  { key: 'availableHoursPerWeek', weight: 6, label: 'Available hours per week', route: '/my-profile', roles: ['freelancer'] },
-  { key: 'education', weight: 4, label: 'Education', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'licenseCertifications', weight: 4, label: 'License & Certifications', route: '/my-profile', roles: ['freelancer','founder', 'mentor', 'investor'] },
-  { key: 'languages', weight: 2, label: 'Languages', route: '/my-profile', roles: ['freelancer','founder', 'mentor', 'investor'] },
-  { key: 'achievements', weight: 2, label: 'Achievements & Recognitions', route: '/my-profile', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'emailVerification', weight: 3, label: 'Email Verification', route: '/verify/email', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'phoneVerification', weight: 3, label: 'Phone Verification', route: '/verify/phone-number', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-  { key: 'identityVerification', weight: 14, label: 'Identity Verification', route: '/verify/identity', roles: ['freelancer', 'founder', 'mentor', 'investor'] },
-];
+/**
+ * Per-role weight overrides.
+ * If a role has an entry here, that weight is used instead of the default.
+ * If a section is not listed for a role, it's not included for that role.
+ */
+const ROLE_WEIGHTS: Record<UserRole, Partial<Record<ProfileCompletionSectionKey, number>>> = {
+  freelancer: {
+    profilePicture: 3,
+    profileCover: 2,
+    profileSummary: 10,
+    personalInfo: 5,
+    skillsExpertise: 12,
+    workExperience: 10,
+    portfolio: 16,
+    hourlyRate: 4,
+    availableHoursPerWeek: 4,
+    education: 3,
+    licenseCertifications: 3,
+    languages: 2,
+    achievements: 3,
+    emailVerification: 2,
+    phoneVerification: 3,
+    identityVerification: 18,
+  },
+  founder: {
+    profilePicture: 3,
+    profileCover: 3,
+    profileSummary: 10,
+    personalInfo: 6,
+    skillsExpertise: 10,
+    workExperience: 10,
+    education: 6,
+    licenseCertifications: 6,
+    languages: 3,
+    achievements: 8,
+    emailVerification: 5,
+    phoneVerification: 5,
+    identityVerification: 25,
+  },
+  mentor: {
+    profilePicture: 3,
+    profileCover: 2,
+    profileSummary: 10,
+    personalInfo: 5,
+    skillsExpertise: 12,
+    workExperience: 10,
+    portfolio: 16,
+    hourlyRate: 4,
+    education: 3,
+    licenseCertifications: 3,
+    languages: 2,
+    achievements: 3,
+    emailVerification: 2,
+    phoneVerification: 3,
+    identityVerification: 18,
+  },
+  investor: {
+    profilePicture: 3,
+    profileCover: 2,
+    profileSummary: 10,
+    personalInfo: 5,
+    skillsExpertise: 12,
+    workExperience: 10,
+    portfolio: 16,
+    hourlyRate: 4,
+    education: 3,
+    licenseCertifications: 3,
+    languages: 2,
+    achievements: 3,
+    emailVerification: 2,
+    phoneVerification: 3,
+    identityVerification: 18,
+  },
+};
+
+/** Master section list with labels and routes. */
+const SECTION_META: Record<ProfileCompletionSectionKey, { label: string; route: string }> = {
+  profilePicture: { label: 'Profile Picture', route: '/my-profile' },
+  profileCover: { label: 'Profile Cover', route: '/my-profile' },
+  profileSummary: { label: 'Profile Summary', route: '/my-profile' },
+  personalInfo: { label: 'Personal Info', route: '/my-profile' },
+  skillsExpertise: { label: 'Skills / Expertise', route: '/my-profile' },
+  workExperience: { label: 'Work Experience', route: '/my-profile' },
+  portfolio: { label: 'Portfolio', route: '/portfolio' },
+  hourlyRate: { label: 'Hourly Rate', route: '/my-profile' },
+  availableHoursPerWeek: { label: 'Available hours per week', route: '/my-profile' },
+  education: { label: 'Education', route: '/my-profile' },
+  licenseCertifications: { label: 'License & Certifications', route: '/my-profile' },
+  languages: { label: 'Languages', route: '/my-profile' },
+  achievements: { label: 'Achievements & Recognitions', route: '/my-profile' },
+  emailVerification: { label: 'Email Verification', route: '/verify/email' },
+  phoneVerification: { label: 'Phone Verification', route: '/verify/phone-number' },
+  identityVerification: { label: 'Identity Verification', route: '/verify/identity' },
+};
 
 export type ProfileCompletionSectionsMap = Record<string, boolean>;
 
-/** Sections for a given role (used for % and pending list). */
+/** Sections for a given role with role-specific weights. */
 export function getSectionsForRole(role: UserRole | string | null): SectionConfig[] {
   const r = role === 'founder' || role === 'freelancer' || role === 'mentor' || role === 'investor' ? role : 'freelancer';
-  return PROFILE_COMPLETION_SECTIONS.filter((s) => s.roles.includes(r));
+  const weights = ROLE_WEIGHTS[r];
+  return (Object.keys(weights) as ProfileCompletionSectionKey[]).map((key) => ({
+    key,
+    weight: weights[key]!,
+    label: SECTION_META[key].label,
+    route: SECTION_META[key].route,
+    roles: [r],
+  }));
 }
 
 /** Total weight for a role (denominator for %). */
