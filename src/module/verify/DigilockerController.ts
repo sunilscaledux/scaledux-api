@@ -11,7 +11,7 @@ import {
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import crypto from "crypto";
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:3000").replace(/\/$/, "");
+const FRONTEND_URL = (process.env.CLIENT_APP_UR || "http://localhost:3000").replace(/\/$/, "");
 
 /**
  * POST /verify/digilocker/initiate

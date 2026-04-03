@@ -92,7 +92,9 @@ export async function resolveAttachmentUrl(
   const baseUrl = (process.env.APP_URL || ASSET_URL).replace(/\/$/, '');
 
   const att = await getByUniqueId(value);
-  if (!att) return '';
+  if (!att) {
+    return '';
+  }
 
   const allowed = att.visibility === 'public' && isPublicField(fieldName);
 

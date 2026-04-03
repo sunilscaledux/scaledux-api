@@ -3,15 +3,9 @@ import { CompanyProfileService } from './CompanyProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
 import * as CompanyProfileValidation from './CompanyProfileValidation';
 
-/**
- * CompanyProfileController
- * Handles HTTP requests for company/founder profile operations
- */
+
 export class CompanyProfileController {
-  /**
-   * Get my company profile
-   * GET /api/v1/profile/company/me
-   */
+ 
   static async getMyProfile(req: Request, res: Response) {
     try {
       const userId = req.user.id;
@@ -313,16 +307,18 @@ export class CompanyProfileController {
       const file = req.file;
 
       // Validate that we have at least a file, document ID, or title
-      if (!file && !traction_title && !traction_document) {
+      if (!file && !traction_title && traction_document === undefined) {
         return ApiResponse.error(res, 'Either file, document ID, or title is required', 400);
       }
 
-      // If attachment ID is provided directly (from MediaUploadV2), update it directly
-      if (traction_document && !file) {
-        const result = await CompanyProfileService.updateTraction(userId, {
-          traction_title: traction_title || undefined,
-          traction_document: traction_document
-        });
+      // If no file upload, update title and/or document directly
+      if (!file) {
+        const updateData: { traction_title?: string; traction_document?: string | null } = {};
+        if (traction_title !== undefined) updateData.traction_title = traction_title;
+        // Empty string means clear the document
+        if (traction_document !== undefined) updateData.traction_document = traction_document || null;
+
+        const result = await CompanyProfileService.updateTraction(userId, updateData);
         if (result.success) {
           return ApiResponse.success(res, result.data, result.message);
         } else {
