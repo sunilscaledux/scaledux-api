@@ -35,9 +35,9 @@ export const createFounderProjectSchema = Joi.object({
     'string.empty': 'Scope of work is required',
     'any.required': 'Scope of work is required'
   }),
-  skillsRequired: Joi.array().items(Joi.string()).min(5).messages({
+  skillsRequired: Joi.array().items(Joi.string()).min(2).messages({
     'array.base': 'Skills required must be an array',
-    'array.min': 'At least 5 skills are required'
+    'array.min': 'At least 2 skills are required'
   }),
   experienceNeeded: Joi.string().required().min(1).messages({
     'string.base': 'Experience needed must be a string',

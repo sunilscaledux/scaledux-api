@@ -525,6 +525,31 @@ export class FounderProjectService {
       // Freelancer side: only show invitation message when PENDING (when REJECTED, message holds rejection reason — do not show to freelancer)
       const invitationMessageForViewer = !isOwner && inviteStatus === ProposalStatus.REJECTED ? null : (inviteData?.message || null);
 
+      // Fetch client stats for the project owner
+      const ownerId = project.user_id;
+      const [projectsPosted, openProjects, totalHired, activeHired, publicReviews] = await Promise.all([
+        prisma.founderProject.count({ where: { user_id: ownerId, deleted_at: null } }),
+        prisma.founderProject.count({ where: { user_id: ownerId, status: 'PUBLISHED', deleted_at: null } }),
+        prisma.proposal.count({
+          where: { project: { user_id: ownerId }, status: 'HIRED' }
+        }),
+        prisma.proposal.count({
+          where: { project: { user_id: ownerId }, status: { in: ['HIRED', 'TERMINATING'] } }
+        }),
+        prisma.review.findMany({
+          where: { review_to_id: ownerId, review_type: 'PUBLIC' },
+          select: { rating: true }
+        })
+      ]);
+
+      const reviewsCount = publicReviews.length;
+      const averageRating = reviewsCount > 0
+        ? Number((publicReviews.reduce((sum, r) => sum + Number(r.rating), 0) / reviewsCount).toFixed(1))
+        : 0;
+      const hireRate = projectsPosted > 0
+        ? Math.round((totalHired / projectsPosted) * 100)
+        : 0;
+
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, subcategory, category: cat, ...projectData } = project as any;
       // Use user's currency symbol if available
@@ -545,7 +570,16 @@ export class FounderProjectService {
         invite_status: inviteStatus,
         invitation_message: invitationMessageForViewer,
         invitation_date: inviteData?.created_at || null,
-        is_owner: isOwner
+        is_owner: isOwner,
+        client_stats: {
+          projects_posted: projectsPosted,
+          open_projects: openProjects,
+          total_hired: totalHired,
+          active_hired: activeHired,
+          hire_rate: hireRate,
+          average_rating: averageRating,
+          reviews_count: reviewsCount
+        }
       };
 
       return {

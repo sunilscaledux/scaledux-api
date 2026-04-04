@@ -35,9 +35,9 @@ router.get("/languages/country/:countryCode", getLanguagesByCountry)
 router.get("/currencies", getCurrencies)
 router.get("/countries-with-currencies", getCountriesWithCurrencies)
 
-router.get("/expertise-categories", getExpertiseCategories)
-router.get("/expertise-categories/:categoryId/specialties", getSpecialtiesByCategory)
-router.get("/expertise-categories/:categoryId/skills", getSkillsByCategory)
+router.get("/categories", getExpertiseCategories)
+router.get("/categories/:categoryId/subcategories", getSpecialtiesByCategory)
+router.get("/categories/:categoryId/skills", getSkillsByCategory)
 
 router.get("/industries", getIndustries)
 router.get("/industries/:industryId/sub-industries", getSubIndustriesByIndustry)
