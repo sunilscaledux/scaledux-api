@@ -2,7 +2,6 @@ import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
-import { createRedirectLink, createRedirectLinks } from '@services/redirectLinkService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -28,32 +27,13 @@ async function transformPortfolio(portfolio: any): Promise<any> {
   };
 }
 
-/** Convert project_link and reference URLs to redirect links before storing */
-async function wrapExternalUrls(
-  data: { projectLink?: string; references?: any[] },
-  entityType: string,
-  entityId: number,
-  createdBy?: number
-): Promise<{ project_link?: string; references?: any[] }> {
-  const entityOpts = { entityType, entityId, createdBy };
-  const result: any = {};
-
-  if (data.projectLink) {
-    result.project_link = await createRedirectLink(data.projectLink, entityOpts);
-  }
-
-  if (Array.isArray(data.references) && data.references.length > 0) {
-    result.references = await Promise.all(
-      data.references.map(async (ref: any) => {
-        if (ref?.url && !ref.url.includes('/r/')) {
-          return { url: ref.url, redirect_url: await createRedirectLink(ref.url, entityOpts) };
-        }
-        return ref;
-      })
-    );
-  }
-
-  return result;
+/** Normalize references — store actual URLs directly, no redirect wrapping */
+function normalizeReferences(references?: any[]): any[] {
+  if (!Array.isArray(references) || references.length === 0) return [];
+  return references.map((ref: any) => {
+    if (typeof ref === 'string') return { url: ref };
+    return { url: ref?.url ?? '' };
+  }).filter((ref: any) => ref.url);
 }
 
 export class PortfolioService {
@@ -170,7 +150,7 @@ export class PortfolioService {
         project_skills: (portfolioData.projectSkills || []) as any,
         thumbnail_url: normalizedThumbnail as any,
         media_urls: normalizedMedia as any,
-        references: (portfolioData.references || []) as any,
+        references: normalizeReferences(portfolioData.references) as any,
         status: portfolioData.status || 'DRAFT'
       };
 
@@ -198,19 +178,7 @@ export class PortfolioService {
       });
       await updateCompletionSection(userId, 'portfolio', true);
 
-      // Wrap external URLs in redirect links and update the record
-      const wrappedUrls = await wrapExternalUrls(portfolioData, 'portfolio', portfolio.id, userId);
-      if (wrappedUrls.project_link || wrappedUrls.references) {
-        await prisma.portfolio.update({
-          where: { id: portfolio.id },
-          data: {
-            ...(wrappedUrls.project_link ? { project_link: wrappedUrls.project_link } : {}),
-            ...(wrappedUrls.references ? { references: wrappedUrls.references as any } : {})
-          }
-        });
-        if (wrappedUrls.project_link) portfolio.project_link = wrappedUrls.project_link;
-        if (wrappedUrls.references) portfolio.references = wrappedUrls.references as any;
-      }
+      // References are stored as actual URLs (no redirect wrapping)
 
       const transformedPortfolio = await transformPortfolio(portfolio);
 
@@ -252,9 +220,6 @@ export class PortfolioService {
       const normalizedThumbnail = urlsOrPathsToAttachmentIds([portfolioData.thumbnail])[0] ?? null
       const normalizedMedia = urlsOrPathsToAttachmentIds(portfolioData.media || [])
 
-      // Wrap external URLs in redirect links before storing
-      const wrappedUrls = await wrapExternalUrls(portfolioData, 'portfolio', existingPortfolio.id, userId);
-
       const updatedPortfolio = await prisma.portfolio.update({
         where: { id: existingPortfolio.id },
         data: {
@@ -267,10 +232,10 @@ export class PortfolioService {
           project_skills: (portfolioData.projectSkills || []) as any,
           thumbnail_url: normalizedThumbnail as any,
           media_urls: normalizedMedia as any,
-          project_link: wrappedUrls.project_link || portfolioData.projectLink,
+          project_link: portfolioData.projectLink || null,
           completion_month: portfolioData.completionMonth,
           completion_year: portfolioData.completionYear,
-          references: (wrappedUrls.references || portfolioData.references || []) as any,
+          references: normalizeReferences(portfolioData.references) as any,
           status: portfolioData.status || existingPortfolio.status
         },
         include: {
