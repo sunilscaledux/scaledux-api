@@ -146,7 +146,18 @@ const googleCallback = async (req: Request, res: Response) => {
     );
 
   } catch (error: any) {
-    Log.error("Google OAuth error", { error });
+    const errorDetails = {
+      message: error?.message,
+      name: error?.name,
+      code: error?.code,
+      stack: error?.stack,
+      ...(axios.isAxiosError(error) && {
+        status: error.response?.status,
+        responseData: error.response?.data,
+        requestUrl: error.config?.url,
+      }),
+    };
+    Log.error("Google OAuth error", errorDetails);
 
     if (axios.isAxiosError(error)) {
       const status = error.response?.status;
@@ -163,7 +174,7 @@ const googleCallback = async (req: Request, res: Response) => {
       }
     }
 
-    return ApiResponse.error(res, 'Google authentication failed. Please try again.');
+    return ApiResponse.error(res, `Google authentication failed: ${error?.message || 'Unknown error'}`);
   }
 }
 
