@@ -1,5 +1,3 @@
--- Rename expertise_category_id to category_id
-ALTER TABLE "scd_service_packages" RENAME COLUMN "expertise_category_id" TO "category_id";
-
--- Rename specialty_id to sub_category_id
-ALTER TABLE "scd_service_packages" RENAME COLUMN "specialty_id" TO "sub_category_id";
+-- No-op: init migration already creates these columns with the correct names.
+-- The subsequent 20260328120000 migration handles the full taxonomy rework.
+SELECT 1;
