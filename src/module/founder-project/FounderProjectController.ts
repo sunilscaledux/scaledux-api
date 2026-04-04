@@ -61,7 +61,7 @@ export async function browseProjects(req: Request, res: Response) {
     budgetMin: budgetMin ? parseFloat(budgetMin as string) : undefined,
     budgetMax: budgetMax ? parseFloat(budgetMax as string) : undefined,
     experienceLevel: experienceLevel as string,
-    sortBy: sortBy as 'newest' | 'oldest' | 'budget_high' | 'budget_low',
+    sortBy: sortBy as 'newest' | 'oldest' | 'budget_high' | 'budget_low' | 'relevance',
     page: page ? parseInt(page as string) : 1,
     limit: limit ? parseInt(limit as string) : (Number(process.env.FOUNDER_PROJECT_PAGE_LIMIT) || 20),
     filter: filter as 'all' | 'saved'
@@ -275,7 +275,7 @@ export async function duplicateProject(req: Request, res: Response) {
 export async function getMatchingServiceProviders(req: Request, res: Response) {
   const userId = req.user?.id;
   const projectId = getStringParam(req.params.id);
-  const { page, limit, sortBy, filter } = req.query;
+  const { page, limit, sortBy, filter, earnedMin, ratingMin, hourlyRateMin, hourlyRateMax, providerType, englishLevel, search } = req.query;
 
   if (!userId) {
     return ApiResponse.error(res, "User not authenticated", 401);
@@ -292,7 +292,16 @@ export async function getMatchingServiceProviders(req: Request, res: Response) {
     page ? parseInt(page as string) : 1,
     limit ? parseInt(limit as string) : defaultProvidersLimit,
     sortBy as 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed',
-    filter as 'all' | 'invited' | 'saved'
+    filter as 'all' | 'invited' | 'saved',
+    {
+      earnedMin: earnedMin ? parseFloat(earnedMin as string) : undefined,
+      ratingMin: ratingMin ? parseFloat(ratingMin as string) : undefined,
+      hourlyRateMin: hourlyRateMin ? parseFloat(hourlyRateMin as string) : undefined,
+      hourlyRateMax: hourlyRateMax ? parseFloat(hourlyRateMax as string) : undefined,
+      providerType: providerType as string | undefined,
+      englishLevel: englishLevel ? (englishLevel as string).split(',') : undefined,
+      search: search as string | undefined,
+    }
   );
 
   if (result.success) {

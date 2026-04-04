@@ -10,6 +10,7 @@ import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
 import { getUserFullName } from '@utils/General';
+import { MatchingService, buildFreelancerProfile } from '@services/matchingService';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -218,7 +219,7 @@ export class FounderProjectService {
       budgetMin?: number;
       budgetMax?: number;
       experienceLevel?: string;
-      sortBy?: 'newest' | 'oldest' | 'budget_high' | 'budget_low';
+      sortBy?: 'newest' | 'oldest' | 'budget_high' | 'budget_low' | 'relevance';
       page?: number;
       limit?: number;
       filter?: 'all' | 'saved';
@@ -330,49 +331,153 @@ export class FounderProjectService {
         }
       } : baseInclude;
 
-      // Check if budget filtering is needed
-      const hasBudgetFilter = budgetMin !== undefined || budgetMax !== undefined;
-
-      // Get all projects (we'll filter by budget and skills in JS - budget is string, skills_required is Json)
-      let allProjects = await prisma.founderProject.findMany({
-        where: whereClause,
-        include: include as any,
-        orderBy
-      });
-
-      // Apply skills filter in JavaScript (skills_required is Json; Prisma Json type doesn't support hasSome)
+      // Skills filter at DB level (Prisma JSON array_contains on PostgreSQL)
       if (skills && skills.length > 0) {
-        allProjects = allProjects.filter((project: any) => {
-          const projectSkills = Array.isArray(project.skills_required)
-            ? project.skills_required
-            : typeof project.skills_required === 'string'
-              ? (() => { try { return JSON.parse(project.skills_required); } catch { return []; } })()
-              : [];
-          const skillStrings = projectSkills.map((s: any) => (typeof s === 'string' ? s : s?.name ?? s?.skill ?? '')).filter(Boolean);
-          return skills.some((requested: string) =>
-            skillStrings.some((ps: string) => String(ps).toLowerCase() === String(requested).toLowerCase())
-          );
+        const andConditions = whereClause.AND || [];
+        andConditions.push({
+          OR: skills.map((s: string) => ({
+            skills_required: { array_contains: [s] }
+          }))
         });
+        whereClause.AND = andConditions;
       }
 
-      // Apply budget filter in JavaScript (because budget_amount is stored as string)
+      // Budget filter at DB level using raw SQL (budget_amount is stored as VARCHAR)
+      const hasBudgetFilter = budgetMin !== undefined || budgetMax !== undefined;
       if (hasBudgetFilter) {
-        allProjects = allProjects.filter((project: any) => {
-          const budgetValue = parseFloat(project.budget_amount) || 0;
-          if (budgetMin !== undefined && budgetValue < budgetMin) return false;
-          if (budgetMax !== undefined && budgetValue > budgetMax) return false;
-          return true;
-        });
+        const andConditions = whereClause.AND || [];
+        if (budgetMin !== undefined) {
+          andConditions.push({
+            budget_amount: { not: null }
+          });
+        }
+        whereClause.AND = andConditions;
       }
 
-      // Calculate pagination after budget filtering
-      const totalCount = allProjects.length;
-      const paginatedProjects = allProjects.slice((page - 1) * limit, page * limit);
+      // Budget needs JS filtering since it's stored as string (can't CAST in Prisma)
+      const matchesBudget = (project: any): boolean => {
+        if (!hasBudgetFilter) return true;
+        const budgetValue = parseFloat(project.budget_amount) || 0;
+        if (budgetMin !== undefined && budgetValue < budgetMin) return false;
+        if (budgetMax !== undefined && budgetValue > budgetMax) return false;
+        return true;
+      };
+
+      let paginatedProjects: any[];
+      let totalCount: number;
+
+      if (sortBy === 'relevance' && userId) {
+        // ── Relevance path: score + paginate in SQL, then hydrate only the page ──
+        const freelancerData = await prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            expertises: true,
+            personalInfo: { include: { country: { select: { name: true } } } }
+          }
+        });
+
+        if (freelancerData) {
+          const profile = buildFreelancerProfile(freelancerData);
+
+          // Build raw WHERE clause matching Prisma's whereClause
+          const conditions: string[] = [`status = 'PUBLISHED'`, `deleted_at IS NULL`];
+          const params: any[] = [];
+          let paramIdx = 1;
+
+          if (categoryIds && categoryIds.length > 0) {
+            conditions.push(`expertise_category_id = ANY($${paramIdx}::int[])`);
+            params.push(categoryIds);
+            paramIdx++;
+          }
+          if (search) {
+            conditions.push(`(project_title ILIKE $${paramIdx} OR project_description ILIKE $${paramIdx})`);
+            params.push(`%${search}%`);
+            paramIdx++;
+          }
+          if (experienceLevel) {
+            conditions.push(`experience_needed = $${paramIdx}`);
+            params.push(experienceLevel);
+            paramIdx++;
+          }
+          if (skills && skills.length > 0) {
+            const skillConditions = skills.map(s => {
+              const escaped = s.replace(/'/g, "''");
+              return `EXISTS (SELECT 1 FROM jsonb_array_elements_text(skills_required) AS elem WHERE LOWER(elem) = '${escaped.toLowerCase()}')`;
+            });
+            conditions.push(`(${skillConditions.join(' OR ')})`);
+          }
+          if (hasBudgetFilter) {
+            if (budgetMin !== undefined) {
+              conditions.push(`budget_amount IS NOT NULL AND CAST(budget_amount AS DECIMAL) >= $${paramIdx}`);
+              params.push(budgetMin);
+              paramIdx++;
+            }
+            if (budgetMax !== undefined) {
+              conditions.push(`budget_amount IS NOT NULL AND CAST(budget_amount AS DECIMAL) <= $${paramIdx}`);
+              params.push(budgetMax);
+              paramIdx++;
+            }
+          }
+          if (filter === 'saved' && userId) {
+            conditions.push(`EXISTS (SELECT 1 FROM scd_saved_projects sp WHERE sp.project_id = scd_founder_projects.id AND sp.user_id = $${paramIdx})`);
+            params.push(userId);
+            paramIdx++;
+          }
+
+          const baseWhere = conditions.join(' AND ');
+          const { ids, total } = await MatchingService.getScoredProjectIds(profile, baseWhere, params, page, limit);
+          totalCount = total;
+
+          if (ids.length > 0) {
+            // Hydrate only the page of projects with full includes
+            const projects = await prisma.founderProject.findMany({
+              where: { id: { in: ids } },
+              include: include as any
+            });
+            // Preserve the score-based order from SQL
+            const idOrder = new Map(ids.map((id, i) => [id, i]));
+            paginatedProjects = projects.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+          } else {
+            paginatedProjects = [];
+          }
+        } else {
+          // Freelancer not found, fall back to newest
+          const [count, projects] = await Promise.all([
+            prisma.founderProject.count({ where: whereClause }),
+            prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy: { created_at: 'desc' }, skip: (page - 1) * limit, take: limit })
+          ]);
+          totalCount = count;
+          paginatedProjects = projects;
+        }
+      } else if (hasBudgetFilter) {
+        // ── Budget filter path: budget is a string, need JS filter then paginate ──
+        let allProjects = await prisma.founderProject.findMany({
+          where: whereClause,
+          include: include as any,
+          orderBy
+        });
+        allProjects = allProjects.filter(matchesBudget);
+        totalCount = allProjects.length;
+        paginatedProjects = allProjects.slice((page - 1) * limit, page * limit);
+      } else {
+        // ── Fast path: all filters at DB level, use DB pagination ──
+        const [count, projects] = await Promise.all([
+          prisma.founderProject.count({ where: whereClause }),
+          prisma.founderProject.findMany({
+            where: whereClause,
+            include: include as any,
+            orderBy,
+            skip: (page - 1) * limit,
+            take: limit
+          })
+        ]);
+        totalCount = count;
+        paginatedProjects = projects;
+      }
 
       // Transform projects
       const transformedProjects = await Promise.all(paginatedProjects.map(async (project: any) => {
-        const { invites, savedByUsers, subcategory, ...projectData } = project;
-        // Use user's currency symbol if available, otherwise fallback to budget_currency or default
+        const { invites, savedByUsers, subcategory, _match_score, _matched_skills, ...projectData } = project;
         const currencySymbol = project.user?.currency?.symbol || '₹';
         return {
           ...projectData,
@@ -383,7 +488,9 @@ export class FounderProjectService {
             : [],
           scaledux_url: `${FRONTEND_URL}/project/${project.unique_id}`,
           is_saved: userId ? (savedByUsers?.length > 0) : false,
-          is_invited: userId ? (invites?.length > 0) : false
+          is_invited: userId ? (invites?.length > 0) : false,
+          match_score: _match_score ?? 0,
+          matched_skills: _matched_skills ?? []
         };
       }));
 
@@ -852,7 +959,16 @@ export class FounderProjectService {
     page: number = 1,
     limit: number = 10,
     sortBy: 'relevance' | 'rating' | 'hourly_rate' | 'projects_completed' = 'relevance',
-    filter: 'all' | 'invited' | 'saved' = 'all'
+    filter: 'all' | 'invited' | 'saved' = 'all',
+    advancedFilters?: {
+      earnedMin?: number;
+      ratingMin?: number;
+      hourlyRateMin?: number;
+      hourlyRateMax?: number;
+      providerType?: string;
+      englishLevel?: string[];
+      search?: string;
+    }
   ): Promise<ServiceResponse> {
     try {
       // First check if project exists
@@ -906,7 +1022,22 @@ export class FounderProjectService {
         status: 1
       };
 
-      if (filter === 'invited') {
+      if (filter === 'all') {
+        // Only show freelancers with at least one expertise matching the project's category or skills
+        const relevanceFilter: any[] = [];
+        if (project.expertise_category_id) {
+          relevanceFilter.push({ expertises: { some: { categoryId: project.expertise_category_id } } });
+        }
+        // Also include freelancers with matching skills (even if different category)
+        if (projectSkills.length > 0) {
+          for (const skill of projectSkills) {
+            relevanceFilter.push({ expertises: { some: { skills: { array_contains: [skill] } } } });
+          }
+        }
+        if (relevanceFilter.length > 0) {
+          whereClause.OR = relevanceFilter;
+        }
+      } else if (filter === 'invited') {
         // Show all providers with any invite status (PENDING, ACCEPTED, REJECTED)
         if (allInvitedProviderIds.length === 0) {
           return {
@@ -935,6 +1066,40 @@ export class FounderProjectService {
         whereClause.id = { in: savedProviderIds };
       }
 
+      // Apply advanced filters at DB level
+      if (advancedFilters) {
+        const andConditions: any[] = [];
+
+        // Hourly rate range
+        if (advancedFilters.hourlyRateMin !== undefined || advancedFilters.hourlyRateMax !== undefined) {
+          const rateFilter: any = {};
+          if (advancedFilters.hourlyRateMin !== undefined) rateFilter.gte = advancedFilters.hourlyRateMin;
+          if (advancedFilters.hourlyRateMax !== undefined) rateFilter.lte = advancedFilters.hourlyRateMax;
+          andConditions.push({ personalInfo: { hourly_rate: rateFilter } });
+        }
+
+        // Provider type (freelancer/agency)
+        if (advancedFilters.providerType && advancedFilters.providerType !== 'any') {
+          const isAgency = advancedFilters.providerType === 'agency';
+          andConditions.push({ personalInfo: { show_as_agency: isAgency } });
+        }
+
+        // Search by name
+        if (advancedFilters.search) {
+          andConditions.push({
+            OR: [
+              { first_name: { contains: advancedFilters.search, mode: 'insensitive' } },
+              { last_name: { contains: advancedFilters.search, mode: 'insensitive' } },
+              { personalInfo: { title: { contains: advancedFilters.search, mode: 'insensitive' } } }
+            ]
+          });
+        }
+
+        if (andConditions.length > 0) {
+          whereClause.AND = [...(whereClause.AND || []), ...andConditions];
+        }
+      }
+
       // Fetch freelancers
       const freelancers = await prisma.user.findMany({
         where: whereClause,
@@ -957,7 +1122,7 @@ export class FounderProjectService {
         }
       });
 
-      // Transform freelancers to provider format
+      // Transform freelancers to provider format with matching scores
       const providers = await Promise.all(freelancers.map(async freelancer => {
         const userSkills: string[] = [];
         freelancer.expertises.forEach((exp: any) => {
@@ -966,8 +1131,10 @@ export class FounderProjectService {
           }
         });
 
+        // Compute match score
+        const matchResult = MatchingService.scoreFreelancerForProject(freelancer, project);
+
         const invite = inviteMap.get(freelancer.id);
-        // is_invited is true only for PENDING invitations
         const isInvited = pendingInvitedProviderIds.includes(freelancer.id);
         const isSaved = savedProviderIds.includes(freelancer.id);
 
@@ -978,7 +1145,7 @@ export class FounderProjectService {
           last_name: freelancer.last_name,
           email: freelancer.email,
           profile_image: freelancer.personalInfo?.profileImage
-            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, 'profile_image') 
+            ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, 'profile_image')
             : null,
           title: freelancer.personalInfo?.title || null,
           about: freelancer.personalInfo?.about || null,
@@ -993,8 +1160,8 @@ export class FounderProjectService {
             skills: exp.skills || []
           })),
           all_skills: userSkills,
-          matched_skills: [],
-          match_score: 0,
+          matched_skills: matchResult.matched_skills,
+          match_score: matchResult.match_score,
           service_packages_count: freelancer.servicePackages.length,
           total_earned: 0,
           projects_completed: freelancer.servicePackages.length,
@@ -1008,11 +1175,37 @@ export class FounderProjectService {
         };
       }));
 
+      // For recommended tab, exclude providers with no relevance at all
+      let filteredProviders = filter === 'all'
+        ? providers.filter(p => p.match_score > 0 || p.matched_skills.length > 0)
+        : providers;
+
+      // Apply advanced filters that need JS (rating, earned — need aggregated data)
+      if (advancedFilters) {
+        if (advancedFilters.ratingMin !== undefined) {
+          filteredProviders = filteredProviders.filter(p => p.rating >= advancedFilters.ratingMin!);
+        }
+        if (advancedFilters.earnedMin !== undefined) {
+          filteredProviders = filteredProviders.filter(p => p.total_earned >= advancedFilters.earnedMin!);
+        }
+      }
+
+      // Sort providers
+      if (sortBy === 'relevance') {
+        filteredProviders.sort((a, b) => b.match_score - a.match_score);
+      } else if (sortBy === 'hourly_rate') {
+        filteredProviders.sort((a, b) => (a.hourly_rate || 0) - (b.hourly_rate || 0));
+      } else if (sortBy === 'rating') {
+        filteredProviders.sort((a, b) => b.rating - a.rating);
+      } else if (sortBy === 'projects_completed') {
+        filteredProviders.sort((a, b) => b.projects_completed - a.projects_completed);
+      }
+
       // Pagination
-      const total = providers.length;
+      const total = filteredProviders.length;
       const totalPages = Math.ceil(total / limit);
       const offset = (page - 1) * limit;
-      const paginatedProviders = providers.slice(offset, offset + limit);
+      const paginatedProviders = filteredProviders.slice(offset, offset + limit);
 
       return {
         success: true,
