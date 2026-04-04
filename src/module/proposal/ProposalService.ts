@@ -10,6 +10,7 @@ import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
 import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
+import { getUserFullName } from '@utils/General';
 
 /**
  * Human-readable labels for proposal status.
@@ -307,8 +308,9 @@ export class ProposalService {
         userId
       );
 
-      const notificationTitle = `New proposal for "${projectTitle}"`;
-      const notificationBody = `A new proposal was submitted for "${projectTitle}".`;
+      const freelancerNameP = await getUserFullName(userId);
+      const notificationTitle = `${freelancerNameP} submitted a proposal`;
+      const notificationBody = `${freelancerNameP} submitted a proposal for "${projectTitle}".`;
       const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
 
       const notifData = { userId: project.user_id, type: 'PROPOSAL_RECEIVED' as const, notificationTitle, notificationBody: notificationBody ?? null, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
@@ -1391,8 +1393,9 @@ export class ProposalService {
         proposal.project.user_id
       );
 
+      const founderNameW = await getUserFullName(userId);
       const withdrawOfferLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      const notifData = { userId: proposal.provider_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: 'Offer withdrawn', notificationBody: `The offer for "${projectTitle}" was withdrawn by the project owner.`, notificationLink: withdrawOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      const notifData = { userId: proposal.provider_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${founderNameW} withdrew the offer`, notificationBody: `${founderNameW} withdrew the offer for "${projectTitle}".`, notificationLink: withdrawOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
@@ -1476,8 +1479,9 @@ export class ProposalService {
         userId
       );
 
+      const freelancerNameD = await getUserFullName(userId);
       const declineOfferLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      const notifData = { userId: proposal.project.user_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: 'Offer declined', notificationBody: `A freelancer declined your offer for "${projectTitle}".`, notificationLink: declineOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      const notifData = { userId: proposal.project.user_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${freelancerNameD} declined your offer`, notificationBody: `${freelancerNameD} declined your offer for "${projectTitle}".`, notificationLink: declineOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
@@ -1709,9 +1713,10 @@ export class ProposalService {
           proposal.project.id,
           proposal.provider_id
         );
+        const freelancerNameAccept = await getUserFullName(userId);
         const projectTitleAccept = proposal.project?.project_title || "Project";
         const offerAcceptedLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: 'Offer accepted', notificationBody: `A freelancer accepted your offer for "${projectTitleAccept}".`, notificationLink: offerAcceptedLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: `${freelancerNameAccept} accepted your offer`, notificationBody: `${freelancerNameAccept} accepted your offer for "${projectTitleAccept}".`, notificationLink: offerAcceptedLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
         return { success: true, message: "Offer accepted" };
@@ -1836,9 +1841,10 @@ export class ProposalService {
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
+        const freelancerNameSign = await getUserFullName(userId);
         const projectTitleSign = proposal.project?.project_title || "Project";
         const offerAcceptedLinkSign = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: 'Offer accepted', notificationBody: `A freelancer accepted your offer for "${projectTitleSign}".`, notificationLink: offerAcceptedLinkSign ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: `${freelancerNameSign} accepted your offer`, notificationBody: `${freelancerNameSign} accepted your offer for "${projectTitleSign}".`, notificationLink: offerAcceptedLinkSign ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
       }
@@ -1979,8 +1985,9 @@ export class ProposalService {
           userId
         );
 
+        const freelancerNamePW = await getUserFullName(userId);
         const proposalWithdrawnLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-        const notifData = { userId: project.user_id, type: 'PROPOSAL_WITHDRAWN' as const, notificationTitle: 'Proposal withdrawn', notificationBody: `A freelancer withdrew their proposal for "${projectTitle}".`, notificationLink: proposalWithdrawnLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: project.user_id, type: 'PROPOSAL_WITHDRAWN' as const, notificationTitle: `${freelancerNamePW} withdrew their proposal`, notificationBody: `${freelancerNamePW} withdrew their proposal for "${projectTitle}".`, notificationLink: proposalWithdrawnLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
       }

@@ -114,3 +114,14 @@ export function generateBackupCodes(count = 8): string[] {
     crypto.randomBytes(4).toString('hex')
   )
 }
+
+/** Fetch a user's full display name by ID. Returns "Someone" if not found. */
+export async function getUserFullName(userId: number): Promise<string> {
+  const { prisma } = await import('../services/prismaService');
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { first_name: true, last_name: true }
+  });
+  if (!user) return 'Someone';
+  return [user.first_name, user.last_name].filter(Boolean).join(' ');
+}

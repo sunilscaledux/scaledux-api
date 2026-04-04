@@ -7,6 +7,7 @@ import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { MilestoneStatus } from "@constants/status";
+import { getUserFullName } from "@utils/General";
 
 /**
  * Submit one deliverable (freelancer only). Sets status SUBMITTED, stores remark + files; clears feedback.
@@ -102,8 +103,9 @@ export async function submitDeliverable(
       project.id,
       userId
     );
+    const freelancerNameDel = await getUserFullName(userId);
     const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
-    const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: 'Deliverable submitted', notificationBody: `A freelancer submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: `${freelancerNameDel} submitted a deliverable`, notificationBody: `${freelancerNameDel} submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
   }

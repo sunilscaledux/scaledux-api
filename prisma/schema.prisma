@@ -68,7 +68,8 @@ model User {
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
   loginDevices                 LoginDevice[]
-  notifications                Notification[]
+  notifications                Notification[] @relation("UserNotifications")
+  actedNotifications           Notification[] @relation("NotificationActor")
   is_deactivated               Boolean   @default(false)
   scheduleTermination          ScheduleTermination?
   /** Razorpay X contact id (cont_xxx); reused when user updates bank so we don't create duplicate contacts. */
@@ -766,7 +767,7 @@ model FounderProject {
   id                    Int       @id @default(autoincrement())
   unique_id             String    @unique @default(cuid())
   user_id               Int
-  project_title         String    @db.VarChar(50)
+  project_title         String    @db.VarChar(100)
   project_description   String?   @db.Text
   expertise_category_id Int?
   specialty_id          Int?
@@ -1420,7 +1421,8 @@ model Notification {
   subject_type String?   @db.VarChar(80)   // FounderProject, Proposal, etc.
   subject_id   Int?
   created_at   DateTime  @default(now())
-  user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user         User      @relation("UserNotifications", fields: [user_id], references: [id], onDelete: Cascade)
+  actor        User?     @relation("NotificationActor", fields: [actor_id], references: [id], onDelete: SetNull)
 
   @@index([user_id])
   @@index([user_id, read_at])

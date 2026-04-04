@@ -1,7 +1,7 @@
 import Joi from 'joi'
 
 export const createFounderProjectSchema = Joi.object({
-  projectTitle: Joi.string().required().min(1).max(50).messages({
+  projectTitle: Joi.string().required().min(1).max(100).messages({
     'string.base': 'Project title must be a string',
     'string.empty': 'Project title is required',
     'string.min': 'Project title is required',
@@ -117,7 +117,7 @@ export const createFounderProjectSchema = Joi.object({
 
 // Draft: only title required; everything else optional
 export const saveDraftProjectSchema = Joi.object({
-  projectTitle: Joi.string().required().min(1).max(50).messages({
+  projectTitle: Joi.string().required().min(1).max(100).messages({
     'string.empty': 'Project title is required',
     'string.min': 'Project title is required',
     'any.required': 'Project title is required'
@@ -154,7 +154,7 @@ export const saveDraftProjectSchema = Joi.object({
 })
 
 export const updateFounderProjectSchema = Joi.object({
-  projectTitle: Joi.string().min(1).max(50).messages({
+  projectTitle: Joi.string().min(1).max(100).messages({
     'string.base': 'Project title must be a string',
     'string.min': 'Project title is required',
     'string.max': 'Project title is too long (max 50 characters)'

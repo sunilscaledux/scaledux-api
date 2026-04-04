@@ -9,6 +9,7 @@ import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
+import { getUserFullName } from '@utils/General';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
@@ -1065,12 +1066,15 @@ export class FounderProjectService {
     message?: string
   ): Promise<ServiceResponse> {
     try {
-      // Get the project
+      // Get the project with founder name
       const project = await prisma.founderProject.findFirst({
         where: {
           unique_id: projectId,
           user_id: userId,
           deleted_at: null
+        },
+        include: {
+          user: { select: { first_name: true, last_name: true } }
         }
       });
 
@@ -1148,7 +1152,7 @@ export class FounderProjectService {
 
       // Sync to chat: get-or-create conversation and add system message (initiator = founder)
       const projectTitle = project.project_title || "Project";
-      await ConversationService.syncSystemMessage(
+      const chatSync = await ConversationService.syncSystemMessage(
         project.user_id,
         providerId,
         "",
@@ -1163,8 +1167,20 @@ export class FounderProjectService {
         project.user_id
       );
 
-      const notificationTitle = `You're invited to work on "${projectTitle}"`;
-      const notificationBody = `A project owner invited you to submit a proposal for "${projectTitle}".`;
+      // Send the invitation message as a regular chat message from the founder
+      if (message && chatSync.success && chatSync.data?.conversationUniqueId) {
+        await ConversationService.sendMessage(
+          chatSync.data.conversationUniqueId,
+          project.user_id,
+          message
+        );
+      }
+
+      const founderName = [project.user?.first_name, project.user?.last_name].filter(Boolean).join(' ') || 'Someone';
+      const notificationTitle = `${founderName} invited you to "${projectTitle}"`;
+      const bodyParts = [`${founderName} invited you to submit a proposal for "${projectTitle}".`];
+      if (message) bodyParts.push(`"${message}"`);
+      const notificationBody = bodyParts.join('\n\n');
       const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
 
       const notifData = { userId: providerId, type: 'PROJECT_INVITATION' as const, notificationTitle, notificationBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
@@ -1256,8 +1272,12 @@ export class FounderProjectService {
         userId
       );
 
+      const providerName = await getUserFullName(userId);
       const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-      const notifData = { userId: project.user_id, type: 'INVITATION_REJECTED' as const, notificationTitle: 'Invitation declined', notificationBody: `A freelancer declined your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
+      const rejectionBody = reason?.trim()
+        ? `${providerName} declined your invitation for "${projectTitle}".\n\nReason: "${reason.trim()}"`
+        : `${providerName} declined your invitation for "${projectTitle}".`;
+      const notifData = { userId: project.user_id, type: 'INVITATION_REJECTED' as const, notificationTitle: `${providerName} declined your invitation`, notificationBody: rejectionBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
@@ -1320,8 +1340,9 @@ export class FounderProjectService {
       );
       await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
 
+      const accepterName = await getUserFullName(userId);
       const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-      const notifData = { userId: project.user_id, type: 'INVITATION_ACCEPTED' as const, notificationTitle: 'Invitation accepted', notificationBody: `A freelancer accepted your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
+      const notifData = { userId: project.user_id, type: 'INVITATION_ACCEPTED' as const, notificationTitle: `${accepterName} accepted your invitation`, notificationBody: `${accepterName} accepted your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 

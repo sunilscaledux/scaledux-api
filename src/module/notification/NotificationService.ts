@@ -9,6 +9,11 @@ export interface NotificationItem {
   link: string | null;
   read_at: Date | null;
   created_at: Date;
+  actor?: {
+    id: number;
+    first_name: string;
+    last_name: string | null;
+  } | null;
 }
 
 export class NotificationService {
@@ -30,7 +35,14 @@ export class NotificationService {
         body: true,
         link: true,
         read_at: true,
-        created_at: true
+        created_at: true,
+        actor: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+          }
+        }
       }
     });
     const hasMore = rows.length > limit;

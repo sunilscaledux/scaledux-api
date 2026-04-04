@@ -20,6 +20,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: scaledux-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build:
       context: .
@@ -35,8 +48,13 @@ services:
       - scaledux_api_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   socket:
     build:
@@ -53,6 +71,10 @@ services:
       - scaledux_api_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
     depends_on:
       app: { condition: service_started }
 
@@ -69,6 +91,10 @@ services:
       - scaledux_api_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
     depends_on:
       app: { condition: service_started }
 
@@ -85,6 +111,10 @@ services:
       - scaledux_api_node_modules:/app/node_modules
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
     depends_on:
       app: { condition: service_started }
 
@@ -102,6 +132,9 @@ services:
     env_file:
       - .env
     environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
       LOG_CHANNEL: stack
     depends_on:
       app: { condition: service_started }
