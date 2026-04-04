@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { urlsOrPathsToAttachmentIds } from "@services/attachmentService";
+import { urlsOrPathsToAttachmentIds, markAttachmentsAttached } from "@services/attachmentService";
 import { ConversationService } from "@module/chat/ConversationService";
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
@@ -63,6 +63,13 @@ export async function submitDeliverable(
       feedback: null
     }
   });
+
+  // Grant the project owner (client) access to the submitted files so they can view/download
+  const projectOwnerId = deliverable.milestone.proposal.project?.user_id;
+  const attachmentIds = submittedFileRelative.map((f: { url: string }) => f.url).filter(Boolean);
+  if (projectOwnerId && attachmentIds.length > 0) {
+    await markAttachmentsAttached(attachmentIds, [projectOwnerId, userId]);
+  }
 
   const submittedRemark = remark != null && String(remark).trim() !== "" ? String(remark).trim() : undefined;
   const fileLinks = files.map((f: { url: string; name?: string }) => ({ url: f.url, name: f.name }));

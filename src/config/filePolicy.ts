@@ -26,7 +26,7 @@ const policy: Record<string, FileVisibility> = {
   service_package_thumbnail: 'public',
   service_package_documents: 'public',
   service_package_media: 'public',
-  proposal_attachments: 'private',
+  proposal_attachments: 'public',
   proposal_nda: 'private',
   proposal_milestone_document: 'private',
   achievement_media: 'public',

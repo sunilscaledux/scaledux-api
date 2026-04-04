@@ -267,7 +267,18 @@ export class ProposalService {
         }
       });
 
-      await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, data.milestones ?? []);
+      // For "byProject" payment: auto-create a single milestone with the full amount and a deliverable
+      let milestones = data.milestones ?? [];
+      if (data.payment_schedule === 'byProject' && milestones.length === 0) {
+        milestones = [{
+          title: project.project_title || 'Full Project',
+          amount: data.proposed_amount,
+          dueDate: null,
+          description: 'Full project delivery',
+          deliverables: [{ deliverable: 'Complete project delivery' }]
+        }];
+      }
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, project.id, milestones);
 
       // Check if user was invited to this project and update invite status to ACCEPTED
       const invite = await (prisma as any).projectInvite.findFirst({
@@ -1133,7 +1144,18 @@ export class ProposalService {
           main_reason: null // Clear when freelancer updates proposal
         }
       });
-      await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, data.milestones ?? []);
+      // For "byProject" payment: auto-create a single milestone with the full amount and a deliverable
+      let updateMilestones = data.milestones ?? [];
+      if (data.payment_schedule === 'byProject' && updateMilestones.length === 0) {
+        updateMilestones = [{
+          title: proposal.project?.project_title || 'Full Project',
+          amount: data.proposed_amount,
+          dueDate: null,
+          description: 'Full project delivery',
+          deliverables: [{ deliverable: 'Complete project delivery' }]
+        }];
+      }
+      await ProposalService.syncProposalMilestonesToTable(proposal.id, proposal.project_id, updateMilestones);
 
       if (proposal.project?.id != null && proposal.project?.user_id != null) {
         const projectTitle = proposal.project.project_title || "Project";
