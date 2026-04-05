@@ -128,7 +128,8 @@ export async function getPrivateFile(
       contentLength: Number.isNaN(contentLength) ? null : contentLength,
       filename,
     };
-  } catch {
+  } catch (err: any) {
+    console.error(`[getPrivateFile] Failed to fetch from Bunny. url=${url}, status=${err?.response?.status}, error=${err?.message}`);
     return null;
   }
 }

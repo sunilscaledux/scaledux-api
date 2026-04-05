@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from '@services/loggerService';
-import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService';
 import { createRedirectLink } from '@services/redirectLinkService';
 
 /**
@@ -306,6 +306,9 @@ export class ServicePackageService {
         include: packageRelationInclude,
       });
 
+      const allFileIds = [normalizedThumbnail, ...normalizedImages, ...normalizedVideo, ...normalizedDocuments].filter(Boolean) as string[];
+      if (allFileIds.length > 0) await markAttachmentsAttached(allFileIds, [userId]);
+
       const transformedPackage = await parseServicePackageJsonAsync(newPackage);
 
       return {
@@ -378,6 +381,9 @@ export class ServicePackageService {
         },
         include: packageRelationInclude,
       });
+
+      const allFileIds = [normalizedThumbnail, ...normalizedImages, ...normalizedVideo, ...normalizedDocuments].filter(Boolean) as string[];
+      if (allFileIds.length > 0) await markAttachmentsAttached(allFileIds, [userId]);
 
       const transformedPackage = await parseServicePackageJsonAsync(updatedPackage);
 

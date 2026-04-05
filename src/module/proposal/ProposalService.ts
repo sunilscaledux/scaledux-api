@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService';
 import { Log } from '@services/loggerService';
 import { createProposalActivity, getProposalActivities as fetchProposalActivities } from './ProposalActivityService';
 import { dispatch } from '@queues/Queue';
@@ -40,6 +40,43 @@ function buildRemark(reasonLabel: string, reasonMessage?: string | null): string
   const b = reasonMessage?.trim() ?? '';
   if (a && b) return `${a}. ${b}`;
   return a || b;
+}
+
+type RemarkRole = 'founder' | 'freelancer';
+
+/**
+ * Build role-specific display messages + reason fields for both sides.
+ * Stores pre-built messages with embedded actor name so each side sees proper context.
+ * `founder_remark`/`freelancer_remark` are also used for chat sync (messageSent/messageReceived).
+ */
+function buildRemarkFields(
+  actorRole: RemarkRole,
+  actorName: string,
+  actionSent: string,
+  actionReceived: string,
+  reasonKey?: string | null,
+  reasonMessage?: string | null,
+) {
+  const rawRemark = buildRemark(reasonKey ?? '', reasonMessage) || null;
+  const reasonKeyTrimmed = reasonKey?.trim() || null;
+
+  const sentDisplay = rawRemark ? `${actionSent}. ${rawRemark}` : actionSent;
+  const receivedDisplay = rawRemark
+    ? `${actorName} ${actionReceived}. Reason: ${rawRemark}`
+    : `${actorName} ${actionReceived}`;
+
+  if (actorRole === 'founder') {
+    return {
+      founder_remark: sentDisplay,
+      founder_reason: reasonKeyTrimmed,
+      freelancer_remark: receivedDisplay,
+    };
+  }
+  return {
+    freelancer_remark: sentDisplay,
+    freelancer_reason: reasonKeyTrimmed,
+    founder_remark: receivedDisplay,
+  };
 }
 
 /** NDA + offer data (from ProposalNda table or legacy proposal.nda JSON). Dates in API as ISO strings. */
@@ -266,6 +303,11 @@ export class ProposalService {
           status: 'PENDING'
         }
       });
+
+      // Mark proposal attachments as attached
+      if (attachmentPaths.length > 0) {
+        await markAttachmentsAttached(attachmentPaths, [userId, project.user_id]);
+      }
 
       // For "byProject" payment: auto-create a single milestone with the full amount and a deliverable
       let milestones = data.milestones ?? [];
@@ -1018,7 +1060,7 @@ export class ProposalService {
       const projectUser = proposal.project?.user;
       const [milestones, attachments, projectUserProfileImage, providerProfileImage] = await Promise.all([
         milestonesFromRowsWithDocuments(proposal.milestonesRows),
-        resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
+        resolveAttachmentUrls(proposal.attachments || [], 'proposal_attachments'),
         projectUser?.personalInfo?.profileImage
           ? resolveAttachmentUrl(projectUser.personalInfo.profileImage, 'profile_image')
           : Promise.resolve(null),
@@ -1029,7 +1071,7 @@ export class ProposalService {
       const transformedProposal: any = {
         ...proposal,
         milestones,
-        attachments,
+        attachments: attachments,
         milestonesRows: proposal.milestonesRows ?? [],
         project: proposal.project ? {
           ...proposal.project,
@@ -1140,10 +1182,19 @@ export class ProposalService {
           ...(data.attachments !== undefined && {
             attachments: urlsOrPathsToAttachmentIds(data.attachments || [])
           }),
-          remark: null,
-          main_reason: null // Clear when freelancer updates proposal
+          founder_remark: null,
+          founder_reason: null,
+          freelancer_remark: null,
+          freelancer_reason: null // Clear when freelancer updates proposal
         }
       });
+      // Mark updated attachments as attached
+      if (data.attachments !== undefined) {
+        const updatedAttachmentIds = urlsOrPathsToAttachmentIds(data.attachments || []);
+        if (updatedAttachmentIds.length > 0) {
+          await markAttachmentsAttached(updatedAttachmentIds, [userId, proposal.project.user_id]);
+        }
+      }
       // For "byProject" payment: auto-create a single milestone with the full amount and a deliverable
       let updateMilestones = data.milestones ?? [];
       if (data.payment_schedule === 'byProject' && updateMilestones.length === 0) {
@@ -1235,27 +1286,25 @@ export class ProposalService {
         };
       }
 
-      const rejectionReason = status === 'REJECTED' ? (rejection?.reason_key?.trim() || null) : null;
-      const rejectionMsg = status === 'REJECTED' ? (rejection?.reason_message?.trim() || null) : null;
-      const rejectionRemark = status === 'REJECTED' && (rejectionReason || rejectionMsg)
-        ? buildRemark(rejectionReason ?? '', rejectionMsg ?? null)
-        : undefined;
-      const mainReason = rejectionReason;
-
-      if (status === 'REJECTED' && (rejectionRemark || mainReason)) {
+      let remarkFields: ReturnType<typeof buildRemarkFields> | null = null;
+      if (status === 'REJECTED') {
+        const rejectionReason = rejection?.reason_key?.trim() || null;
+        const rejectionMsg = rejection?.reason_message?.trim() || null;
+        const founderName = await getUserFullName(userId);
+        remarkFields = buildRemarkFields(
+          'founder', founderName,
+          'You rejected the proposal',
+          'rejected your proposal',
+          rejectionReason, rejectionMsg,
+        );
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: {
-            status: ProposalStatus.REJECTED,
-            remark: rejectionRemark ?? null,
-            main_reason: mainReason
-          }
+          data: { status: ProposalStatus.REJECTED, ...remarkFields }
         });
       } else {
-        const updateData: any = { status };
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
-          data: updateData
+          data: { status }
         });
       }
 
@@ -1264,23 +1313,24 @@ export class ProposalService {
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
           oldStatus: proposal.status,
           newStatus: status,
-          ...(status === 'REJECTED' && rejectionRemark ? { message: rejectionRemark } : {}),
-          ...(mainReason ? { main_reason: mainReason } : {})
+          ...(remarkFields?.founder_remark ? { message: remarkFields.founder_remark } : {}),
+          ...(remarkFields?.founder_reason ? { main_reason: remarkFields.founder_reason } : {})
         }, userId);
 
-        // Sync to chat: notify provider (initiator = founder)
-        const sentText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT;
-        const receivedText = status === ProposalStatus.SHORTLISTED ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED : CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED;
+        // Sync to chat: use role-specific remark fields
+        const messageSent = status === ProposalStatus.SHORTLISTED
+          ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_SENT
+          : (remarkFields?.founder_remark ?? CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_SENT);
+        const messageReceived = status === ProposalStatus.SHORTLISTED
+          ? CHAT_SYSTEM_MESSAGES.PROPOSAL_ACCEPTED_RECEIVED
+          : (remarkFields?.freelancer_remark ?? CHAT_SYSTEM_MESSAGES.PROPOSAL_REJECTED_RECEIVED);
         const metadata: Record<string, unknown> = {
           activityType: "proposal_status",
           activityId: proposal.unique_id,
           newStatus: status,
-          messageSent: sentText,
-          messageReceived: receivedText
+          messageSent,
+          messageReceived
         };
-        if (status === 'REJECTED' && rejectionRemark) {
-          metadata.message = rejectionRemark;
-        }
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
           proposal.provider_id,
@@ -1297,7 +1347,7 @@ export class ProposalService {
           await dispatch(NotificationJob, notifData);
           await dispatch(NotificationEmailJob, notifData);
         } else {
-        const notifData = { userId: proposal.provider_id, type: 'PROPOSAL_REJECTED' as const, notificationTitle: 'Proposal rejected', notificationBody: rejectionRemark ? `Your proposal for "${projectTitle}" was rejected. Reason: ${rejectionRemark}` : `Your proposal for "${projectTitle}" was rejected.`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: proposal.provider_id, type: 'PROPOSAL_REJECTED' as const, notificationTitle: 'Proposal rejected', notificationBody: remarkFields?.freelancer_remark ? `Your proposal for "${projectTitle}" was rejected. Reason: ${remarkFields.freelancer_remark}` : `Your proposal for "${projectTitle}" was rejected.`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
         }
@@ -1350,16 +1400,17 @@ export class ProposalService {
 
       const reason = body.reason?.trim();
       const reasonMsg = body.reason_message?.trim() || null;
-      const remark = buildRemark(reason ?? '', reasonMsg) || null;
-      const mainReason = reason || null;
 
+      const founderNameCH = await getUserFullName(userId);
+      const remarkFields = buildRemarkFields(
+        'founder', founderNameCH,
+        'You withdrew the offer',
+        'withdrew the offer',
+        reason, reasonMsg,
+      );
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: {
-          status: ProposalStatus.WITHDRAWN,
-          remark: remark ?? null,
-          main_reason: mainReason
-        }
+        data: { status: ProposalStatus.WITHDRAWN, ...remarkFields }
       });
       const toDateOrNull = (v: string | null | undefined): Date | null =>
         v == null || v === '' ? null : new Date(v);
@@ -1390,34 +1441,27 @@ export class ProposalService {
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: ProposalStatus.OFFER_SENT,
         newStatus: ProposalStatus.WITHDRAWN,
-        message: remark ?? undefined,
-        ...(mainReason ? { main_reason: mainReason } : {})
+        message: remarkFields.founder_remark ?? undefined,
+        ...(remarkFields.founder_reason ? { main_reason: remarkFields.founder_reason } : {})
       }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
-      const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}`;
-      const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle}`;
-      const metadata: Record<string, unknown> = {
-        activityType: "offer_cancelled",
-        activityId: proposal.unique_id,
-        messageSent: sentText,
-        messageReceived: receivedText
-      };
-      if (remark) {
-        metadata.message = remark;
-      }
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         "",
-        metadata,
+        {
+          activityType: "offer_cancelled",
+          activityId: proposal.unique_id,
+          messageSent: remarkFields.founder_remark,
+          messageReceived: remarkFields.freelancer_remark
+        },
         proposal.project.id,
         proposal.project.user_id
       );
 
-      const founderNameW = await getUserFullName(userId);
       const withdrawOfferLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      const notifData = { userId: proposal.provider_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${founderNameW} withdrew the offer`, notificationBody: `${founderNameW} withdrew the offer for "${projectTitle}".`, notificationLink: withdrawOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      const notifData = { userId: proposal.provider_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${founderNameCH} withdrew the offer`, notificationBody: `${founderNameCH} withdrew the offer for "${projectTitle}".`, notificationLink: withdrawOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
@@ -1463,47 +1507,43 @@ export class ProposalService {
 
       const reason = body.reason?.trim();
       const reasonMsg = body.reason_message?.trim() || null;
-      const remark = buildRemark(reason ?? '', reasonMsg) || null;
-      const mainReason = reason || null;
 
+      const freelancerNameDO = await getUserFullName(userId);
+      const remarkFields = buildRemarkFields(
+        'freelancer', freelancerNameDO,
+        'You declined the offer',
+        'declined the offer',
+        reason, reasonMsg,
+      );
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: {
-          status: ProposalStatus.REJECTED,
-          remark: remark ?? null,
-          main_reason: mainReason
-        }
+        data: { status: ProposalStatus.REJECTED, ...remarkFields }
       });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: ProposalStatus.OFFER_SENT,
         newStatus: ProposalStatus.REJECTED,
-        message: remark ?? undefined,
-        ...(mainReason ? { main_reason: mainReason } : {})
+        message: remarkFields.freelancer_remark ?? undefined,
+        ...(remarkFields.freelancer_reason ? { main_reason: remarkFields.freelancer_reason } : {})
       }, userId);
 
       const projectTitle = proposal.project?.project_title || "Project";
-      const sentText = `${CHAT_SYSTEM_MESSAGES.OFFER_DECLINED_SENT} ${projectTitle}`;
-      const receivedText = `${CHAT_SYSTEM_MESSAGES.OFFER_DECLINED_RECEIVED} ${projectTitle}`;
-      const metadata: Record<string, unknown> = {
-        activityType: "offer_declined",
-        activityId: proposal.unique_id,
-        messageSent: sentText,
-        messageReceived: receivedText
-      };
-      if (remark) metadata.message = remark;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
         "",
-        metadata,
+        {
+          activityType: "offer_declined",
+          activityId: proposal.unique_id,
+          messageSent: remarkFields.freelancer_remark,
+          messageReceived: remarkFields.founder_remark
+        },
         proposal.project.id,
         userId
       );
 
-      const freelancerNameD = await getUserFullName(userId);
       const declineOfferLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/proposals-and-offers/${proposal.unique_id}`;
-      const notifData = { userId: proposal.project.user_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${freelancerNameD} declined your offer`, notificationBody: `${freelancerNameD} declined your offer for "${projectTitle}".`, notificationLink: declineOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+      const notifData = { userId: proposal.project.user_id, type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN' as const, notificationTitle: `${freelancerNameDO} declined your offer`, notificationBody: `${freelancerNameDO} declined your offer for "${projectTitle}".`, notificationLink: declineOfferLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
@@ -1958,23 +1998,24 @@ export class ProposalService {
 
       const reason = body.reason?.trim();
       const reasonMsg = body.reason_message?.trim() || null;
-      const remark = buildRemark(reason ?? '', reasonMsg) || null;
-      const mainReason = reason || null;
 
+      const freelancerNameWP = await getUserFullName(userId);
+      const remarkFields = buildRemarkFields(
+        'freelancer', freelancerNameWP,
+        'You withdrew your proposal',
+        'withdrew their proposal',
+        reason, reasonMsg,
+      );
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: {
-          status: ProposalStatus.WITHDRAWN,
-          remark: remark ?? null,
-          main_reason: mainReason
-        }
+        data: { status: ProposalStatus.WITHDRAWN, ...remarkFields }
       });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: ProposalStatus.PENDING,
         newStatus: ProposalStatus.WITHDRAWN,
-        message: remark ?? undefined,
-        ...(mainReason ? { main_reason: mainReason } : {})
+        message: remarkFields.freelancer_remark ?? undefined,
+        ...(remarkFields.freelancer_reason ? { main_reason: remarkFields.freelancer_reason } : {})
       }, userId);
 
       // Decrement proposals_count on the project
@@ -1990,26 +2031,23 @@ export class ProposalService {
       });
       if (project) {
         const projectTitle = project.project_title || "Project";
-        const metadata: Record<string, unknown> = {
-          activityType: "proposal_withdrawn",
-          activityId: proposal.unique_id,
-          projectTitle: project.project_title,
-          messageSent: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_SENT,
-          messageReceived: CHAT_SYSTEM_MESSAGES.PROPOSAL_WITHDRAWN_RECEIVED
-        };
-        if (remark) metadata.message = remark;
         await ConversationService.syncSystemMessage(
           project.user_id,
           userId,
           "",
-          metadata,
+          {
+            activityType: "proposal_withdrawn",
+            activityId: proposal.unique_id,
+            projectTitle: project.project_title,
+            messageSent: remarkFields.freelancer_remark,
+            messageReceived: remarkFields.founder_remark
+          },
           proposal.project.id,
           userId
         );
 
-        const freelancerNamePW = await getUserFullName(userId);
         const proposalWithdrawnLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-        const notifData = { userId: project.user_id, type: 'PROPOSAL_WITHDRAWN' as const, notificationTitle: `${freelancerNamePW} withdrew their proposal`, notificationBody: `${freelancerNamePW} withdrew their proposal for "${projectTitle}".`, notificationLink: proposalWithdrawnLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: project.user_id, type: 'PROPOSAL_WITHDRAWN' as const, notificationTitle: `${freelancerNameWP} withdrew their proposal`, notificationBody: `${freelancerNameWP} withdrew their proposal for "${projectTitle}".`, notificationLink: proposalWithdrawnLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
       }
@@ -2062,34 +2100,37 @@ export class ProposalService {
         return { success: false, message: "Reason or reason message is required" };
       }
 
-      const remark = buildRemark(reason ?? '', reasonMsg) || null;
-      const mainReason = reason || null;
-
       const terminateAt = new Date();
       terminateAt.setDate(terminateAt.getDate() + 7);
 
+      const actorRole: RemarkRole = isFounder ? 'founder' : 'freelancer';
+      const actorName = await getUserFullName(userId);
+      const remarkFields = buildRemarkFields(
+        actorRole, actorName,
+        'You scheduled termination',
+        'scheduled contract termination',
+        reason, reasonMsg,
+      );
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: {
           status: ProposalStatus.TERMINATING,
           terminate_at: terminateAt,
           terminate_by: userId,
-          remark: remark ?? null,
-          main_reason: mainReason
+          ...remarkFields
         }
       });
 
+      const actorRemark = isFounder ? remarkFields.founder_remark : remarkFields.freelancer_remark;
+      const actorReason = isFounder ? remarkFields.founder_reason : remarkFields.freelancer_reason;
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: ProposalStatus.HIRED,
         newStatus: ProposalStatus.TERMINATING,
-        message: remark ?? undefined,
-        ...(mainReason ? { main_reason: mainReason } : {})
+        message: actorRemark ?? undefined,
+        ...(actorReason ? { main_reason: actorReason } : {})
       }, userId);
 
       const projectTitle = proposal.project.project_title || "Project";
-      const displayReason = remark ?? '';
-      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_SENT} ${projectTitle}. Reason: ${displayReason}. You can restore before the date.`;
-      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_TERMINATE_SCHEDULED_RECEIVED} ${projectTitle}. Reason: ${displayReason}.`;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
@@ -2098,10 +2139,9 @@ export class ProposalService {
           activityType: "contract_terminate_scheduled",
           activityId: proposal.unique_id,
           projectTitle: proposal.project.project_title,
-          reason: displayReason,
           terminateAt: terminateAt.toISOString(),
-          messageSent,
-          messageReceived
+          messageSent: isFounder ? remarkFields.founder_remark : remarkFields.freelancer_remark,
+          messageReceived: isFounder ? remarkFields.freelancer_remark : remarkFields.founder_remark
         },
         proposal.project.id,
         userId
@@ -2137,14 +2177,28 @@ export class ProposalService {
         return { success: false, message: "No scheduled termination to restore or it has already passed" };
       }
 
+      const restorerName = await getUserFullName(userId);
+      const isFounder = proposal.project.user_id === userId;
+      const restorerRole: RemarkRole = isFounder ? 'founder' : 'freelancer';
+      const restoreFields = buildRemarkFields(
+        restorerRole, restorerName,
+        'You restored the contract',
+        'restored the contract',
+      );
+
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
-        data: { status: ProposalStatus.HIRED, terminate_at: null, terminate_by: null }
+        data: {
+          status: ProposalStatus.HIRED,
+          terminate_at: null,
+          terminate_by: null,
+          ...restoreFields,
+          founder_reason: null,
+          freelancer_reason: null,
+        }
       });
 
       const projectTitle = proposal.project?.project_title ?? "Project";
-      const messageSent = `${CHAT_SYSTEM_MESSAGES.CONTRACT_RESTORED_SENT} ${projectTitle}.`;
-      const messageReceived = `${CHAT_SYSTEM_MESSAGES.CONTRACT_RESTORED_RECEIVED} ${projectTitle}.`;
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
         proposal.provider_id,
@@ -2153,8 +2207,8 @@ export class ProposalService {
           activityType: "contract_restored",
           activityId: proposal.unique_id,
           projectTitle,
-          messageSent,
-          messageReceived
+          messageSent: isFounder ? restoreFields.founder_remark : restoreFields.freelancer_remark,
+          messageReceived: isFounder ? restoreFields.freelancer_remark : restoreFields.founder_remark
         },
         proposal.project.id,
         userId
@@ -2243,9 +2297,15 @@ export class ProposalService {
       }
       await createProposalActivity(proposal.unique_id, 'REQUEST_MODIFY', { message: trimmed }, userId);
 
+      const founderNameRM = await getUserFullName(userId);
+      const founderRemark = `You requested a modification. ${trimmed}`;
+      const freelancerRemark = `${founderNameRM} requested a modification. ${trimmed}`;
       await (prisma as any).proposal.update({
         where: { unique_id: proposalId },
-        data: { remark: trimmed }
+        data: {
+          founder_remark: founderRemark,
+          freelancer_remark: freelancerRemark,
+        }
       });
 
       const projectTitle = proposal.project.project_title || "Project";
@@ -2258,8 +2318,8 @@ export class ProposalService {
           activityId: proposal.unique_id,
           message: trimmed,
           projectTitle: proposal.project.project_title,
-          messageSent: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_SENT} ${projectTitle}`,
-          messageReceived: `${CHAT_SYSTEM_MESSAGES.REQUEST_MODIFY_RECEIVED} ${projectTitle}`
+          messageSent: founderRemark,
+          messageReceived: freelancerRemark
         },
         proposal.project.id,
         proposal.project.user_id

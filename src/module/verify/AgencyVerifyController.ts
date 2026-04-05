@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
-import { urlsOrPathsToAttachmentIds } from '@services/attachmentService'
+import { urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService'
 import { uploadFile } from '@module/general/FileController'
 import { resolveAttachmentUrls } from '@services/attachmentService'
 import fs from 'fs'
@@ -95,6 +95,10 @@ export async function submitAgencyVerification(req: Request, res: Response) {
         verified_at: verifiedAt,
       }
     })
+  }
+
+  if (normalizedDocumentUrls.length > 0) {
+    await markAttachmentsAttached(normalizedDocumentUrls, [userId!])
   }
 
   await prisma.user.update({

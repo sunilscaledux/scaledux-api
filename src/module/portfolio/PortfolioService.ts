@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreatePortfolioInput, UpdatePortfolioInput } from "./PortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService';
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -176,6 +176,8 @@ export class PortfolioService {
       const portfolio = await prisma.portfolio.create({
         data: createData
       });
+      const allFileIds = [normalizedThumbnail, ...normalizedMedia].filter(Boolean) as string[];
+      if (allFileIds.length > 0) await markAttachmentsAttached(allFileIds, [userId]);
       await updateCompletionSection(userId, 'portfolio', true);
 
       // References are stored as actual URLs (no redirect wrapping)
@@ -248,6 +250,9 @@ export class PortfolioService {
           }
         }
       });
+
+      const allFileIds = [normalizedThumbnail, ...normalizedMedia].filter(Boolean) as string[];
+      if (allFileIds.length > 0) await markAttachmentsAttached(allFileIds, [userId]);
 
       const transformedPortfolio = await transformPortfolio(updatedPortfolio);
 

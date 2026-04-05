@@ -812,6 +812,7 @@ model ProjectInvite {
   project_id            Int
   provider_id           Int       // Freelancer user id
   message               String?   @db.Text
+  main_reason           String?   @db.VarChar(50) // Predefined reason key when freelancer declines invitation
   status                String    @default("PENDING") @db.VarChar(20) // PENDING, ACCEPTED, REJECTED
   created_at            DateTime  @default(now())
   updated_at            DateTime  @default(now()) @updatedAt
@@ -858,8 +859,14 @@ model Proposal {
   hours_required        Int?
   screening_answers     Json      @default("[]") // Answers to screening questions
   attachments           Json      @default("[]") // File URLs
-  remark                String?   @db.Text       // Optional message or full display text (reason label + message)
-  main_reason           String?   @db.VarChar(50) // Predefined reason key (e.g. BUDGET_MISMATCH, OTHER) from proposal reasons
+  /** Display message for founder (contextual, e.g. "You rejected…" or "[Name] withdrew…") */
+  founder_remark        String?   @db.Text
+  /** Predefined reason key from founder's action */
+  founder_reason        String?   @db.VarChar(50)
+  /** Display message for freelancer (contextual, e.g. "You withdrew…" or "Your proposal was rejected…") */
+  freelancer_remark     String?   @db.Text
+  /** Predefined reason key from freelancer's action */
+  freelancer_reason     String?   @db.VarChar(50)
 
   // Lock milestones after hire (no more edit/delete)
   milestones_approved   Boolean   @default(false) // true when status becomes HIRED

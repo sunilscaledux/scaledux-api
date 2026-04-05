@@ -116,19 +116,37 @@ export async function viewProtectedFile(req: Request, res: Response) {
       return res.redirect(302, fileLostUrl())
     }
 
-    const checkAccess = async (): Promise<boolean> => {
-      const att = await getByUniqueId(uniqueId)
-      if (!att) return false
-      if (!userId) return false
-      if (att.owner_user_id === userId) return true
-      const ids = att.accessible_user_ids as number[] | null | undefined
-      if (Array.isArray(ids) && ids.includes(userId)) return true
-      return false
+    // Look up attachment (including soft-deleted to give proper error)
+    const att = await getByUniqueId(uniqueId)
+    if (!att) {
+      // Check if it exists but is soft-deleted
+      const deleted = await (prisma as any).attachment.findUnique({ where: { unique_id: uniqueId } })
+      if (deleted?.deleted_at) {
+        Log.info(`[viewFile] File ${uniqueId} is soft-deleted. deleted_at=${deleted.deleted_at}`)
+        return res.status(410).json({ error: 'File has been deleted' })
+      }
+      Log.info(`[viewFile] File ${uniqueId} not found in DB`)
+      return res.redirect(302, fileLostUrl())
     }
 
-    const sent = await viewProtectedFileService(uniqueId, checkAccess, res)
-    if (!sent) {
+    if (!userId) {
+      Log.info(`[viewFile] No userId for file ${uniqueId}`)
       return res.redirect(302, fileLostUrl())
+    }
+
+    const isOwner = att.owner_user_id === userId
+    const ids = att.accessible_user_ids as number[] | null | undefined
+    const hasAccess = isOwner || (Array.isArray(ids) && ids.includes(userId))
+
+    if (!hasAccess) {
+      Log.info(`[viewFile] Access denied for file ${uniqueId}. userId=${userId}, owner=${att.owner_user_id}, accessible=${JSON.stringify(ids)}`)
+      return res.status(403).json({ error: 'Access denied' })
+    }
+
+    const sent = await viewProtectedFileService(uniqueId, () => Promise.resolve(true), res)
+    if (!sent) {
+      Log.info(`[viewFile] Bunny CDN failed to stream file ${uniqueId}, path=${att.path}`)
+      return res.status(404).json({ error: 'File not found on storage' })
     }
   } catch (error: any) {
     Log.error("Error in viewProtectedFile", { error })

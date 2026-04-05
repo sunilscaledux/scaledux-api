@@ -354,11 +354,14 @@ export async function inviteProvider(req: Request, res: Response) {
 
 /**
  * Reject an invitation (service provider rejects founder's invitation).
- * Body: { reason?: string } - optional rejection reason (shown to founder only).
+ * Body: { reason_key?: string; reason_message?: string } - predefined reason + optional message (shown to founder only).
  */
 export async function rejectInvitation(req: Request, res: Response) {
   const userId = req.user?.id;
   const projectId = getStringParam(req.params.id);
+  const reasonKey = typeof req.body?.reason_key === 'string' ? req.body.reason_key.trim() : undefined;
+  const reasonMessage = typeof req.body?.reason_message === 'string' ? req.body.reason_message.trim() : undefined;
+  // Backward compat: accept old `reason` field as reason_message fallback
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : undefined;
 
   if (!userId) {
@@ -369,7 +372,10 @@ export async function rejectInvitation(req: Request, res: Response) {
     return ApiResponse.error(res, "Project ID is required", 400);
   }
 
-  const result = await FounderProjectService.rejectInvitation(userId, projectId, reason);
+  const result = await FounderProjectService.rejectInvitation(userId, projectId, {
+    reason_key: reasonKey,
+    reason_message: reasonMessage || reason,
+  });
 
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);

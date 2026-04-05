@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { CreateAchievementInput, UpdateAchievementInput } from "./AchievementType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
+import { resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from "@services/attachmentService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
@@ -62,6 +62,8 @@ export class AchievementService {
           media_files: Array.isArray(achievementData.media_files) ? urlsOrPathsToAttachmentIds(achievementData.media_files) : undefined
         }
       });
+      const mediaIds = Array.isArray(achievement.media_files) ? (achievement.media_files as string[]) : [];
+      if (mediaIds.length > 0) await markAttachmentsAttached(mediaIds, [userId]);
       await updateCompletionSection(userId, 'achievements', true);
       return {
         success: true,
@@ -117,6 +119,8 @@ export class AchievementService {
         }
       });
 
+      const updatedMediaIds = Array.isArray(updatedAchievement.media_files) ? (updatedAchievement.media_files as string[]) : [];
+      if (updatedMediaIds.length > 0) await markAttachmentsAttached(updatedMediaIds, [userId]);
       return {
         success: true,
         message: 'Achievement updated successfully',

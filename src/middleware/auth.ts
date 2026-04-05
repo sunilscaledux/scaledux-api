@@ -12,9 +12,14 @@ declare global {
 
 export function privateFileAccess(req: Request, res: Response, next: NextFunction) {
   try {
-    const token = req.cookies?.auth_token;
+    // Try cookie first, then Authorization header, then ?token= query param
+    const token =
+      req.cookies?.auth_token ||
+      (req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null) ||
+      (typeof req.query.token === 'string' ? req.query.token : null);
 
     if (!token) {
+      console.log('[privateFileAccess] No token found. cookies:', Object.keys(req.cookies || {}), 'origin:', req.headers.origin, 'referer:', req.headers.referer);
       const loginUrl = process.env.FRONTEND_URL||'http://localhost:3000';
       return res.redirect(302, loginUrl);
     }
@@ -26,6 +31,7 @@ export function privateFileAccess(req: Request, res: Response, next: NextFunctio
     req.user = decoded;
     next();
   } catch (error) {
+    console.log('[privateFileAccess] Token verification failed:', (error as Error).message);
     return ApiResponse.unauthorized(res, 'Invalid or expired token');
   }
 }

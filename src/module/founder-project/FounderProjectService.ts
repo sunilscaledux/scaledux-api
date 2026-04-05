@@ -2,7 +2,7 @@ import { prisma } from "@services/prismaService";
 import { CreateFounderProjectInput, UpdateFounderProjectInput } from "./FounderProjectType";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
-import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { dispatch } from '@queues/Queue';
@@ -740,6 +740,11 @@ export class FounderProjectService {
         }
       });
 
+      // Mark uploaded files as attached
+      if (projectFiles.length > 0) {
+        await markAttachmentsAttached(projectFiles, [userId]);
+      }
+
       // Transform file URLs for response
       const transformedProject = {
         ...project,
@@ -828,6 +833,12 @@ export class FounderProjectService {
         where: { id: existingProject.id },
         data: updateData
       });
+
+      // Mark uploaded files as attached
+      const fileIds = (updatedProject.project_files as string[]) || [];
+      if (fileIds.length > 0) {
+        await markAttachmentsAttached(fileIds, [userId]);
+      }
 
       // Transform file URLs
       const transformedProject = {
@@ -1171,7 +1182,8 @@ export class FounderProjectService {
           invite_status: (invite as any)?.status || null,
           invited_at: (invite as any)?.created_at || null,
           is_saved: isSaved,
-          invite_rejection_reason: (invite as any)?.status === ProposalStatus.REJECTED ? (invite as any)?.message || null : null
+          invite_rejection_reason: (invite as any)?.status === ProposalStatus.REJECTED ? (invite as any)?.message || null : null,
+          invite_rejection_main_reason: (invite as any)?.status === ProposalStatus.REJECTED ? (invite as any)?.main_reason || null : null
         };
       }));
 
@@ -1396,12 +1408,12 @@ export class FounderProjectService {
 
   /**
    * Reject an invitation (service provider rejects founder's invitation).
-   * Optional reason is stored in invite message (founder sees it; freelancer does not).
+   * Stores predefined reason key + optional message. Founder sees the rejection reason.
    */
   static async rejectInvitation(
     userId: number,
     projectId: string,
-    reason?: string
+    payload: { reason_key?: string; reason_message?: string }
   ): Promise<ServiceResponse> {
     try {
       // Get the project
@@ -1435,7 +1447,21 @@ export class FounderProjectService {
         };
       }
 
-      // Update the invite status to REJECTED and store rejection reason in message (for founder to see)
+      const reasonKey = payload.reason_key?.trim() || null;
+      const reasonMsg = payload.reason_message?.trim() || null;
+      // Build combined display text from reason key + message
+      const parts = [reasonKey, reasonMsg].filter(Boolean);
+      const displayReason = parts.length > 0 ? parts.join('. ') : null;
+
+      const providerName = await getUserFullName(userId);
+      const freelancerRemark = displayReason
+        ? `You declined the invitation. ${displayReason}`
+        : 'You declined the invitation';
+      const founderRemark = displayReason
+        ? `${providerName} declined the invitation. Reason: ${displayReason}`
+        : `${providerName} declined the invitation`;
+
+      // Update the invite status to REJECTED and store rejection reason
       await (prisma as any).projectInvite.update({
         where: {
           project_id_provider_id: {
@@ -1445,7 +1471,8 @@ export class FounderProjectService {
         },
         data: {
           status: ProposalStatus.REJECTED,
-          message: (reason && reason.trim()) ? reason.trim() : null
+          message: displayReason,
+          main_reason: reasonKey,
         }
       });
 
@@ -1458,17 +1485,16 @@ export class FounderProjectService {
           activityType: "project_invitation_rejected",
           activityId: project.unique_id,
           projectTitle,
-          messageSent: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_SENT}: ${projectTitle}`,
-          messageReceived: `${CHAT_SYSTEM_MESSAGES.PROJECT_INVITATION_REJECTED_RECEIVED}: ${projectTitle}`
+          messageSent: founderRemark,
+          messageReceived: freelancerRemark
         },
         project.id,
         userId
       );
 
-      const providerName = await getUserFullName(userId);
       const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
-      const rejectionBody = reason?.trim()
-        ? `${providerName} declined your invitation for "${projectTitle}".\n\nReason: "${reason.trim()}"`
+      const rejectionBody = displayReason
+        ? `${providerName} declined your invitation for "${projectTitle}".\n\nReason: "${displayReason}"`
         : `${providerName} declined your invitation for "${projectTitle}".`;
       const notifData = { userId: project.user_id, type: 'INVITATION_REJECTED' as const, notificationTitle: `${providerName} declined your invitation`, notificationBody: rejectionBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);

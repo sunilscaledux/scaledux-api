@@ -137,7 +137,7 @@ export async function resolveAttachmentUrls(
       return getPublicUrl(att.path);
     }
     return buildPrivateUrl(baseUrl, att.unique_id, att.original_name);
-  });
+  }).filter(Boolean);
 }
 
 function buildPrivateUrl(baseUrl: string, uniqueId: string, originalName: string | null): string {
@@ -146,7 +146,7 @@ function buildPrivateUrl(baseUrl: string, uniqueId: string, originalName: string
 }
 
 /**
- * Mark attachments as 'attached' and grant access to additional user IDs.
+ * Mark attachments as 'attached', grant access to additional user IDs, and restore soft-deleted files.
  */
 export async function markAttachmentsAttached(
   attachmentIds: string[],
@@ -154,13 +154,14 @@ export async function markAttachmentsAttached(
 ): Promise<void> {
   if (!attachmentIds.length) return;
   for (const uid of attachmentIds) {
-    const att = await getByUniqueId(uid);
-    if (!att || att.status === 'attached') continue;
+    // Find even soft-deleted files — if we're attaching them, they should be restored
+    const att = await prisma.attachment.findUnique({ where: { unique_id: uid } });
+    if (!att) continue;
     const existing = Array.isArray(att.accessible_user_ids) ? (att.accessible_user_ids as number[]) : [];
     const merged = [...new Set([...existing, ...grantAccessToUserIds])];
     await prisma.attachment.update({
       where: { id: att.id },
-      data: { status: 'attached', accessible_user_ids: merged },
+      data: { status: 'attached', accessible_user_ids: merged, deleted_at: null },
     });
   }
 }

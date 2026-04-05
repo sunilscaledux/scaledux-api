@@ -46,13 +46,23 @@ export const TERMINATE_REASONS: string[] = [
   "Other"
 ];
 
+/** Freelancer declining a project invitation */
+export const INVITATION_DECLINE_REASONS: string[] = [
+  "Budget doesn't fit",
+  "Not a relevant fit",
+  "Timeline not feasible",
+  "Already committed to another project",
+  "Other"
+];
+
 /** Single route: get reasons by key. Valid keys for frontend. */
 export const PROPOSAL_REASON_KEYS = [
   "proposalDecline",
   "offerDecline",
   "withdrawOffer",
   "withdrawProposal",
-  "terminate"
+  "terminate",
+  "invitationDecline"
 ] as const;
 
 export type ProposalReasonKey = (typeof PROPOSAL_REASON_KEYS)[number];
@@ -62,7 +72,8 @@ const REASONS_BY_KEY: Record<ProposalReasonKey, string[]> = {
   offerDecline: OFFER_DECLINE_REASONS,
   withdrawOffer: WITHDRAW_OFFER_REASONS,
   withdrawProposal: WITHDRAW_PROPOSAL_REASONS,
-  terminate: TERMINATE_REASONS
+  terminate: TERMINATE_REASONS,
+  invitationDecline: INVITATION_DECLINE_REASONS
 };
 
 export function getReasonsByKey(key: string | undefined): string[] | null {

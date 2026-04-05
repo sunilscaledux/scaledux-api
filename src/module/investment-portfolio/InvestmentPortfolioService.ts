@@ -4,7 +4,7 @@ import {
   UpdateInvestmentPortfolioInput
 } from "./InvestmentPortfolioType";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { resolveAttachmentUrl, urlsOrPathsToAttachmentIds } from "@services/attachmentService";
+import { resolveAttachmentUrl, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from "@services/attachmentService";
 import { createRedirectLink } from "@services/redirectLinkService";
 import { Log } from '@services/loggerService';
 
@@ -194,6 +194,8 @@ export class InvestmentPortfolioService {
         }
       });
 
+      if (normalizedLogo) await markAttachmentsAttached([normalizedLogo], [userId]);
+
       // Wrap company_website in redirect link and store
       if (data.companyWebsite) {
         const redirectUrl = await createRedirectLink(data.companyWebsite, { entityType: 'investor_portfolio', entityId: portfolio.id, createdBy: userId });
@@ -292,6 +294,8 @@ export class InvestmentPortfolioService {
           }
         }
       });
+
+      if (normalizedLogo) await markAttachmentsAttached([normalizedLogo], [userId]);
 
       const transformed = {
         ...portfolio,

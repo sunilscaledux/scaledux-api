@@ -102,6 +102,11 @@ const PORT = process.env.PORT || 4000;
 
 const httpServer = http.createServer(app);
 
+// Allow large file uploads (streaming to Bunny CDN) without socket hang up
+httpServer.timeout = 5 * 60 * 1000; // 5 minutes
+httpServer.keepAliveTimeout = 120 * 1000; // 2 minutes
+httpServer.headersTimeout = 125 * 1000; // slightly above keepAliveTimeout
+
 async function start() {
   httpServer.listen(PORT, () => {
     Log.info(`API Base URL: http://localhost:${PORT}/api/v1`);
