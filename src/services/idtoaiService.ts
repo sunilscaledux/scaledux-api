@@ -282,7 +282,7 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
     });
 
     const data = response.data;
-    const info = data.company_info || data.result?.company_info || data;
+    const info = data.response?.details?.company_info || data.company_info || data.result?.company_info || data;
 
     return {
       success: true,
@@ -291,7 +291,7 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
       companyStatus: info.company_status || info.status,
       dateOfIncorporation: info.date_of_incorporation,
       registeredAddress: info.registered_address,
-      directors: (data.directors || data.result?.directors || []).map((d: any) => ({
+      directors: (data.response?.details?.directors || data.directors || data.result?.directors || []).map((d: any) => ({
         name: d.director_name || d.name,
         din: d.din_number || d.din,
       })),
