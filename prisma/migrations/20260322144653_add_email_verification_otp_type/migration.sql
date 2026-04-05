@@ -1,2 +1,0 @@
--- AlterEnum
-ALTER TYPE "public"."OtpType" ADD VALUE 'EMAIL_VERIFICATION';

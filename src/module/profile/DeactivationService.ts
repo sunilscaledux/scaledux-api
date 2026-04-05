@@ -30,7 +30,8 @@ function formatCountdown(until: Date): string {
  */
 export async function confirmDeactivateWithPassword(
   userId: number,
-  password: string
+  password: string,
+  reason?: string
 ): Promise<ServiceResponse> {
   const verify = await PersonalInfoService.verifyPassword(userId, password);
   if (!verify.success) return verify;
@@ -54,8 +55,8 @@ export async function confirmDeactivateWithPassword(
     }),
     prisma.scheduleTermination.upsert({
       where: { user_id: userId },
-      create: { user_id: userId, scheduled_at: scheduledAt },
-      update: { scheduled_at: scheduledAt, cancelled_at: null },
+      create: { user_id: userId, scheduled_at: scheduledAt, action: 'deactivate', reason: reason || null },
+      update: { scheduled_at: scheduledAt, cancelled_at: null, action: 'deactivate', reason: reason || null },
     }),
   ]);
 
@@ -71,7 +72,8 @@ export async function confirmDeactivateWithPassword(
  */
 export async function scheduleDeleteWithPassword(
   userId: number,
-  password: string
+  password: string,
+  reason?: string
 ): Promise<ServiceResponse> {
   const verify = await PersonalInfoService.verifyPassword(userId, password);
   if (!verify.success) return verify;
@@ -81,8 +83,8 @@ export async function scheduleDeleteWithPassword(
 
   await prisma.scheduleTermination.upsert({
     where: { user_id: userId },
-    create: { user_id: userId, scheduled_at: scheduledAt },
-    update: { scheduled_at: scheduledAt, cancelled_at: null },
+    create: { user_id: userId, scheduled_at: scheduledAt, action: 'delete', reason: reason || null },
+    update: { scheduled_at: scheduledAt, cancelled_at: null, action: 'delete', reason: reason || null },
   });
 
   return {

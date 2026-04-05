@@ -1057,6 +1057,9 @@ model ScheduleTermination {
   id           Int       @id @default(autoincrement())
   user_id      Int       @unique
   scheduled_at DateTime
+  /** deactivate | delete */
+  action       String?   @db.VarChar(20)
+  reason       String?   @db.Text
   created_at   DateTime  @default(now())
   cancelled_at DateTime?
   user         User      @relation(fields: [user_id], references: [id], onDelete: Cascade)

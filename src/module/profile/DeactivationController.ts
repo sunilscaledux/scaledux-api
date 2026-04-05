@@ -9,11 +9,11 @@ export async function confirmDeactivate(req: Request, res: Response) {
   try {
     const userId = (req as any).user?.id;
     if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
-    const { password } = req.body || {};
+    const { password, reason } = req.body || {};
     if (!password || typeof password !== "string") {
       return ApiResponse.error(res, "Password is required", 400);
     }
-    const result = await DeactivationService.confirmDeactivateWithPassword(userId, password);
+    const result = await DeactivationService.confirmDeactivateWithPassword(userId, password, typeof reason === 'string' ? reason.trim() : undefined);
     if (!result.success) return ApiResponse.error(res, result.message, 400);
 
     // Revoke all devices (same as logout-all); notify connected clients via existing socket
@@ -34,11 +34,11 @@ export async function scheduleDelete(req: Request, res: Response) {
   try {
     const userId = (req as any).user?.id;
     if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
-    const { password } = req.body || {};
+    const { password, reason } = req.body || {};
     if (!password || typeof password !== "string") {
       return ApiResponse.error(res, "Password is required", 400);
     }
-    const result = await DeactivationService.scheduleDeleteWithPassword(userId, password);
+    const result = await DeactivationService.scheduleDeleteWithPassword(userId, password, typeof reason === 'string' ? reason.trim() : undefined);
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message, 400);
   } catch (e: any) {
