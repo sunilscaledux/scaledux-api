@@ -17,6 +17,7 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'PROPOSAL_REJECTED', label: 'A proposal is rejected', category: 'Proposals' },
   { type: 'JOB_APPLIED_CANCELLED_OR_CLOSED', label: 'A job I applied to has been cancelled or closed', category: 'Proposals' },
   { type: 'PROPOSAL_WITHDRAWN', label: 'A proposal is withdrawn', category: 'Proposals' },
+  { type: 'PROPOSAL_CHANGE_REQUESTED', label: 'Changes requested on a proposal', category: 'Proposals' },
   { type: 'OFFER_SENT', label: 'Offer sent', category: 'Proposals' },
   { type: 'DELIVERABLE_SUBMITTED', label: 'Deliverable submitted', category: 'Proposals' },
   { type: 'DELIVERABLE_APPROVED', label: 'Deliverable approved', category: 'Proposals' },

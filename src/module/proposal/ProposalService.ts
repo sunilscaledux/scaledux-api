@@ -2326,6 +2326,20 @@ export class ProposalService {
         proposal.project.user_id
       );
 
+      const notificationLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
+      const notifData = {
+        userId: proposal.provider_id,
+        type: 'PROPOSAL_CHANGE_REQUESTED' as const,
+        notificationTitle: `${founderNameRM} requested changes`,
+        notificationBody: `${founderNameRM} requested changes to your proposal for "${projectTitle}". ${trimmed}`,
+        notificationLink,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+
       return { success: true, message: "Request sent to the service provider" };
     } catch (error: any) {
       Log.error("Request Modify Error", { error });
