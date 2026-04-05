@@ -88,9 +88,6 @@ export class PersonalInfoService {
         lastName,
         hideEmail: profile.hideEmail,
         hidePhone: profile.hidePhone,
-        // Only show email/phone if not hidden
-        email: profile.hideEmail ? null : user.email,
-        phone: profile.hidePhone ? null : user.phone,
         show_as_agency: user.show_as_agency,
         identity_verification_status: (user as any).identity_verification_status,
         profile_type: (user as any).profile_type || user.role,

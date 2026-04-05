@@ -150,6 +150,27 @@ export class ServicePackageService {
   }
 
   /**
+   * Get all PUBLISHED service packages for a user (public, no auth).
+   */
+  static async getPublicUserServicePackages(userUniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { unique_id: userUniqueId },
+        select: { id: true }
+      });
+      if (!user) {
+        return { success: false, message: "User not found" };
+      }
+
+      const result = await ServicePackageService.getUserServicePackages(user.id, 'PUBLISHED');
+      return result;
+    } catch (error: any) {
+      Log.error("Error", { error });
+      return { success: false, message: "Failed to retrieve service packages" };
+    }
+  }
+
+  /**
    * Get service package by ID
    */
   static async getServicePackageById(userId: number, uniqueId: string): Promise<ServiceResponse> {

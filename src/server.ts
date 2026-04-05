@@ -27,6 +27,8 @@ import billingRoutes from './module/billing/BillingRoute';
 import bankInformationRoutes from './module/bank-information/BankInformationRoute';
 import taxInformationRoutes from './module/tax-information/TaxInformationRoute';
 import reviewRoutes from './module/review/ReviewRoute';
+import mentorRoutes from './module/mentor/MentorRoute';
+import reportRoutes from './module/report/ReportRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -75,6 +77,8 @@ app.use("/api/v1/billing", billingRoutes);
 app.use("/api/v1/billing", bankInformationRoutes);
 app.use("/api/v1/billing", taxInformationRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
+app.use("/api/v1/mentors", mentorRoutes);
+app.use("/api/v1/reports", reportRoutes);
 
 // Public redirect endpoint — /r/:code/redirect → redirects to target URL
 app.get("/r/:code/redirect", async (req, res) => {

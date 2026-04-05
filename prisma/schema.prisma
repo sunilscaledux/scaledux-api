@@ -61,9 +61,13 @@ model User {
   wallet                        UserWallet?
   projectInvites               ProjectInvite[] @relation("ProjectInvites")
   savedProjects                SavedProject[] @relation("SavedProjects")
+  savedMentors                 SavedMentor[] @relation("SavedMentors")
+  savedAsMentor                SavedMentor[] @relation("SavedAsMentor")
   proposals                    Proposal[] @relation("UserProposals")
   reviewsGiven                 Review[]   @relation("ReviewsGiven")
   reviewsReceived              Review[]   @relation("ReviewsReceived")
+  reportsGiven                 ReportSpam[] @relation("ReportsGiven")
+  reportsReceived              ReportSpam[] @relation("ReportsReceived")
   conversationsAsUser1        Conversation[] @relation("ConversationUser1")
   conversationsAsUser2         Conversation[] @relation("ConversationUser2")
   sentMessages                 Message[]
@@ -845,6 +849,21 @@ model SavedProject {
   @@map("scd_saved_projects")
 }
 
+model SavedMentor {
+  id                    Int       @id @default(autoincrement())
+  mentor_id             Int       // The mentor user id being saved
+  user_id               Int       // The user who saved the mentor
+  created_at            DateTime  @default(now())
+
+  mentor                User @relation("SavedAsMentor", fields: [mentor_id], references: [id], onDelete: Cascade)
+  user                  User @relation("SavedMentors", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([mentor_id, user_id])
+  @@index([mentor_id])
+  @@index([user_id])
+  @@map("scd_saved_mentors")
+}
+
 // Proposals submitted by service providers for founder projects
 model Proposal {
   id                    Int       @id @default(autoincrement())
@@ -946,6 +965,25 @@ model Review {
   @@index([review_to_id, action_type])
   @@index([action_type, action_id])
   @@map("scd_reviews")
+}
+
+model ReportSpam {
+  id                Int       @id @default(autoincrement())
+  unique_id         String    @unique @default(cuid())
+  reporter_id       Int
+  reported_user_id  Int
+  reason            String    @db.VarChar(255)
+  description       String?   @db.Text
+  status            String    @default("PENDING") @db.VarChar(20) // PENDING, REVIEWED, DISMISSED
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  reporter          User      @relation("ReportsGiven", fields: [reporter_id], references: [id], onDelete: Cascade)
+  reported_user     User      @relation("ReportsReceived", fields: [reported_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([reporter_id, reported_user_id])
+  @@index([reported_user_id])
+  @@map("scd_report_spam")
 }
 
 // Milestones linked to project and proposal (enables per-milestone docs and status)

@@ -55,6 +55,16 @@ export const INVITATION_DECLINE_REASONS: string[] = [
   "Other"
 ];
 
+/** Report profile reasons */
+export const REPORT_PROFILE_REASONS: string[] = [
+  "Spam or misleading",
+  "Fake profile",
+  "Harassment or abuse",
+  "Inappropriate content",
+  "Impersonation",
+  "Other"
+];
+
 /** Single route: get reasons by key. Valid keys for frontend. */
 export const PROPOSAL_REASON_KEYS = [
   "proposalDecline",
@@ -62,7 +72,8 @@ export const PROPOSAL_REASON_KEYS = [
   "withdrawOffer",
   "withdrawProposal",
   "terminate",
-  "invitationDecline"
+  "invitationDecline",
+  "reportProfile"
 ] as const;
 
 export type ProposalReasonKey = (typeof PROPOSAL_REASON_KEYS)[number];
@@ -73,7 +84,8 @@ const REASONS_BY_KEY: Record<ProposalReasonKey, string[]> = {
   withdrawOffer: WITHDRAW_OFFER_REASONS,
   withdrawProposal: WITHDRAW_PROPOSAL_REASONS,
   terminate: TERMINATE_REASONS,
-  invitationDecline: INVITATION_DECLINE_REASONS
+  invitationDecline: INVITATION_DECLINE_REASONS,
+  reportProfile: REPORT_PROFILE_REASONS
 };
 
 export function getReasonsByKey(key: string | undefined): string[] | null {

@@ -3,6 +3,7 @@ import {
   getUserServicePackages,
   getServicePackageById,
   getPublicServicePackage,
+  getPublicUserServicePackages,
   createServicePackage,
   updateServicePackage,
   deleteServicePackage,
@@ -14,7 +15,8 @@ import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
-// Public route - no auth required
+// Public routes - no auth required
+router.get("/public/user/:uniqueId", getPublicUserServicePackages)
 router.get("/public/:id", getPublicServicePackage)
 
 router.use(authenticateToken)

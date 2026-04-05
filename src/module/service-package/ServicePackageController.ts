@@ -70,6 +70,25 @@ export async function getPublicServicePackage(req: Request, res: Response) {
 }
 
 /**
+ * Get all PUBLISHED service packages for a user (public)
+ */
+export async function getPublicUserServicePackages(req: Request, res: Response) {
+  const uniqueId = getStringParam(req.params.uniqueId);
+
+  if (!uniqueId) {
+    return ApiResponse.error(res, "User ID is required", 400);
+  }
+
+  const result = await ServicePackageService.getPublicUserServicePackages(uniqueId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    return ApiResponse.error(res, result.message);
+  }
+}
+
+/**
  * Create new service package
  */
 export async function createServicePackage(req: Request, res: Response) {
