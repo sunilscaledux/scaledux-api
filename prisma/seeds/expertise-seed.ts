@@ -17,17 +17,9 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
  * schema and local schema drift or Prisma versions differ.
  */
 export async function clearExpertiseTaxonomy(prisma: PrismaClient) {
-  console.log('🗑️  Clearing old expertise data (user expertises, projects, packages, taxonomy)...')
+  console.log('🗑️  Clearing old taxonomy data (skills, specialties, categories only — user data preserved)...')
 
-  const deletedUe = await prisma.userExpertise.deleteMany({})
-  console.log(`   UserExpertise removed: ${deletedUe.count}`)
-
-  const deletedFp = await prisma.founderProject.deleteMany({})
-  console.log(`   FounderProject removed: ${deletedFp.count}`)
-
-  const deletedSp = await prisma.servicePackage.deleteMany({})
-  console.log(`   ServicePackage removed: ${deletedSp.count}`)
-
+  // Only clear taxonomy tables, NOT user data (UserExpertise, FounderProject, ServicePackage)
   const skills = await prisma.$executeRawUnsafe(`DELETE FROM "scd_skills"`)
   const subs = await prisma.$executeRawUnsafe(`DELETE FROM "scd_specialties"`)
   const cats = await prisma.$executeRawUnsafe(`DELETE FROM "scd_expertise_categories"`)

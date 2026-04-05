@@ -75,6 +75,7 @@
     "dev:schedule": "nodemon --watch src --ext ts --exec ts-node -r tsconfig-paths/register src/scheduleServer.ts",
     "worker": "ts-node -r tsconfig-paths/register src/workerServer.ts",
     "seed": "tsx prisma/seed.ts",
+    "seed:run": "tsx prisma/seed-runner.ts",
     "cache": "tsx prisma/cache.ts"
   },
   "prisma": {
