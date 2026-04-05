@@ -4,7 +4,7 @@ import { Log } from '@services/loggerService';
 import { ApiResponse } from "@utils/ApiResponse"
 import SmsService from "@services/SmsService"
 import { verifyOtpByType, generateAndSendOtp, OTP_TYPES } from '@module/auth/AuthService'
-import { info } from 'console';
+import { updateCompletionSection } from '../profile/ProfileCompletionService';
 
 export async function sendPhoneOTP(req: Request, res: Response) {
   try {
@@ -105,7 +105,7 @@ export async function verifyPhoneOTP(req: Request, res: Response) {
     // Update user's phone verification status in database
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         phone_verified_at: new Date(),
         phone: otpRecord.phone // Save the phone number from OTP record
       },
@@ -115,6 +115,8 @@ export async function verifyPhoneOTP(req: Request, res: Response) {
         phone_verified_at: true
       }
     })
+
+    await updateCompletionSection(userId!, 'phoneVerification', true);
 
     return ApiResponse.success(res, {
       user: updatedUser,

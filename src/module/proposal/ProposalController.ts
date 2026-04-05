@@ -32,14 +32,15 @@ const MIN_PROFILE_COMPLETION_PERCENT = Number(process.env.MIN_PROFILE_COMPLETION
  */
 export async function createProposal(req: Request, res: Response) {
   const userId = req.user?.id;
-  const { 
-    projectId, 
-    cover_letter, 
-    proposed_amount, 
-    payment_schedule, 
+  const {
+    projectId,
+    cover_letter,
+    proposed_amount,
+    payment_schedule,
     hours_required,
+    milestones,
     screening_answers,
-    attachments 
+    attachments
   } = req.body;
 
   if (!userId) {
@@ -82,6 +83,7 @@ export async function createProposal(req: Request, res: Response) {
     proposed_amount: parseFloat(proposed_amount),
     payment_schedule: payment_schedule || 'byProject',
     hours_required: hours_required != null ? (typeof hours_required === 'number' ? hours_required : parseFloat(hours_required)) : undefined,
+    milestones: Array.isArray(milestones) ? milestones : [],
     screening_answers: screening_answers || [],
     attachments: attachments || []
   });

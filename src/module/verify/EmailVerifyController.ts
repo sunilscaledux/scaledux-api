@@ -3,6 +3,7 @@ import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import * as AuthService from '../auth/AuthService'
 import { Log } from '@services/loggerService';
+import { updateCompletionSection } from '../profile/ProfileCompletionService';
 
 export async function sendEmailOTP(req: Request, res: Response) {
   try {
@@ -93,7 +94,7 @@ export async function verifyEmailOTP(req: Request, res: Response) {
     // Update user's email verification status
     const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         email_verified_at: new Date(),
         email: email
       },
@@ -103,6 +104,8 @@ export async function verifyEmailOTP(req: Request, res: Response) {
         email_verified_at: true
       }
     })
+
+    await updateCompletionSection(userId!, 'emailVerification', true);
 
     return ApiResponse.success(res, {
       user: updatedUser,
