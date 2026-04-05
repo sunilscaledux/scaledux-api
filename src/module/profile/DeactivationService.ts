@@ -45,25 +45,18 @@ export async function confirmDeactivateWithPassword(
     return { success: false, message: "Account is already deactivated." };
   }
 
-  const scheduledAt = new Date();
-  scheduledAt.setDate(scheduledAt.getDate() + DEACTIVATION_GRACE_DAYS);
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: { is_deactivated: true },
-    }),
-    prisma.scheduleTermination.upsert({
-      where: { user_id: userId },
-      create: { user_id: userId, scheduled_at: scheduledAt, action: 'deactivate', reason: reason || null },
-      update: { scheduled_at: scheduledAt, cancelled_at: null, action: 'deactivate', reason: reason || null },
-    }),
-  ]);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      is_deactivated: true,
+      deactivated_at: new Date(),
+      deactivated_reason: reason || null,
+    },
+  });
 
   return {
     success: true,
     message: "Account deactivated. You have been logged out.",
-    data: { scheduledAt: scheduledAt.toISOString() },
   };
 }
 
@@ -144,7 +137,7 @@ export async function cancelDeactivation(userId: number): Promise<ServiceRespons
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { is_deactivated: false },
+      data: { is_deactivated: false, deactivated_at: null, deactivated_reason: null },
     }),
     prisma.scheduleTermination.update({
       where: { user_id: userId },
@@ -170,7 +163,7 @@ export async function reactivateOnLogin(userId: number): Promise<void> {
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { is_deactivated: false },
+      data: { is_deactivated: false, deactivated_at: null, deactivated_reason: null },
     }),
     // Always cancel any schedule for this user on reactivation (updateMany is no-op if no row)
     prisma.scheduleTermination.updateMany({

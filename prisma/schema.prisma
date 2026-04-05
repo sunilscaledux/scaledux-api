@@ -71,6 +71,8 @@ model User {
   notifications                Notification[] @relation("UserNotifications")
   actedNotifications           Notification[] @relation("NotificationActor")
   is_deactivated               Boolean   @default(false)
+  deactivated_at               DateTime?
+  deactivated_reason           String?   @db.Text
   scheduleTermination          ScheduleTermination?
   /** Razorpay X contact id (cont_xxx); reused when user updates bank so we don't create duplicate contacts. */
   razorpay_contact_id          String?   @db.VarChar(64)
