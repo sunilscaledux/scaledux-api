@@ -12,4 +12,5 @@ export interface TaxInformationInput {
   panNumber: string;
   hasGSTIN: boolean;
   gstin?: string;
+  gstConsent?: boolean;
 }

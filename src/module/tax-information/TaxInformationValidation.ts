@@ -27,5 +27,6 @@ export const saveTaxInformationSchema = Joi.object<TaxInformationInput>({
       'any.required': 'GSTIN is required when registered for GST'
     }),
     otherwise: Joi.string().optional().allow('')
-  })
+  }),
+  gstConsent: Joi.boolean().optional()
 });

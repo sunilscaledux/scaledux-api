@@ -1,12 +1,14 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { TaxInformationInput } from "./TaxInformationType";
+import { verifyPAN, validatePanWithGSTIN, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 
 export class TaxInformationService {
 
   static async saveTaxInformation(userId: string, data: TaxInformationInput) {
     const userIdNum = parseInt(userId);
     const entityType = data.activeTab;
+    const entityLabel = entityType === 'AGENCY' ? 'company/agency' : 'individual';
 
     if (entityType === 'AGENCY') {
       const user = await prisma.user.findUnique({
@@ -27,6 +29,33 @@ export class TaxInformationService {
       return { success: false, message: "PAN number is required." };
     }
 
+    // ── PAN verification ──
+    if (!isIdtoaiConfigured()) {
+      return { success: false, message: "PAN verification service is temporarily unavailable. Please try again later." };
+    }
+
+    const panResult = await verifyPAN(panNumber, String(userIdNum));
+    if (!panResult.success) {
+      return { success: false, message: `PAN verification failed for ${panNumber}. Please check your ${entityLabel} PAN number.` };
+    }
+
+    // Match name with PAN
+    if (panResult.full_name && name) {
+      const panName = panResult.full_name.trim().toLowerCase();
+      const userName = name.trim().toLowerCase();
+      if (panName && userName && !panName.includes(userName) && !userName.includes(panName)) {
+        return { success: false, message: `Name does not match PAN. PAN is registered to "${panResult.full_name}". Please ensure your ${entityLabel} name matches your PAN.` };
+      }
+    }
+
+    // ── GSTIN validation (local only, no API verification) ──
+    if (gstin) {
+      const panGstinCheck = validatePanWithGSTIN(panNumber, gstin);
+      if (!panGstinCheck.matches) {
+        return { success: false, message: panGstinCheck.reason || `PAN and GSTIN do not match. Please check both.` };
+      }
+    }
+
     const taxInfo = await (prisma as any).taxInformation.upsert({
       where: {
         user_id_entity_type: { user_id: userIdNum, entity_type: entityType }
@@ -37,6 +66,10 @@ export class TaxInformationService {
         pan_number: panNumber,
         has_gstin: hasGSTIN,
         gstin,
+        gstin_status: 'VERIFIED',
+        gstin_verified_at: new Date(),
+        gstin_failure_reason: null,
+        gstin_api_response: panResult.raw || null,
         updated_at: new Date()
       },
       create: {
@@ -47,12 +80,15 @@ export class TaxInformationService {
         pan_number: panNumber,
         has_gstin: hasGSTIN,
         gstin,
+        gstin_status: 'VERIFIED',
+        gstin_verified_at: new Date(),
+        gstin_api_response: panResult.raw || null,
       }
     });
 
     return {
       success: true,
-      message: "Tax information saved successfully.",
+      message: "Tax information verified and saved successfully.",
       data: TaxInformationService.mapRecord(taxInfo)
     };
   }
