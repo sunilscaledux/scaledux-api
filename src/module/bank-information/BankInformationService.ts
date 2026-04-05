@@ -193,54 +193,73 @@ export class BankInformationService {
     if (!record) {
       return { success: false, message: 'Bank information not found.' };
     }
-    if (record.verification_status !== 'failed') {
-      return { success: false, message: 'Only failed bank details can be edited.' };
-    }
+
     const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : record.ifsc;
     if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
       return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
     }
-    const accountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : record.account_number;
-    if (!accountNumber || accountNumber.length < 9) {
-      return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
-    }
-    const accountNumberLast4 = accountNumber.slice(-4);
+
+    const newAccountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : null;
     const displayLabel = data.displayLabel?.trim() ?? record.display_label;
     const accountHolderName = data.accountHolderName?.trim() ?? record.account_holder_name;
+    const bankName = data.bankName?.trim() ?? record.bank_name;
 
-    if (!isIdtoaiConfigured()) {
-      return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
-    }
+    // Check if account number or IFSC changed — only re-verify if they did
+    const accountChanged = newAccountNumber && newAccountNumber !== record.account_number;
+    const ifscChanged = ifsc !== record.ifsc;
+    const needsReverification = accountChanged || ifscChanged;
 
-    const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
-    if (!verification.success) {
-      const reason = String(verification.error || 'Verification failed').slice(0, 500);
+    if (needsReverification) {
+      const accountNumber = newAccountNumber || record.account_number;
+      if (!accountNumber || accountNumber.length < 9) {
+        return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
+      }
+
+      if (!isIdtoaiConfigured()) {
+        return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
+      }
+
+      const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
+      if (!verification.success) {
+        const reason = String(verification.error || 'Verification failed').slice(0, 500);
+        await (prisma as any).bankInformation.update({
+          where: { id: recordIdNum },
+          data: { verification_status: 'failed', verification_failure_reason: reason }
+        }).catch(() => {});
+        return { success: false, message: reason };
+      }
+
+      const verifiedName = verification.accountHolderName || accountHolderName;
+      const verifiedBankName = verification.bankName || bankName;
+      const accountNumberLast4 = accountNumber.slice(-4);
+
+      await prisma.$executeRaw`
+        UPDATE scd_bank_information
+        SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
+            account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
+            account_holder_name = ${verifiedName},
+            verification_status = 'verified', verification_failure_reason = NULL,
+            verified_at = NOW(), updated_at = NOW()
+        WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
+      `;
+    } else {
+      // Only label/name/bank name changed — no re-verification needed
       await (prisma as any).bankInformation.update({
         where: { id: recordIdNum },
-        data: { verification_status: 'failed', verification_failure_reason: reason }
-      }).catch(() => {});
-      return { success: false, message: reason };
+        data: {
+          display_label: displayLabel,
+          bank_name: bankName,
+          account_holder_name: accountHolderName,
+        }
+      });
     }
-
-    const verifiedName = verification.accountHolderName || accountHolderName;
-    const verifiedBankName = verification.bankName || data.bankName?.trim() || record.bank_name;
-
-    await prisma.$executeRaw`
-      UPDATE scd_bank_information
-      SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
-          account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
-          account_holder_name = ${verifiedName},
-          verification_status = 'verified', verification_failure_reason = NULL,
-          verified_at = NOW(), updated_at = NOW()
-      WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
-    `;
 
     const updated = await (prisma as any).bankInformation.findUnique({
       where: { id: recordIdNum }
     });
     return {
       success: true,
-      message: 'Bank account verified and updated successfully.',
+      message: needsReverification ? 'Bank account verified and updated successfully.' : 'Bank details updated successfully.',
       data: updated ? BankInformationService.mapRecord(updated) : undefined
     };
   }

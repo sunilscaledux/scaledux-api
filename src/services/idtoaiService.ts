@@ -313,7 +313,7 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
   }
 }
 
-// ─── Pennyless Bank Account Verification ────────────────────────────────────
+// ─── Penny Drop Bank Account Verification ───────────────────────────────────
 
 export interface BankVerificationResponse {
   success: boolean;
@@ -328,8 +328,8 @@ export interface BankVerificationResponse {
 }
 
 /**
- * Verify a bank account using IDtoAI pennyless verification.
- * No monetary transaction — validates via banking networks.
+ * Verify a bank account using IDtoAI penny drop verification.
+ * Sends a small transaction to validate the account.
  */
 export async function verifyBankAccount(
   accountNumber: string,
@@ -352,26 +352,40 @@ export async function verifyBankAccount(
     Log.info(`${tag} Bank verification response`, { data: JSON.stringify(response.data) });
 
     const data = response.data;
-    const result = data.result || data;
+    const resp = data.response || data;
+    const result = resp.result || resp;
 
-    const status = (result.account_status || result.status || data.status || "").toLowerCase();
+    Log.info(`${tag} Bank verification parsed`, { is_valid: result.is_valid, failure_reason: result.failure_reason, status: result.status });
+
+    // Check is_valid first (penny drop API returns this)
+    if (result.is_valid === false) {
+      const reason = (result.failure_reason || '').trim();
+      return {
+        success: false,
+        error: reason || "Bank account is invalid. Please check your account number and IFSC.",
+        accountStatus: "invalid",
+        raw: data,
+      };
+    }
+
+    const status = (result.account_status || result.status || "").toLowerCase();
 
     if (status === "failure" || status === "invalid" || status === "inactive") {
       return {
         success: false,
-        error: result.message || "Bank account is invalid or inactive. Please check your details.",
+        error: result.message || result.failure_reason || "Bank account is invalid or inactive. Please check your details.",
         accountStatus: status,
         raw: data,
       };
     }
 
-    Log.info(`${tag} Bank verified: holder=${result.account_holder_name || result.full_name}, status=${status}`);
+    Log.info(`${tag} Bank verified: holder=${result.account_holder_name || result.full_name || result.user}, status=${status}`);
 
     return {
       success: true,
-      accountHolderName: result.account_holder_name || result.full_name || result.beneficiary_name || "",
+      accountHolderName: result.account_holder_name || result.full_name || result.user || result.beneficiary_name || "",
       accountNumber: result.account_number || accountNumber,
-      ifsc: result.ifsc || ifsc,
+      ifsc: result.account_ifsc || result.ifsc || ifsc,
       bankName: result.bank_name || result.bank || "",
       branch: result.branch || "",
       accountStatus: status,
