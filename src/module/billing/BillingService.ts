@@ -1182,11 +1182,15 @@ export class BillingService {
     const gstOnServiceCharge = Math.round(serviceCharge * gstPercent * 100) / 100;
 
     const taxInfos = await (prisma as any).taxInformation.findMany({
-      where: { user_id: { in: [transaction.from_id, transaction.to_id] } },
-      select: { user_id: true, has_gstin: true, gstin: true }
+      where: { user_id: { in: [transaction.from_id, transaction.to_id] }, has_gstin: true, gstin: { not: null } },
+      select: { user_id: true, entity_type: true, has_gstin: true, gstin: true }
     });
-    const senderGst = taxInfos.find((t: any) => t.user_id === transaction.from_id && t.has_gstin && t.gstin)?.gstin ?? null;
-    const receiverGst = taxInfos.find((t: any) => t.user_id === transaction.to_id && t.has_gstin && t.gstin)?.gstin ?? null;
+    const findGst = (uid: number) => {
+      const rows = taxInfos.filter((t: any) => t.user_id === uid && t.has_gstin && t.gstin);
+      return (rows.find((t: any) => t.entity_type === 'AGENCY') || rows[0])?.gstin ?? null;
+    };
+    const senderGst = findGst(transaction.from_id);
+    const receiverGst = findGst(transaction.to_id);
 
     const invoiceNumberFor = (billingId: number, invoiceId: number) =>
       `INV-${billingId}-${invoiceId}-${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`;

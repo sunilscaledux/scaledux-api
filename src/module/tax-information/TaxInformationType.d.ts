@@ -8,14 +8,8 @@ export interface TaxInformationInput {
     zipCode: string;
   };
   activeTab: 'INDIVIDUAL' | 'AGENCY';
-  individualName: string;
-  individualPAN: string;
-  individualHasGSTIN: boolean;
-  individualGSTIN: string;
-  individualGSTConsent?: boolean;
-  agencyName: string;
-  agencyPAN: string;
-  agencyHasGSTIN: boolean;
-  agencyGSTIN: string;
-  agencyGSTConsent?: boolean;
+  name: string;
+  panNumber: string;
+  hasGSTIN: boolean;
+  gstin?: string;
 }

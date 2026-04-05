@@ -53,7 +53,7 @@ model User {
   paymentMethods               PaymentMethod[]
   bankInformation              BankInformation[]
   withdrawal_requests          WithdrawalRequest[]
-  taxInformation               TaxInformation?
+  taxInformation               TaxInformation[]
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
   profile_completion_percentage Int?    // 0-100, cached from preference.profile_sections + role weights
@@ -1217,32 +1217,23 @@ model WithdrawalRequest {
 
 model TaxInformation {
   id             Int      @id @default(autoincrement())
-  user_id        Int      @unique
+  user_id        Int
+  entity_type    String   @default("INDIVIDUAL") @db.VarChar(20) // INDIVIDUAL | AGENCY
   tax_residence  Json
-  entity_type    String   @default("INDIVIDUAL")
+  name           String?  @db.VarChar(200)
   pan_number     String?  @db.VarChar(10)
-  individual_name String? @db.VarChar(200)
-  individual_pan String?  @db.VarChar(10)
-  individual_gstin String? @db.VarChar(15)
-  agency_name    String?  @db.VarChar(200)
-  agency_pan     String?  @db.VarChar(10)
-  agency_gstin   String?  @db.VarChar(15)
   has_gstin      Boolean  @default(false)
   gstin          String?  @db.VarChar(15)
-  // GSTIN verification
-  individual_gstin_status         String?  @default("PENDING") @db.VarChar(20) // PENDING | IN_REVIEW | VERIFIED | FAILED
-  individual_gstin_verified_at    DateTime?
-  individual_gstin_failure_reason String?  @db.VarChar(500)
-  individual_gstin_api_response   Json?
-  agency_gstin_status             String?  @default("PENDING") @db.VarChar(20)
-  agency_gstin_verified_at        DateTime?
-  agency_gstin_failure_reason     String?  @db.VarChar(500)
-  agency_gstin_api_response       Json?
+  gstin_status   String?  @default("PENDING") @db.VarChar(20) // PENDING | VERIFIED | FAILED
+  gstin_verified_at    DateTime?
+  gstin_failure_reason String?  @db.VarChar(500)
+  gstin_api_response   Json?
   created_at     DateTime @default(now())
   updated_at     DateTime @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, entity_type])
   @@index([user_id])
   @@map("scd_tax_information")
 }

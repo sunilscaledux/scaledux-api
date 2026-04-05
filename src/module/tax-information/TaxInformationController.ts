@@ -16,11 +16,15 @@ export class TaxInformationController {
       return ApiResponse.error(res, error.details.map(detail => detail.message).join(', '), 400);
     }
 
-    const result = await TaxInformationService.saveTaxInformation(userId.toString(), value);
-    if (!result.success) {
-      return ApiResponse.error(res, result.message || "Verification failed", 400);
+    try {
+      const result = await TaxInformationService.saveTaxInformation(userId.toString(), value);
+      if (!result.success) {
+        return ApiResponse.error(res, result.message || "Failed to save tax information", 400);
+      }
+      return ApiResponse.success(res, result.data, result.message);
+    } catch (err: any) {
+      return ApiResponse.error(res, err.message || "Failed to save tax information", 400);
     }
-    return ApiResponse.success(res, result.data, result.message);
   }
 
   static async getTaxInformation(req: Request, res: Response) {
