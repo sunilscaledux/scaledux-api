@@ -30,7 +30,14 @@ export function createRateLimiter(windowSeconds: number, max: number) {
     legacyHeaders: false,
     handler: (req: Request, res: Response) => {
       const minutes = Math.ceil(windowSeconds / 60);
-      const retryText = minutes === 1 ? '1 minute' : `${minutes} minutes`;
+      const hours = Math.floor(minutes / 60);
+      const remainingMins = minutes % 60;
+      let retryText: string;
+      if (hours >= 1) {
+        retryText = remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours} hour${hours > 1 ? 's' : ''}`;
+      } else {
+        retryText = minutes === 1 ? '1 minute' : `${minutes} minutes`;
+      }
       res.status(429).json({
         success: false,
         message: `Too many requests. Please try again after ${retryText}.`,

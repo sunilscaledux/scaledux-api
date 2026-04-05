@@ -26,19 +26,22 @@ import { createRateLimiter } from "@middleware/rateLimiter"
 
 const router = Router()
 
-router.post("/phone/send-otp",createRateLimiter(15 * 60, 5), authenticateToken, sendPhoneOTP)
-router.post("/phone/verify-otp",createRateLimiter(5 * 60, 10), authenticateToken, verifyPhoneOTP)
+// 2 verification attempts per 24 hours
+const verifyLimit = createRateLimiter(24 * 60 * 60, 2)
 
-router.post("/email/send-otp",createRateLimiter(5 * 60, 15), authenticateToken, sendEmailOTP)
-router.post("/email/verify-otp", createRateLimiter(5 * 60, 10),authenticateToken, verifyEmailOTP)
+router.post("/phone/send-otp", verifyLimit, authenticateToken, sendPhoneOTP)
+router.post("/phone/verify-otp", verifyLimit, authenticateToken, verifyPhoneOTP)
+
+router.post("/email/send-otp", verifyLimit, authenticateToken, sendEmailOTP)
+router.post("/email/verify-otp", verifyLimit, authenticateToken, verifyEmailOTP)
 
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
 
 // DigiLocker (Aadhaar via IDtoAI)
-router.post("/digilocker/initiate", authenticateToken, createRateLimiter(5 * 60, 15), initiateDigilocker)
+router.post("/digilocker/initiate", authenticateToken, verifyLimit, initiateDigilocker)
 router.post("/digilocker/complete", authenticateToken, completeDigilocker)
 
-router.post("/agency/submit", authenticateToken, createRateLimiter(24 * 60 * 60, 20), submitAgencyVerification)
+router.post("/agency/submit", authenticateToken, verifyLimit, submitAgencyVerification)
 router.get("/agency/details", authenticateToken, getAgencyVerificationDetails)
 
 
