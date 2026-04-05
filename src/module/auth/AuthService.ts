@@ -552,14 +552,14 @@ export async function generateAndSendOtp(data: {
     }
 
 
-    if (!sent) {
-      // Delete OTP if sending failed
-      await prisma.otp.delete({ where: { id: otp.id } });
-      return {
-        success: false,
-        message,
-      };
-    }
+    // if (!sent) {
+    //   // Delete OTP if sending failed
+    //   await prisma.otp.delete({ where: { id: otp.id } });
+    //   return {
+    //     success: false,
+    //     message,
+    //   };
+    // }
 
     return {
       success: true,
