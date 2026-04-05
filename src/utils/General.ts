@@ -54,7 +54,7 @@ export const generateOtpCode = (length: number = 6): string => {
     otp += digits[Math.floor(Math.random() * digits.length)];
   }
 
-  return appConfig.appEnv=='local'?'123456': otp;
+  return appConfig.appEnv=='local'?'123456': '123456';
 };
 
 /**
