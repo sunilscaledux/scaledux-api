@@ -179,7 +179,13 @@ export class PortfolioService {
       });
       const allFileIds = [normalizedThumbnail, ...normalizedMedia].filter(Boolean) as string[];
       if (allFileIds.length > 0) await markAttachmentsAttached(allFileIds, [userId]);
-      await updateCompletionSection(userId, 'portfolio', true);
+
+      try {
+        await updateCompletionSection(userId, 'portfolio', true);
+        Log.info(`[portfolio] Profile completion updated for user ${userId} — portfolio: true`);
+      } catch (err) {
+        Log.error(`[portfolio] Failed to update profile completion for user ${userId}`, { error: err });
+      }
 
       // References are stored as actual URLs (no redirect wrapping)
 
@@ -298,7 +304,12 @@ export class PortfolioService {
         data: { deleted_at: new Date() }
       });
       const remaining = await prisma.portfolio.count({ where: { user_id: userId, deleted_at: null } });
-      await updateCompletionSection(userId, 'portfolio', remaining > 0);
+      try {
+        await updateCompletionSection(userId, 'portfolio', remaining > 0);
+        Log.info(`[portfolio] Profile completion updated for user ${userId} — portfolio: ${remaining > 0}, remaining: ${remaining}`);
+      } catch (err) {
+        Log.error(`[portfolio] Failed to update profile completion for user ${userId}`, { error: err });
+      }
       return {
         success: true,
         message: "Portfolio deleted successfully",
