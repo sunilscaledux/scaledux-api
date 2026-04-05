@@ -13,4 +13,8 @@ router.post("/save", authenticateToken, MentorController.toggleSaveMentor);
 router.get("/saved", authenticateToken, MentorController.getSavedMentors);
 router.get("/saved/check/:uniqueId", authenticateToken, MentorController.checkSaved);
 
+// Mentorship on-request settings
+router.get("/on-request", authenticateToken, MentorController.getOnRequestSettings);
+router.post("/on-request", authenticateToken, MentorController.saveOnRequestSettings);
+
 export default router;

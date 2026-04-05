@@ -63,6 +63,7 @@ model User {
   savedProjects                SavedProject[] @relation("SavedProjects")
   savedMentors                 SavedMentor[] @relation("SavedMentors")
   savedAsMentor                SavedMentor[] @relation("SavedAsMentor")
+  mentorOnRequest              MentorOnRequest?
   proposals                    Proposal[] @relation("UserProposals")
   reviewsGiven                 Review[]   @relation("ReviewsGiven")
   reviewsReceived              Review[]   @relation("ReviewsReceived")
@@ -862,6 +863,31 @@ model SavedMentor {
   @@index([mentor_id])
   @@index([user_id])
   @@map("scd_saved_mentors")
+}
+
+model MentorOnRequest {
+  id                      Int       @id @default(autoincrement())
+  user_id                 Int       @unique
+  is_available            Boolean   @default(false)
+  session_frequency       Json?     // ["Daily","Weekly"] etc
+  session_duration_min    Int?      // in minutes
+  session_duration_max    Int?
+  price_amount            Decimal?  @db.Decimal(10, 2)
+  price_currency          String?   @default("INR") @db.VarChar(10)
+  discount_enabled        Boolean   @default(false)
+  discount_title          String?   @db.VarChar(200)
+  discount_percent        Int?
+  discount_available_till DateTime?
+  recording_enabled       Boolean   @default(false)
+  recording_type          String?   @db.VarChar(10) // "paid" | "free"
+  recording_amount        Decimal?  @db.Decimal(10, 2)
+  terms_and_conditions    String?   @db.Text
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("scd_mentor_on_request")
 }
 
 // Proposals submitted by service providers for founder projects

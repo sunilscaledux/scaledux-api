@@ -286,4 +286,99 @@ export class MentorService {
       return { success: true, message: "OK", data: { is_saved: false } };
     }
   }
+
+  /**
+   * Save/update mentorship on-request settings.
+   */
+  static async saveOnRequestSettings(userId: number, data: any): Promise<ServiceResponse> {
+    try {
+      const durationMap: Record<string, number> = { '15m': 15, '30m': 30, '45m': 45, '1 hr': 60, '1h 15m': 75, '1h 30m': 90, '1h 45m': 105, '2h': 120 };
+
+      const settings = await (prisma as any).mentorOnRequest.upsert({
+        where: { user_id: userId },
+        update: {
+          is_available: !!data.isAvailable,
+          session_frequency: Array.isArray(data.sessionFrequency) ? data.sessionFrequency : [],
+          session_duration_min: durationMap[data.sessionDurationMin] ?? data.sessionDurationMin ?? null,
+          session_duration_max: durationMap[data.sessionDurationMax] ?? data.sessionDurationMax ?? null,
+          price_amount: data.priceAmount != null ? Number(data.priceAmount) : null,
+          price_currency: data.priceCurrency || 'INR',
+          discount_enabled: !!data.discountEnabled,
+          discount_title: data.discountTitle?.trim() || null,
+          discount_percent: data.discountPercent != null ? Number(data.discountPercent) : null,
+          discount_available_till: data.discountAvailableTill ? new Date(data.discountAvailableTill) : null,
+          recording_enabled: !!data.recordingEnabled,
+          recording_type: data.recordingType || null,
+          recording_amount: data.recordingAmount != null ? Number(data.recordingAmount) : null,
+          terms_and_conditions: data.termsAndConditions?.trim() || null,
+        },
+        create: {
+          user_id: userId,
+          is_available: !!data.isAvailable,
+          session_frequency: Array.isArray(data.sessionFrequency) ? data.sessionFrequency : [],
+          session_duration_min: durationMap[data.sessionDurationMin] ?? data.sessionDurationMin ?? null,
+          session_duration_max: durationMap[data.sessionDurationMax] ?? data.sessionDurationMax ?? null,
+          price_amount: data.priceAmount != null ? Number(data.priceAmount) : null,
+          price_currency: data.priceCurrency || 'INR',
+          discount_enabled: !!data.discountEnabled,
+          discount_title: data.discountTitle?.trim() || null,
+          discount_percent: data.discountPercent != null ? Number(data.discountPercent) : null,
+          discount_available_till: data.discountAvailableTill ? new Date(data.discountAvailableTill) : null,
+          recording_enabled: !!data.recordingEnabled,
+          recording_type: data.recordingType || null,
+          recording_amount: data.recordingAmount != null ? Number(data.recordingAmount) : null,
+          terms_and_conditions: data.termsAndConditions?.trim() || null,
+        },
+      });
+
+      return {
+        success: true,
+        message: "Mentorship settings saved successfully",
+        data: MentorService.mapOnRequestSettings(settings),
+      };
+    } catch (error: any) {
+      Log.error("Save on-request settings error", { error });
+      return { success: false, message: "Failed to save mentorship settings" };
+    }
+  }
+
+  /**
+   * Get mentorship on-request settings.
+   */
+  static async getOnRequestSettings(userId: number): Promise<ServiceResponse> {
+    try {
+      const settings = await (prisma as any).mentorOnRequest.findUnique({
+        where: { user_id: userId },
+      });
+
+      return {
+        success: true,
+        message: "OK",
+        data: settings ? MentorService.mapOnRequestSettings(settings) : null,
+      };
+    } catch (error: any) {
+      Log.error("Get on-request settings error", { error });
+      return { success: false, message: "Failed to fetch mentorship settings" };
+    }
+  }
+
+  private static mapOnRequestSettings(s: any) {
+    const minuteToLabel: Record<number, string> = { 15: '15m', 30: '30m', 45: '45m', 60: '1 hr', 75: '1h 15m', 90: '1h 30m', 105: '1h 45m', 120: '2h' };
+    return {
+      isAvailable: s.is_available,
+      sessionFrequency: s.session_frequency ?? [],
+      sessionDurationMin: minuteToLabel[s.session_duration_min] ?? s.session_duration_min,
+      sessionDurationMax: minuteToLabel[s.session_duration_max] ?? s.session_duration_max,
+      priceAmount: s.price_amount != null ? Number(s.price_amount) : null,
+      priceCurrency: s.price_currency || 'INR',
+      discountEnabled: s.discount_enabled,
+      discountTitle: s.discount_title || '',
+      discountPercent: s.discount_percent,
+      discountAvailableTill: s.discount_available_till,
+      recordingEnabled: s.recording_enabled,
+      recordingType: s.recording_type || '',
+      recordingAmount: s.recording_amount != null ? Number(s.recording_amount) : null,
+      termsAndConditions: s.terms_and_conditions || '',
+    };
+  }
 }
