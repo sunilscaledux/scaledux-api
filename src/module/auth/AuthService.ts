@@ -605,7 +605,8 @@ export async function verifyOtpByType(
     if (contactInfo.email) {
       whereConditions.email = contactInfo.email;
     } else if (contactInfo.phone) {
-      whereConditions.phone = contactInfo.phone;
+      // Match phone with or without '+' prefix since DB may store either format
+      whereConditions.phone = { in: [contactInfo.phone, `+${contactInfo.phone}`] };
     } else {
       return {
         success: false,
@@ -638,9 +639,9 @@ export async function verifyOtpByType(
     await prisma.otp.updateMany({
       where: {
         OR: [
-          { email: contactInfo.email },
-          { phone: contactInfo.phone }
-        ].filter(Boolean),
+          contactInfo.email ? { email: contactInfo.email } : undefined,
+          contactInfo.phone ? { phone: { in: [contactInfo.phone, `+${contactInfo.phone}`] } } : undefined,
+        ].filter(Boolean) as any[],
         verified: false,
         otp_type: otpType,
         id: { not: otp.id },
