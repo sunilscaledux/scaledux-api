@@ -282,16 +282,20 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
     });
 
     const data = response.data;
-    const info = data.response?.details?.company_info || data.company_info || data.result?.company_info || data;
+    const resp = data.response || data.result || data;
+    const details = resp.details || resp;
+    const info = details.company_info || resp.company_info || data.company_info || {};
+
+    Log.info(`${tag} CIN raw keys: ${JSON.stringify(Object.keys(data))}, response keys: ${JSON.stringify(Object.keys(resp))}, company_status: ${info.company_status}`);
 
     return {
       success: true,
-      companyName: info.company_name || info.companyName,
+      companyName: info.company_name || resp.company_name || info.companyName,
       cin: info.cin || cinNumber,
-      companyStatus: info.company_status || info.status,
+      companyStatus: info.company_status,
       dateOfIncorporation: info.date_of_incorporation,
       registeredAddress: info.registered_address,
-      directors: (data.response?.details?.directors || data.directors || data.result?.directors || []).map((d: any) => ({
+      directors: (details.directors || resp.directors || data.directors || []).map((d: any) => ({
         name: d.director_name || d.name,
         din: d.din_number || d.din,
       })),
