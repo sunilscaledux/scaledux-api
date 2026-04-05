@@ -368,7 +368,86 @@ export class FounderProjectService {
       let paginatedProjects: any[];
       let totalCount: number;
 
-      if (sortBy === 'relevance' && userId) {
+      // Check if user applied any explicit filters
+      const hasExplicitFilters = !!(search || (categoryIds && categoryIds.length > 0) || (skills && skills.length > 0) || budgetMin !== undefined || budgetMax !== undefined || experienceLevel || filter === 'saved');
+
+      if (!hasExplicitFilters && userId) {
+        // ── No filters: try to show jobs matching user's skills/industry first ──
+        const userData = await prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            expertises: true,
+            personalInfo: { select: { country_id: true } }
+          }
+        });
+
+        if (userData?.expertises?.length) {
+          const userSkills: string[] = [];
+          const userCategoryIds: number[] = [];
+          userData.expertises.forEach((exp: any) => {
+            if (exp.categoryId || exp.expertise_category_id) {
+              userCategoryIds.push(exp.categoryId || exp.expertise_category_id);
+            }
+            if (Array.isArray(exp.skills)) userSkills.push(...(exp.skills as string[]));
+          });
+
+          if (userSkills.length > 0 || userCategoryIds.length > 0) {
+            // Build a where clause matching user's skills or categories
+            const personalizedWhere: any = { ...whereClause };
+            const orConditions: any[] = [];
+            if (userCategoryIds.length > 0) {
+              orConditions.push({ expertise_category_id: { in: userCategoryIds } });
+            }
+            for (const skill of userSkills.slice(0, 20)) { // limit to avoid huge query
+              orConditions.push({ skills_required: { array_contains: [skill] } });
+            }
+            if (orConditions.length > 0) {
+              personalizedWhere.OR = orConditions;
+            }
+
+            const matchedCount = await prisma.founderProject.count({ where: personalizedWhere });
+
+            if (matchedCount > 0) {
+              // Found matching projects — use personalized query
+              const [projects] = await Promise.all([
+                prisma.founderProject.findMany({
+                  where: personalizedWhere,
+                  include: include as any,
+                  orderBy,
+                  skip: (page - 1) * limit,
+                  take: limit
+                })
+              ]);
+              totalCount = matchedCount;
+              paginatedProjects = projects;
+            } else {
+              // No matching projects — fall through to show all
+              const [count, projects] = await Promise.all([
+                prisma.founderProject.count({ where: whereClause }),
+                prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
+              ]);
+              totalCount = count;
+              paginatedProjects = projects;
+            }
+          } else {
+            // User has no skills — show all
+            const [count, projects] = await Promise.all([
+              prisma.founderProject.count({ where: whereClause }),
+              prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
+            ]);
+            totalCount = count;
+            paginatedProjects = projects;
+          }
+        } else {
+          // No expertises — show all
+          const [count, projects] = await Promise.all([
+            prisma.founderProject.count({ where: whereClause }),
+            prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
+          ]);
+          totalCount = count;
+          paginatedProjects = projects;
+        }
+      } else if (sortBy === 'relevance' && userId) {
         // ── Relevance path: score + paginate in SQL, then hydrate only the page ──
         const freelancerData = await prisma.user.findUnique({
           where: { id: userId },
