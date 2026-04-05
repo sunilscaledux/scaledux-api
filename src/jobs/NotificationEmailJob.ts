@@ -1,4 +1,5 @@
 import { BaseJob } from './BaseJob';
+import { appConfig } from '@config/app';
 import { prisma } from '../services/prismaService';
 import { emailService } from '@services/emailService';
 import { Log } from '@services/loggerService';
@@ -31,7 +32,7 @@ export class NotificationEmailJob extends BaseJob<NotificationJobPayload> {
     }
 
     const link = data.notificationLink
-      ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${process.env.FRONTEND_URL || process.env.APP_URL || ''}${data.notificationLink}`)
+      ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${appConfig.frontendUrl}${data.notificationLink}`)
       : '#';
     const compiled = await templateService.getCustomTemplate(
       'notification',

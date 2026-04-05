@@ -17,8 +17,13 @@ const agencyCooldownDays = Math.max(
   parseInt(process.env.AGENCY_VERIFICATION_COOLDOWN_DAYS || '15', 10)
 );
 
+const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+const appUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
+
 export const appConfig = {
-  appEnv:process.env.NODE_ENV,
+  appEnv: process.env.NODE_ENV,
+  frontendUrl,
+  appUrl,
   platformGstNumber: platformGstRaw || null as string | null,
   serviceFeePercent: Math.min(100, Math.max(0, Number(serviceFeePercentRaw) || 10)),
   appFeeFounder: Math.max(0, Number(appFeeFounderRaw) || 100),

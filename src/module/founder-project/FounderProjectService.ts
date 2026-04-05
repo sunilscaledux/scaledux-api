@@ -11,8 +11,10 @@ import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
 import { getUserFullName } from '@utils/General';
 import { MatchingService, buildFreelancerProfile } from '@services/matchingService';
+import { areMandatorySectionsComplete, type ProfileCompletionSectionsMap } from '@constants/profileCompletion';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+import { appConfig } from '@config/app';
+const FRONTEND_URL = appConfig.frontendUrl;
 
 // Force server restart to pick up database changes
 
@@ -1111,7 +1113,7 @@ export class FounderProjectService {
         }
       }
 
-      // Fetch freelancers
+      // Fetch freelancers (include preference for mandatory section check)
       const freelancers = await prisma.user.findMany({
         where: whereClause,
         include: {
@@ -1129,12 +1131,23 @@ export class FounderProjectService {
           servicePackages: {
             where: { status: 'PUBLISHED' },
             select: { id: true }
+          },
+          preference: {
+            select: { profile_sections: true }
           }
         }
       });
 
+      // Filter out freelancers with incomplete mandatory sections (only for 'all' tab; invited/saved always show)
+      const eligibleFreelancers = filter === 'all'
+        ? freelancers.filter((f: any) => {
+            const sections = (f.preference?.profile_sections as ProfileCompletionSectionsMap) || null;
+            return areMandatorySectionsComplete(sections, f.role || 'freelancer');
+          })
+        : freelancers;
+
       // Transform freelancers to provider format with matching scores
-      const providers = await Promise.all(freelancers.map(async freelancer => {
+      const providers = await Promise.all(eligibleFreelancers.map(async freelancer => {
         const userSkills: string[] = [];
         freelancer.expertises.forEach((exp: any) => {
           if (exp.skills && Array.isArray(exp.skills)) {
@@ -1386,7 +1399,7 @@ export class FounderProjectService {
       const bodyParts = [`${founderName} invited you to submit a proposal for "${projectTitle}".`];
       if (message) bodyParts.push(`"${message}"`);
       const notificationBody = bodyParts.join('\n\n');
-      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${appConfig.frontendUrl}/project/${project.unique_id}`;
 
       const notifData = { userId: providerId, type: 'PROJECT_INVITATION' as const, notificationTitle, notificationBody, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
@@ -1492,7 +1505,7 @@ export class FounderProjectService {
         userId
       );
 
-      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${appConfig.frontendUrl}/project/${project.unique_id}`;
       const rejectionBody = displayReason
         ? `${providerName} declined your invitation for "${projectTitle}".\n\nReason: "${displayReason}"`
         : `${providerName} declined your invitation for "${projectTitle}".`;
@@ -1560,7 +1573,7 @@ export class FounderProjectService {
       await ConversationService.setConversationStatusAcceptedByProject(project.id, userId);
 
       const accepterName = await getUserFullName(userId);
-      const notificationLink = `${process.env.FRONTEND_URL || process.env.APP_URL || ''}/project/${project.unique_id}`;
+      const notificationLink = `${appConfig.frontendUrl}/project/${project.unique_id}`;
       const notifData = { userId: project.user_id, type: 'INVITATION_ACCEPTED' as const, notificationTitle: `${accepterName} accepted your invitation`, notificationBody: `${accepterName} accepted your invitation for "${projectTitle}".`, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'FounderProject' as const, subjectId: project.id };
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);

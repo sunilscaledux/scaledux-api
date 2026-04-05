@@ -8,7 +8,8 @@ import { resolveAttachmentUrl, urlsOrPathsToAttachmentIds, markAttachmentsAttach
 import { createRedirectLink } from "@services/redirectLinkService";
 import { Log } from '@services/loggerService';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+import { appConfig } from '@config/app';
+const FRONTEND_URL = appConfig.frontendUrl;
 
 export class InvestmentPortfolioService {
   static async getUserInvestmentPortfolios(

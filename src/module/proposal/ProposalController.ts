@@ -63,6 +63,15 @@ export async function createProposal(req: Request, res: Response) {
         400
       );
     }
+    if (!completion.mandatoryComplete) {
+      const missing = completion.incompleteMandatory.map((s) => s.label).join(', ');
+      return ApiResponse.error(
+        res,
+        `Complete the following mandatory sections before submitting a proposal: ${missing}`,
+        { incompleteMandatory: completion.incompleteMandatory },
+        400
+      );
+    }
   } catch (err) {
     Log.error("Profile completion check failed", { err });
     return ApiResponse.error(res, "Unable to verify profile completion", 500);
@@ -235,6 +244,15 @@ export async function updateProposal(req: Request, res: Response) {
       return ApiResponse.error(
         res,
         `Complete your profile to submit a proposal. Your profile is ${completion.totalPercentage}% complete; at least ${MIN_PROFILE_COMPLETION_PERCENT}% is required.`,
+        400
+      );
+    }
+    if (!completion.mandatoryComplete) {
+      const missing = completion.incompleteMandatory.map((s) => s.label).join(', ');
+      return ApiResponse.error(
+        res,
+        `Complete the following mandatory sections before updating your proposal: ${missing}`,
+        { incompleteMandatory: completion.incompleteMandatory },
         400
       );
     }

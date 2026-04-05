@@ -104,8 +104,8 @@ export async function deleteFile(req: Request, res: Response) {
   }, "File deleted successfully")
 }
 
-const fileLostUrl = () =>
-  `${(process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '')}/file-lost`
+import { appConfig } from '@config/app';
+const fileLostUrl = () => `${appConfig.frontendUrl}/file-lost`
 
 export async function viewProtectedFile(req: Request, res: Response) {
   try {

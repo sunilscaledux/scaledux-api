@@ -20,7 +20,8 @@ export function privateFileAccess(req: Request, res: Response, next: NextFunctio
 
     if (!token) {
       console.log('[privateFileAccess] No token found. cookies:', Object.keys(req.cookies || {}), 'origin:', req.headers.origin, 'referer:', req.headers.referer);
-      const loginUrl = process.env.FRONTEND_URL||'http://localhost:3000';
+      const { appConfig: cfg } = require('@config/app');
+      const loginUrl = cfg.frontendUrl;
       return res.redirect(302, loginUrl);
     }
 

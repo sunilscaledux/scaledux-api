@@ -6,7 +6,8 @@ import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+import { appConfig } from '@config/app';
+const FRONTEND_URL = appConfig.frontendUrl;
 
 /** Transform a portfolio record: resolve attachment URLs */
 async function transformPortfolio(portfolio: any): Promise<any> {

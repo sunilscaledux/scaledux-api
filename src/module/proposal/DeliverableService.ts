@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { urlsOrPathsToAttachmentIds, markAttachmentsAttached } from "@services/attachmentService";
+import { appConfig } from '@config/app';
 import { ConversationService } from "@module/chat/ConversationService";
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
@@ -111,7 +112,7 @@ export async function submitDeliverable(
       userId
     );
     const freelancerNameDel = await getUserFullName(userId);
-    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
+    const baseUrl = appConfig.frontendUrl;
     const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: `${freelancerNameDel} submitted a deliverable`, notificationBody: `${freelancerNameDel} submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
@@ -304,7 +305,7 @@ export async function approveDeliverable(
       project.id,
       userId
     );
-    const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
+    const baseUrl = appConfig.frontendUrl;
     const notifData = { userId: providerId, type: 'DELIVERABLE_APPROVED' as const, notificationTitle: 'Deliverable approved', notificationBody: `Your deliverable for "${projectTitle}" was approved.`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);

@@ -2,7 +2,8 @@ import crypto from 'crypto';
 import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 
-const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
+import { appConfig } from '@config/app';
+const FRONTEND_URL = appConfig.frontendUrl;
 
 /** Generate a short 6-8 char alphanumeric code */
 function shortId(len: number): string {

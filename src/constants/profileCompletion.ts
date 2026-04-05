@@ -171,3 +171,42 @@ export function getPendingSectionKeys(
   const roleSections = getSectionsForRole(role);
   return roleSections.filter((s) => !sections || sections[s.key] !== true).map((s) => s.key);
 }
+
+/**
+ * Mandatory sections that MUST be completed before a freelancer can submit proposals or appear in invite lists.
+ * Even if profile completion ≥ threshold, these are enforced individually.
+ */
+export const MANDATORY_SECTIONS: ProfileCompletionSectionKey[] = [
+  'profilePicture',
+  'profileCover',
+  'profileSummary',
+  'skillsExpertise',
+  'workExperience',
+  'portfolio',
+  'hourlyRate',
+  'availableHoursPerWeek',
+  'education',
+  'emailVerification',
+  'phoneVerification',
+  'identityVerification',
+];
+
+/** Get incomplete mandatory sections with labels. */
+export function getIncompleteMandatorySections(
+  sections: ProfileCompletionSectionsMap | null | undefined,
+  role: UserRole | string | null
+): { key: ProfileCompletionSectionKey; label: string; route: string }[] {
+  const roleSections = getSectionsForRole(role);
+  const roleKeys = new Set(roleSections.map((s) => s.key));
+  return MANDATORY_SECTIONS
+    .filter((key) => roleKeys.has(key) && (!sections || sections[key] !== true))
+    .map((key) => ({ key, label: SECTION_META[key].label, route: SECTION_META[key].route }));
+}
+
+/** Check if all mandatory sections are complete. */
+export function areMandatorySectionsComplete(
+  sections: ProfileCompletionSectionsMap | null | undefined,
+  role: UserRole | string | null
+): boolean {
+  return getIncompleteMandatorySections(sections, role).length === 0;
+}

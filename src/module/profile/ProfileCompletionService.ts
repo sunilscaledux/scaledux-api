@@ -6,6 +6,8 @@ import {
   getSectionsForRole,
   computeCompletionPercentage,
   getPendingSectionKeys,
+  getIncompleteMandatorySections,
+  areMandatorySectionsComplete,
 } from '../../constants/profileCompletion';
 
 export type ProfileCompletionResult = {
@@ -14,6 +16,10 @@ export type ProfileCompletionResult = {
   fieldPercentages: Record<string, number>;
   pendingSectionKeys: ProfileCompletionSectionKey[];
   sectionsForRole: Array<{ key: string; label: string; weight: number; route: string; isCompleted: boolean }>;
+  /** Mandatory sections that are still incomplete. Empty = all mandatory sections done. */
+  incompleteMandatory: Array<{ key: string; label: string; route: string }>;
+  /** True when all mandatory sections are complete. */
+  mandatoryComplete: boolean;
 };
 
 /**
@@ -138,12 +144,16 @@ export async function calculateProfileCompletion(userId: number): Promise<Profil
     route: s.route,
     isCompleted: sections[s.key] === true,
   }));
+  const incompleteMandatory = getIncompleteMandatorySections(sections, role);
+  const mandatoryComplete = incompleteMandatory.length === 0;
   return {
     totalPercentage,
     completedFields,
     fieldPercentages,
     pendingSectionKeys,
     sectionsForRole,
+    incompleteMandatory,
+    mandatoryComplete,
   };
 }
 

@@ -1,4 +1,5 @@
 import { prisma } from "@services/prismaService";
+import { appConfig } from '@config/app';
 import { ServiceResponse } from "@utils/ApiResponse";
 import { BillingService } from "../billing/BillingService";
 import { dispatch } from '@queues/Queue';
@@ -226,7 +227,7 @@ export async function releaseMilestonePayment(
   );
 
   const projectTitle = milestone.project?.project_title ?? "Project";
-  const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || "";
+  const baseUrl = appConfig.frontendUrl;
   const notifData = { userId: milestone.proposal.provider_id, type: 'PAYMENT_RELEASED' as const, notificationTitle: 'Payment released', notificationBody: `Payment for "${projectTitle}" (milestone: ${milestone.title}) was released.`, notificationLink: `${baseUrl}/proposals-and-offers/${milestone.proposal.unique_id}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: milestone.proposal.id };
   await dispatch(NotificationJob, notifData);
   await dispatch(NotificationEmailJob, notifData);
