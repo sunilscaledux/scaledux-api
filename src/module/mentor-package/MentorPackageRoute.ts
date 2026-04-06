@@ -7,6 +7,7 @@ import {
   createMentorPackage,
   updateMentorPackage,
   deleteMentorPackage,
+  duplicateMentorPackage,
 } from "./MentorPackageController";
 import { authenticateToken } from "@middleware/auth";
 
@@ -21,6 +22,7 @@ router.use(authenticateToken);
 router.get("/", getUserMentorPackages);
 router.post("/", createMentorPackage);
 router.get("/:id", getMentorPackageById);
+router.post("/:id/duplicate", duplicateMentorPackage);
 router.put("/:id", updateMentorPackage);
 router.delete("/:id", deleteMentorPackage);
 

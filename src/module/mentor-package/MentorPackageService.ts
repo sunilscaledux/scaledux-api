@@ -264,6 +264,41 @@ export class MentorPackageService {
   }
 
   /**
+   * Duplicate mentor package (owner only)
+   */
+  static async duplicateMentorPackage(userId: number, uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const existing = await prisma.mentorPackage.findFirst({
+        where: { unique_id: uniqueId, user_id: userId },
+      });
+
+      if (!existing) {
+        return { success: false, message: "Mentor package not found" };
+      }
+
+      const { id, unique_id, created_at, updated_at, ...data } = existing as any;
+
+      const duplicate = await prisma.mentorPackage.create({
+        data: {
+          ...data,
+          title: `${data.title} (Copy)`,
+          status: "DRAFT",
+        },
+        include: categorySelect,
+      });
+
+      return {
+        success: true,
+        message: "Mentor package duplicated successfully",
+        data: transformOutput(duplicate),
+      };
+    } catch (error: any) {
+      Log.error("Error duplicating mentor package", { error });
+      return { success: false, message: "Failed to duplicate mentor package" };
+    }
+  }
+
+  /**
    * Get all PUBLISHED mentor packages for a user (public)
    */
   static async getPublicUserMentorPackages(userUniqueId: string): Promise<ServiceResponse> {

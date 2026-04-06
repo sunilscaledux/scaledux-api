@@ -68,6 +68,20 @@ export async function deleteMentorPackage(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, statusCode);
 }
 
+export async function duplicateMentorPackage(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const id = getStringParam(req.params.id);
+  if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+  if (!id) return ApiResponse.error(res, "Mentor package ID is required", 400);
+
+  const result = await MentorPackageService.duplicateMentorPackage(userId, id);
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message, 201);
+  }
+  const statusCode = result.message === "Mentor package not found" ? 404 : 500;
+  return ApiResponse.error(res, result.message, statusCode);
+}
+
 export async function getPublicUserMentorPackages(req: Request, res: Response) {
   const uniqueId = getStringParam(req.params.uniqueId);
   if (!uniqueId) return ApiResponse.error(res, "User ID is required", 400);
