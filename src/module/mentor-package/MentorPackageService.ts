@@ -17,6 +17,20 @@ function formatDuration(minutes: number): string {
   return `${minutes}m`;
 }
 
+/** Safe parseInt — returns undefined if not a valid number */
+function safeInt(val: any): number | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  const n = parseInt(String(val), 10);
+  return isNaN(n) ? undefined : n;
+}
+
+/** Safe parseFloat — returns undefined if not a valid number */
+function safeFloat(val: any): number | undefined {
+  if (val === undefined || val === null || val === '') return undefined;
+  const n = parseFloat(String(val));
+  return isNaN(n) ? undefined : n;
+}
+
 /** Transform UI form data → Prisma create/update data */
 function transformInput(data: any) {
   const result: any = {};
@@ -25,14 +39,14 @@ function transformInput(data: any) {
   if (data.packageDescription !== undefined) result.description = data.packageDescription;
 
   if (data.sessionDetails) {
-    if (data.sessionDetails.sessionDuration !== undefined)
+    if (data.sessionDetails.sessionDuration)
       result.session_duration = parseDuration(data.sessionDetails.sessionDuration);
-    if (data.sessionDetails.noOfSessions !== undefined)
-      result.no_of_sessions = parseInt(data.sessionDetails.noOfSessions, 10);
+    const sessions = safeInt(data.sessionDetails.noOfSessions);
+    if (sessions !== undefined) result.no_of_sessions = sessions;
     if (data.sessionDetails.sessionPrice) {
-      if (data.sessionDetails.sessionPrice.amount !== undefined)
-        result.session_price_amount = parseFloat(data.sessionDetails.sessionPrice.amount);
-      if (data.sessionDetails.sessionPrice.currency !== undefined)
+      const amount = safeFloat(data.sessionDetails.sessionPrice.amount);
+      if (amount !== undefined) result.session_price_amount = amount;
+      if (data.sessionDetails.sessionPrice.currency)
         result.session_price_currency = data.sessionDetails.sessionPrice.currency;
     }
   }
@@ -41,22 +55,20 @@ function transformInput(data: any) {
     result.recording_enabled = data.sessionRecording.isRecordingEnabled ?? false;
     result.recording_type = data.sessionRecording.recordingType || null;
     if (data.sessionRecording.recordingPrice) {
-      result.recording_price_amount = data.sessionRecording.recordingPrice.amount
-        ? parseFloat(data.sessionRecording.recordingPrice.amount)
-        : null;
+      result.recording_price_amount = safeFloat(data.sessionRecording.recordingPrice.amount) ?? null;
       result.recording_price_currency = data.sessionRecording.recordingPrice.currency || null;
     }
   }
 
   if (data.expertise) {
-    if (data.expertise.yourExpertise !== undefined)
-      result.category_id = parseInt(data.expertise.yourExpertise, 10);
+    const catId = safeInt(data.expertise.yourExpertise);
+    if (catId !== undefined) result.category_id = catId;
     if (data.expertise.topics !== undefined)
       result.topics = data.expertise.topics;
     if (data.expertise.expectedOutcomes !== undefined)
-      result.expected_outcomes = data.expertise.expectedOutcomes.map((o: any) => o.value);
+      result.expected_outcomes = (data.expertise.expectedOutcomes || []).map((o: any) => o.value).filter(Boolean);
     if (data.expertise.menteesExpections !== undefined)
-      result.mentees_expectations = data.expertise.menteesExpections.map((o: any) => o.value);
+      result.mentees_expectations = (data.expertise.menteesExpections || []).map((o: any) => o.value).filter(Boolean);
   }
 
   if (data.terms !== undefined) result.terms_and_conditions = data.terms || null;
@@ -74,8 +86,8 @@ function transformOutput(pkg: any) {
     packageTitle: row.title,
     packageDescription: row.description || "",
     sessionDetails: {
-      sessionDuration: formatDuration(row.session_duration),
-      noOfSessions: String(row.no_of_sessions),
+      sessionDuration: row.session_duration ? formatDuration(row.session_duration) : "",
+      noOfSessions: row.no_of_sessions != null ? String(row.no_of_sessions) : "",
       sessionPrice: {
         currency: row.session_price_currency === "INR" ? "₹" : (row.session_price_currency || "₹"),
         amount: row.session_price_amount != null ? String(row.session_price_amount) : "",
