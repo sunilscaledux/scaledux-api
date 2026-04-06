@@ -7,6 +7,7 @@ const router = Router();
 // Public routes
 router.get("/browse", optionalAuth, MentorController.browseMentors);
 router.get("/featured", optionalAuth, MentorController.getFeaturedMentors);
+router.get("/on-request/public/:uniqueId", MentorController.getPublicOnRequestSettings);
 
 // Auth-required routes
 router.post("/save", authenticateToken, MentorController.toggleSaveMentor);

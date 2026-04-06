@@ -362,6 +362,36 @@ export class MentorService {
     }
   }
 
+  /**
+   * Get public mentorship on-request settings by user unique_id.
+   */
+  static async getPublicOnRequestSettings(userUniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { unique_id: userUniqueId },
+        select: { id: true },
+      });
+      if (!user) return { success: false, message: "User not found" };
+
+      const settings = await (prisma as any).mentorOnRequest.findUnique({
+        where: { user_id: user.id },
+      });
+
+      if (!settings || !settings.is_available) {
+        return { success: true, message: "OK", data: null };
+      }
+
+      return {
+        success: true,
+        message: "OK",
+        data: MentorService.mapOnRequestSettings(settings),
+      };
+    } catch (error: any) {
+      Log.error("Get public on-request settings error", { error });
+      return { success: false, message: "Failed to fetch mentorship settings" };
+    }
+  }
+
   private static mapOnRequestSettings(s: any) {
     const minuteToLabel: Record<number, string> = { 15: '15m', 30: '30m', 45: '45m', 60: '1 hr', 75: '1h 15m', 90: '1h 30m', 105: '1h 45m', 120: '2h' };
     return {

@@ -78,4 +78,13 @@ export class MentorController {
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message);
   }
+
+  static async getPublicOnRequestSettings(req: Request, res: Response) {
+    const uniqueId = req.params.uniqueId;
+    if (!uniqueId) return ApiResponse.error(res, "User ID is required", 400);
+
+    const result = await MentorService.getPublicOnRequestSettings(uniqueId);
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message);
+  }
 }
