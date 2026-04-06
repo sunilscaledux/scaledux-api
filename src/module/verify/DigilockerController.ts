@@ -10,6 +10,7 @@ import {
 } from "@services/idtoaiService";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import crypto from "crypto";
+import { getResubmitWindow } from "@utils/General";
 
 import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
@@ -64,6 +65,18 @@ export async function completeDigilocker(req: Request, res: Response) {
   const { code, codeVerifier, state, docType } = req.body;
   if (!code || !codeVerifier) {
     return ApiResponse.error(res, "code and codeVerifier are required", 400);
+  }
+
+  // ── 15-day cooldown check ──
+  const existingIdentity = await prisma.identityVerification.findFirst({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' }
+  });
+  if (existingIdentity && existingIdentity.status === 'APPROVED' && existingIdentity.verified_at) {
+    const cooldown = getResubmitWindow(existingIdentity.verified_at, appConfig.verification.identityCooldownDays);
+    if (!cooldown.canSubmit) {
+      return ApiResponse.error(res, `Identity is verified and locked. You can re-verify after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`, 400);
+    }
   }
 
   // docType: "aadhaar" (default) or "driving_licence"

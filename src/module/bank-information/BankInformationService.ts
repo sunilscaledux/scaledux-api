@@ -2,6 +2,8 @@ import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
+import { getResubmitWindow } from "@utils/General";
+import { appConfig } from "@config/app";
 
 export class BankInformationService {
 
@@ -18,8 +20,8 @@ export class BankInformationService {
     return {
       success: true,
       data: {
-        individual: individual ? BankInformationService.mapRecord(individual) : null,
-        agency: agency ? BankInformationService.mapRecord(agency) : null,
+        individual: individual ? BankInformationService.mapRecordWithCooldown(individual) : null,
+        agency: agency ? BankInformationService.mapRecordWithCooldown(agency) : null,
       }
     };
   }
@@ -39,6 +41,20 @@ export class BankInformationService {
       verificationFailureReason: m.verification_failure_reason ?? null,
       verifiedAt: m.verified_at || null,
       createdAt: m.created_at
+    };
+  }
+
+  private static mapRecordWithCooldown(m: any) {
+    const base = BankInformationService.mapRecord(m);
+    const isVerified = m.verification_status === 'verified';
+    const cooldown = getResubmitWindow(m.verified_at, appConfig.verification.bankCooldownDays);
+    return {
+      ...base,
+      isVerified,
+      verifiedMessage: isVerified ? 'Bank information verified' : null,
+      canEdit: !isVerified || cooldown.canSubmit,
+      nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
+      cooldownDays: appConfig.verification.bankCooldownDays,
     };
   }
 
@@ -76,6 +92,8 @@ export class BankInformationService {
     if (existing) {
       return { success: false, message: `You already have ${entityType.toLowerCase()} bank information. Please edit the existing details instead.` };
     }
+
+    // Note: cooldown check not needed for create since we block if record exists
 
     const accountNumber = data.accountNumber.replace(/\D/g, '').trim() || null;
     if (!accountNumber || accountNumber.length < 9) {
@@ -192,6 +210,17 @@ export class BankInformationService {
     });
     if (!record) {
       return { success: false, message: 'Bank information not found.' };
+    }
+
+    // ── 15-day cooldown check ──
+    if (record.verification_status === 'verified' && record.verified_at) {
+      const cooldown = getResubmitWindow(record.verified_at, appConfig.verification.bankCooldownDays);
+      if (!cooldown.canSubmit) {
+        return {
+          success: false,
+          message: `Bank information is verified and locked. You can update after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`
+        };
+      }
     }
 
     const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : record.ifsc;

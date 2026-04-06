@@ -16,6 +16,14 @@ const agencyCooldownDays = Math.max(
   1,
   parseInt(process.env.AGENCY_VERIFICATION_COOLDOWN_DAYS || '15', 10)
 );
+const taxCooldownDays = Math.max(
+  1,
+  parseInt(process.env.TAX_VERIFICATION_COOLDOWN_DAYS || '15', 10)
+);
+const bankCooldownDays = Math.max(
+  1,
+  parseInt(process.env.BANK_VERIFICATION_COOLDOWN_DAYS || '15', 10)
+);
 
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const appUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
@@ -32,5 +40,7 @@ export const appConfig = {
   verification: {
     identityCooldownDays,
     agencyCooldownDays,
+    taxCooldownDays,
+    bankCooldownDays,
   },
 };

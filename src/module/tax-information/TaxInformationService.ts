@@ -2,6 +2,8 @@ import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { TaxInformationInput } from "./TaxInformationType";
 import { verifyPAN, validatePanWithGSTIN, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
+import { getResubmitWindow } from "@utils/General";
+import { appConfig } from "@config/app";
 
 export class TaxInformationService {
 
@@ -17,6 +19,20 @@ export class TaxInformationService {
       });
       if (user?.agency_verification_status !== 'APPROVED') {
         return { success: false, message: "You need to verify your agency before saving agency tax details." };
+      }
+    }
+
+    // ── 15-day cooldown check ──
+    const existing = await (prisma as any).taxInformation.findFirst({
+      where: { user_id: userIdNum, entity_type: entityType }
+    });
+    if (existing && existing.gstin_status === 'VERIFIED' && existing.gstin_verified_at) {
+      const cooldown = getResubmitWindow(existing.gstin_verified_at, appConfig.verification.taxCooldownDays);
+      if (!cooldown.canSubmit) {
+        return {
+          success: false,
+          message: `Tax information is verified and locked. You can update after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`
+        };
       }
     }
 
@@ -106,8 +122,8 @@ export class TaxInformationService {
     return {
       success: true,
       data: {
-        individual: individual ? TaxInformationService.mapRecord(individual) : null,
-        agency: agency ? TaxInformationService.mapRecord(agency) : null,
+        individual: individual ? TaxInformationService.mapRecordWithCooldown(individual) : null,
+        agency: agency ? TaxInformationService.mapRecordWithCooldown(agency) : null,
       }
     };
   }
@@ -125,6 +141,20 @@ export class TaxInformationService {
       gstinFailureReason: record.gstin_failure_reason || null,
       createdAt: record.created_at,
       updatedAt: record.updated_at,
+    };
+  }
+
+  private static mapRecordWithCooldown(record: any) {
+    const base = TaxInformationService.mapRecord(record);
+    const isVerified = record.gstin_status === 'VERIFIED';
+    const cooldown = getResubmitWindow(record.gstin_verified_at, appConfig.verification.taxCooldownDays);
+    return {
+      ...base,
+      isVerified,
+      verifiedMessage: isVerified ? 'Tax information verified' : null,
+      canEdit: !isVerified || cooldown.canSubmit,
+      nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
+      cooldownDays: appConfig.verification.taxCooldownDays,
     };
   }
 }

@@ -22,6 +22,18 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
 
 
+  // ── 15-day cooldown check ──
+  const existingAgency = await prisma.agencyVerification.findFirst({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' }
+  });
+  if (existingAgency && existingAgency.status === 'APPROVED' && existingAgency.verified_at) {
+    const cooldown = getResubmitWindow(existingAgency.verified_at, appConfig.verification.agencyCooldownDays);
+    if (!cooldown.canSubmit) {
+      return ApiResponse.error(res, `Company/Agency is verified and locked. You can update after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`, 400);
+    }
+  }
+
   // Validate required fields
   if (!agencyName || !cin) {
     return ApiResponse.error(res, "Agency name and CIN are required", 400)
@@ -139,16 +151,23 @@ export async function getAgencyVerificationDetails(req: Request, res: Response) 
 
   const cooldown = getResubmitWindow(agencyVerification.verified_at, appConfig.verification.agencyCooldownDays)
 
+  const isVerified = agencyVerification.status === 'APPROVED'
+
   return ApiResponse.success(res, {
     id: agencyVerification.id,
     agencyName: agencyVerification.agency_name,
     cin: agencyVerification.cin,
     documents: documentUrls,
     status: agencyVerification.status,
+    isVerified,
+    verifiedMessage: isVerified ? 'Company/Agency verified' : null,
     submittedAt: agencyVerification.submitted_at,
     verifiedAt: agencyVerification.verified_at,
     rejectionReason: agencyVerification.rejection_reason,
     cooldownDays: appConfig.verification.agencyCooldownDays,
+    canEdit: !isVerified || cooldown.canSubmit,
+    nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
+    // Keep legacy fields for backward compatibility
     canSubmit: cooldown.canSubmit,
     nextSubmitAllowedAt: cooldown.nextSubmitAllowedAt
   }, "Agency verification details retrieved successfully")
