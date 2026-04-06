@@ -77,7 +77,7 @@ function transformOutput(pkg: any) {
       sessionDuration: formatDuration(row.session_duration),
       noOfSessions: String(row.no_of_sessions),
       sessionPrice: {
-        currency: row.session_price_currency || "INR",
+        currency: row.session_price_currency === "INR" ? "₹" : (row.session_price_currency || "₹"),
         amount: row.session_price_amount != null ? String(row.session_price_amount) : "",
       },
     },
@@ -85,7 +85,7 @@ function transformOutput(pkg: any) {
       isRecordingEnabled: row.recording_enabled,
       recordingType: row.recording_type || "",
       recordingPrice: {
-        currency: row.recording_price_currency || "",
+        currency: row.recording_price_currency === "INR" ? "₹" : (row.recording_price_currency || ""),
         amount: row.recording_price_amount != null ? String(row.recording_price_amount) : "",
       },
     },
