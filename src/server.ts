@@ -28,6 +28,7 @@ import bankInformationRoutes from './module/bank-information/BankInformationRout
 import taxInformationRoutes from './module/tax-information/TaxInformationRoute';
 import reviewRoutes from './module/review/ReviewRoute';
 import mentorRoutes from './module/mentor/MentorRoute';
+import mentorPackageRoutes from './module/mentor-package/MentorPackageRoute';
 import reportRoutes from './module/report/ReportRoute';
 
 import path from "path";
@@ -78,6 +79,7 @@ app.use("/api/v1/billing", bankInformationRoutes);
 app.use("/api/v1/billing", taxInformationRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/mentors", mentorRoutes);
+app.use("/api/v1/mentor-packages", mentorPackageRoutes);
 app.use("/api/v1/reports", reportRoutes);
 
 // Public redirect endpoint — /r/:code/redirect → redirects to target URL
