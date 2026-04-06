@@ -87,6 +87,9 @@ export class MentorService {
             reviewsReceived: {
               select: { rating: true },
             },
+            workExperiences: {
+              select: { start_year: true, end_year: true, is_current: true },
+            },
             _count: {
               select: {
                 reviewsReceived: true,
@@ -106,6 +109,17 @@ export class MentorService {
             ? await resolveAttachmentUrl(mentor.personalInfo.profileImage, 'profile_image')
             : null;
 
+          // Calculate total experience in years from work experiences
+          let totalExperienceYears = 0;
+          for (const we of (mentor as any).workExperiences || []) {
+            const startYear = we.start_year ? parseInt(we.start_year) : null;
+            const endYear = we.is_current ? new Date().getFullYear() : (we.end_year ? parseInt(we.end_year) : null);
+            if (startYear && endYear) {
+              totalExperienceYears += endYear - startYear;
+            }
+          }
+          const experience = Math.max(0, totalExperienceYears);
+
           return {
             id: mentor.id,
             uniqueId: mentor.unique_id,
@@ -118,6 +132,7 @@ export class MentorService {
             country: mentor.personalInfo?.country?.name || null,
             hourlyRate: mentor.personalInfo?.hourly_rate ?? null,
             skills: mentor.expertises.map((e: any) => e.category?.name).filter(Boolean),
+            experience,
             avgRating,
             reviewCount: mentor._count.reviewsReceived,
             packageCount: mentor._count.servicePackages,
