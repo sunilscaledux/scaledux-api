@@ -4,6 +4,29 @@ import { ServiceResponse } from "@utils/ApiResponse";
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import { Log } from '@services/loggerService';
 
+/**
+ * Recalculate total experience years from work experiences and store on user.
+ */
+async function recalcExperienceYears(userId: number) {
+  const experiences = await prisma.workExperience.findMany({
+    where: { user_id: userId },
+    select: { start_year: true, end_year: true, is_current: true },
+  });
+  let total = 0;
+  const currentYear = new Date().getFullYear();
+  for (const we of experiences) {
+    const start = we.start_year ? parseInt(we.start_year) : null;
+    const end = we.is_current ? currentYear : (we.end_year ? parseInt(we.end_year) : null);
+    if (start && end && end >= start) {
+      total += end - start;
+    }
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { experience_years: Math.max(0, total) },
+  });
+}
+
 export class WorkExperienceService {
   /**
    * Get all work experiences for a user
@@ -59,6 +82,7 @@ export class WorkExperienceService {
         }
       });
       await updateCompletionSection(userId, 'workExperience', true);
+      await recalcExperienceYears(userId);
       return {
         success: true,
         message: 'Work experience created successfully',
@@ -116,6 +140,8 @@ export class WorkExperienceService {
         }
       });
 
+      await recalcExperienceYears(userId);
+
       return {
         success: true,
         message: 'Work experience updated successfully',
@@ -157,6 +183,7 @@ export class WorkExperienceService {
       });
       const remaining = await prisma.workExperience.count({ where: { user_id: userId } });
       await updateCompletionSection(userId, 'workExperience', remaining > 0);
+      await recalcExperienceYears(userId);
       return {
         success: true,
         message: 'Work experience deleted successfully',

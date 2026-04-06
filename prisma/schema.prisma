@@ -56,6 +56,7 @@ model User {
   taxInformation               TaxInformation[]
   currency_id                  Int?
   currency                     Currency? @relation(fields: [currency_id], references: [id])
+  experience_years              Int       @default(0)  // total years of work experience, auto-calculated
   profile_completion_percentage Int?    // 0-100, cached from preference.profile_sections + role weights
   preference                    UserPreference?
   wallet                        UserWallet?

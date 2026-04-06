@@ -13,6 +13,11 @@ export class MentorService {
     categoryId?: number;
     skills?: string[];
     sortBy?: 'newest' | 'rating' | 'experience';
+    minExperience?: number;
+    maxExperience?: number;
+    minRating?: number;
+    minHourlyRate?: number;
+    maxHourlyRate?: number;
     page?: number;
     limit?: number;
   }): Promise<ServiceResponse> {
@@ -24,7 +29,11 @@ export class MentorService {
       const where: any = {
         role: 'mentor',
         status: 1,
-        personalInfo: { isNot: null },
+        personalInfo: {
+          isNot: null,
+          title: { not: null, notIn: [''] },
+        },
+        experience_years: { gt: 0 },
       };
 
       if (params.search?.trim()) {
@@ -50,9 +59,27 @@ export class MentorService {
         };
       }
 
+      // Experience filter
+      if (params.minExperience !== undefined || params.maxExperience !== undefined) {
+        where.experience_years = {
+          ...(where.experience_years || {}),
+          ...(params.minExperience !== undefined ? { gte: params.minExperience } : {}),
+          ...(params.maxExperience !== undefined ? { lte: params.maxExperience } : {}),
+        };
+      }
+
+      // Hourly rate filter
+      if (params.minHourlyRate !== undefined || params.maxHourlyRate !== undefined) {
+        where.personalInfo = {
+          ...where.personalInfo,
+          ...(params.minHourlyRate !== undefined ? { hourly_rate: { ...(where.personalInfo?.hourly_rate || {}), gte: params.minHourlyRate } } : {}),
+          ...(params.maxHourlyRate !== undefined ? { hourly_rate: { ...(where.personalInfo?.hourly_rate || {}), lte: params.maxHourlyRate } } : {}),
+        };
+      }
+
       let orderBy: any = { created_at: 'desc' };
       if (params.sortBy === 'experience') {
-        orderBy = { created_at: 'asc' };
+        orderBy = { experience_years: 'desc' };
       }
 
       const [mentors, total] = await Promise.all([
@@ -67,6 +94,7 @@ export class MentorService {
             first_name: true,
             last_name: true,
             role: true,
+            experience_years: true,
             created_at: true,
             personalInfo: {
               select: {
@@ -87,9 +115,6 @@ export class MentorService {
             reviewsReceived: {
               select: { rating: true },
             },
-            workExperiences: {
-              select: { start_year: true, end_year: true, is_current: true },
-            },
             _count: {
               select: {
                 reviewsReceived: true,
@@ -109,17 +134,6 @@ export class MentorService {
             ? await resolveAttachmentUrl(mentor.personalInfo.profileImage, 'profile_image')
             : null;
 
-          // Calculate total experience in years from work experiences
-          let totalExperienceYears = 0;
-          for (const we of (mentor as any).workExperiences || []) {
-            const startYear = we.start_year ? parseInt(we.start_year) : null;
-            const endYear = we.is_current ? new Date().getFullYear() : (we.end_year ? parseInt(we.end_year) : null);
-            if (startYear && endYear) {
-              totalExperienceYears += endYear - startYear;
-            }
-          }
-          const experience = Math.max(0, totalExperienceYears);
-
           return {
             id: mentor.id,
             uniqueId: mentor.unique_id,
@@ -132,7 +146,7 @@ export class MentorService {
             country: mentor.personalInfo?.country?.name || null,
             hourlyRate: mentor.personalInfo?.hourly_rate ?? null,
             skills: mentor.expertises.map((e: any) => e.category?.name).filter(Boolean),
-            experience,
+            experience: (mentor as any).experience_years || 0,
             avgRating,
             reviewCount: mentor._count.reviewsReceived,
             packageCount: mentor._count.servicePackages,
@@ -140,11 +154,16 @@ export class MentorService {
         })
       );
 
+      // Post-filter by rating (computed field)
+      const filtered = params.minRating
+        ? data.filter(m => m.avgRating >= params.minRating!)
+        : data;
+
       return {
         success: true,
         message: "Mentors fetched successfully",
         data: {
-          mentors: data,
+          mentors: filtered,
           pagination: {
             page,
             limit,
