@@ -6,6 +6,7 @@ import { seedExpertise } from "./seeds/expertise-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
 import { seedBillingData } from "./seeds/billing-seed";
+import { seedStartupPhases } from "./seeds/startup-phases-seed";
 
 const prisma = new PrismaClient();
 
@@ -34,6 +35,9 @@ async function main() {
   // await seedRevenueModels(prisma);
 
   await seedBillingData(prisma);
+
+  // 8. Seed Startup Phases (Phase 0 to Phase 7)
+  await seedStartupPhases(prisma);
 
   console.log("All seeding completed successfully!");
   console.log("Run 'npm run cache' to warm Redis caches.");

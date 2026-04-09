@@ -30,6 +30,7 @@ import reviewRoutes from './module/review/ReviewRoute';
 import mentorRoutes from './module/mentor/MentorRoute';
 import mentorPackageRoutes from './module/mentor-package/MentorPackageRoute';
 import reportRoutes from './module/report/ReportRoute';
+import { startupPhaseRouter, startupProgressRouter } from './module/startup-phase/StartupPhaseRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -81,6 +82,8 @@ app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/mentors", mentorRoutes);
 app.use("/api/v1/mentor-packages", mentorPackageRoutes);
 app.use("/api/v1/reports", reportRoutes);
+app.use("/api/v1/startup-phases", startupPhaseRouter);
+app.use("/api/v1/profile/company/startup-progress", startupProgressRouter);
 
 // Public redirect endpoint — /r/:code/redirect → redirects to target URL
 app.get("/r/:code/redirect", async (req, res) => {
