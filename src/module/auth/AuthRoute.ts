@@ -24,6 +24,7 @@ import {
   verify2FA,
   verify2FABackup,
   send2FAOtp,
+  resend2FALoginOtp,
 } from "@module/auth/TwoFAController";
 import { googleCallback } from "@module/auth/AuthGoogleController";
 import { linkedinCallback } from "@module/auth/AuthLinkedinController";
@@ -60,6 +61,7 @@ router.patch("/auth/role", authenticateToken, updateUserRole);
 // 2FA routes (public — token in body)
 router.post("/auth/2fa/verify", createRateLimiter(5 * 60, 10), verify2FA);
 router.post("/auth/2fa/verify-backup", createRateLimiter(5 * 60, 5), verify2FABackup);
+router.post("/auth/2fa/resend-otp", createRateLimiter(5 * 60, 5), resend2FALoginOtp);
 
 // 2FA settings (authenticated)
 router.get("/auth/2fa/status", authenticateToken, get2FAStatus);

@@ -336,6 +336,50 @@ export async function verify2FABackup(req: Request, res: Response) {
   return ApiResponse.success(res, sessionData, 'Login successful');
 }
 
+// ─── POST /auth/2fa/resend-otp (login flow — resend OTP using 2fa token) ────
+
+export async function resend2FALoginOtp(req: Request, res: Response) {
+  const { twoFAToken } = req.body;
+  if (!twoFAToken) return ApiResponse.error(res, '2FA token is required');
+
+  let payload: any;
+  try {
+    payload = jwt.verify(twoFAToken, JWT_SECRET);
+  } catch {
+    return ApiResponse.error(res, 'Invalid or expired 2FA token. Please log in again.', null, 401);
+  }
+
+  if (payload.purpose !== '2fa') {
+    return ApiResponse.error(res, 'Invalid token', null, 401);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: { email: true, phone: true, two_fa_enabled: true, two_fa_method: true },
+  });
+
+  if (!user) return ApiResponse.error(res, 'User not found', null, 401);
+  if (!user.two_fa_enabled) {
+    return ApiResponse.error(res, 'Two-factor authentication is not enabled');
+  }
+
+  const identifier = user.two_fa_method === 'email' ? user.email : user.phone;
+  if (!identifier) return ApiResponse.error(res, 'Contact method not available');
+
+  const otpResult = await generateAndSendOtp({
+    email: user.two_fa_method === 'email' ? user.email : null,
+    phone: user.two_fa_method === 'sms' ? user.phone : null,
+    otpType: OTP_TYPES.TWO_FA_VERIFICATION,
+    userId: payload.userId,
+  });
+
+  if (!otpResult.success) {
+    return ApiResponse.error(res, otpResult.message);
+  }
+
+  return ApiResponse.success(res, { method: user.two_fa_method }, 'A new verification code has been sent');
+}
+
 // ─── POST /auth/2fa/send-otp (for disable flow — send OTP before disabling) ─
 
 export async function send2FAOtp(req: Request, res: Response) {
