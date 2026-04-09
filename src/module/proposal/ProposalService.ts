@@ -269,7 +269,10 @@ export class ProposalService {
         };
       }
 
-      // Check if user already submitted a proposal for this project
+      // Check if user already submitted (or drafted) a proposal for this project.
+      // - Non-draft existing → reject: one real proposal per provider/project.
+      // - Draft existing → convert it: update fields, flip is_draft=false, fire
+      //   the same side effects below (chat, invite, counter).
       const existingProposal = await (prisma as any).proposal.findFirst({
         where: {
           project_id: project.id,
@@ -277,33 +280,49 @@ export class ProposalService {
         }
       });
 
-      if (existingProposal) {
+      if (existingProposal && !existingProposal.is_draft) {
         return {
           success: false,
           message: "You have already submitted a proposal for this project"
         };
       }
 
-      // Create the proposal (milestones live in Milestone table only; proposal.milestones kept empty)
+      const wasDraft = !!existingProposal?.is_draft;
+
+      // Create or promote-from-draft (milestones live in Milestone table only)
       const hoursRequired =
         data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
           ? data.hours_required
           : null;
       const attachmentPaths = urlsOrPathsToAttachmentIds(data.attachments || []);
-      const proposal = await (prisma as any).proposal.create({
-        data: {
-          project_id: project.id,
-          provider_id: userId,
-          cover_letter: data.cover_letter || '',
-          proposed_amount: data.proposed_amount,
-          payment_schedule: data.payment_schedule,
-          hours_required: hoursRequired,
-          // milestones: [],
-          screening_answers: data.screening_answers,
-          attachments: attachmentPaths,
-          status: 'PENDING'
-        }
-      });
+      const proposal = existingProposal
+        ? await (prisma as any).proposal.update({
+            where: { id: existingProposal.id },
+            data: {
+              cover_letter: data.cover_letter || '',
+              proposed_amount: data.proposed_amount,
+              payment_schedule: data.payment_schedule,
+              hours_required: hoursRequired,
+              screening_answers: data.screening_answers,
+              attachments: attachmentPaths,
+              status: 'PENDING',
+              is_draft: false,
+            }
+          })
+        : await (prisma as any).proposal.create({
+            data: {
+              project_id: project.id,
+              provider_id: userId,
+              cover_letter: data.cover_letter || '',
+              proposed_amount: data.proposed_amount,
+              payment_schedule: data.payment_schedule,
+              hours_required: hoursRequired,
+              screening_answers: data.screening_answers,
+              attachments: attachmentPaths,
+              status: 'PENDING',
+              is_draft: false,
+            }
+          });
 
       // Mark proposal attachments as attached
       if (attachmentPaths.length > 0) {
@@ -384,6 +403,118 @@ export class ProposalService {
       return {
         success: false,
         message: error.message || "Failed to submit proposal"
+      };
+    }
+  }
+
+  /**
+   * Save (or update) a proposal draft. Drafts are hidden from the founder
+   * (filtered out of founder-facing queries) and do not trigger the chat
+   * sync, invite flip, proposals_count increment, or notifications. A
+   * provider can save multiple times — the draft is upserted by
+   * (project_id, provider_id). Once they click "Submit", createProposal
+   * converts the draft by flipping is_draft=false and running the usual
+   * side effects.
+   */
+  static async saveDraftProposal(
+    userId: number,
+    projectId: string,
+    data: {
+      cover_letter?: string;
+      proposed_amount?: number;
+      payment_schedule?: string;
+      hours_required?: number | null;
+      milestones?: any[];
+      screening_answers?: any[];
+      attachments?: string[];
+    }
+  ): Promise<ServiceResponse> {
+    try {
+      const project = await prisma.founderProject.findFirst({
+        where: {
+          unique_id: projectId,
+          status: 'PUBLISHED',
+          deleted_at: null
+        }
+      });
+
+      if (!project) {
+        return { success: false, message: "Project not found or not available" };
+      }
+
+      if (project.user_id === userId) {
+        return { success: false, message: "You cannot save a draft proposal for your own project" };
+      }
+
+      const existingProposal = await (prisma as any).proposal.findFirst({
+        where: { project_id: project.id, provider_id: userId }
+      });
+
+      // Can't save a draft on top of a proposal that's already been submitted.
+      if (existingProposal && !existingProposal.is_draft) {
+        return {
+          success: false,
+          message: "You have already submitted a proposal for this project"
+        };
+      }
+
+      const hoursRequired =
+        data.hours_required != null && Number.isInteger(data.hours_required) && data.hours_required >= 0
+          ? data.hours_required
+          : null;
+      const attachmentPaths = urlsOrPathsToAttachmentIds(data.attachments || []);
+
+      const draft = existingProposal
+        ? await (prisma as any).proposal.update({
+            where: { id: existingProposal.id },
+            data: {
+              cover_letter: data.cover_letter || '',
+              proposed_amount: data.proposed_amount ?? 0,
+              payment_schedule: data.payment_schedule || 'byProject',
+              hours_required: hoursRequired,
+              screening_answers: data.screening_answers ?? [],
+              attachments: attachmentPaths,
+              status: 'PENDING',
+              is_draft: true,
+            }
+          })
+        : await (prisma as any).proposal.create({
+            data: {
+              project_id: project.id,
+              provider_id: userId,
+              cover_letter: data.cover_letter || '',
+              proposed_amount: data.proposed_amount ?? 0,
+              payment_schedule: data.payment_schedule || 'byProject',
+              hours_required: hoursRequired,
+              screening_answers: data.screening_answers ?? [],
+              attachments: attachmentPaths,
+              status: 'PENDING',
+              is_draft: true,
+            }
+          });
+
+      if (attachmentPaths.length > 0) {
+        await markAttachmentsAttached(attachmentPaths, [userId, project.user_id]);
+      }
+
+      // Keep the draft's milestones in sync so when it's promoted to a real
+      // proposal later, they're already on the Milestone table.
+      const milestones = Array.isArray(data.milestones) ? data.milestones : [];
+      await ProposalService.syncProposalMilestonesToTable(draft.id, project.id, milestones);
+
+      return {
+        success: true,
+        message: "Your proposal has been saved as a draft.",
+        data: {
+          id: draft.id,
+          unique_id: draft.unique_id
+        }
+      };
+    } catch (error: any) {
+      Log.error("Save Draft Proposal Error", { error });
+      return {
+        success: false,
+        message: error.message || "Could not save your proposal draft. Please try again."
       };
     }
   }
@@ -731,12 +862,17 @@ export class ProposalService {
 
       const isOwner = project.user_id === userId;
       const whereClause: any = {
-        project_id: project.id
+        project_id: project.id,
+        // Founder never sees drafts. Provider viewing their own row through
+        // this endpoint is fine because we only show them their own proposal,
+        // and getProposal/useProposal (/proposals/:id) is the canonical way
+        // for a provider to load their draft for editing.
+        is_draft: false
       };
 
       if (!isOwner) {
         const hasProposal = await (prisma as any).proposal.findFirst({
-          where: { project_id: project.id, provider_id: userId }
+          where: { project_id: project.id, provider_id: userId, is_draft: false }
         });
         if (!hasProposal) {
           return {
@@ -854,6 +990,8 @@ export class ProposalService {
         : status;
       const whereClause = {
         status: statusFilter,
+        // Drafts never appear on the founder side
+        is_draft: false,
         project: {
           user_id: userId,
           deleted_at: null
@@ -2019,11 +2157,15 @@ export class ProposalService {
         ...(remarkFields.freelancer_reason ? { main_reason: remarkFields.freelancer_reason } : {})
       }, userId);
 
-      // Decrement proposals_count on the project
-      await prisma.founderProject.update({
-        where: { id: proposal.project.id },
-        data: { proposals_count: { decrement: 1 } }
-      });
+      // Decrement proposals_count on the project — but only if this proposal
+      // was actually counted. Drafts were never incremented in the first
+      // place, so withdrawing them must not decrement below reality.
+      if (!proposal.is_draft) {
+        await prisma.founderProject.update({
+          where: { id: proposal.project.id },
+          data: { proposals_count: { decrement: 1 } }
+        });
+      }
 
       // Sync to chat: notify founder (provider withdrew)
       const project = await prisma.founderProject.findFirst({

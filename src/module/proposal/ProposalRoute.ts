@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createProposal,
+  saveDraftProposal,
   getMyProposals,
   getProposalsByProject,
   getFounderContracts,
@@ -77,6 +78,10 @@ router.post(
 // 403 short-circuit for clients that want to bail out before hitting the
 // controller's business logic.
 router.post("/", requireCompleteProfile(), createProposal);
+// Draft save — intentionally NOT gated by requireCompleteProfile so providers
+// can stash progress before their profile is complete. The row is hidden
+// from founder-facing queries until it's submitted.
+router.post("/draft", saveDraftProposal);
 router.get("/", getMyProposals);
 router.get("/check/:projectId", checkProposalStatus);
 

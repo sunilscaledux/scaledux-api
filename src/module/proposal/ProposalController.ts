@@ -97,6 +97,58 @@ export async function createProposal(req: Request, res: Response) {
 }
 
 /**
+ * Save a proposal draft. Unlike createProposal:
+ *   - No profile completion check — drafts can be saved at any completion %.
+ *   - No required fields beyond projectId; the form is allowed to be partial.
+ *   - The service skips chat sync, invite flip, proposals_count increment and
+ *     notifications, and hides the row from founder-facing queries.
+ */
+export async function saveDraftProposal(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const {
+    projectId,
+    cover_letter,
+    proposed_amount,
+    payment_schedule,
+    hours_required,
+    milestones,
+    screening_answers,
+    attachments
+  } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await ProposalService.saveDraftProposal(userId, projectId, {
+    cover_letter,
+    proposed_amount:
+      proposed_amount != null && proposed_amount !== ''
+        ? parseFloat(String(proposed_amount))
+        : undefined,
+    payment_schedule: payment_schedule || 'byProject',
+    hours_required:
+      hours_required != null && hours_required !== ''
+        ? typeof hours_required === 'number'
+          ? hours_required
+          : parseFloat(String(hours_required))
+        : undefined,
+    milestones: Array.isArray(milestones) ? milestones : [],
+    screening_answers: screening_answers || [],
+    attachments: attachments || []
+  });
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message, 200);
+  }
+  return ApiResponse.error(res, result.message, 400);
+}
+
+/**
  * Get my proposals (service provider)
  */
 export async function getMyProposals(req: Request, res: Response) {

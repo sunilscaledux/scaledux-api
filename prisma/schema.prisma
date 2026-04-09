@@ -902,6 +902,8 @@ model Proposal {
   project_id            Int
   provider_id           Int       // Service provider user id
   status                String    @default("PENDING") @db.VarChar(20) // PENDING, SHORTLISTED, OFFER_SENT, OFFER_ACCEPTED, REJECTED, WITHDRAWN, HIRED, TERMINATING, TERMINATED
+  /** When true, this row is a work-in-progress draft: hidden from the founder, not counted, no chat/invite side effects. Flipped to false when the provider hits Submit. */
+  is_draft              Boolean   @default(false)
   
   // Proposal content
   cover_letter          String    @db.Text
