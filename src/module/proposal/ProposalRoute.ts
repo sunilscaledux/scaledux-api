@@ -24,6 +24,7 @@ import {
 import { submitMilestone, requestChangesMilestone, approveMilestone, releaseMilestonePayment } from "./MilestoneController";
 import { submitDeliverable, requestChangesDeliverable, approveDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
+import { requireCompleteProfile } from "@middleware/requireCompleteProfile";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 
@@ -70,7 +71,12 @@ router.post(
   handleMulterError
 );
 
-router.post("/", createProposal);
+// Service providers submitting a proposal (apply) must have a complete profile.
+// Note: ProposalController.createProposal already runs its own completion
+// check against MIN_PROFILE_COMPLETION_PERCENT; this middleware is a shorter
+// 403 short-circuit for clients that want to bail out before hitting the
+// controller's business logic.
+router.post("/", requireCompleteProfile(), createProposal);
 router.get("/", getMyProposals);
 router.get("/check/:projectId", checkProposalStatus);
 
@@ -93,7 +99,8 @@ router.post("/:id/milestones", addMilestone);
 router.get("/:id", getProposalById);
 
 router.put("/:id/status", updateProposalStatus);
-router.post("/:id/hire", setHire);
+// Founder hiring a service provider requires a complete founder profile.
+router.post("/:id/hire", requireCompleteProfile(), setHire);
 router.post("/:id/cancel-hire", cancelHire);
 router.post("/:id/decline-offer", declineOffer);
 router.post("/:id/terminate", terminateContract);

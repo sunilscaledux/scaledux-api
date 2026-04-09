@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from "@services/attachmentService";
+import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
 
 export class MentorService {
 
@@ -26,6 +27,9 @@ export class MentorService {
       const limit = Math.min(50, Math.max(1, params.limit || 12));
       const skip = (page - 1) * limit;
 
+      // Only surface mentors whose own profile meets the required completion
+      // bar — makes "Receive requests → NO" for incomplete mentors work
+      // automatically.
       const where: any = {
         role: 'mentor',
         status: 1,
@@ -34,6 +38,7 @@ export class MentorService {
           title: { not: null, notIn: [''] },
         },
         experience_years: { gt: 0 },
+        profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
       };
 
       if (params.search?.trim()) {

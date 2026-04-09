@@ -17,6 +17,7 @@ import {
 } from "./FounderProjectController"
 import { uploadFile } from "@module/general/FileController"
 import { authenticateToken, optionalAuth } from "@middleware/auth"
+import { requireCompleteProfile } from "@middleware/requireCompleteProfile"
 import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
@@ -42,7 +43,8 @@ router.post(
 router.post("/:id/duplicate", duplicateProject)
 
 router.get("/:id/matching-providers", getMatchingServiceProviders)
-router.post("/:id/invite-provider", inviteProvider)
+// Founder inviting a service provider requires a complete founder profile.
+router.post("/:id/invite-provider", requireCompleteProfile(), inviteProvider)
 router.post("/:id/toggle-save-provider", toggleSaveProvider)
 
 router.post("/:id/save", toggleSaveProject)

@@ -12,6 +12,7 @@ import { ProposalStatus, InviteStatus } from '@constants/status';
 import { getUserFullName } from '@utils/General';
 import { MatchingService, buildFreelancerProfile } from '@services/matchingService';
 import { areMandatorySectionsComplete, type ProfileCompletionSectionsMap } from '@constants/profileCompletion';
+import { PROFILE_COMPLETION_THRESHOLD } from '@middleware/requireCompleteProfile';
 
 import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
@@ -242,13 +243,14 @@ export class FounderProjectService {
       } = params;
 
       // Base where clause - only published, not deleted, and only from
-      // founders whose profile is at least 75% complete (so service providers
-      // don't see projects from founders they can't realistically work with).
+      // founders whose profile meets the required completion bar (so service
+      // providers don't see projects from founders they can't realistically
+      // work with).
       const whereClause: any = {
         status: 'PUBLISHED',
         deleted_at: null,
         user: {
-          profile_completion_percentage: { gte: 75 }
+          profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
         }
       };
 
@@ -1112,11 +1114,15 @@ export class FounderProjectService {
       const pendingInvites = invites.filter((i: any) => i.status === ProposalStatus.PENDING);
       const pendingInvitedProviderIds = pendingInvites.map((i: any) => i.provider_id);
 
-      // Build where clause based on filter
+      // Build where clause based on filter. Only expose service providers
+      // whose own profile meets the required completion bar — keeps the
+      // "Receive invite → NO" rule for incomplete providers consistent with
+      // the browse-projects filter applied elsewhere.
       let whereClause: any = {
         role: 'freelancer',
         id: { not: userId },
-        status: 1
+        status: 1,
+        profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
       };
 
       if (filter === 'all') {

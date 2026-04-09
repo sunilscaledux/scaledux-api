@@ -28,6 +28,11 @@ const bankCooldownDays = Math.max(
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const appUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
 
+const minProfileCompletionPercent = Math.min(
+  100,
+  Math.max(0, Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 75)
+);
+
 export const appConfig = {
   appEnv: process.env.NODE_ENV,
   frontendUrl,
@@ -43,4 +48,6 @@ export const appConfig = {
     taxCooldownDays,
     bankCooldownDays,
   },
+  /** Minimum profile completion % required to perform gated actions. */
+  minProfileCompletionPercent,
 };
