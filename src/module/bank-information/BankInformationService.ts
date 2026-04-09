@@ -6,6 +6,13 @@ import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 
+/** Bank name and account holder name: letters and spaces only. */
+const BANK_NAME_PATTERN = /^[A-Za-z ]+$/;
+
+/** Trim and collapse internal whitespace. */
+const cleanName = (v?: string | null) =>
+  (v ?? '').trim().replace(/\s+/g, ' ');
+
 export class BankInformationService {
 
   static async getBankInformation(userId: string) {
@@ -75,6 +82,15 @@ export class BankInformationService {
       return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
     }
 
+    const cleanedBankName = cleanName(data.bankName);
+    if (cleanedBankName && !BANK_NAME_PATTERN.test(cleanedBankName)) {
+      return { success: false, message: 'Bank name can only contain letters and spaces' };
+    }
+    const cleanedHolderName = cleanName(data.accountHolderName);
+    if (cleanedHolderName && !BANK_NAME_PATTERN.test(cleanedHolderName)) {
+      return { success: false, message: 'Account holder name can only contain letters and spaces' };
+    }
+
     const entityType = data.entityType || 'INDIVIDUAL';
 
     if (entityType === 'AGENCY') {
@@ -102,7 +118,7 @@ export class BankInformationService {
     }
     const accountNumberLast4 = accountNumber.slice(-4);
 
-    let accountHolderName = data.accountHolderName?.trim() || null;
+    let accountHolderName = cleanedHolderName || null;
     if (!accountHolderName) {
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
@@ -124,7 +140,7 @@ export class BankInformationService {
 
     // Use verified account holder name from bank if available
     const verifiedName = verification.accountHolderName || accountHolderName;
-    const verifiedBankName = verification.bankName || data.bankName || null;
+    const verifiedBankName = verification.bankName || cleanedBankName || null;
 
     const record = await (prisma as any).bankInformation.create({
       data: {
@@ -237,8 +253,18 @@ export class BankInformationService {
 
     const newAccountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : null;
     const displayLabel = data.displayLabel?.trim() ?? record.display_label;
-    const accountHolderName = data.accountHolderName?.trim() ?? record.account_holder_name;
-    const bankName = data.bankName?.trim() ?? record.bank_name;
+
+    const incomingHolderName = data.accountHolderName != null ? cleanName(data.accountHolderName) : null;
+    if (incomingHolderName && !BANK_NAME_PATTERN.test(incomingHolderName)) {
+      return { success: false, message: 'Account holder name can only contain letters and spaces' };
+    }
+    const accountHolderName = incomingHolderName ?? record.account_holder_name;
+
+    const incomingBankName = data.bankName != null ? cleanName(data.bankName) : null;
+    if (incomingBankName && !BANK_NAME_PATTERN.test(incomingBankName)) {
+      return { success: false, message: 'Bank name can only contain letters and spaces' };
+    }
+    const bankName = incomingBankName ?? record.bank_name;
 
     // Check if account number or IFSC changed — only re-verify if they did
     const accountChanged = newAccountNumber && newAccountNumber !== record.account_number;
