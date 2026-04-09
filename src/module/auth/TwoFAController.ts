@@ -183,28 +183,19 @@ export async function disable2FA(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) return ApiResponse.error(res, 'User not authenticated', null, 401);
 
-  const { password, otp } = req.body;
+  const { password } = req.body;
   if (!password) return ApiResponse.error(res, 'Password is required');
-  if (!otp) return ApiResponse.error(res, 'OTP is required');
 
   const valid = await verifyPassword(userId, password);
   if (!valid) return ApiResponse.error(res, 'Incorrect password');
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { email: true, phone: true, two_fa_enabled: true, two_fa_method: true },
+    select: { two_fa_enabled: true },
   });
 
   if (!user?.two_fa_enabled) {
     return ApiResponse.error(res, 'Two-factor authentication is not enabled');
-  }
-
-  const identifier = user.two_fa_method === 'email' ? user.email : user.phone;
-  if (!identifier) return ApiResponse.error(res, 'Contact method not available');
-
-  const otpResult = await verifyOtpByType(identifier, otp, OTP_TYPES.TWO_FA_VERIFICATION);
-  if (!otpResult.success) {
-    return ApiResponse.error(res, otpResult.message);
   }
 
   await prisma.user.update({

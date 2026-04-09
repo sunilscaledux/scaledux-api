@@ -11,6 +11,7 @@ import {
 import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import crypto from "crypto";
 import { getResubmitWindow } from "@utils/General";
+import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 
 import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
@@ -153,6 +154,12 @@ export async function completeDigilocker(req: Request, res: Response) {
 
     Log.info(`[digilocker][${uid}] DL verified & saved — dlNumber: ${dlResult.dlNumber}`);
 
+    void notifySensitiveUpdate(
+      userId,
+      'Your identity verification was updated',
+      'Your Driving Licence was verified and linked to your ScaleDux account via DigiLocker.',
+    );
+
     return ApiResponse.success(res, {
       name: dlResult.name,
       dob: dlResult.dob,
@@ -217,6 +224,12 @@ export async function completeDigilocker(req: Request, res: Response) {
   await updateCompletionSection(userId, "identityVerification", true);
 
   Log.info(`[digilocker][${uid}] Aadhaar verified & saved — name: ${aadhaar.name}`);
+
+  void notifySensitiveUpdate(
+    userId,
+    'Your identity verification was updated',
+    'Your Aadhaar identity was verified and linked to your ScaleDux account via DigiLocker.',
+  );
 
   return ApiResponse.success(res, {
     name: aadhaar.name,

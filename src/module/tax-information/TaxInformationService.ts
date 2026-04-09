@@ -4,6 +4,7 @@ import { TaxInformationInput } from "./TaxInformationType";
 import { verifyPAN, validatePanWithGSTIN, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
+import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 
 export class TaxInformationService {
 
@@ -101,6 +102,12 @@ export class TaxInformationService {
         gstin_api_response: panResult.raw || null,
       }
     });
+
+    void notifySensitiveUpdate(
+      userIdNum,
+      'Your tax information was updated',
+      `Your ${entityLabel} tax information (PAN${gstin ? ' and GSTIN' : ''}) on ScaleDux was updated.`,
+    );
 
     return {
       success: true,

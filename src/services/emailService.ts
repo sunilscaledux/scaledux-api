@@ -119,6 +119,40 @@ class EmailService {
     return this.sendOtpEmail(email, otp, undefined, 'Reset Your Password');
   }
 
+  /**
+   * Send a sensitive-field-updated alert. The caller supplies both the
+   * subject and the user-facing message; we simply render them through the
+   * generic `notification` template. No per-field template is defined.
+   */
+  async sendSensitiveUpdateEmail(
+    email: string,
+    subject: string,
+    message: string,
+    link?: string,
+  ): Promise<boolean> {
+    try {
+      const template = await templateService.getCustomTemplate(
+        'notification',
+        {
+          TITLE: subject,
+          HEADER_TITLE: subject,
+          MESSAGE: message,
+          LINK: link || '',
+        },
+        subject,
+      );
+
+      return await this.sendEmail({
+        to: email,
+        subject: template.subject,
+        html: template.html,
+      });
+    } catch (error) {
+      Log.error('Failed to send sensitive update email', { error, email });
+      return false;
+    }
+  }
+
   async sendCustomEmail(
     email: string,
     templateName: string,

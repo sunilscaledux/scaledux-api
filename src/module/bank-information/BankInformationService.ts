@@ -4,6 +4,7 @@ import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
+import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 
 export class BankInformationService {
 
@@ -140,6 +141,12 @@ export class BankInformationService {
         verified_at: new Date(),
       }
     });
+
+    void notifySensitiveUpdate(
+      userIdNum,
+      'Your bank details were updated',
+      `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
+    );
 
     return {
       success: true,
@@ -286,6 +293,14 @@ export class BankInformationService {
     const updated = await (prisma as any).bankInformation.findUnique({
       where: { id: recordIdNum }
     });
+
+    const last4 = updated?.account_number_last4 || record.account_number_last4;
+    void notifySensitiveUpdate(
+      userIdNum,
+      'Your bank details were updated',
+      `Your ${(updated?.entity_type || record.entity_type || '').toLowerCase()} bank account (ending in ${last4}) on ScaleDux was updated.`,
+    );
+
     return {
       success: true,
       message: needsReverification ? 'Bank account verified and updated successfully.' : 'Bank details updated successfully.',
