@@ -29,11 +29,11 @@ const router = Router()
 // 2 verification attempts per 24 hours
 const verifyLimit = createRateLimiter(24 * 60 * 60, 2)
 
-router.post("/phone/send-otp", verifyLimit, authenticateToken, sendPhoneOTP)
-router.post("/phone/verify-otp", verifyLimit, authenticateToken, verifyPhoneOTP)
+router.post("/phone/send-otp", createRateLimiter(15 * 60, 15), authenticateToken, sendPhoneOTP)
+router.post("/phone/verify-otp", createRateLimiter(15 * 60, 15), authenticateToken, verifyPhoneOTP)
 
-router.post("/email/send-otp", verifyLimit, authenticateToken, sendEmailOTP)
-router.post("/email/verify-otp", verifyLimit, authenticateToken, verifyEmailOTP)
+router.post("/email/send-otp", createRateLimiter(15 * 60, 15), authenticateToken, sendEmailOTP)
+router.post("/email/verify-otp", createRateLimiter(15 * 60, 15), authenticateToken, verifyEmailOTP)
 
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
 
