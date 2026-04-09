@@ -131,13 +131,17 @@ class EmailService {
     link?: string,
   ): Promise<boolean> {
     try {
+      const ctaButton = link
+        ? `<p><a href="${link}" style="display:inline-block;padding:10px 24px;background-color:#667eea;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">View Details</a></p>`
+        : '';
+
       const template = await templateService.getCustomTemplate(
         'notification',
         {
           TITLE: subject,
           HEADER_TITLE: subject,
           MESSAGE: message,
-          LINK: link || '',
+          CTA_BUTTON: ctaButton,
         },
         subject,
       );

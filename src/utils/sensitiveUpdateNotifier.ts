@@ -1,7 +1,6 @@
 import { prisma } from '@services/prismaService';
 import { emailService } from '@services/emailService';
 import { Log } from '@services/loggerService';
-import { appConfig } from '@config/app';
 
 /**
  * Fire-and-forget email notification that a sensitive field on a user's
@@ -11,9 +10,8 @@ import { appConfig } from '@config/app';
  * per-field template. We look up the user's email internally so service
  * callers only need to pass userId + copy.
  *
- * `link` is the destination for the "View Details" CTA in the email. It
- * defaults to the account settings page so the button is always clickable
- * and lands the user somewhere they can secure their account.
+ * `link` is the destination for the optional "View Details" CTA in the
+ * email. If omitted, no button is rendered.
  */
 export async function notifySensitiveUpdate(
   userId: number,
@@ -36,13 +34,11 @@ export async function notifySensitiveUpdate(
     const footer =
       '<br/><br/>If this wasn\'t you, please secure your account and contact support immediately.';
 
-    const ctaLink = link || `${appConfig.frontendUrl}/settings`;
-
     await emailService.sendSensitiveUpdateEmail(
       user.email,
       subject,
       `${greeting}${message}${footer}`,
-      ctaLink,
+      link,
     );
   } catch (error) {
     Log.error('notifySensitiveUpdate failed', { error, userId });

@@ -33,13 +33,16 @@ export class NotificationEmailJob extends BaseJob<NotificationJobPayload> {
 
     const link = data.notificationLink
       ? (data.notificationLink.startsWith('http') ? data.notificationLink : `${appConfig.frontendUrl}${data.notificationLink}`)
-      : '#';
+      : '';
+    const ctaButton = link
+      ? `<p><a href="${link}" style="display:inline-block;padding:10px 24px;background-color:#667eea;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;">View Details</a></p>`
+      : '';
     const compiled = await templateService.getCustomTemplate(
       'notification',
       {
         TITLE: data.notificationTitle,
         MESSAGE: data.notificationBody || '',
-        LINK: link
+        CTA_BUTTON: ctaButton
       },
       data.notificationTitle,
       true
