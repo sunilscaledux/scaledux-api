@@ -241,10 +241,15 @@ export class FounderProjectService {
         filter = 'all'
       } = params;
 
-      // Base where clause - only published, not deleted
+      // Base where clause - only published, not deleted, and only from
+      // founders whose profile is at least 75% complete (so service providers
+      // don't see projects from founders they can't realistically work with).
       const whereClause: any = {
         status: 'PUBLISHED',
-        deleted_at: null
+        deleted_at: null,
+        user: {
+          profile_completion_percentage: { gte: 75 }
+        }
       };
 
       // Category filter (supports multiple categories)
