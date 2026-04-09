@@ -630,6 +630,7 @@ export class FounderProjectService {
         user: {
           select: {
             id: true,
+            unique_id: true,
             first_name: true,
             last_name: true,
             email: true,
