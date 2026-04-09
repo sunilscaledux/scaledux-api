@@ -7,6 +7,7 @@ import { resolveAttachmentUrl, createAttachment, urlOrPathToAttachmentId } from 
 import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 import { notifySensitiveUpdate } from '@utils/sensitiveUpdateNotifier';
+import { appConfig } from '@config/app';
 
 /**
  * CompanyProfileService
@@ -512,6 +513,7 @@ export class CompanyProfileService {
           userId,
           'Your company CIN was updated',
           `Your company CIN on ScaleDux was updated${incomingCin ? ` to <strong>${incomingCin}</strong>` : ' (cleared)'}.`,
+          `${appConfig.frontendUrl}/company-profile`,
         );
       }
 

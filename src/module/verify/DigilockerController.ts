@@ -158,6 +158,7 @@ export async function completeDigilocker(req: Request, res: Response) {
       userId,
       'Your identity verification was updated',
       'Your Driving Licence was verified and linked to your ScaleDux account via DigiLocker.',
+      `${FRONTEND_URL}/verify/identity`,
     );
 
     return ApiResponse.success(res, {
@@ -229,6 +230,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     userId,
     'Your identity verification was updated',
     'Your Aadhaar identity was verified and linked to your ScaleDux account via DigiLocker.',
+    `${FRONTEND_URL}/verify/identity`,
   );
 
   return ApiResponse.success(res, {
