@@ -180,6 +180,7 @@ model CompanyProfile {
   company_size          String?
   founded_year          Int?
   company_stage         String?
+  business_model        String?
   team_size             Int?
   
   // Business model

@@ -71,9 +71,18 @@ export const updateOverviewSchema = Joi.object({
 /**
  * Validation schema for updating company details
  */
+import { STARTUP_STAGES } from '../../constants/startupStages';
+
 export const updateDetailsSchema = Joi.object({
   company_size: Joi.string().optional().allow('', null),
-  company_stage: Joi.string().optional().allow('', null),
+  company_stage: Joi.string()
+    .optional()
+    .allow('', null)
+    .valid(...STARTUP_STAGES)
+    .messages({
+      'any.only': `Startup stage must be one of: ${STARTUP_STAGES.join(', ')}`
+    }),
+  business_model: Joi.string().optional().allow('', null).max(100),
   team_size: Joi.number().integer().min(0).optional().messages({
     'number.min': 'Team size cannot be negative'
   }),

@@ -69,6 +69,7 @@ export class CompanyProfileService {
         industry: profile.industry,
         subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
+        business_model: profile.business_model,
         team_size: profile.team_size,
 
         // Business model
@@ -197,6 +198,7 @@ export class CompanyProfileService {
         industry: profile.industry,
         subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
+        business_model: profile.business_model,
         team_size: profile.team_size,
         revenue_description: profile.revenue_description,
         revenueModels: profile.revenue_models || [],
@@ -453,6 +455,7 @@ export class CompanyProfileService {
         industry: profile.industry,
         subIndustry: profile.subIndustry,
         company_stage: profile.company_stage,
+        business_model: profile.business_model,
         team_size: profile.team_size,
 
         // Business model
@@ -532,6 +535,7 @@ export class CompanyProfileService {
   static async updateDetails(userId: number, data: {
     company_size?: string;
     company_stage?: string;
+    business_model?: string;
     team_size?: number;
     address?: string;
     city?: string;

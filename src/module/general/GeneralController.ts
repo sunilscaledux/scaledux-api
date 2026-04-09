@@ -5,6 +5,7 @@ import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getPublicUrl } from "@services/bunnyStorageService"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
+import { STARTUP_STAGES } from "../../constants/startupStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
 import { ID_TYPES } from "../../constants/idTypes"
 
@@ -300,6 +301,14 @@ export async function getRevenueModels(req: Request, res: Response) {
 export async function getFundingStages(req: Request, res: Response) {
   // Return funding stages from constants (no database needed)
   return ApiResponse.success(res, FUNDING_STAGES, "Funding stages retrieved successfully")
+}
+
+/**
+ * Get all startup stages (for company profile "Startup Stage" dropdown)
+ * GET /api/v1/startup-stages
+ */
+export async function getStartupStages(req: Request, res: Response) {
+  return ApiResponse.success(res, STARTUP_STAGES, "Startup stages retrieved successfully")
 }
 
 /**

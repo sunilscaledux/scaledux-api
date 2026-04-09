@@ -15,6 +15,7 @@ import {
   getBusinessModels,
   getRevenueModels,
   getFundingStages,
+  getStartupStages,
   getInvestorTypes,
   getInvestmentProfileOptions,
   getContractEndReasons,
@@ -44,6 +45,7 @@ router.get("/industries/:industryId/sub-industries", getSubIndustriesByIndustry)
 router.get("/business-models", getBusinessModels)
 router.get("/revenue-models", getRevenueModels)
 router.get("/funding-stages", getFundingStages)
+router.get("/startup-stages", getStartupStages)
 router.get("/investor-types", getInvestorTypes)
 router.get("/investment-profile-options", getInvestmentProfileOptions)
 router.get("/contract-end-reasons", getContractEndReasons)
