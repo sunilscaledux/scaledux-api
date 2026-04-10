@@ -159,7 +159,7 @@ export const updateFounderProjectSchema = Joi.object({
     'string.min': 'Project title is required',
     'string.max': 'Project title is too long (max 50 characters)'
   }),
-  projectDescription: Joi.string().min(1).max(3000).messages({
+  projectDescription: Joi.string().optional().allow('').max(3000).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description is too long (max 3000 characters)'
   }),
