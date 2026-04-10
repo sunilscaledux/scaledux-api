@@ -6,8 +6,6 @@ import { Log } from '@services/loggerService';
 import { resolveAttachmentUrl, createAttachment, urlOrPathToAttachmentId } from '@services/attachmentService';
 import { createRedirectLink } from '@services/redirectLinkService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
-import { notifySensitiveUpdate } from '@utils/sensitiveUpdateNotifier';
-import { appConfig } from '@config/app';
 
 /**
  * CompanyProfileService
@@ -397,17 +395,6 @@ export class CompanyProfileService {
         })
       ) as typeof profileData;
 
-      // Detect CIN change so we can notify the user afterward
-      const existingProfile = await prisma.companyProfile.findUnique({
-        where: { user_id: userId },
-        select: { cin: true },
-      });
-      const previousCin = existingProfile?.cin ?? null;
-      const incomingCin = Object.prototype.hasOwnProperty.call(filteredProfileData, 'cin')
-        ? (filteredProfileData.cin ?? null)
-        : previousCin;
-      const cinChanged = (previousCin ?? '') !== (incomingCin ?? '');
-
       // Update company profile
       const profile = await prisma.companyProfile.upsert({
         where: { user_id: userId },
@@ -507,15 +494,6 @@ export class CompanyProfileService {
         emailVerified: !!profile.user.email_verified_at,
         phoneVerified: !!profile.user.phone_verified_at,
       };
-
-      if (cinChanged) {
-        void notifySensitiveUpdate(
-          userId,
-          'Your company CIN was updated',
-          `Your company CIN on ScaleDux was updated${incomingCin ? ` to <strong>${incomingCin}</strong>` : ' (cleared)'}.`,
-          `${appConfig.frontendUrl}/company-profile`,
-        );
-      }
 
       return {
         success: true,
