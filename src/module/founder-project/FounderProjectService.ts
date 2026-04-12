@@ -724,7 +724,7 @@ export class FounderProjectService {
 
       // Fetch client stats for the project owner
       const ownerId = project.user_id;
-      const [projectsPosted, openProjects, totalHired, activeHired, publicReviews] = await Promise.all([
+      const [projectsPosted, openProjects, totalHired, activeHired, ownerUser, reviewsCount] = await Promise.all([
         prisma.founderProject.count({ where: { user_id: ownerId, deleted_at: null } }),
         prisma.founderProject.count({ where: { user_id: ownerId, status: 'PUBLISHED', deleted_at: null } }),
         prisma.proposal.count({
@@ -733,16 +733,11 @@ export class FounderProjectService {
         prisma.proposal.count({
           where: { project: { user_id: ownerId }, status: { in: ['HIRED', 'TERMINATING'] } }
         }),
-        prisma.review.findMany({
-          where: { review_to_id: ownerId, review_type: 'PUBLIC' },
-          select: { rating: true }
-        })
+        prisma.user.findUnique({ where: { id: ownerId }, select: { avg_rating: true } }),
+        prisma.review.count({ where: { review_to_id: ownerId, review_type: 'PUBLIC' } })
       ]);
 
-      const reviewsCount = publicReviews.length;
-      const averageRating = reviewsCount > 0
-        ? Number((publicReviews.reduce((sum, r) => sum + Number(r.rating), 0) / reviewsCount).toFixed(1))
-        : 0;
+      const averageRating = Number(ownerUser?.avg_rating) || 0;
       const hireRate = projectsPosted > 0
         ? Math.round((totalHired / projectsPosted) * 100)
         : 0;

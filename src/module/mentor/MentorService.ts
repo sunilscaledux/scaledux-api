@@ -82,9 +82,16 @@ export class MentorService {
         };
       }
 
+      // Rating filter – now a DB-level filter instead of post-filter
+      if (params.minRating !== undefined) {
+        where.avg_rating = { gte: params.minRating };
+      }
+
       let orderBy: any = { created_at: 'desc' };
       if (params.sortBy === 'experience') {
         orderBy = { experience_years: 'desc' };
+      } else if (params.sortBy === 'rating') {
+        orderBy = { avg_rating: 'desc' };
       }
 
       const [mentors, total] = await Promise.all([
@@ -117,9 +124,7 @@ export class MentorService {
               },
               take: 5,
             },
-            reviewsReceived: {
-              select: { rating: true },
-            },
+            avg_rating: true,
             _count: {
               select: {
                 reviewsReceived: true,
@@ -132,9 +137,7 @@ export class MentorService {
       ]);
 
       const data = await Promise.all(
-        mentors.map(async (mentor) => {
-          const ratings = mentor.reviewsReceived.map((r: any) => Number(r.rating) || 0);
-          const avgRating = ratings.length > 0 ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10 : 0;
+        mentors.map(async (mentor: any) => {
           const profileImage = mentor.personalInfo?.profileImage
             ? await resolveAttachmentUrl(mentor.personalInfo.profileImage, 'profile_image')
             : null;
@@ -151,24 +154,19 @@ export class MentorService {
             country: mentor.personalInfo?.country?.name || null,
             hourlyRate: mentor.personalInfo?.hourly_rate ?? null,
             skills: mentor.expertises.map((e: any) => e.category?.name).filter(Boolean),
-            experience: (mentor as any).experience_years || 0,
-            avgRating,
+            experience: mentor.experience_years || 0,
+            avgRating: Number(mentor.avg_rating) || 0,
             reviewCount: mentor._count.reviewsReceived,
             packageCount: mentor._count.servicePackages,
           };
         })
       );
 
-      // Post-filter by rating (computed field)
-      const filtered = params.minRating
-        ? data.filter(m => m.avgRating >= params.minRating!)
-        : data;
-
       return {
         success: true,
         message: "Mentors fetched successfully",
         data: {
-          mentors: filtered,
+          mentors: data,
           pagination: {
             page,
             limit,
@@ -257,9 +255,7 @@ export class MentorService {
                 select: { category: { select: { id: true, name: true } } },
                 take: 5,
               },
-              reviewsReceived: {
-                select: { rating: true },
-              },
+              avg_rating: true,
               _count: {
                 select: { reviewsReceived: true },
               },
@@ -272,8 +268,6 @@ export class MentorService {
       const mentors = await Promise.all(
         saved.map(async (s: any) => {
           const m = s.mentor;
-          const ratings = m.reviewsReceived.map((r: any) => Number(r.rating) || 0);
-          const avgRating = ratings.length > 0 ? Math.round((ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length) * 10) / 10 : 0;
           const profileImage = m.personalInfo?.profileImage
             ? await resolveAttachmentUrl(m.personalInfo.profileImage, 'profile_image')
             : null;
@@ -290,7 +284,7 @@ export class MentorService {
             country: m.personalInfo?.country?.name || null,
             hourlyRate: m.personalInfo?.hourly_rate ?? null,
             skills: m.expertises.map((e: any) => e.category?.name).filter(Boolean),
-            avgRating,
+            avgRating: Number(m.avg_rating) || 0,
             reviewCount: m._count.reviewsReceived,
             savedAt: s.created_at,
           };

@@ -5,6 +5,24 @@ import { Log } from '@services/loggerService';
 
 const ACTION_TYPE_PROPOSAL_CONTRACT = 'PROPOSAL_CONTRACT';
 
+/**
+ * Recalculate and persist the cached avg_rating on the User row.
+ * Only PUBLIC reviews count towards the displayed average.
+ */
+async function refreshAvgRating(userId: number): Promise<void> {
+  const result = await (prisma as any).review.aggregate({
+    where: { review_to_id: userId, review_type: 'PUBLIC' },
+    _avg: { rating: true },
+  });
+  const avg = result._avg?.rating != null
+    ? Math.round(Number(result._avg.rating) * 10) / 10
+    : 0;
+  await prisma.user.update({
+    where: { id: userId },
+    data: { avg_rating: avg },
+  });
+}
+
 export interface CreateReviewInput {
   action_type: string;
   action_id: string;
@@ -113,6 +131,10 @@ export async function createReview(
         review_to: { select: { id: true, first_name: true, last_name: true } }
       }
     });
+
+    if (review_type === 'PUBLIC') {
+      await refreshAvgRating(review_to_id);
+    }
 
     return {
       success: true,
@@ -301,6 +323,10 @@ export async function updateReview(
       where: { id: review.id },
       data: { ...updatePayload, updated_at: new Date() }
     });
+
+    if (review.review_type === 'PUBLIC' && data.rating != null) {
+      await refreshAvgRating(review.review_to_id);
+    }
 
     return { success: true, message: 'Review updated', data: { review: { unique_id: review.unique_id } } };
   } catch (error: any) {
