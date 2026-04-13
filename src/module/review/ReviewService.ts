@@ -17,7 +17,7 @@ async function refreshAvgRating(userId: number): Promise<void> {
   const avg = result._avg?.rating != null
     ? Math.round(Number(result._avg.rating) * 10) / 10
     : 0;
-  await prisma.user.update({
+  await (prisma as any).user.update({
     where: { id: userId },
     data: { avg_rating: avg },
   });

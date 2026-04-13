@@ -19,26 +19,25 @@ export class MentorService {
     minRating?: number;
     minHourlyRate?: number;
     maxHourlyRate?: number;
-    page?: number;
     limit?: number;
+    cursor?: string;
   }): Promise<ServiceResponse> {
     try {
-      const page = Math.max(1, params.page || 1);
-      const limit = Math.min(50, Math.max(1, params.limit || 12));
-      const skip = (page - 1) * limit;
+      const limit = Math.min(50, Math.max(1, params.limit || 16));
+      const cursorDate = params.cursor ? new Date(params.cursor) : null;
 
-      // Only surface mentors whose own profile meets the required completion
       // bar — makes "Receive requests → NO" for incomplete mentors work
       // automatically.
       const where: any = {
         role: 'mentor',
         status: 1,
-        personalInfo: {
+               personalInfo: {
           isNot: null,
-          title: { not: null, notIn: [''] },
+          is: { title: { not: null, notIn: [''] } },
         },
         experience_years: { gt: 0 },
         profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
+ 
       };
 
       if (params.search?.trim()) {
@@ -46,7 +45,7 @@ export class MentorService {
         where.OR = [
           { first_name: { contains: term, mode: 'insensitive' } },
           { last_name: { contains: term, mode: 'insensitive' } },
-          { personalInfo: { title: { contains: term, mode: 'insensitive' } } },
+          { personalInfo: { is: { title: { contains: term, mode: 'insensitive' } } } },
         ];
       }
 
@@ -64,21 +63,16 @@ export class MentorService {
         };
       }
 
-      // Experience filter
-      if (params.minExperience !== undefined || params.maxExperience !== undefined) {
-        where.experience_years = {
-          ...(where.experience_years || {}),
-          ...(params.minExperience !== undefined ? { gte: params.minExperience } : {}),
-          ...(params.maxExperience !== undefined ? { lte: params.maxExperience } : {}),
-        };
-      }
+     
 
       // Hourly rate filter
       if (params.minHourlyRate !== undefined || params.maxHourlyRate !== undefined) {
+        const hrFilter: any = {};
+        if (params.minHourlyRate !== undefined) hrFilter.gte = params.minHourlyRate||0;
+        if (params.maxHourlyRate !== undefined) hrFilter.lte = params.maxHourlyRate;
         where.personalInfo = {
           ...where.personalInfo,
-          ...(params.minHourlyRate !== undefined ? { hourly_rate: { ...(where.personalInfo?.hourly_rate || {}), gte: params.minHourlyRate } } : {}),
-          ...(params.maxHourlyRate !== undefined ? { hourly_rate: { ...(where.personalInfo?.hourly_rate || {}), lte: params.maxHourlyRate } } : {}),
+          is: { ...(where.personalInfo?.is || {}), hourly_rate: hrFilter },
         };
       }
 
@@ -94,50 +88,53 @@ export class MentorService {
         orderBy = { avg_rating: 'desc' };
       }
 
-      const [mentors, total] = await Promise.all([
-        prisma.user.findMany({
-          where,
-          skip,
-          take: limit,
-          orderBy,
-          select: {
-            id: true,
-            unique_id: true,
-            first_name: true,
-            last_name: true,
-            role: true,
-            experience_years: true,
-            created_at: true,
-            personalInfo: {
-              select: {
-                profileImage: true,
-                title: true,
-                about: true,
-                city: true,
-                hourly_rate: true,
-                country: { select: { name: true } },
-              },
-            },
-            expertises: {
-              select: {
-                category: { select: { id: true, name: true } },
-              },
-              take: 5,
-            },
-            avg_rating: true,
-            _count: {
-              select: {
-                reviewsReceived: true,
-                servicePackages: { where: { status: 'PUBLISHED' } },
-              },
+      if (cursorDate) {
+        where.created_at = { ...(where.created_at || {}), lt: cursorDate };
+      }
+
+      const mentors = await (prisma as any).user.findMany({
+        where,
+        take: limit + 1,
+        orderBy,
+        select: {
+          id: true,
+          unique_id: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          experience_years: true,
+          created_at: true,
+          personalInfo: {
+            select: {
+              profileImage: true,
+              title: true,
+              about: true,
+              city: true,
+              hourly_rate: true,
+              country: { select: { name: true } },
             },
           },
-        }),
-        prisma.user.count({ where }),
-      ]);
+          expertises: {
+            select: {
+              category: { select: { id: true, name: true } },
+            },
+            take: 5,
+          },
+          avg_rating: true,
+          _count: {
+            select: {
+              reviewsReceived: true,
+              servicePackages: { where: { status: 'PUBLISHED' } },
+            },
+          },
+        },
+      });
+
+      const hasMore = mentors.length > limit;
+      const slice = hasMore ? mentors.slice(0, limit) : mentors;
 
       const data = await Promise.all(
-        mentors.map(async (mentor: any) => {
+        slice.map(async (mentor: any) => {
           const profileImage = mentor.personalInfo?.profileImage
             ? await resolveAttachmentUrl(mentor.personalInfo.profileImage, 'profile_image')
             : null;
@@ -162,24 +159,24 @@ export class MentorService {
         })
       );
 
+      const nextCursor = hasMore && data.length > 0
+        ? slice[slice.length - 1].created_at.toISOString()
+        : null;
+
       return {
         success: true,
         message: "Mentors fetched successfully",
         data: {
           mentors: data,
-          pagination: {
-            page,
-            limit,
-            total,
-            totalPages: Math.ceil(total / limit),
-          },
+          nextCursor,
+          hasMore,
         },
       };
     } catch (error: any) {
       Log.error("Browse mentors error", { error });
       return {
         success: false,
-        message: "Failed to fetch mentors",
+        message: error.message || "Failed to fetch mentors",
       };
     }
   }

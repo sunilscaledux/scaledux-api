@@ -733,7 +733,7 @@ export class FounderProjectService {
         prisma.proposal.count({
           where: { project: { user_id: ownerId }, status: { in: ['HIRED', 'TERMINATING'] } }
         }),
-        prisma.user.findUnique({ where: { id: ownerId }, select: { avg_rating: true } }),
+        (prisma as any).user.findUnique({ where: { id: ownerId }, select: { avg_rating: true } }),
         prisma.review.count({ where: { review_to_id: ownerId, review_type: 'PUBLIC' } })
       ]);
 

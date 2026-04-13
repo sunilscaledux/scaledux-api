@@ -5,7 +5,7 @@ import { ApiResponse } from "@utils/ApiResponse";
 export class MentorController {
 
   static async browseMentors(req: Request, res: Response) {
-    const { search, categoryId, skills, sortBy, page, limit, minExperience, maxExperience, minRating, minHourlyRate, maxHourlyRate } = req.query;
+    const { search, categoryId, skills, sortBy, limit, cursor, minExperience, maxExperience, minRating, minHourlyRate, maxHourlyRate } = req.query;
 
     const result = await MentorService.browseMentors({
       search: search as string,
@@ -17,8 +17,8 @@ export class MentorController {
       minRating: minRating ? parseFloat(String(minRating)) : undefined,
       minHourlyRate: minHourlyRate ? parseFloat(String(minHourlyRate)) : undefined,
       maxHourlyRate: maxHourlyRate ? parseFloat(String(maxHourlyRate)) : undefined,
-      page: page ? parseInt(String(page)) : 1,
-      limit: limit ? parseInt(String(limit)) : 12,
+      limit: limit ? parseInt(String(limit)) : 16,
+      cursor: cursor ? String(cursor) : undefined,
     });
 
     if (result.success) return ApiResponse.success(res, result.data, result.message);
