@@ -87,6 +87,8 @@ model User {
   razorpay_contact_id          String?   @db.VarChar(64)
   /** Razorpay X fund account id (fa_xxx) for freelancer payouts (set after bank verification). */
   razorpay_account_id          String?   @db.VarChar(64)
+  bookingsAsMentor             Booking[] @relation("BookingMentor")
+  bookingsAsUser               Booking[] @relation("BookingUser")
   attachmentsOwned              Attachment[] @relation("AttachmentOwner")
   attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
   /** Temporary state token for DigiLocker OAuth callback validation */
@@ -520,6 +522,7 @@ model Currency {
   countries           Country[]
   users               User[]
   billingTransactions BillingTransaction[]
+  bookings            Booking[]
 
   @@map("scd_currencies")
 }
@@ -1671,4 +1674,46 @@ model UserStartupProgress {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("scd_user_startup_progress")
+}
+
+model Booking {
+  id                     Int       @id @default(autoincrement())
+  unique_id              String    @unique @default(cuid())
+  mentor_id              Int
+  user_id                Int       // the person booking (mentee/client)
+  title                  String    @db.VarChar(255)
+  description            String?   @db.Text
+  duration               Int       // minutes
+  scheduled_at           DateTime
+  message                String?   @db.Text  // discussion points from booker
+  status                 String    @default("PENDING") @db.VarChar(20)
+  // PENDING → CONFIRMED (after payment) → COMPLETED | CANCELLED
+  payment_status         String    @default("UNPAID") @db.VarChar(20)
+  // UNPAID → PAID → RELEASED | REFUNDED
+  amount                 Decimal   @db.Decimal(12, 2)
+  currency_id            Int       @default(1)
+  platform_fee           Decimal?  @db.Decimal(12, 2)
+  razorpay_order_id      String?   @db.VarChar(64)
+  meta                   Json?
+  // Reschedule chain
+  parent_id              Int?      // original booking this was rescheduled from
+  is_reschedule          Boolean   @default(false)
+  rescheduled_by         Int?      // user who initiated the reschedule
+  // Cancellation
+  cancelled_by           Int?
+  cancel_reason          String?   @db.Text
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
+
+  mentor                 User      @relation("BookingMentor", fields: [mentor_id], references: [id])
+  user                   User      @relation("BookingUser", fields: [user_id], references: [id])
+  currency               Currency  @relation(fields: [currency_id], references: [id])
+  parent                 Booking?  @relation("BookingReschedule", fields: [parent_id], references: [id])
+  rescheduled            Booking[] @relation("BookingReschedule")
+
+  @@index([mentor_id, scheduled_at])
+  @@index([user_id, status])
+  @@index([status])
+  @@index([parent_id])
+  @@map("scd_bookings")
 }

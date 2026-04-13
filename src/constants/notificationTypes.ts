@@ -2,12 +2,12 @@
 
 export const NOTIFICATION_EMAIL_TYPES = [
   // Recruiting
-  { type: 'INTERVIEW_ACCEPTED_OR_OFFER_MODIFIED', label: 'An interview is accepted or offer terms are modified', category: 'Recruiting' },
-  { type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN', label: 'An interview or offer is declined or withdrawn', category: 'Recruiting' },
-  { type: 'OFFER_ACCEPTED', label: 'An offer is accepted', category: 'Recruiting' },
-  { type: 'JOB_POSTING_EXPIRING_SOON', label: 'A job posting will expire soon', category: 'Recruiting' },
-  { type: 'JOB_POSTING_EXPIRED', label: 'A job posting expired', category: 'Recruiting' },
-  { type: 'NO_INTERVIEWS_INITIATED', label: 'No interviews have been initiated', category: 'Recruiting' },
+  // { type: 'INTERVIEW_ACCEPTED_OR_OFFER_MODIFIED', label: 'An interview is accepted or offer terms are modified', category: 'Recruiting' },
+  // { type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN', label: 'An interview or offer is declined or withdrawn', category: 'Recruiting' },
+  // { type: 'OFFER_ACCEPTED', label: 'An offer is accepted', category: 'Recruiting' },
+  // { type: 'JOB_POSTING_EXPIRING_SOON', label: 'A job posting will expire soon', category: 'Recruiting' },
+  // { type: 'JOB_POSTING_EXPIRED', label: 'A job posting expired', category: 'Recruiting' },
+  // { type: 'NO_INTERVIEWS_INITIATED', label: 'No interviews have been initiated', category: 'Recruiting' },
   // Proposals
   { type: 'PROJECT_INVITATION', label: 'Project invitation', category: 'Proposals' },
   { type: 'INVITATION_ACCEPTED', label: 'An invitation is accepted', category: 'Proposals' },
@@ -27,7 +27,11 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'REQUEST_ACCEPTED', label: 'Sent request is accepted', category: 'Connections' },
   { type: 'REQUEST_DECLINED', label: 'Sent request is declined', category: 'Connections' },
   // Subscriptions
-  { type: 'SUBSCRIPTION_EVENT', label: 'Subscription related event occur', category: 'Subscriptions' },
+  // { type: 'SUBSCRIPTION_EVENT', label: 'Subscription related event occur', category: 'Subscriptions' },
+  // Bookings
+  { type: 'BOOKING_REQUESTED', label: 'A new booking request is received', category: 'Bookings' },
+  { type: 'BOOKING_CONFIRMED', label: 'A booking is confirmed after payment', category: 'Bookings' },
+  { type: 'BOOKING_CANCELLED', label: 'A booking is cancelled', category: 'Bookings' },
   // System (single opt-in style)
   { type: 'SYSTEM_HELPFUL_EMAILS', label: 'Send me genuinely useful emails every now and then to help me get the most out of ScaleDux', category: 'System' }
 ] as const
