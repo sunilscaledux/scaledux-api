@@ -17,6 +17,63 @@ const DURATION_MAP: Record<string, number> = {
 /** Minimum gap before a booking can be scheduled (2 hours 15 minutes). */
 const MIN_ADVANCE_MS = (2 * 60 + 15) * 60 * 1000;
 
+/** Format a date for notification text (email/DB). */
+function formatNotifDate(date: Date): string {
+  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }).format(date);
+  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
+  return `${d} at ${t}`;
+}
+
+/** Escape HTML special characters to prevent XSS in email templates. */
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/** Build HTML notification body for booking emails. */
+function buildBookingEmailBody(params: {
+  userName: string;
+  duration: number;
+  scheduledAt: Date;
+  isReschedule?: boolean;
+  message?: string | null;
+  cancelledBy?: string;
+  cancelReason?: string | null;
+  type: 'confirmed' | 'cancelled';
+}): string {
+  const { userName, duration, scheduledAt, isReschedule, message, cancelledBy, cancelReason, type } = params;
+  const dateStr = formatNotifDate(scheduledAt);
+
+  const lines: string[] = [];
+
+  if (type === 'confirmed') {
+    lines.push(isReschedule
+      ? `<p><strong>${escapeHtml(userName)}</strong> has rescheduled their 1:1 video call with you.</p>`
+      : `<p><strong>${escapeHtml(userName)}</strong> has booked a 1:1 video call with you. Payment has been received.</p>`
+    );
+  } else {
+    lines.push(`<p><strong>${escapeHtml(cancelledBy || userName)}</strong> has cancelled the 1:1 video call.</p>`);
+  }
+
+  lines.push(`<table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
+    <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Call type</td><td style="padding:8px 0;font-weight:600;font-size:14px;">1:1 Video Call</td></tr>
+    <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Duration</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${duration} minutes</td></tr>
+    <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Scheduled</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${escapeHtml(dateStr)}</td></tr>
+  </table>`);
+
+  if (message) {
+    lines.push(`<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin:12px 0;">
+      <p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#344054;">Discussion points</p>
+      <div style="margin:0;font-size:13px;color:#667085;">${message}</div>
+    </div>`);
+  }
+
+  if (cancelReason) {
+    lines.push(`<p style="font-size:13px;color:#667085;"><strong>Reason:</strong> ${escapeHtml(cancelReason)}</p>`);
+  }
+
+  return lines.join('');
+}
+
 export class BookingService {
   /**
    * Create a PENDING booking request.
@@ -245,10 +302,15 @@ export class BookingService {
       // Notify mentor — only after successful payment
       const userName = await getUserFullName(userId);
       const isReschedule = booking.is_reschedule;
-      const notifTitle = isReschedule ? 'Booking rescheduled' : 'New booking confirmed';
-      const notifBody = isReschedule
-        ? `${userName} rescheduled and paid for a ${booking.duration}-minute call.`
-        : `${userName} booked and paid for a ${booking.duration}-minute call.`;
+      const notifTitle = isReschedule ? 'Call rescheduled & confirmed' : '1:1 Call booked';
+      const notifBody = buildBookingEmailBody({
+        userName,
+        duration: booking.duration,
+        scheduledAt: new Date(booking.scheduled_at),
+        isReschedule,
+        message: booking.message,
+        type: 'confirmed',
+      });
       const notifData = {
         userId: booking.mentor_id,
         type: 'BOOKING_CONFIRMED' as const,
@@ -488,8 +550,15 @@ export class BookingService {
       const notifData = {
         userId: otherUserId,
         type: 'BOOKING_CANCELLED' as const,
-        notificationTitle: 'Booking cancelled',
-        notificationBody: `${cancellerName} cancelled the ${booking.duration}-minute call.`,
+        notificationTitle: '1:1 Call cancelled',
+        notificationBody: buildBookingEmailBody({
+          userName: cancellerName,
+          duration: booking.duration,
+          scheduledAt: new Date(booking.scheduled_at),
+          cancelledBy: cancellerName,
+          cancelReason: reason?.trim(),
+          type: 'cancelled',
+        }),
         notificationLink: `${appConfig.frontendUrl}/my-bookings`,
         actorId: userId,
         subjectType: 'Booking' as const,
