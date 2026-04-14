@@ -90,4 +90,14 @@ export class BookingController {
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message, 400);
   }
+
+  static async getOccupiedSlots(req: Request, res: Response) {
+    const { mentorId } = req.params;
+    const { date } = req.query;
+    if (!mentorId || !date) return ApiResponse.error(res, 'mentorId and date are required', 400);
+
+    const result = await BookingService.getOccupiedSlots(mentorId, String(date));
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message);
+  }
 }

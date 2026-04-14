@@ -1685,6 +1685,7 @@ model Booking {
   description            String?   @db.Text
   duration               Int       // minutes
   scheduled_at           DateTime
+  scheduled_end          DateTime
   message                String?   @db.Text  // discussion points from booker
   status                 String    @default("PENDING") @db.VarChar(20)
   // PENDING → CONFIRMED (after payment) → COMPLETED | CANCELLED

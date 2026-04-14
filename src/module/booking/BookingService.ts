@@ -61,24 +61,24 @@ export class BookingService {
         return { success: false, message: 'Booking must be at least 2 hours 15 minutes from now' };
       }
 
-      // Check for overlapping booking (ignore PENDING bookings older than 2 min — they're stale)
-      const staleThreshold = new Date(Date.now() - 2 * 60 * 1000);
-      const endTime = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+      // Check for overlapping booking using scheduled_end (ignore stale PENDING > 3 min)
+      const staleThreshold = new Date(Date.now() - 3 * 60 * 1000);
+      const newEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+
+      // Two bookings overlap when: existingStart < newEnd AND existingEnd > newStart
       const overlap = await (prisma as any).booking.findFirst({
         where: {
           mentor_id: mentor.id,
+          scheduled_at: { lt: newEnd },        // existing starts before new ends
+          scheduled_end: { gt: scheduledAt },   // existing ends after new starts
           OR: [
             { status: 'CONFIRMED' },
             { status: 'PENDING', created_at: { gt: staleThreshold } },
           ],
-          scheduled_at: { lt: endTime },
-          AND: {
-            scheduled_at: {
-              gte: new Date(scheduledAt.getTime() - maxDur * 60 * 1000),
-            },
-          },
         },
+        select: { id: true },
       });
+
       if (overlap) {
         return { success: false, message: 'This time slot is not available' };
       }
@@ -116,6 +116,8 @@ export class BookingService {
         parentId = oldBooking.id;
       }
 
+      const scheduledEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+
       const booking = await (prisma as any).booking.create({
         data: {
           mentor_id: mentor.id,
@@ -123,6 +125,7 @@ export class BookingService {
           title: '1:1 Video Call',
           duration: data.duration,
           scheduled_at: scheduledAt,
+          scheduled_end: scheduledEnd,
           message: data.message?.trim() || null,
           amount,
           currency_id: 1, // INR default
@@ -157,7 +160,7 @@ export class BookingService {
 
       // Expire stale PENDING bookings (older than 2 minutes)
       const ageMs = Date.now() - new Date(booking.created_at).getTime();
-      if (ageMs > 2 * 60 * 1000) {
+      if (ageMs > 3 * 60 * 1000) {
         await (prisma as any).booking.update({
           where: { id: booking.id },
           data: { status: 'CANCELLED', cancel_reason: 'Payment timeout' },
@@ -259,15 +262,18 @@ export class BookingService {
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
-      // Sync to chat
-      const bDate = new Date(booking.scheduled_at);
-      const bDateStr = bDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
-      const bTimeStr = bDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      // Sync to chat — pass raw data in metadata, frontend formats with user's local tz
       const chatPrefix = isReschedule ? '📅 Booking rescheduled & confirmed!' : '✅ New booking confirmed!';
       await ConversationService.syncSystemMessage(
         userId, booking.mentor_id,
-        `${chatPrefix} Payment received.\n\n1:1 Video Call · ${booking.duration} mins\n${bDateStr} at ${bTimeStr}${booking.message ? `\n\nDiscussion: ${booking.message}` : ''}`,
-        { activityType: 'BOOKING_CONFIRMED' },
+        `${chatPrefix} Payment received.`,
+        {
+          activityType: 'BOOKING_CONFIRMED',
+          bookingTitle: '1:1 Video Call',
+          bookingDuration: booking.duration,
+          bookingScheduledAt: booking.scheduled_at,
+          bookingMessage: booking.message || null,
+        },
         undefined, userId
       );
 
@@ -492,14 +498,17 @@ export class BookingService {
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
-      // Sync to chat
-      const cDate = new Date(booking.scheduled_at);
-      const cDateStr = cDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
-      const cTimeStr = cDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      // Sync to chat — raw data in metadata, frontend formats
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
-        `❌ ${cancellerName} cancelled the call.\n\n1:1 Video Call · ${booking.duration} mins\n${cDateStr} at ${cTimeStr}${reason ? `\n\nReason: ${reason.trim()}` : ''}`,
-        { activityType: 'BOOKING_CANCELLED' },
+        `❌ ${cancellerName} cancelled the call.`,
+        {
+          activityType: 'BOOKING_CANCELLED',
+          bookingTitle: '1:1 Video Call',
+          bookingDuration: booking.duration,
+          bookingScheduledAt: booking.scheduled_at,
+          cancelReason: reason?.trim() || null,
+        },
         undefined, userId
       );
 
@@ -507,6 +516,56 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Cancel booking error', { error });
       return { success: false, message: error.message || 'Failed to cancel booking' };
+    }
+  }
+
+  /**
+   * Get occupied time ranges for a mentor on a given date.
+   * Returns array of { start (minutes since midnight), end (minutes since midnight) }.
+   * Used by frontend to disable booked slots.
+   */
+  static async getOccupiedSlots(
+    mentorUniqueId: string,
+    date: string // YYYY-MM-DD
+  ): Promise<ServiceResponse> {
+    try {
+      const mentor = await prisma.user.findFirst({
+        where: { unique_id: mentorUniqueId, role: 'mentor' },
+        select: { id: true },
+      });
+      if (!mentor) return { success: false, message: 'Mentor not found' };
+
+      // Parse date as server-local start/end of day (matches frontend's local date)
+      const [y, m, d] = date.split('-').map(Number);
+      const dayStart = new Date(y, m - 1, d, 0, 0, 0);
+      const dayEnd = new Date(y, m - 1, d, 23, 59, 59);
+
+      const staleThreshold = new Date(Date.now() - 3 * 60 * 1000);
+
+      const bookings = await (prisma as any).booking.findMany({
+        where: {
+          mentor_id: mentor.id,
+          // Any booking that overlaps with this day
+          scheduled_at: { lte: dayEnd },
+          scheduled_end: { gte: dayStart },
+          OR: [
+            { status: 'CONFIRMED' },
+            { status: 'PENDING', created_at: { gt: staleThreshold } },
+          ],
+        },
+        select: { scheduled_at: true, scheduled_end: true },
+      });
+
+      // Dates are auto-serialized to ISO strings by Express res.json()
+      const slots = bookings.map((b: any) => ({
+        start: b.scheduled_at,
+        end: b.scheduled_end,
+      }));
+
+      return { success: true, message: 'Slots fetched', data: { slots } };
+    } catch (error: any) {
+      Log.error('Get occupied slots error', { error });
+      return { success: false, message: error.message || 'Failed to fetch slots' };
     }
   }
 }
