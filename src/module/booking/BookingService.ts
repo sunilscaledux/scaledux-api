@@ -61,12 +61,16 @@ export class BookingService {
         return { success: false, message: 'Booking must be at least 2 hours 15 minutes from now' };
       }
 
-      // Check for overlapping booking
+      // Check for overlapping booking (ignore PENDING bookings older than 2 min — they're stale)
+      const staleThreshold = new Date(Date.now() - 2 * 60 * 1000);
       const endTime = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
       const overlap = await (prisma as any).booking.findFirst({
         where: {
           mentor_id: mentor.id,
-          status: { in: ['PENDING', 'CONFIRMED'] },
+          OR: [
+            { status: 'CONFIRMED' },
+            { status: 'PENDING', created_at: { gt: staleThreshold } },
+          ],
           scheduled_at: { lt: endTime },
           AND: {
             scheduled_at: {
@@ -79,15 +83,16 @@ export class BookingService {
         return { success: false, message: 'This time slot is not available' };
       }
 
-      // Compute amount
-      let amount = settings.price_amount != null ? Number(settings.price_amount) : 0;
+      // Compute amount — pro-rate hourly rate by duration
+      let hourlyRate = settings.price_amount != null ? Number(settings.price_amount) : 0;
       if (
         settings.discount_enabled &&
         settings.discount_percent > 0 &&
         (!settings.discount_available_till || new Date(settings.discount_available_till) > new Date())
       ) {
-        amount = Math.round(amount * (1 - settings.discount_percent / 100) * 100) / 100;
+        hourlyRate = Math.round(hourlyRate * (1 - settings.discount_percent / 100) * 100) / 100;
       }
+      const amount = Math.round((hourlyRate / 60) * data.duration * 100) / 100;
 
       // Handle reschedule: cancel old booking and link
       let parentId: number | null = null;
@@ -150,11 +155,36 @@ export class BookingService {
       if (booking.status !== 'PENDING') return { success: false, message: 'Booking is not in pending state' };
       if (booking.payment_status !== 'UNPAID') return { success: false, message: 'Payment already initiated' };
 
-      const amount = Number(booking.amount);
-      if (amount <= 0) return { success: false, message: 'Invalid booking amount' };
+      // Expire stale PENDING bookings (older than 2 minutes)
+      const ageMs = Date.now() - new Date(booking.created_at).getTime();
+      if (ageMs > 2 * 60 * 1000) {
+        await (prisma as any).booking.update({
+          where: { id: booking.id },
+          data: { status: 'CANCELLED', cancel_reason: 'Payment timeout' },
+        });
+        return { success: false, message: 'Booking expired. Please create a new booking.' };
+      }
 
-      const result = await BillingService.createVerificationOrder(String(userId), amount, {
+      const baseAmount = Number(booking.amount);
+      if (baseAmount <= 0) return { success: false, message: 'Invalid booking amount' };
+
+      // Platform fee + GST — same constants as frontend checkout
+      const PLATFORM_FEE_PERCENT = 5;
+      const GST_PERCENT = 18;
+      const platformFee = Math.round(baseAmount * PLATFORM_FEE_PERCENT) / 100;
+      const gstOnFee = Math.round(platformFee * GST_PERCENT) / 100;
+      const totalAmount = baseAmount + platformFee + gstOnFee;
+      const platformTransferPaise = Math.round((platformFee + gstOnFee) * 100);
+
+      // Store platform fee on booking
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: { platform_fee: platformFee + gstOnFee },
+      });
+
+      const result = await BillingService.createVerificationOrder(String(userId), totalAmount, {
         receiptPrefix: 'booking',
+        platformTransferAmountPaise: platformTransferPaise,
         notes: { purpose: 'mentor_booking', booking_id: String(booking.id), user_id: String(userId) },
       });
 
@@ -263,7 +293,9 @@ export class BookingService {
       const limit = Math.min(opts.limit ?? 16, 50);
       const cursorDate = opts.cursor ? new Date(opts.cursor) : null;
 
-      const where: any = {};
+      const where: any = {
+        status: { notIn: ['PENDING', 'CANCELLED'] },
+      };
       if (opts.role === 'mentor') {
         where.mentor_id = userId;
       } else {
