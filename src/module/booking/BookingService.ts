@@ -626,12 +626,43 @@ export class BookingService {
       });
 
       // Dates are auto-serialized to ISO strings by Express res.json()
-      const slots = bookings.map((b: any) => ({
+      const occupiedSlots = bookings.map((b: any) => ({
         start: b.scheduled_at,
         end: b.scheduled_end,
       }));
 
-      return { success: true, message: 'Slots fetched', data: { slots } };
+      // Fetch mentor's availability schedule
+      const avail = await (prisma as any).availability.findUnique({
+        where: { user_id: mentor.id },
+      });
+
+      // Get the day name for the requested date (lowercase)
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayOfWeek = dayNames[dayStart.getDay()];
+
+      // Check if date is in unavailability list
+      const unavailDates: string[] = avail?.unavailability ?? [];
+      const isUnavailable = unavailDates.includes(date);
+
+      // Get available time windows for this day
+      // null = no availability configured (show default 9-6), [] = day has no schedule (show nothing)
+      let availableWindows: Array<{ from: string; to: string }> | null = null;
+      if (avail) {
+        const schedule: Array<{ day: string; time: Array<{ from: string; to: string }> }> = avail.schedule ?? [];
+        const daySchedule = schedule.find((s: any) => s.day.toLowerCase() === dayOfWeek);
+        availableWindows = (!isUnavailable && daySchedule) ? daySchedule.time : [];
+      }
+
+      return {
+        success: true,
+        message: 'Slots fetched',
+        data: {
+          slots: occupiedSlots,
+          availableWindows, // [{ from: "09:00", to: "17:00" }]
+          isUnavailable,
+          restBreak: avail?.rest_break ?? null,
+        },
+      };
     } catch (error: any) {
       Log.error('Get occupied slots error', { error });
       return { success: false, message: error.message || 'Failed to fetch slots' };

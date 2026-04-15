@@ -66,6 +66,7 @@ model User {
   savedMentors                 SavedMentor[] @relation("SavedMentors")
   savedAsMentor                SavedMentor[] @relation("SavedAsMentor")
   mentorOnRequest              MentorOnRequest?
+  availability                 Availability?
   mentorPackages               MentorPackage[]
   proposals                    Proposal[] @relation("UserProposals")
   reviewsGiven                 Review[]   @relation("ReviewsGiven")
@@ -897,6 +898,23 @@ model MentorOnRequest {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("scd_mentor_on_request")
+}
+
+model Availability {
+  id               Int      @id @default(autoincrement())
+  user_id          Int      @unique
+  timezone         String   @default("Asia/Kolkata") @db.VarChar(50)
+  /** JSON: [{ day: "monday", time: [{ from: "09:00", to: "17:00" }] }] */
+  schedule         Json
+  /** JSON: ["2026-04-20", "2026-04-25"] — dates user is unavailable */
+  unavailability   Json?
+  rest_break       Int?     // minutes between sessions (15, 30, 45, 60)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("scd_availability")
 }
 
 // Proposals submitted by service providers for founder projects
