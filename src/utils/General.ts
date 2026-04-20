@@ -69,7 +69,7 @@ export const normalizeContact = (email: string) => {
 
   const isEmail = /@/.test(incoming);
   const digitsOnly = incoming.replace(/\D/g, "");
-  const isPhone = /^\d{7,15}$/.test(digitsOnly);
+  const isPhone = /^\d{10}$/.test(digitsOnly);
 
   if (isEmail) {
     return { email: incoming, phone: null };

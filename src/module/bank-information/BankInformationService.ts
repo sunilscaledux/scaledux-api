@@ -34,7 +34,24 @@ export class BankInformationService {
     };
   }
 
-  private static mapRecord(m: any) {
+  /** Mask name: show first char of each word, e.g. John Doe → J*** D** */
+  private static maskName(name: string): string {
+    if (!name) return '';
+    return name.split(/\s+/).map(w =>
+      w.length <= 1 ? w : w[0] + '*'.repeat(w.length - 1)
+    ).join(' ');
+  }
+
+  /** Mask IFSC: show first 4 (bank code) + mask rest, e.g. HDFC0001234 → HDFC******* */
+  private static maskIFSC(ifsc: string): string {
+    if (!ifsc || ifsc.length < 5) return ifsc || '';
+    return ifsc.slice(0, 4) + '*'.repeat(ifsc.length - 4);
+  }
+
+  private static mapRecord(m: any, mask = false) {
+    const accountHolderName = m.account_holder_name || null;
+    const ifsc = m.ifsc || '';
+
     return {
       id: m.id,
       uniqueId: m.unique_id,
@@ -42,9 +59,9 @@ export class BankInformationService {
       entityType: m.entity_type || 'INDIVIDUAL',
       displayLabel: m.display_label,
       bankName: m.bank_name,
-      accountHolderName: m.account_holder_name || null,
+      accountHolderName: mask && accountHolderName ? BankInformationService.maskName(accountHolderName) : accountHolderName,
       accountNumberLast4: m.account_number_last4,
-      ifsc: m.ifsc,
+      ifsc: mask ? BankInformationService.maskIFSC(ifsc) : ifsc,
       verificationStatus: m.verification_status ?? 'pending',
       verificationFailureReason: m.verification_failure_reason ?? null,
       verifiedAt: m.verified_at || null,
@@ -53,8 +70,8 @@ export class BankInformationService {
   }
 
   private static mapRecordWithCooldown(m: any) {
-    const base = BankInformationService.mapRecord(m);
     const isVerified = m.verification_status === 'verified';
+    const base = BankInformationService.mapRecord(m, isVerified);
     const cooldown = getResubmitWindow(m.verified_at, appConfig.verification.bankCooldownDays);
     return {
       ...base,

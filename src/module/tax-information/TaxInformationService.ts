@@ -135,15 +135,39 @@ export class TaxInformationService {
     };
   }
 
-  private static mapRecord(record: any) {
+  /** Mask PAN: show first 4 + last char, e.g. ABCDE1234F → ABCD*****F */
+  private static maskPAN(pan: string): string {
+    if (!pan || pan.length < 6) return pan ? '*'.repeat(pan.length) : '';
+    return pan.slice(0, 4) + '*'.repeat(pan.length - 5) + pan.slice(-1);
+  }
+
+  /** Mask name: show first char of each word, e.g. John Doe → J*** D** */
+  private static maskName(name: string): string {
+    if (!name) return '';
+    return name.split(/\s+/).map(w =>
+      w.length <= 1 ? w : w[0] + '*'.repeat(w.length - 1)
+    ).join(' ');
+  }
+
+  /** Mask GSTIN: show first 2 (state code) + last 3, e.g. 27ABCDE1234F1Z5 → 27**********Z5 */
+  private static maskGSTIN(gstin: string): string {
+    if (!gstin || gstin.length < 6) return gstin ? '*'.repeat(gstin.length) : '';
+    return gstin.slice(0, 2) + '*'.repeat(gstin.length - 4) + gstin.slice(-2);
+  }
+
+  private static mapRecord(record: any, mask = false) {
+    const name = record.name || '';
+    const panNumber = record.pan_number || '';
+    const gstin = record.gstin || '';
+
     return {
       id: record.id,
       entityType: record.entity_type,
       taxResidence: record.tax_residence,
-      name: record.name || '',
-      panNumber: record.pan_number || '',
+      name: mask ? TaxInformationService.maskName(name) : name,
+      panNumber: mask ? TaxInformationService.maskPAN(panNumber) : panNumber,
       hasGSTIN: !!record.has_gstin,
-      gstin: record.gstin || '',
+      gstin: mask && gstin ? TaxInformationService.maskGSTIN(gstin) : gstin,
       gstinStatus: record.gstin_status || 'PENDING',
       gstinFailureReason: record.gstin_failure_reason || null,
       createdAt: record.created_at,
@@ -152,8 +176,8 @@ export class TaxInformationService {
   }
 
   private static mapRecordWithCooldown(record: any) {
-    const base = TaxInformationService.mapRecord(record);
     const isVerified = record.gstin_status === 'VERIFIED';
+    const base = TaxInformationService.mapRecord(record, isVerified);
     const cooldown = getResubmitWindow(record.gstin_verified_at, appConfig.verification.taxCooldownDays);
     return {
       ...base,

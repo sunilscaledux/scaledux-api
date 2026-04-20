@@ -2003,6 +2003,14 @@ export class ProposalService {
         },
       });
 
+      // Grant file access to both parties so they can download NDA documents
+      const ndaAttachmentIds = urlsOrPathsToAttachmentIds(
+        [current.nda_file_link, current.nda_signed_file_link].filter(Boolean) as string[]
+      );
+      if (ndaAttachmentIds.length > 0) {
+        await markAttachmentsAttached(ndaAttachmentIds, [proposal.project.user_id, proposal.provider_id]);
+      }
+
       // When founder sends the NDA (uploads nda_file_link), set status to OFFER_SENT
       const didJustSendOffer = isFounder && data.nda_file_link !== undefined && (proposal.status === ProposalStatus.PENDING || proposal.status === ProposalStatus.SHORTLISTED);
       if (didJustSendOffer) {
