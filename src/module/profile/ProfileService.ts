@@ -203,6 +203,8 @@ export class PersonalInfoService {
         agency_verified_at: profile.user.agency_verified_at?.toISOString(),
         show_as_agency: profile.user.show_as_agency,
         profile_completion_percentage: profile.user.profile_completion_percentage ?? 0,
+        googleCalendarConnected: !!profile.user.google_calendar_refresh_token,
+        googleCalendarEmail: profile.user.google_calendar_email ?? null,
       };
 
       // Include agency name only when agency is verified

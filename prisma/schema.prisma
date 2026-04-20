@@ -94,6 +94,12 @@ model User {
   attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
   /** Temporary state token for DigiLocker OAuth callback validation */
   digilocker_state             String?      @db.VarChar(64)
+  /** Google Calendar OAuth: encrypted refresh token */
+  google_calendar_refresh_token String?     @db.Text
+  /** Google Calendar: email of the connected account */
+  google_calendar_email         String?     @db.VarChar(255)
+  /** Google Calendar: when the user connected their calendar */
+  google_calendar_connected_at  DateTime?
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
