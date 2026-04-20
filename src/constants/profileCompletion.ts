@@ -20,7 +20,8 @@ export type ProfileCompletionSectionKey =
   | 'achievements'
   | 'emailVerification'
   | 'phoneVerification'
-  | 'identityVerification';
+  | 'identityVerification'
+  | 'successStoryHighlights';
 
 export type UserRole = 'freelancer' | 'founder' | 'mentor' | 'investor';
 
@@ -74,20 +75,19 @@ const ROLE_WEIGHTS: Record<UserRole, Partial<Record<ProfileCompletionSectionKey,
   },
   mentor: {
     profilePicture: 3,
-    profileCover: 2,
+    profileCover: 3,
     profileSummary: 10,
-    personalInfo: 5,
-    skillsExpertise: 12,
+    personalInfo: 6,
+    skillsExpertise: 10,
     workExperience: 10,
-    portfolio: 16,
-    hourlyRate: 4,
-    education: 3,
-    licenseCertifications: 3,
-    languages: 2,
-    achievements: 3,
-    emailVerification: 2,
-    phoneVerification: 3,
-    identityVerification: 18,
+    education: 6,
+    licenseCertifications: 6,
+    languages: 3,
+    achievements: 5,
+    emailVerification: 5,
+    phoneVerification: 5,
+    identityVerification: 23,
+    successStoryHighlights: 5,
   },
   investor: {
     profilePicture: 3,
@@ -126,6 +126,7 @@ const SECTION_META: Record<ProfileCompletionSectionKey, { label: string; route: 
   emailVerification: { label: 'Email Verification', route: '/verify/email' },
   phoneVerification: { label: 'Phone Verification', route: '/verify/phone-number' },
   identityVerification: { label: 'Identity Verification', route: '/verify/identity' },
+  successStoryHighlights: { label: 'Success Story Highlights', route: '/my-profile' },
 };
 
 export type ProfileCompletionSectionsMap = Record<string, boolean>;
