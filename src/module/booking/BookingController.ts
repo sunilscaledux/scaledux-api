@@ -91,6 +91,19 @@ export class BookingController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  static async addMeetingLink(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const { uniqueId } = req.params;
+    const { provider, manualLink } = req.body;
+    if (!provider) return ApiResponse.error(res, 'provider is required', 400);
+
+    const result = await BookingService.addMeetingLink(userId, uniqueId, { provider, manualLink });
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
   static async getOccupiedSlots(req: Request, res: Response) {
     const { mentorId } = req.params;
     const { date } = req.query;

@@ -33,6 +33,7 @@ import reportRoutes from './module/report/ReportRoute';
 import bookingRoutes from './module/booking/BookingRoute';
 import availabilityRoutes from './module/availability/AvailabilityRoute';
 import googleCalendarRoutes from './module/google-calendar/GoogleCalendarRoute';
+import videoConferencingRoutes from './module/video-conferencing/VideoConferencingRoute';
 import { startupPhaseRouter, startupProgressRouter } from './module/startup-phase/StartupPhaseRoute';
 
 import path from "path";
@@ -88,6 +89,7 @@ app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/availability", availabilityRoutes);
 app.use("/api/v1/google-calendar", googleCalendarRoutes);
+app.use("/api/v1/video-conferencing", videoConferencingRoutes);
 app.use("/api/v1/startup-phases", startupPhaseRouter);
 app.use("/api/v1/profile/company/startup-progress", startupProgressRouter);
 

@@ -8,6 +8,7 @@ import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { appConfig } from '@config/app';
 import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
+import { MeetingService } from '../video-conferencing/MeetingService';
 
 const DURATION_MAP: Record<string, number> = {
   '15m': 15, '30m': 30, '45m': 45, '1 hr': 60,
@@ -414,6 +415,8 @@ export class BookingService {
         currencySymbol: b.currency?.symbol || '₹',
         isReschedule: b.is_reschedule,
         parentId: b.parent_id,
+        meetingLink: b.meeting_link ?? null,
+        meetingProvider: b.meeting_provider ?? null,
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
@@ -490,6 +493,8 @@ export class BookingService {
           platformFee: booking.platform_fee ? Number(booking.platform_fee) : null,
           isReschedule: booking.is_reschedule,
           parentId: booking.parent_id,
+          meetingLink: booking.meeting_link ?? null,
+          meetingProvider: booking.meeting_provider ?? null,
           createdAt: booking.created_at,
           mentor: {
             uniqueId: booking.mentor.unique_id,
@@ -666,6 +671,99 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Get occupied slots error', { error });
       return { success: false, message: error.message || 'Failed to fetch slots' };
+    }
+  }
+
+  /**
+   * Add a meeting link to a confirmed booking (mentor action).
+   * Generates a link via OAuth provider or accepts a manual URL.
+   * Sends notification + email to the user and syncs to chat.
+   */
+  static async addMeetingLink(
+    mentorId: number,
+    bookingUniqueId: string,
+    data: { provider: 'zoom' | 'google_meet' | 'ms_teams' | 'manual'; manualLink?: string }
+  ): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, mentor_id: mentorId },
+        include: {
+          mentor: { select: { id: true, first_name: true, last_name: true } },
+          user: { select: { id: true, first_name: true, last_name: true } },
+        },
+      });
+      if (!booking) return { success: false, message: 'Booking not found' };
+      if (booking.status !== 'CONFIRMED') return { success: false, message: 'Only confirmed bookings can have a meeting link' };
+
+      let meetingLink: string;
+      let meetingProvider: string;
+
+      if (data.provider === 'manual') {
+        if (!data.manualLink || !data.manualLink.startsWith('https://')) {
+          return { success: false, message: 'A valid HTTPS meeting link is required' };
+        }
+        meetingLink = data.manualLink.trim();
+        meetingProvider = 'manual';
+      } else {
+        const result = await MeetingService.generateMeetingLink(mentorId, data.provider, {
+          title: booking.title,
+          scheduledAt: new Date(booking.scheduled_at),
+          duration: booking.duration,
+        });
+        meetingLink = result.link;
+        meetingProvider = result.provider;
+      }
+
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: { meeting_link: meetingLink, meeting_provider: meetingProvider },
+      });
+
+      // Notify the user (mentee) about the meeting link
+      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const dateStr = formatNotifDate(new Date(booking.scheduled_at));
+      const notifBody = `<p><strong>${escapeHtml(mentorName)}</strong> has added a meeting link for your upcoming 1:1 video call on <strong>${escapeHtml(dateStr)}</strong>.</p>
+        <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
+          <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Duration</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${booking.duration} minutes</td></tr>
+          <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Meeting link</td><td style="padding:8px 0;font-weight:600;font-size:14px;"><a href="${escapeHtml(meetingLink)}" style="color:#7C3AED;">Join meeting</a></td></tr>
+        </table>`;
+
+      const notifData = {
+        userId: booking.user_id,
+        type: 'MEETING_LINK_ADDED' as const,
+        notificationTitle: 'Meeting link added',
+        notificationBody: notifBody,
+        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+        actorId: mentorId,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+
+      // Sync to chat
+      await ConversationService.syncSystemMessage(
+        booking.user_id, booking.mentor_id,
+        `🔗 Meeting link added for the upcoming call.`,
+        {
+          activityType: 'MEETING_LINK_ADDED',
+          bookingTitle: '1:1 Video Call',
+          bookingDuration: booking.duration,
+          bookingScheduledAt: booking.scheduled_at,
+          meetingLink,
+          meetingProvider,
+        },
+        undefined, mentorId
+      );
+
+      return {
+        success: true,
+        message: 'Meeting link added',
+        data: { meetingLink, meetingProvider },
+      };
+    } catch (error: any) {
+      Log.error('Add meeting link error', { error });
+      return { success: false, message: error.message || 'Failed to add meeting link' };
     }
   }
 }
