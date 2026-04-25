@@ -9,6 +9,7 @@ import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
 import SmsService from '@services/SmsService';
+import WhatsappService from '@services/WhatsappService';
 import { OtpType } from "@prisma/client";
 
 // ─── OTP type constants ─────────────────────────────────────────────────────
@@ -489,10 +490,15 @@ export async function cleanupExpiredOtps(
 }
 
 
-async function sendSmsOtp(phone: string, otpCode: string): Promise<boolean> {
+async function sendWhatsappOtp(phone: string, otpCode: string): Promise<boolean> {
   try {
-    const result = await SmsService.sendOTP(phone, otpCode);
-    return result.success;
+    const result = await WhatsappService.sendOTP(phone, otpCode);
+    if (result.success) return true;
+
+    // Fallback to SMS if WhatsApp fails
+    Log.warn("WhatsApp OTP failed, falling back to SMS", { phone });
+    const smsResult = await SmsService.sendOTP(phone, otpCode);
+    return smsResult.success;
   } catch (error) {
     Log.error("Error", { error });
     return false;
@@ -545,10 +551,10 @@ export async function generateAndSendOtp(data: {
         ? "OTP sent successfully to your email"
         : "Failed to send OTP email. Please try again.";
     } else if (data.phone) {
-      sent = await sendSmsOtp(data.phone, otpCode);
+      sent = await sendWhatsappOtp(data.phone, otpCode);
       message = sent
-        ? "OTP sent successfully to your phone"
-        : "Failed to send OTP SMS. Please try again.";
+        ? "OTP sent successfully to your WhatsApp"
+        : "Failed to send OTP. Please try again.";
     }
 
 
