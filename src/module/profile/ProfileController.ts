@@ -1,8 +1,11 @@
 import { Request, Response } from 'express';
 import { PersonalInfoService } from './ProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
-import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema, updatePasswordSchema, setPasswordSchema } from './ProfileValidation';
+import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema, updatePasswordSchema, setPasswordSchema, updateNameSchema } from './ProfileValidation';
 import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
+import { prisma } from '@services/prismaService';
+import { getResubmitWindow } from '@utils/General';
+import { appConfig } from '@config/app';
 
 export class ProfileController {
 
@@ -296,5 +299,66 @@ export class ProfileController {
     const result = await PersonalInfoService.verifyPassword(userId, password);
     if (!result.success) return ApiResponse.error(res, result.message, 400);
     return ApiResponse.success(res, null, 'Password verified');
+  }
+
+  /**
+   * Update name with 15-day cooldown
+   * PATCH /api/v1/profile/name
+   */
+  static async updateName(req: Request, res: Response) {
+    const { value, error } = updateNameSchema.validate(req.body, { abortEarly: false });
+    if (error) {
+      return ApiResponse.joiValidationError(res, error);
+    }
+
+    const userId = req.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name_updated_at: true },
+    });
+
+    const cooldown = getResubmitWindow(user?.name_updated_at, appConfig.verification.nameCooldownDays);
+    if (!cooldown.canSubmit) {
+      return ApiResponse.error(
+        res,
+        `Name was recently updated. You can update again after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`,
+        null,
+        429
+      );
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        first_name: value.first_name,
+        last_name: value.last_name || null,
+        name_updated_at: new Date(),
+      },
+      select: { first_name: true, last_name: true, name_updated_at: true },
+    });
+
+    return ApiResponse.success(res, updated, 'Name updated successfully');
+  }
+
+  /**
+   * Get name update status (cooldown info)
+   * GET /api/v1/profile/name-status
+   */
+  static async getNameStatus(req: Request, res: Response) {
+    const userId = req.user.id;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { first_name: true, last_name: true, name_updated_at: true },
+    });
+
+    const cooldown = getResubmitWindow(user?.name_updated_at, appConfig.verification.nameCooldownDays);
+
+    return ApiResponse.success(res, {
+      firstName: user?.first_name,
+      lastName: user?.last_name,
+      canEdit: cooldown.canSubmit,
+      nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
+      cooldownDays: appConfig.verification.nameCooldownDays,
+    }, 'Name status');
   }
 }

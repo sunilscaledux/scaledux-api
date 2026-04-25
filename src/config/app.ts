@@ -24,6 +24,10 @@ const bankCooldownDays = Math.max(
   1,
   parseInt(process.env.BANK_VERIFICATION_COOLDOWN_DAYS || '15', 10)
 );
+const nameCooldownDays = Math.max(
+  1,
+  parseInt(process.env.NAME_UPDATE_COOLDOWN_DAYS || '15', 10)
+);
 
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 const appUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '');
@@ -47,6 +51,7 @@ export const appConfig = {
     agencyCooldownDays,
     taxCooldownDays,
     bankCooldownDays,
+    nameCooldownDays,
   },
   /** Minimum profile completion % required to perform gated actions. */
   minProfileCompletionPercent,

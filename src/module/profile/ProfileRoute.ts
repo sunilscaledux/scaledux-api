@@ -41,6 +41,8 @@ router.get('/password-status', authenticateToken, ProfileController.getPasswordS
 router.patch('/set-password', authenticateToken, ProfileController.setPassword);
 router.patch('/password', authenticateToken, ProfileController.updatePassword);
 router.patch('/privacy', authenticateToken, ProfileController.updatePrivacySettings);
+router.get('/name-status', authenticateToken, ProfileController.getNameStatus);
+router.patch('/name', authenticateToken, ProfileController.updateName);
 router.patch('/agency-settings', authenticateToken, ProfileController.updateAgencySettings);
 
 router.get('/company/me', authenticateToken, CompanyProfileController.getMyProfile);

@@ -108,6 +108,8 @@ model User {
   ms_teams_refresh_token        String?     @db.Text
   ms_teams_email                String?     @db.VarChar(255)
   ms_teams_connected_at         DateTime?
+  /** Tracks when the user last updated their name (15-day cooldown) */
+  name_updated_at               DateTime?
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])

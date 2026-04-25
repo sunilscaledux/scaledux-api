@@ -100,6 +100,16 @@ export const setPasswordSchema = Joi.object({
   }),
 }).options({ stripUnknown: true });
 
+export const updateNameSchema = Joi.object({
+  first_name: Joi.string().trim().min(1).max(50).required().messages({
+    'string.empty': 'First name is required',
+    'string.max': 'First name must be at most 50 characters',
+  }),
+  last_name: Joi.string().trim().max(50).allow('', null).optional().messages({
+    'string.max': 'Last name must be at most 50 characters',
+  }),
+});
+
 export const updateInvestorPreferencesSchema = Joi.object({
   investorTypes: Joi.array().items(Joi.string().trim()).min(1).required().messages({
     'array.min': 'Please select at least one investor type',

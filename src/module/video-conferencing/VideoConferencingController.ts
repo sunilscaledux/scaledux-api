@@ -27,8 +27,9 @@ export class VideoConferencingController {
       const result = await ZoomService.handleCallback(req.user.id, code, redirectUri);
       return ApiResponse.success(res, result, 'Zoom connected');
     } catch (err: any) {
-      Log.error('Zoom callback error', err);
-      return ApiResponse.error(res, err.message || 'Failed to connect Zoom');
+      const message = err?.response?.data?.message || err?.response?.data?.reason || err?.message || 'Failed to connect Zoom';
+      Log.error('Zoom callback error', message);
+      return ApiResponse.error(res, message);
     }
   }
 
@@ -72,8 +73,9 @@ export class VideoConferencingController {
       const result = await MsTeamsService.handleCallback(req.user.id, code, redirectUri);
       return ApiResponse.success(res, result, 'Microsoft Teams connected');
     } catch (err: any) {
-      Log.error('MS Teams callback error', err);
-      return ApiResponse.error(res, err.message || 'Failed to connect Microsoft Teams');
+      const message = err?.response?.data?.message || err?.response?.data?.reason || err?.message || 'Failed to connect Microsoft Teams';
+      Log.error('MS Teams callback error', message);
+      return ApiResponse.error(res, message);
     }
   }
 
