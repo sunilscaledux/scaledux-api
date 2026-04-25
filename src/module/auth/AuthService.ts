@@ -9,7 +9,6 @@ import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
 import SmsService from '@services/SmsService';
-import WhatsappService from '@services/WhatsappService';
 import { OtpType } from "@prisma/client";
 
 // ─── OTP type constants ─────────────────────────────────────────────────────
@@ -490,15 +489,10 @@ export async function cleanupExpiredOtps(
 }
 
 
-async function sendWhatsappOtp(phone: string, otpCode: string): Promise<boolean> {
+async function sendSmsOtp(phone: string, otpCode: string): Promise<boolean> {
   try {
-    const result = await WhatsappService.sendOTP(phone, otpCode);
-    if (result.success) return true;
-
-    // Fallback to SMS if WhatsApp fails
-    Log.warn("WhatsApp OTP failed, falling back to SMS", { phone });
-    const smsResult = await SmsService.sendOTP(phone, otpCode);
-    return smsResult.success;
+    const result = await SmsService.sendOTP(phone, otpCode);
+    return result.success;
   } catch (error) {
     Log.error("Error", { error });
     return false;
@@ -551,21 +545,21 @@ export async function generateAndSendOtp(data: {
         ? "OTP sent successfully to your email"
         : "Failed to send OTP email. Please try again.";
     } else if (data.phone) {
-      sent = await sendWhatsappOtp(data.phone, otpCode);
+      sent = await sendSmsOtp(data.phone, otpCode);
       message = sent
-        ? "OTP sent successfully to your WhatsApp"
+        ? "OTP sent successfully to your phone"
         : "Failed to send OTP. Please try again.";
     }
 
 
-    // if (!sent) {
-    //   // Delete OTP if sending failed
-    //   await prisma.otp.delete({ where: { id: otp.id } });
-    //   return {
-    //     success: false,
-    //     message,
-    //   };
-    // }
+    if (!sent) {
+      // Delete OTP if sending failed
+      await prisma.otp.delete({ where: { id: otp.id } });
+      return {
+        success: false,
+        message,
+      };
+    }
 
     return {
       success: true,
