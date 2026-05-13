@@ -3,7 +3,7 @@ import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { getDisplayName } from '@utils/General';
-import { resolveAttachmentUrl, createAttachment } from '@services/attachmentService';
+import { resolveAttachmentUrl, resolveAttachmentUrls, createAttachment } from '@services/attachmentService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from './ProfileType';
 import { updateCompletionSection } from './ProfileCompletionService';
@@ -40,6 +40,7 @@ export class PersonalInfoService {
           },
           licenses: { orderBy: { created_at: 'desc' } },
           achievements: { orderBy: { created_at: 'desc' } },
+          successStories: { orderBy: [{ date: 'desc' }, { created_at: 'desc' }] },
         },
       });
 
@@ -65,6 +66,16 @@ export class PersonalInfoService {
 
       // Enrich expertises with subcategory details
       const enrichedExpertises = await this.enrichExpertisesWithSpecialties(user.expertises || []);
+
+      // Resolve success story media URLs
+      const successStoriesWithUrls = await Promise.all(
+        (user.successStories || []).map(async (story) => ({
+          ...story,
+          media_files: Array.isArray(story.media_files)
+            ? await resolveAttachmentUrls(story.media_files as string[], 'success_story_media')
+            : []
+        }))
+      );
 
       // Return public profile data (hide sensitive information)
       const publicProfile = {
@@ -97,6 +108,7 @@ export class PersonalInfoService {
         userExpertises: enrichedExpertises,
         licenses: user.licenses || [],
         achievements: user.achievements || [],
+        successStories: successStoriesWithUrls,
       };
 
       return {

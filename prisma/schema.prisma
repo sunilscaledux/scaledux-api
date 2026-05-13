@@ -88,6 +88,7 @@ model User {
   razorpay_contact_id          String?   @db.VarChar(64)
   /** Razorpay X fund account id (fa_xxx) for freelancer payouts (set after bank verification). */
   razorpay_account_id          String?   @db.VarChar(64)
+  successStories               SuccessStory[]
   bookingsAsMentor             Booking[] @relation("BookingMentor")
   bookingsAsUser               Booking[] @relation("BookingUser")
   attachmentsOwned              Attachment[] @relation("AttachmentOwner")
@@ -1755,4 +1756,23 @@ model Booking {
   @@index([status])
   @@index([parent_id])
   @@map("scd_bookings")
+}
+
+model SuccessStory {
+  id                Int       @id @default(autoincrement())
+  user_id           Int
+  title             String    @db.VarChar(255)
+  description       String?   @db.VarChar(900)
+  date              DateTime? @db.Date
+  organisation_name String    @db.VarChar(255)
+  client_name       String?   @db.VarChar(255)
+  linkedin_link     String?   @db.VarChar(500)
+  media_files       Json?     // Array of attachment unique_ids (max 5, PNG/JPG/PDF, 5MB, 600x400px)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("scd_success_stories")
 }
