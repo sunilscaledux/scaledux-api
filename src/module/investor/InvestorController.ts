@@ -20,4 +20,19 @@ export class InvestorController {
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message);
   }
+
+  static async browseStartups(req: Request, res: Response) {
+    const { search, industry, sortBy, limit, cursor } = req.query;
+
+    const result = await InvestorService.browseStartups({
+      search: search as string,
+      industry: industry as string,
+      sortBy: sortBy as any,
+      limit: limit ? parseInt(String(limit)) : 16,
+      cursor: cursor ? String(cursor) : undefined,
+    });
+
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message);
+  }
 }

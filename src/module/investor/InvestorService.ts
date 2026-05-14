@@ -188,4 +188,132 @@ export class InvestorService {
       };
     }
   }
+
+  /**
+   * Browse startups — public listing for investors with filters.
+   */
+  static async browseStartups(params: {
+    search?: string;
+    industry?: string;
+    sortBy?: 'newest' | 'name' | 'funding_high' | 'funding_low';
+    limit?: number;
+    cursor?: string;
+  }): Promise<ServiceResponse> {
+    try {
+      const limit = Math.min(50, Math.max(1, params.limit || 16));
+      const cursorDate = params.cursor ? new Date(params.cursor) : null;
+
+      const where: any = {
+        user: { role: 'founder', status: 1 },
+        company_name: { not: null },
+      };
+
+      if (params.search?.trim()) {
+        const term = params.search.trim();
+        where.OR = [
+          { company_name: { contains: term, mode: 'insensitive' } },
+          { company_description: { contains: term, mode: 'insensitive' } },
+          { user: { first_name: { contains: term, mode: 'insensitive' } } },
+          { user: { last_name: { contains: term, mode: 'insensitive' } } },
+        ];
+      }
+
+      if (params.industry?.trim()) {
+        where.industry = { name: { equals: params.industry.trim(), mode: 'insensitive' } };
+      }
+
+      let orderBy: any = { created_at: 'desc' };
+      if (params.sortBy === 'name') orderBy = { company_name: 'asc' };
+      else if (params.sortBy === 'funding_high') orderBy = { total_funding: 'desc' };
+      else if (params.sortBy === 'funding_low') orderBy = { total_funding: 'asc' };
+
+      if (cursorDate) {
+        where.created_at = { ...(where.created_at || {}), lt: cursorDate };
+      }
+
+      const startups = await (prisma as any).companyProfile.findMany({
+        where,
+        take: limit + 1,
+        orderBy,
+        select: {
+          id: true,
+          unique_id: true,
+          profileImage: true,
+          company_name: true,
+          company_description: true,
+          company_stage: true,
+          total_funding: true,
+          created_at: true,
+          industry: { select: { id: true, name: true } },
+          raisingFund: {
+            select: { is_raising: true, round_type: true, target_amount: true },
+          },
+          user: {
+            select: {
+              id: true,
+              unique_id: true,
+              first_name: true,
+              last_name: true,
+              personalInfo: {
+                select: { profileImage: true },
+              },
+            },
+          },
+        },
+      });
+
+      const hasMore = startups.length > limit;
+      const slice = hasMore ? startups.slice(0, limit) : startups;
+
+      const data = await Promise.all(
+        slice.map(async (s: any) => {
+          const companyLogo = s.profileImage
+            ? await resolveAttachmentUrl(s.profileImage, 'company_profile_image')
+            : null;
+          const founderImage = s.user?.personalInfo?.profileImage
+            ? await resolveAttachmentUrl(s.user.personalInfo.profileImage, 'profile_image')
+            : null;
+
+          return {
+            id: s.id,
+            uniqueId: s.unique_id,
+            companyName: s.company_name,
+            companyDescription: s.company_description
+              ? String(s.company_description).replace(/<[^>]*>/g, '').slice(0, 160)
+              : null,
+            companyLogo,
+            companyStage: s.company_stage || null,
+            industry: s.industry?.name || null,
+            totalFunding: s.total_funding != null ? Number(s.total_funding) : null,
+            isRaising: s.raisingFund?.is_raising || false,
+            roundType: s.raisingFund?.round_type || null,
+            targetAmount: s.raisingFund?.target_amount != null ? Number(s.raisingFund.target_amount) : null,
+            founder: {
+              id: s.user?.id,
+              uniqueId: s.user?.unique_id,
+              firstName: s.user?.first_name || null,
+              lastName: s.user?.last_name || null,
+              profileImage: founderImage,
+            },
+          };
+        })
+      );
+
+      const nextCursor = hasMore && data.length > 0
+        ? slice[slice.length - 1].created_at.toISOString()
+        : null;
+
+      return {
+        success: true,
+        message: "Startups fetched successfully",
+        data: { startups: data, nextCursor, hasMore },
+      };
+    } catch (error: any) {
+      Log.error("Browse startups error", { error });
+      return {
+        success: false,
+        message: error.message || "Failed to fetch startups",
+      };
+    }
+  }
 }
