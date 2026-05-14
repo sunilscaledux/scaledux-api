@@ -22,7 +22,7 @@ for (const fileName of fs.readdirSync(jobsDir)) {
 
   for (const [exportName, jobExport] of Object.entries(moduleExports)) {
     if (typeof jobExport === 'function' && typeof (jobExport as any).prototype?.handle === 'function') {
-      const key = `src/jobs/${exportName}`;
+      const key = `src/jobs/${exportName}`;            
       jobMap.set(key, jobExport as unknown as JobClassType<any>);
     }
   }

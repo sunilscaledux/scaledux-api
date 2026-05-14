@@ -30,6 +30,7 @@ const policy: Record<string, FileVisibility> = {
   proposal_nda: 'private',
   proposal_milestone_document: 'private',
   achievement_media: 'public',
+  success_story_media: 'public',
   chat_files: 'private',
   identity_documents: 'private',
   identity_selfie: 'private',
