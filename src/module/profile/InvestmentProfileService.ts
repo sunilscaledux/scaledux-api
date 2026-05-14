@@ -80,6 +80,18 @@ export class InvestmentProfileService {
         investment_stage?: string | null;
         investment_criteria?: string | null;
       }>;
+      geo_preferences?: Array<{
+        country_id: number;
+        state_id?: number | null;
+      }>;
+      committee_members?: Array<{
+        name: string;
+        role?: string | null;
+        role_description?: string | null;
+        photo?: string | null;
+        email?: string | null;
+        hide_email?: boolean;
+      }>;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -114,6 +126,46 @@ export class InvestmentProfileService {
                 specialisation: item.specialisation ?? null,
                 investment_stage: item.investment_stage ?? null,
                 investment_criteria: item.investment_criteria ?? null,
+                order_index: i,
+              },
+            });
+          }
+        }
+      }
+
+      if (data.geo_preferences !== undefined) {
+        await (prisma as any).investmentProfileGeoPreference.deleteMany({ where: { investment_profile_id: profileId } });
+        const list = Array.isArray(data.geo_preferences) ? data.geo_preferences : [];
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          if (item && typeof item.country_id === "number") {
+            await (prisma as any).investmentProfileGeoPreference.create({
+              data: {
+                investment_profile_id: profileId,
+                country_id: item.country_id,
+                state_id: item.state_id ?? null,
+                order_index: i,
+              },
+            });
+          }
+        }
+      }
+
+      if (data.committee_members !== undefined) {
+        await (prisma as any).investmentProfileCommitteeMember.deleteMany({ where: { investment_profile_id: profileId } });
+        const list = Array.isArray(data.committee_members) ? data.committee_members : [];
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          if (item && item.name) {
+            await (prisma as any).investmentProfileCommitteeMember.create({
+              data: {
+                investment_profile_id: profileId,
+                name: item.name,
+                role: item.role ?? null,
+                role_description: item.role_description ?? null,
+                photo: item.photo ?? null,
+                email: item.email ?? null,
+                hide_email: item.hide_email ?? false,
                 order_index: i,
               },
             });

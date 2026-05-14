@@ -108,6 +108,13 @@ router.post(
 
 router.get("/investment-profile", authenticateToken, getInvestmentProfile);
 router.patch("/investment-profile", authenticateToken, updateInvestmentProfile);
+router.post(
+  '/investment-profile/upload-photo',
+  authenticateToken,
+  FileUpload({ uploadPath: 'committee-members', fileFilter: 'image', maxSize: 5, maxFiles: 1, fieldName: 'committee_member_photo' }).single('photo'),
+  uploadFile,
+  handleMulterError
+);
 
 router.get("/notification-preferences/types", authenticateToken, NotificationPreferencesController.getTypes);
 router.get("/notification-preferences", authenticateToken, NotificationPreferencesController.getPreferences);

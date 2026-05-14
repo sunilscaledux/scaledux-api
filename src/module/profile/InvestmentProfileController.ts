@@ -44,6 +44,18 @@ export async function updateInvestmentProfile(req: Request, res: Response) {
         investment_stage?: string | null;
         investment_criteria?: string | null;
       }>;
+      geo_preferences?: Array<{
+        country_id: number;
+        state_id?: number | null;
+      }>;
+      committee_members?: Array<{
+        name: string;
+        role?: string | null;
+        role_description?: string | null;
+        photo?: string | null;
+        email?: string | null;
+        hide_email?: boolean;
+      }>;
     } = {};
     if (body.investorTypes !== undefined) data.investor_types = Array.isArray(body.investorTypes) ? body.investorTypes : null;
     if (body.thesisSummary !== undefined) data.thesis_summary = body.thesisSummary ?? null;
@@ -63,6 +75,26 @@ export async function updateInvestmentProfile(req: Request, res: Response) {
         investment_stage: item.investmentStage ?? item.investment_stage ?? null,
         investment_criteria: item.investmentCriteria ?? item.investment_criteria ?? null,
       })).filter((item: any) => !Number.isNaN(item.industry_id));
+    }
+
+    if (body.geoPreferences !== undefined) {
+      const arr = Array.isArray(body.geoPreferences) ? body.geoPreferences : [];
+      data.geo_preferences = arr.map((item: any) => ({
+        country_id: Number(item.countryId ?? item.country_id),
+        state_id: item.stateId != null ? Number(item.stateId) : item.state_id != null ? Number(item.state_id) : null,
+      })).filter((item: any) => !Number.isNaN(item.country_id));
+    }
+
+    if (body.committeeMembers !== undefined) {
+      const arr = Array.isArray(body.committeeMembers) ? body.committeeMembers : [];
+      data.committee_members = arr.map((item: any) => ({
+        name: item.name ?? '',
+        role: item.role ?? null,
+        role_description: item.roleDescription ?? item.role_description ?? null,
+        photo: item.photo ?? null,
+        email: item.email ?? null,
+        hide_email: item.hideEmail ?? item.hide_email ?? false,
+      })).filter((item: any) => item.name);
     }
 
     const result = await InvestmentProfileService.update(userId, data);
