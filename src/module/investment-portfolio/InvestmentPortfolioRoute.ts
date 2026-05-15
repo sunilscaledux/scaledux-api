@@ -3,6 +3,7 @@ import {
   getUserInvestmentPortfolios,
   getInvestmentPortfolioById,
   getPublicInvestmentPortfolioById,
+  getPublicPortfoliosByUser,
   createInvestmentPortfolio,
   updateInvestmentPortfolio,
   deleteInvestmentPortfolio,
@@ -17,6 +18,7 @@ import { authenticateToken } from "@middleware/auth";
 const router = Router();
 
 router.get("/public/:id", getPublicInvestmentPortfolioById);
+router.get("/user/:userUniqueId", getPublicPortfoliosByUser);
 
 router.use(authenticateToken);
 

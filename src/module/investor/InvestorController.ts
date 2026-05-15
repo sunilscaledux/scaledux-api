@@ -35,4 +35,13 @@ export class InvestorController {
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message);
   }
+
+  static async getPublicProfile(req: Request, res: Response) {
+    const uniqueId = req.params.uniqueId as string;
+    if (!uniqueId) return ApiResponse.error(res, "Unique ID is required", 400);
+
+    const result = await InvestorService.getPublicProfile(uniqueId);
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 404);
+  }
 }

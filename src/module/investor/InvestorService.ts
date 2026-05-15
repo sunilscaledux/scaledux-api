@@ -316,4 +316,108 @@ export class InvestorService {
       };
     }
   }
+
+  /**
+   * Get public investor profile by unique_id.
+   */
+  static async getPublicProfile(uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await (prisma as any).user.findFirst({
+        where: { unique_id: uniqueId, role: 'investor', status: 1 },
+        select: {
+          id: true,
+          unique_id: true,
+          first_name: true,
+          last_name: true,
+          created_at: true,
+          personalInfo: {
+            select: {
+              profileImage: true,
+              coverImage: true,
+              title: true,
+              about: true,
+              city: true,
+              country: { select: { name: true } },
+            },
+          },
+          investmentProfile: {
+            include: {
+              preferredIndustries: {
+                include: { industry: true, subIndustry: true },
+                orderBy: { order_index: 'asc' as const },
+              },
+              committeeMembers: { orderBy: { order_index: 'asc' as const } },
+              geoPreferences: {
+                include: { country: true, state: true },
+                orderBy: { order_index: 'asc' as const },
+              },
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return { success: false, message: "Investor not found" };
+      }
+
+      const ip = user.investmentProfile;
+      const profileImage = user.personalInfo?.profileImage
+        ? await resolveAttachmentUrl(user.personalInfo.profileImage, 'profile_image')
+        : null;
+      const coverImage = user.personalInfo?.coverImage
+        ? await resolveAttachmentUrl(user.personalInfo.coverImage, 'cover_image')
+        : null;
+
+      const committeeMembers = await Promise.all(
+        (ip?.committeeMembers || []).map(async (m: any) => ({
+          id: m.id,
+          name: m.name,
+          role: m.role,
+          roleDescription: m.role_description,
+          photo: m.photo ? await resolveAttachmentUrl(m.photo, 'committee_member_photo') : null,
+          email: m.hide_email ? null : m.email,
+          hideEmail: m.hide_email,
+        }))
+      );
+
+      const data = {
+        id: user.id,
+        uniqueId: user.unique_id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        profileImage,
+        coverImage,
+        tagline: user.personalInfo?.title || null,
+        about: user.personalInfo?.about || null,
+        city: user.personalInfo?.city || null,
+        country: user.personalInfo?.country?.name || null,
+        investorTypes: Array.isArray(ip?.investor_types) ? ip.investor_types : [],
+        thesisSummary: ip?.thesis_summary || null,
+        diligenceProcess: ip?.diligence_process || null,
+        diligenceDocument: ip?.diligence_document || null,
+        investmentSizeMin: ip?.investment_size_min != null ? Number(ip.investment_size_min) : null,
+        investmentSizeMax: ip?.investment_size_max != null ? Number(ip.investment_size_max) : null,
+        investmentSizeCurrency: ip?.investment_size_currency || null,
+        equityRangeMin: ip?.equity_range_min != null ? Number(ip.equity_range_min) : null,
+        equityRangeMax: ip?.equity_range_max != null ? Number(ip.equity_range_max) : null,
+        preferredIndustries: (ip?.preferredIndustries || []).map((pi: any) => ({
+          industryName: pi.industry?.name || null,
+          subIndustryName: pi.subIndustry?.name || null,
+          specialisation: pi.specialisation || null,
+          investmentStage: pi.investment_stage || null,
+          investmentCriteria: pi.investment_criteria || null,
+        })),
+        committeeMembers,
+        geoPreferences: (ip?.geoPreferences || []).map((g: any) => ({
+          country: g.country?.name || null,
+          state: g.state?.name || null,
+        })),
+      };
+
+      return { success: true, message: "Investor profile fetched", data };
+    } catch (error: any) {
+      Log.error("Get public investor profile error", { error });
+      return { success: false, message: error.message || "Failed to fetch investor profile" };
+    }
+  }
 }

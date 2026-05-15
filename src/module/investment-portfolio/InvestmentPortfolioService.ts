@@ -12,6 +12,41 @@ import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
 
 export class InvestmentPortfolioService {
+  /**
+   * Get published portfolios by user unique_id (public, no auth).
+   */
+  static async getPublicPortfoliosByUserUniqueId(userUniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findFirst({
+        where: { unique_id: userUniqueId, status: 1 },
+        select: { id: true },
+      });
+      if (!user) return { success: false, message: "User not found" };
+
+      const portfolios = await prisma.investorPortfolio.findMany({
+        where: { user_id: user.id, status: 'PUBLISHED', deleted_at: null },
+        include: {
+          industry: { select: { id: true, name: true } },
+          subIndustry: { select: { id: true, name: true } },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      const transformed = await Promise.all(portfolios.map(async (p) => ({
+        ...p,
+        company_logo_url: p.company_logo
+          ? await resolveAttachmentUrl(p.company_logo, 'attachment')
+          : null,
+        scaledux_url: `${FRONTEND_URL}/investment-portfolio/${p.unique_id}`,
+      })));
+
+      return { success: true, message: "Portfolios fetched", data: transformed };
+    } catch (error: any) {
+      Log.error("Error fetching public portfolios by user", { error });
+      return { success: false, message: "Failed to fetch portfolios" };
+    }
+  }
+
   static async getUserInvestmentPortfolios(
     userId: number,
     status?: string

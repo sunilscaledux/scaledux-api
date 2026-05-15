@@ -9,6 +9,14 @@ import {
   updateDraftInvestmentPortfolioSchema
 } from "./InvestmentPortfolioValidation";
 
+export async function getPublicPortfoliosByUser(req: Request, res: Response) {
+  const userUniqueId = req.params.userUniqueId as string;
+  if (!userUniqueId) return ApiResponse.error(res, "User ID is required", 400);
+  const result = await InvestmentPortfolioService.getPublicPortfoliosByUserUniqueId(userUniqueId);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  return ApiResponse.error(res, result.message, 404);
+}
+
 export async function getUserInvestmentPortfolios(req: Request, res: Response) {
   const userId = req.user?.id;
   const { status } = req.query;

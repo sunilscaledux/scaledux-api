@@ -7,5 +7,6 @@ const router = Router();
 // Public routes
 router.get("/browse", optionalAuth, InvestorController.browseInvestors);
 router.get("/startups", optionalAuth, InvestorController.browseStartups);
+router.get("/:uniqueId", InvestorController.getPublicProfile);
 
 export default router;
