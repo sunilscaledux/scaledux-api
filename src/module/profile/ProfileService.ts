@@ -44,7 +44,7 @@ export class PersonalInfoService {
         },
       });
 
-      if (!user || !user.personalInfo) {
+      if (!user) {
         return {
           success: false,
           message: 'Profile not found',
@@ -77,28 +77,28 @@ export class PersonalInfoService {
         }))
       );
 
-      // Return public profile data (hide sensitive information)
-      const publicProfile = {
-        id: profile.id,
+      // Personal profile tab (common for all roles)
+      const personalProfile = {
+        id: profile?.id ?? null,
         unique_id: user.unique_id,
-        profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
-        coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
-        title: profile.title,
-        about: profile.about,
-        city: profile.city,
-        website: profile.website,
-        hourly_rate: profile.hourly_rate,
-        available_hours_per_week: profile.available_hours_per_week,
-        links: profile.links,
-        languages: profile.languages,
-        country: profile.country,
-        state: profile.state,
+        profileImage: profile?.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
+        coverImage: profile?.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
+        title: profile?.title ?? null,
+        about: profile?.about ?? null,
+        city: profile?.city ?? null,
+        website: profile?.website ?? null,
+        hourly_rate: profile?.hourly_rate ?? null,
+        available_hours_per_week: profile?.available_hours_per_week ?? null,
+        links: profile?.links ?? null,
+        languages: profile?.languages ?? null,
+        country: profile?.country ?? null,
+        state: profile?.state ?? null,
         currency: user.currency,
         role: user.role,
         firstName,
         lastName,
-        hideEmail: profile.hideEmail,
-        hidePhone: profile.hidePhone,
+        hideEmail: profile?.hideEmail ?? false,
+        hidePhone: profile?.hidePhone ?? false,
         show_as_agency: user.show_as_agency,
         identity_verification_status: (user as any).identity_verification_status,
         profile_type: (user as any).profile_type || user.role,
@@ -111,10 +111,33 @@ export class PersonalInfoService {
         successStories: successStoriesWithUrls,
       };
 
+      // Build role-specific tabs
+      const tabs: string[] = ['personal'];
+      let companyProfile = null;
+      let investorProfile = null;
+      let mentorProfile = null;
+
+      if (user.role === 'founder') {
+        tabs.push('company');
+        companyProfile = await this.getFounderCompanyTab(user.id);
+      } else if (user.role === 'investor') {
+        tabs.push('investor');
+        investorProfile = await this.getInvestorTab(user.id);
+      } else if (user.role === 'mentor') {
+        tabs.push('mentor');
+        mentorProfile = await this.getMentorTab(user.id);
+      }
+
       return {
         success: true,
         message: 'Public profile retrieved successfully',
-        data: publicProfile,
+        data: {
+          tabs,
+          personal: personalProfile,
+          ...(companyProfile && { company: companyProfile }),
+          ...(investorProfile && { investor: investorProfile }),
+          ...(mentorProfile && { mentor: mentorProfile }),
+        },
       };
     } catch (error: any) {
       Log.error('Get Public Profile Error', { error });
@@ -123,6 +146,183 @@ export class PersonalInfoService {
         message: 'Failed to retrieve public profile',
       };
     }
+  }
+
+  /** Fetch company profile tab for founder role */
+  private static async getFounderCompanyTab(userId: number) {
+    const profile = await prisma.companyProfile.findUnique({
+      where: { user_id: userId },
+      include: {
+        country: true,
+        state: true,
+        branchCountry: true,
+        branchState: true,
+        industry: true,
+        subIndustry: true,
+        fundingRounds: {
+          where: { deleted_at: null },
+          orderBy: { funding_date: 'desc' },
+        },
+      },
+    });
+
+    if (!profile) return null;
+
+    const totalFundingNum = profile.total_funding != null ? Number(profile.total_funding) : null;
+    const fundingRounds = (profile.fundingRounds || []).map((r) => ({
+      id: r.id,
+      investor_name: r.investor_name,
+      funding_stage: r.funding_stage,
+      funding_amount: Number(r.funding_amount),
+      funding_date: r.funding_date.toISOString(),
+      funding_valuation: r.funding_valuation != null ? Number(r.funding_valuation) : null,
+    }));
+
+    return {
+      id: profile.id,
+      unique_id: profile.unique_id,
+      profileImage: profile.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
+      coverImage: profile.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
+      company_name: profile.company_name,
+      company_description: profile.company_description,
+      company_website: profile.company_website,
+      cin: profile.cin ?? null,
+      is_registered: profile.is_registered,
+      company_size: profile.company_size,
+      founded_year: profile.founded_year,
+      industry: profile.industry,
+      subIndustry: profile.subIndustry,
+      company_stage: profile.company_stage,
+      business_model: profile.business_model,
+      team_size: profile.team_size,
+      revenue_description: profile.revenue_description,
+      revenueModels: profile.revenue_models || [],
+      target_market: profile.target_market,
+      problem_statement: profile.problem_statement,
+      solution_statement: profile.solution_statement,
+      traction_title: profile.traction_title,
+      traction_document: await resolveAttachmentUrl(profile.traction_document, 'traction_document'),
+      funding_status: profile.funding_status,
+      total_funding: totalFundingNum,
+      fundingRounds,
+      address: profile.address,
+      city: profile.city,
+      zipCode: profile.zipCode,
+      country: profile.country,
+      state: profile.state,
+      is_branch_same_as_hq: profile.is_branch_same_as_hq,
+      branch_address: profile.branch_address,
+      branch_city: profile.branch_city,
+      branch_zipCode: profile.branch_zipCode,
+      branch_country: profile.branchCountry,
+      branch_state: profile.branchState,
+      links: profile.links,
+    };
+  }
+
+  /** Fetch investment profile tab for investor role */
+  private static async getInvestorTab(userId: number) {
+    const ip = await (prisma as any).investmentProfile.findUnique({
+      where: { user_id: userId },
+      include: {
+        preferredIndustries: {
+          include: { industry: true, subIndustry: true },
+          orderBy: { order_index: 'asc' },
+        },
+        committeeMembers: { orderBy: { order_index: 'asc' } },
+        geoPreferences: {
+          include: { country: true, state: true },
+          orderBy: { order_index: 'asc' },
+        },
+      },
+    });
+
+    if (!ip) return null;
+
+    const committeeMembers = await Promise.all(
+      (ip.committeeMembers || []).map(async (m: any) => ({
+        id: m.id,
+        name: m.name,
+        role: m.role,
+        roleDescription: m.role_description,
+        photo: m.photo ? await resolveAttachmentUrl(m.photo, 'committee_member_photo') : null,
+        email: m.hide_email ? null : m.email,
+        hideEmail: m.hide_email,
+      }))
+    );
+
+    return {
+      investorTypes: Array.isArray(ip.investor_types) ? ip.investor_types : [],
+      thesisSummary: ip.thesis_summary || null,
+      diligenceProcess: ip.diligence_process || null,
+      diligenceDocument: ip.diligence_document || null,
+      investmentSizeMin: ip.investment_size_min != null ? Number(ip.investment_size_min) : null,
+      investmentSizeMax: ip.investment_size_max != null ? Number(ip.investment_size_max) : null,
+      investmentSizeCurrency: ip.investment_size_currency || null,
+      equityRangeMin: ip.equity_range_min != null ? Number(ip.equity_range_min) : null,
+      equityRangeMax: ip.equity_range_max != null ? Number(ip.equity_range_max) : null,
+      preferredIndustries: (ip.preferredIndustries || []).map((pi: any) => ({
+        industryName: pi.industry?.name || null,
+        subIndustryName: pi.subIndustry?.name || null,
+        specialisation: pi.specialisation || null,
+        investmentStage: pi.investment_stage || null,
+        investmentCriteria: pi.investment_criteria || null,
+      })),
+      committeeMembers,
+      geoPreferences: (ip.geoPreferences || []).map((g: any) => ({
+        country: g.country?.name || null,
+        state: g.state?.name || null,
+      })),
+    };
+  }
+
+  /** Fetch mentor profile tab for mentor role */
+  private static async getMentorTab(userId: number) {
+    const mentorOnRequest = await (prisma as any).mentorOnRequest.findUnique({
+      where: { user_id: userId },
+    });
+
+    const mentorPackages = await prisma.mentorPackage.findMany({
+      where: { user_id: userId, status: 'PUBLISHED' },
+      select: {
+        id: true,
+        unique_id: true,
+        title: true,
+        description: true,
+        session_duration: true,
+        no_of_sessions: true,
+        session_price_amount: true,
+        session_price_currency: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const minuteToLabel: Record<number, string> = { 15: '15m', 30: '30m', 45: '45m', 60: '1 hr', 75: '1h 15m', 90: '1h 30m', 105: '1h 45m', 120: '2h' };
+
+    return {
+      onRequest: mentorOnRequest ? {
+        isAvailable: mentorOnRequest.is_available,
+        sessionFrequency: mentorOnRequest.session_frequency ?? [],
+        sessionDurationMin: minuteToLabel[mentorOnRequest.session_duration_min] ?? mentorOnRequest.session_duration_min,
+        sessionDurationMax: minuteToLabel[mentorOnRequest.session_duration_max] ?? mentorOnRequest.session_duration_max,
+        priceAmount: mentorOnRequest.price_amount != null ? Number(mentorOnRequest.price_amount) : null,
+        priceCurrency: mentorOnRequest.price_currency || 'INR',
+        discountEnabled: mentorOnRequest.discount_enabled,
+        discountTitle: mentorOnRequest.discount_title || '',
+        discountPercent: mentorOnRequest.discount_percent,
+        discountAvailableTill: mentorOnRequest.discount_available_till,
+      } : null,
+      mentorPackages: mentorPackages.map((pkg: any) => ({
+        id: pkg.id,
+        uniqueId: pkg.unique_id,
+        title: pkg.title,
+        description: pkg.description,
+        sessionDuration: pkg.session_duration,
+        noOfSessions: pkg.no_of_sessions,
+        price: pkg.session_price_amount != null ? Number(pkg.session_price_amount) : null,
+        currency: pkg.session_price_currency || 'INR',
+      })),
+    };
   }
 
   /** Enrich expertise records with subcategory details resolved from specialty_ids JSON */

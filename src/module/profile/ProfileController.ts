@@ -3,6 +3,7 @@ import { PersonalInfoService } from './ProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
 import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, updateAvailableHoursPerWeekSchema, updatePasswordSchema, setPasswordSchema, updateNameSchema } from './ProfileValidation';
 import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
+import { ConnectionService } from '../connection/ConnectionService';
 import { prisma } from '@services/prismaService';
 import { getResubmitWindow } from '@utils/General';
 import { appConfig } from '@config/app';
@@ -286,9 +287,18 @@ export class ProfileController {
     const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
 
     if (personalInfo.success) {
-      return ApiResponse.success(res, personalInfo.data, personalInfo.message);
+      // Include connection status if viewer is authenticated
+      const viewerId = req.user?.id;
+      let connection = null;
+      if (viewerId) {
+        const connResult = await ConnectionService.getConnectionStatus(viewerId, uniqueId);
+        if (connResult.success) {
+          connection = connResult.data;
+        }
+      }
+      return ApiResponse.success(res, { ...personalInfo.data, connection }, personalInfo.message);
     }
-    return ApiResponse.error(res, 'Profile not found', 404);
+    return ApiResponse.error(res, 'Profile not found', null, 404);
   }
 
   static async verifyPassword(req: Request, res: Response) {
