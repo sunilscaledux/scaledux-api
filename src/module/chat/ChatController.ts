@@ -1,8 +1,10 @@
 import { Request, Response } from "express";
 import { ConversationService } from "./ConversationService";
+import { ConnectionService } from "@module/connection/ConnectionService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { addSaveMessageJob } from "@queues/MessageQueue";
 import { publishSocketEvent } from "@services/socketPubSub";
+import { prisma } from "@services/prismaService";
 
 function getStringParam(param: unknown): string {
   return typeof param === "string" ? param : "";
@@ -44,6 +46,21 @@ export async function startConversation(req: Request, res: Response) {
   if (!Number.isInteger(otherUserId) || otherUserId === userId) {
     return ApiResponse.error(res, "Valid other user ID is required", 400);
   }
+
+  // Check connection status — only allow starting conversation if connected
+  const connection = await (prisma as any).connection.findFirst({
+    where: {
+      OR: [
+        { sender_id: userId, receiver_id: otherUserId },
+        { sender_id: otherUserId, receiver_id: userId },
+      ],
+      status: 'CONNECTED',
+    },
+  });
+  if (!connection) {
+    return ApiResponse.error(res, "You must be connected to start a conversation", 403);
+  }
+
   const result = await ConversationService.getOrCreateConversation(userId, otherUserId);
   if (!result.success || !result.data) return ApiResponse.error(res, result.message || "Failed to start conversation", 500);
   const conv = await ConversationService.getConversationByUniqueId(result.data.unique_id, userId);

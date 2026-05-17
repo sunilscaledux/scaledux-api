@@ -236,10 +236,72 @@ export class CompanyProfileService {
         phoneVerified: false,
       };
 
+      // Fetch investment profile tab if exists
+      const tabs: string[] = ['company'];
+      let investorProfile = null;
+
+      const ip = await (prisma as any).investmentProfile.findUnique({
+        where: { user_id: user.id },
+        include: {
+          preferredIndustries: {
+            include: { industry: true, subIndustry: true },
+            orderBy: { order_index: 'asc' },
+          },
+          committeeMembers: { orderBy: { order_index: 'asc' } },
+          geoPreferences: {
+            include: { country: true, state: true },
+            orderBy: { order_index: 'asc' },
+          },
+        },
+      });
+
+      if (ip) {
+        tabs.push('investor');
+        const committeeMembers = await Promise.all(
+          (ip.committeeMembers || []).map(async (m: any) => ({
+            id: m.id,
+            name: m.name,
+            role: m.role,
+            roleDescription: m.role_description,
+            photo: m.photo ? await resolveAttachmentUrl(m.photo, 'committee_member_photo') : null,
+            email: m.hide_email ? null : m.email,
+            hideEmail: m.hide_email,
+          }))
+        );
+
+        investorProfile = {
+          investorTypes: Array.isArray(ip.investor_types) ? ip.investor_types : [],
+          thesisSummary: ip.thesis_summary || null,
+          diligenceProcess: ip.diligence_process || null,
+          diligenceDocument: ip.diligence_document || null,
+          investmentSizeMin: ip.investment_size_min != null ? Number(ip.investment_size_min) : null,
+          investmentSizeMax: ip.investment_size_max != null ? Number(ip.investment_size_max) : null,
+          investmentSizeCurrency: ip.investment_size_currency || null,
+          equityRangeMin: ip.equity_range_min != null ? Number(ip.equity_range_min) : null,
+          equityRangeMax: ip.equity_range_max != null ? Number(ip.equity_range_max) : null,
+          preferredIndustries: (ip.preferredIndustries || []).map((pi: any) => ({
+            industryName: pi.industry?.name || null,
+            subIndustryName: pi.subIndustry?.name || null,
+            specialisation: pi.specialisation || null,
+            investmentStage: pi.investment_stage || null,
+            investmentCriteria: pi.investment_criteria || null,
+          })),
+          committeeMembers,
+          geoPreferences: (ip.geoPreferences || []).map((g: any) => ({
+            country: g.country?.name || null,
+            state: g.state?.name || null,
+          })),
+        };
+      }
+
       return {
         success: true,
         message: 'Company profile retrieved successfully',
-        data: companyDetail,
+        data: {
+          tabs,
+          company: companyDetail,
+          ...(investorProfile && { investor: investorProfile }),
+        },
       };
     } catch (error: any) {
       Log.error("Error", { error });

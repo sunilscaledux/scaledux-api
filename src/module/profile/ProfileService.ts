@@ -115,7 +115,6 @@ export class PersonalInfoService {
       const tabs: string[] = ['personal'];
       let companyProfile = null;
       let investorProfile = null;
-      let mentorProfile = null;
 
       if (user.role === 'founder') {
         tabs.push('company');
@@ -123,9 +122,6 @@ export class PersonalInfoService {
       } else if (user.role === 'investor') {
         tabs.push('investor');
         investorProfile = await this.getInvestorTab(user.id);
-      } else if (user.role === 'mentor') {
-        tabs.push('mentor');
-        mentorProfile = await this.getMentorTab(user.id);
       }
 
       return {
@@ -136,7 +132,6 @@ export class PersonalInfoService {
           personal: personalProfile,
           ...(companyProfile && { company: companyProfile }),
           ...(investorProfile && { investor: investorProfile }),
-          ...(mentorProfile && { mentor: mentorProfile }),
         },
       };
     } catch (error: any) {

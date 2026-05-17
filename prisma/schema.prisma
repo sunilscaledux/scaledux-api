@@ -111,6 +111,8 @@ model User {
   ms_teams_connected_at         DateTime?
   /** Tracks when the user last updated their name (15-day cooldown) */
   name_updated_at               DateTime?
+  connectionsSent               Connection[] @relation("ConnectionSender")
+  connectionsReceived           Connection[] @relation("ConnectionReceiver")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -1775,4 +1777,22 @@ model SuccessStory {
 
   @@index([user_id])
   @@map("scd_success_stories")
+}
+
+model Connection {
+  id            Int       @id @default(autoincrement())
+  sender_id     Int
+  receiver_id   Int
+  status        String    @default("REQUESTED") @db.VarChar(20) // REQUESTED, CONNECTED, REJECTED, WITHDRAWN
+  note          String?   @db.Text
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  sender   User @relation("ConnectionSender", fields: [sender_id], references: [id], onDelete: Cascade)
+  receiver User @relation("ConnectionReceiver", fields: [receiver_id], references: [id], onDelete: Cascade)
+
+  @@unique([sender_id, receiver_id])
+  @@index([receiver_id, status])
+  @@index([sender_id, status])
+  @@map("scd_connections")
 }

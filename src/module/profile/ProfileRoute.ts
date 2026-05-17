@@ -9,7 +9,7 @@ import { getInvestmentProfile, updateInvestmentProfile } from "./InvestmentProfi
 import { NotificationPreferencesController } from "./NotificationPreferencesController";
 import { NotificationController as InAppNotificationController } from "../notification/NotificationController";
 import * as DeactivationController from "./DeactivationController";
-import { authenticateToken } from "@middleware/auth";
+import { authenticateToken, optionalAuth } from "@middleware/auth";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
 import { uploadFile } from "@module/general/FileController";
 
@@ -135,6 +135,6 @@ router.post("/delete/cancel", authenticateToken, DeactivationController.cancelDe
 
 router.get("/completion/status", authenticateToken, getProfileCompletion);
 router.get("/:uniqueId/reviews", ProfileController.getPublicProfileReviews);
-router.get("/:uniqueId", ProfileController.getPublicProfile);
+router.get("/:uniqueId", optionalAuth, ProfileController.getPublicProfile);
 
 export default router;
