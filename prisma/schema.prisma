@@ -1049,7 +1049,7 @@ model ReportSpam {
   reported_user_id  Int
   reason            String    @db.VarChar(255)
   description       String?   @db.Text
-  status            String    @default("PENDING") @db.VarChar(20) // PENDING, REVIEWED, DISMISSED
+  status            String    @default("PENDING") @db.VarChar(20) // PENDING, REVIEWING, RESOLVED, CLOSED
   created_at        DateTime  @default(now())
   updated_at        DateTime  @updatedAt
 
