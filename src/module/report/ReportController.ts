@@ -59,6 +59,33 @@ export async function updateReportStatus(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, 400);
 }
 
+export async function deleteReport(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+
+  const reportId = parseInt(req.params.id, 10);
+  if (isNaN(reportId)) return ApiResponse.error(res, "Invalid report ID", 400);
+
+  const result = await ReportService.deleteReport(userId, reportId);
+  if (result.success) return ApiResponse.success(res, null, result.message);
+  return ApiResponse.error(res, result.message, 400);
+}
+
+export async function updateReport(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+
+  const reportId = parseInt(req.params.id, 10);
+  if (isNaN(reportId)) return ApiResponse.error(res, "Invalid report ID", 400);
+
+  const { reason, description } = req.body;
+  if (!reason) return ApiResponse.error(res, "Reason is required", 400);
+
+  const result = await ReportService.updateReport(userId, reportId, reason, description);
+  if (result.success) return ApiResponse.success(res, null, result.message);
+  return ApiResponse.error(res, result.message, 400);
+}
+
 export async function checkReport(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) {

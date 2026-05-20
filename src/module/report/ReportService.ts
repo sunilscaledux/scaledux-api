@@ -199,6 +199,45 @@ export class ReportService {
     }
   }
 
+  /**
+   * Delete a pending report (only reporter can delete).
+   */
+  static async deleteReport(reporterId: number, reportId: number): Promise<ServiceResponse> {
+    try {
+      const report = await (prisma as any).reportSpam.findUnique({ where: { id: reportId } });
+      if (!report) return { success: false, message: 'Report not found' };
+      if (report.reporter_id !== reporterId) return { success: false, message: 'Not authorized' };
+      if (report.status !== 'PENDING') return { success: false, message: 'Only pending reports can be deleted' };
+
+      await (prisma as any).reportSpam.delete({ where: { id: reportId } });
+      return { success: true, message: 'Report deleted' };
+    } catch (error: any) {
+      Log.error('Delete report error', { error });
+      return { success: false, message: 'Failed to delete report' };
+    }
+  }
+
+  /**
+   * Update a pending report (only reporter can edit).
+   */
+  static async updateReport(reporterId: number, reportId: number, reason: string, description?: string): Promise<ServiceResponse> {
+    try {
+      const report = await (prisma as any).reportSpam.findUnique({ where: { id: reportId } });
+      if (!report) return { success: false, message: 'Report not found' };
+      if (report.reporter_id !== reporterId) return { success: false, message: 'Not authorized' };
+      if (report.status !== 'PENDING') return { success: false, message: 'Only pending reports can be edited' };
+
+      await (prisma as any).reportSpam.update({
+        where: { id: reportId },
+        data: { reason, description: description?.trim() || null },
+      });
+      return { success: true, message: 'Report updated' };
+    } catch (error: any) {
+      Log.error('Update report error', { error });
+      return { success: false, message: 'Failed to update report' };
+    }
+  }
+
   static async checkReport(
     reporterId: number,
     reportedUserUniqueId: string
