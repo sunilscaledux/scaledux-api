@@ -10,8 +10,11 @@ export class ConnectionController {
 
     const { uniqueId, note } = req.body;
     if (!uniqueId) return ApiResponse.error(res, 'uniqueId is required', 400);
+    const trimmedNote = typeof note === 'string' ? note.trim() : '';
+    if (!trimmedNote || trimmedNote.length < 20) return ApiResponse.error(res, 'Message must be at least 20 characters', 400);
+    if (trimmedNote.length > 300) return ApiResponse.error(res, 'Message must be at most 300 characters', 400);
 
-    const result = await ConnectionService.sendRequest(userId, uniqueId, note);
+    const result = await ConnectionService.sendRequest(userId, uniqueId, trimmedNote);
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message, 400);
   }
