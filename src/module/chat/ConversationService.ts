@@ -220,21 +220,21 @@ export class ConversationService {
         return { success: true, message: "OK", data: { users: [] } };
       }
 
-      // Find all conversations the current user is part of
-      const conversations = await (prisma as any).conversation.findMany({
+      // Find all connected users
+      const connections = await (prisma as any).connection.findMany({
         where: {
+          status: 'CONNECTED',
           OR: [
-            { user1_id: currentUserId },
-            { user2_id: currentUserId }
-          ]
+            { sender_id: currentUserId },
+            { receiver_id: currentUserId },
+          ],
         },
-        select: { user1_id: true, user2_id: true }
+        select: { sender_id: true, receiver_id: true },
       });
 
-      // Extract the other user IDs
       const otherUserIds = [...new Set(
-        conversations.map((c: any) =>
-          c.user1_id === currentUserId ? c.user2_id : c.user1_id
+        connections.map((c: any) =>
+          c.sender_id === currentUserId ? c.receiver_id : c.sender_id
         )
       )];
 
@@ -242,7 +242,7 @@ export class ConversationService {
         return { success: true, message: "OK", data: { users: [] } };
       }
 
-      // Search only among conversation users
+      // Search only among connected users
       const users = await (prisma as any).user.findMany({
         where: {
           id: { in: otherUserIds },

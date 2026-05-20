@@ -54,7 +54,7 @@ export class ConnectionService {
           }
           return { success: false, message: 'Connection request already sent' };
         }
-        if (existing.status === 'REJECTED' || existing.status === 'WITHDRAWN') {
+        if (existing.status === 'REJECTED' || existing.status === 'WITHDRAWN' || existing.status === 'DISCONNECTED') {
           // Allow re-request by updating existing record
           await (prisma as any).connection.update({
             where: { id: existing.id },
@@ -194,6 +194,39 @@ export class ConnectionService {
     } catch (error: any) {
       Log.error('Withdraw connection error', { error });
       return { success: false, message: error.message || 'Failed to withdraw connection request' };
+    }
+  }
+
+  /**
+   * Disconnect an accepted connection (either party can disconnect).
+   */
+  static async disconnectConnection(userId: number, connectionId: number): Promise<ServiceResponse> {
+    try {
+      const connection = await (prisma as any).connection.findUnique({
+        where: { id: connectionId },
+      });
+
+      if (!connection) {
+        return { success: false, message: 'Connection not found' };
+      }
+
+      if (connection.sender_id !== userId && connection.receiver_id !== userId) {
+        return { success: false, message: 'Not authorized' };
+      }
+
+      if (connection.status !== 'CONNECTED') {
+        return { success: false, message: 'Connection is not active' };
+      }
+
+      await (prisma as any).connection.update({
+        where: { id: connectionId },
+        data: { status: 'DISCONNECTED' },
+      });
+
+      return { success: true, message: 'Connection removed' };
+    } catch (error: any) {
+      Log.error('Disconnect connection error', { error });
+      return { success: false, message: error.message || 'Failed to disconnect' };
     }
   }
 

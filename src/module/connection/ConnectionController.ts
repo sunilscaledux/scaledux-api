@@ -55,6 +55,19 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  /** PATCH /connections/:id/disconnect — remove an accepted connection */
+  static async disconnectConnection(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const connectionId = parseInt(req.params.id, 10);
+    if (isNaN(connectionId)) return ApiResponse.error(res, 'Invalid connection ID', 400);
+
+    const result = await ConnectionService.disconnectConnection(userId, connectionId);
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
   /** GET /connections/status/:uniqueId — get connection status with another user */
   static async getStatus(req: Request, res: Response) {
     const userId = req.user?.id;

@@ -13,5 +13,6 @@ router.post('/request', ConnectionController.sendRequest);
 router.patch('/:id/accept', ConnectionController.acceptRequest);
 router.patch('/:id/reject', ConnectionController.rejectRequest);
 router.patch('/:id/withdraw', ConnectionController.withdrawRequest);
+router.patch('/:id/disconnect', ConnectionController.disconnectConnection);
 
 export default router;

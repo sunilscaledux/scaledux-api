@@ -1783,7 +1783,7 @@ model Connection {
   id            Int       @id @default(autoincrement())
   sender_id     Int
   receiver_id   Int
-  status        String    @default("REQUESTED") @db.VarChar(20) // REQUESTED, CONNECTED, REJECTED, WITHDRAWN
+  status        String    @default("REQUESTED") @db.VarChar(20) // REQUESTED, CONNECTED, REJECTED, WITHDRAWN, DISCONNECTED
   note          String?   @db.Text
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
