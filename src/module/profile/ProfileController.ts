@@ -284,11 +284,29 @@ export class ProfileController {
       return ApiResponse.error(res, 'Unique ID is required', 400);
     }
 
+    // Check if blocked (either direction)
+    const viewerId = req.user?.id;
+    if (viewerId) {
+      const targetUser = await prisma.user.findUnique({ where: { unique_id: uniqueId }, select: { id: true } });
+      if (targetUser) {
+        const block = await (prisma as any).blockedUser.findFirst({
+          where: {
+            OR: [
+              { blocker_id: viewerId, blocked_user_id: targetUser.id },
+              { blocker_id: targetUser.id, blocked_user_id: viewerId },
+            ],
+          },
+        });
+        if (block) {
+          return ApiResponse.error(res, 'This profile is not available', null, 403);
+        }
+      }
+    }
+
     const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
 
     if (personalInfo.success) {
       // Include connection status if viewer is authenticated
-      const viewerId = req.user?.id;
       let connection = null;
       if (viewerId) {
         const connResult = await ConnectionService.getConnectionStatus(viewerId, uniqueId);
