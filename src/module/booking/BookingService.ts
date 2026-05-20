@@ -161,10 +161,10 @@ export class BookingService {
         if (!oldBooking) return { success: false, message: 'Original booking not found' };
         if (oldBooking.status === 'CANCELLED') return { success: false, message: 'Original booking is already cancelled' };
 
-        // Must be at least 15 min before scheduled time to reschedule
+        // Must be at least 2 hours before scheduled time to reschedule
         const minsUntil = (new Date(oldBooking.scheduled_at).getTime() - Date.now()) / 60000;
-        if (minsUntil < 15) {
-          return { success: false, message: 'Cannot reschedule less than 15 minutes before the call' };
+        if (minsUntil < 120) {
+          return { success: false, message: 'Cannot reschedule less than 2 hours before the call' };
         }
 
         await (prisma as any).booking.update({
@@ -175,6 +175,8 @@ export class BookingService {
       }
 
       const scheduledEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+
+      const isReschedule = !!parentId;
 
       const booking = await (prisma as any).booking.create({
         data: {
@@ -187,9 +189,56 @@ export class BookingService {
           message: data.message?.trim() || null,
           amount,
           currency_id: 1, // INR default
-          ...(parentId ? { parent_id: parentId, is_reschedule: true, rescheduled_by: userId } : {}),
+          ...(isReschedule
+            ? { parent_id: parentId, is_reschedule: true, rescheduled_by: userId, status: 'CONFIRMED', payment_status: 'PAID' }
+            : {}),
         },
       });
+
+      // Reschedule: auto-confirm (no payment needed) and send notifications
+      if (isReschedule) {
+        const userName = await getUserFullName(userId);
+        const notifTitle = 'Call rescheduled & confirmed';
+        const notifBody = buildBookingEmailBody({
+          userName,
+          duration: booking.duration,
+          scheduledAt: new Date(booking.scheduled_at),
+          isReschedule: true,
+          message: booking.message,
+          type: 'confirmed',
+        });
+        const notifData = {
+          userId: booking.mentor_id,
+          type: 'BOOKING_CONFIRMED' as const,
+          notificationTitle: notifTitle,
+          notificationBody: notifBody,
+          notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+          actorId: userId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
+
+        await ConversationService.syncSystemMessage(
+          userId, booking.mentor_id,
+          '📅 Booking rescheduled & confirmed!',
+          {
+            activityType: 'BOOKING_CONFIRMED',
+            bookingTitle: '1:1 Video Call',
+            bookingDuration: booking.duration,
+            bookingScheduledAt: booking.scheduled_at,
+            bookingMessage: booking.message || null,
+          },
+          undefined, userId
+        );
+
+        return {
+          success: true,
+          message: 'Booking rescheduled and confirmed',
+          data: { booking: { unique_id: booking.unique_id, status: 'CONFIRMED', isReschedule: true } },
+        };
+      }
 
       // No notifications/email/chat here — triggered only after payment in verifyPayment
 
