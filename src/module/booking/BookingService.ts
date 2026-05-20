@@ -216,16 +216,6 @@ export class BookingService {
       if (booking.status !== 'PENDING') return { success: false, message: 'Booking is not in pending state' };
       if (booking.payment_status !== 'UNPAID') return { success: false, message: 'Payment already initiated' };
 
-      // Expire stale PENDING bookings (older than 2 minutes)
-      const ageMs = Date.now() - new Date(booking.created_at).getTime();
-      if (ageMs > 3 * 60 * 1000) {
-        await (prisma as any).booking.update({
-          where: { id: booking.id },
-          data: { status: 'CANCELLED', cancel_reason: 'Payment timeout' },
-        });
-        return { success: false, message: 'Booking expired. Please create a new booking.' };
-      }
-
       const baseAmount = Number(booking.amount);
       if (baseAmount <= 0) return { success: false, message: 'Invalid booking amount' };
 
