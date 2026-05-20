@@ -32,6 +32,7 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'BOOKING_REQUESTED', label: 'A new booking request is received', category: 'Bookings' },
   { type: 'BOOKING_CONFIRMED', label: 'A booking is confirmed after payment', category: 'Bookings' },
   { type: 'BOOKING_CANCELLED', label: 'A booking is cancelled', category: 'Bookings' },
+  { type: 'MEETING_LINK_ADDED', label: 'A meeting link is added or updated', category: 'Bookings' },
   // System (single opt-in style)
   { type: 'SYSTEM_HELPFUL_EMAILS', label: 'Send me genuinely useful emails every now and then to help me get the most out of ScaleDux', category: 'System' }
 ] as const
