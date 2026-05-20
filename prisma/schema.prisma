@@ -113,6 +113,8 @@ model User {
   name_updated_at               DateTime?
   connectionsSent               Connection[] @relation("ConnectionSender")
   connectionsReceived           Connection[] @relation("ConnectionReceiver")
+  blockedUsers                  BlockedUser[] @relation("BlockedByUser")
+  blockedByUsers                BlockedUser[] @relation("BlockedTargetUser")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -1059,6 +1061,20 @@ model ReportSpam {
   @@unique([reporter_id, reported_user_id])
   @@index([reported_user_id])
   @@map("scd_report_spam")
+}
+
+model BlockedUser {
+  id              Int       @id @default(autoincrement())
+  blocker_id      Int
+  blocked_user_id Int
+  created_at      DateTime  @default(now())
+
+  blocker       User @relation("BlockedByUser", fields: [blocker_id], references: [id], onDelete: Cascade)
+  blocked_user  User @relation("BlockedTargetUser", fields: [blocked_user_id], references: [id], onDelete: Cascade)
+
+  @@unique([blocker_id, blocked_user_id])
+  @@index([blocked_user_id])
+  @@map("scd_blocked_users")
 }
 
 // Milestones linked to project and proposal (enables per-milestone docs and status)
