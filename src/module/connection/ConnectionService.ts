@@ -2,6 +2,11 @@ import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { Log } from '@services/loggerService';
 import { ConversationService } from '@module/chat/ConversationService';
+import { getUserFullName } from '@utils/General';
+import { dispatch } from '@queues/Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
+import { appConfig } from '@config/app';
 
 export class ConnectionService {
   /**
@@ -50,6 +55,22 @@ export class ConnectionService {
             });
             // Accept the conversation too
             await this.acceptConversation(senderId, receiver.id);
+
+            // Notify the original sender (receiver of this call) that connection is now active
+            const autoAcceptName = await getUserFullName(senderId);
+            const autoAcceptNotif = {
+              userId: receiver.id,
+              type: 'REQUEST_ACCEPTED' as const,
+              notificationTitle: 'Connection request accepted',
+              notificationBody: `<p><strong>${autoAcceptName}</strong> accepted your connection request. You can now message each other.</p>`,
+              notificationLink: `${appConfig.frontendUrl}/my-connects`,
+              actorId: senderId,
+              subjectType: 'Connection' as const,
+              subjectId: existing.id,
+            };
+            await dispatch(NotificationJob, autoAcceptNotif);
+            await dispatch(NotificationEmailJob, autoAcceptNotif);
+
             return { success: true, message: 'Connection accepted' };
           }
           return { success: false, message: 'Connection request already sent' };
@@ -62,7 +83,7 @@ export class ConnectionService {
           });
         }
       } else {
-        await (prisma as any).connection.create({
+        const created = await (prisma as any).connection.create({
           data: {
             sender_id: senderId,
             receiver_id: receiver.id,
@@ -70,6 +91,24 @@ export class ConnectionService {
             note: note || null,
           },
         });
+
+        // Notify receiver only for brand new connection requests
+        const senderName = await getUserFullName(senderId);
+        const notifBody = note
+          ? `<p><strong>${senderName}</strong> sent you a connection request.</p><p style="color:#667085;font-size:13px;margin-top:8px;">"${note}"</p>`
+          : `<p><strong>${senderName}</strong> sent you a connection request.</p>`;
+        const notifData = {
+          userId: receiver.id,
+          type: 'REQUEST_RECEIVED' as const,
+          notificationTitle: 'New connection request',
+          notificationBody: notifBody,
+          notificationLink: `${appConfig.frontendUrl}/my-connects`,
+          actorId: senderId,
+          subjectType: 'Connection' as const,
+          subjectId: created.id,
+        };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
       }
 
       // Create conversation with NOT_ACCEPTED status and send the note as first message
@@ -124,6 +163,21 @@ export class ConnectionService {
       // Set conversation status to ACCEPTED so they can chat freely
       await this.acceptConversation(connection.sender_id, connection.receiver_id);
 
+      // Notify the original sender that their request was accepted
+      const acceptorName = await getUserFullName(receiverId);
+      const acceptNotifData = {
+        userId: connection.sender_id,
+        type: 'REQUEST_ACCEPTED' as const,
+        notificationTitle: 'Connection request accepted',
+        notificationBody: `<p><strong>${acceptorName}</strong> accepted your connection request. You can now message each other.</p>`,
+        notificationLink: `${appConfig.frontendUrl}/my-connects`,
+        actorId: receiverId,
+        subjectType: 'Connection' as const,
+        subjectId: connectionId,
+      };
+      await dispatch(NotificationJob, acceptNotifData);
+      await dispatch(NotificationEmailJob, acceptNotifData);
+
       return { success: true, message: 'Connection accepted' };
     } catch (error: any) {
       Log.error('Accept connection error', { error });
@@ -156,6 +210,21 @@ export class ConnectionService {
         where: { id: connectionId },
         data: { status: 'REJECTED' },
       });
+
+      // Notify the original sender that their request was declined
+      const declineName = await getUserFullName(receiverId);
+      const declineNotifData = {
+        userId: connection.sender_id,
+        type: 'REQUEST_DECLINED' as const,
+        notificationTitle: 'Connection request declined',
+        notificationBody: `<p><strong>${declineName}</strong> declined your connection request.</p>`,
+        notificationLink: `${appConfig.frontendUrl}/my-connects`,
+        actorId: receiverId,
+        subjectType: 'Connection' as const,
+        subjectId: connectionId,
+      };
+      await dispatch(NotificationJob, declineNotifData);
+      await dispatch(NotificationEmailJob, declineNotifData);
 
       return { success: true, message: 'Connection rejected' };
     } catch (error: any) {
