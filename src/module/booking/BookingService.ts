@@ -702,6 +702,139 @@ export class BookingService {
   }
 
   /**
+   * Get analytics/insights for a mentor's bookings.
+   * Supports periods: this-month, quarterly, ytd.
+   */
+  static async getAnalytics(
+    mentorId: number,
+    period: string
+  ): Promise<ServiceResponse> {
+    try {
+      const now = new Date();
+      let currentStart: Date;
+      let prevStart: Date;
+      let prevEnd: Date;
+
+      if (period === 'quarterly') {
+        const quarter = Math.floor(now.getMonth() / 3);
+        currentStart = new Date(now.getFullYear(), quarter * 3, 1);
+        const prevQuarter = quarter === 0 ? 3 : quarter - 1;
+        const prevYear = quarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        prevStart = new Date(prevYear, prevQuarter * 3, 1);
+        prevEnd = new Date(currentStart);
+      } else if (period === 'ytd') {
+        currentStart = new Date(now.getFullYear(), 0, 1);
+        prevStart = new Date(now.getFullYear() - 1, 0, 1);
+        prevEnd = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+      } else {
+        // this-month
+        currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+        const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        prevStart = new Date(prevYear, prevMonth, 1);
+        prevEnd = new Date(currentStart);
+      }
+
+      // Current period bookings
+      const currentBookings = await (prisma as any).booking.findMany({
+        where: {
+          mentor_id: mentorId,
+          status: { in: ['CONFIRMED', 'COMPLETED'] },
+          created_at: { gte: currentStart, lte: now },
+        },
+        select: { id: true, title: true, amount: true, created_at: true },
+      });
+
+      // Previous period bookings
+      const prevBookings = await (prisma as any).booking.findMany({
+        where: {
+          mentor_id: mentorId,
+          status: { in: ['CONFIRMED', 'COMPLETED'] },
+          created_at: { gte: prevStart, lt: prevEnd },
+        },
+        select: { id: true, title: true, amount: true },
+      });
+
+      const callTitle = '1:1 Video Call';
+
+      // Current counts & revenue
+      const totalBookings = currentBookings.length;
+      const callBookings = currentBookings.filter((b: any) => b.title === callTitle);
+      const packageBookings = currentBookings.filter((b: any) => b.title !== callTitle);
+      const callCount = callBookings.length;
+      const packageCount = packageBookings.length;
+      const callRevenue = callBookings.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+      const packageRevenue = packageBookings.reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+
+      // Previous counts & revenue
+      const prevTotal = prevBookings.length;
+      const prevCallRevenue = prevBookings
+        .filter((b: any) => b.title === callTitle)
+        .reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+      const prevPackageRevenue = prevBookings
+        .filter((b: any) => b.title !== callTitle)
+        .reduce((sum: number, b: any) => sum + Number(b.amount), 0);
+
+      // Trend calculation
+      const calcTrend = (current: number, prev: number) => {
+        if (prev === 0) return current > 0 ? 100 : 0;
+        return Math.round(((current - prev) / prev) * 100);
+      };
+
+      const bookingsTrend = calcTrend(totalBookings, prevTotal);
+      const callRevenueTrend = calcTrend(callRevenue, prevCallRevenue);
+      const packageRevenueTrend = calcTrend(packageRevenue, prevPackageRevenue);
+
+      // Chart data — group by day (this-month) or by week (quarterly/ytd)
+      const chartPoints: Record<string, { bookings: number; callRevenue: number; packageRevenue: number }> = {};
+
+      for (const b of currentBookings) {
+        const d = new Date(b.created_at);
+        let key: string;
+        if (period === 'this-month') {
+          key = `${d.getMonth() + 1}/${d.getDate()}`;
+        } else {
+          // Weekly grouping — use ISO week start (Monday)
+          const day = d.getDay();
+          const monday = new Date(d);
+          monday.setDate(d.getDate() - ((day + 6) % 7));
+          key = `${monday.getMonth() + 1}/${monday.getDate()}`;
+        }
+        if (!chartPoints[key]) chartPoints[key] = { bookings: 0, callRevenue: 0, packageRevenue: 0 };
+        chartPoints[key].bookings += 1;
+        const amt = Number(b.amount);
+        if (b.title === callTitle) {
+          chartPoints[key].callRevenue += amt;
+        } else {
+          chartPoints[key].packageRevenue += amt;
+        }
+      }
+
+      const chartData = Object.entries(chartPoints)
+        .map(([label, vals]) => ({ label, ...vals }));
+
+      return {
+        success: true,
+        message: 'Analytics fetched',
+        data: {
+          totalBookings,
+          callCount,
+          packageCount,
+          callRevenue: Math.round(callRevenue * 100) / 100,
+          packageRevenue: Math.round(packageRevenue * 100) / 100,
+          bookingsTrend,
+          callRevenueTrend,
+          packageRevenueTrend,
+          chartData,
+        },
+      };
+    } catch (error: any) {
+      Log.error('Get booking analytics error', { error });
+      return { success: false, message: error.message || 'Failed to fetch analytics' };
+    }
+  }
+
+  /**
    * Get occupied time ranges for a mentor on a given date.
    * Returns array of { start (minutes since midnight), end (minutes since midnight) }.
    * Used by frontend to disable booked slots.

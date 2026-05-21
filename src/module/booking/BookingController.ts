@@ -55,6 +55,17 @@ export class BookingController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  static async getAnalytics(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const period = (req.query.period as string) || 'this-month';
+    const result = await BookingService.getAnalytics(userId, period);
+
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message);
+  }
+
   static async listBookings(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);

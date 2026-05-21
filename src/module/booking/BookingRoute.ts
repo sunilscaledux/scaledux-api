@@ -6,6 +6,7 @@ const router = Router();
 
 router.post('/', authenticateToken, BookingController.createBooking);
 router.get('/slots/:mentorId', BookingController.getOccupiedSlots);
+router.get('/analytics', authenticateToken, BookingController.getAnalytics);
 router.get('/', authenticateToken, BookingController.listBookings);
 router.get('/:uniqueId', authenticateToken, BookingController.getBooking);
 router.post('/:uniqueId/create-order', authenticateToken, BookingController.createOrder);
