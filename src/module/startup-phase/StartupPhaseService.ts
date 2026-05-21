@@ -70,6 +70,50 @@ export async function listStartupPhases(industryId: number | null): Promise<Serv
   }
 }
 
+/**
+ * Get a founder's startup progress by unique_id (public, read-only).
+ * Does NOT auto-create — returns null data if no progress exists.
+ */
+export async function getPublicStartupProgress(founderUniqueId: string): Promise<ServiceResponse> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { unique_id: founderUniqueId },
+      select: { id: true, role: true },
+    });
+    if (!user || user.role !== 'founder') {
+      return { success: false, message: 'Founder not found' };
+    }
+
+    const progress = await prisma.userStartupProgress.findUnique({
+      where: { user_id: user.id },
+    });
+    if (!progress) {
+      return { success: true, message: 'OK', data: { current_phase_id: null, completed_activities: [], deliverables: {} } };
+    }
+
+    const rawDeliverables = (progress.deliverables as DeliverablesMap) || {};
+    const resolved: DeliverablesMap = {};
+    for (const [key, file] of Object.entries(rawDeliverables)) {
+      const attId = urlOrPathToAttachmentId(file.url) || file.url;
+      const url = await resolveAttachmentUrl(attId, 'startup_deliverable').catch(() => file.url);
+      resolved[key] = { ...file, url: url || file.url };
+    }
+
+    return {
+      success: true,
+      message: 'OK',
+      data: {
+        current_phase_id: progress.current_phase_id,
+        completed_activities: (progress.completed_activities as string[]) || [],
+        deliverables: resolved,
+      },
+    };
+  } catch (error: any) {
+    Log.error('getPublicStartupProgress error', { error });
+    return { success: false, message: error.message || 'Failed to fetch startup progress' };
+  }
+}
+
 /** Get current user's startup progress (auto-creates if missing). */
 export async function getUserStartupProgress(userId: number): Promise<ServiceResponse> {
   try {

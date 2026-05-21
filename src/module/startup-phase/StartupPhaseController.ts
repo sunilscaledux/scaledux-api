@@ -21,6 +21,33 @@ export async function listPhases(req: Request, res: Response) {
   }
 }
 
+/**
+ * GET /startup-phases/progress/:uniqueId
+ * Public endpoint — only founder themselves or investors can view.
+ */
+export async function getPublicProgress(req: Request, res: Response) {
+  try {
+    const founderUniqueId = req.params.uniqueId;
+    if (!founderUniqueId) return ApiResponse.error(res, 'Unique ID is required', 400);
+
+    const viewerRole = req.user?.role;
+    const viewerUniqueId = req.user?.unique_id;
+    const isSelf = viewerUniqueId === founderUniqueId;
+    const isInvestor = viewerRole === 'investor';
+
+    if (!isSelf && !isInvestor) {
+      return ApiResponse.error(res, 'Access denied', null, 403);
+    }
+
+    const result = await StartupPhaseService.getPublicStartupProgress(founderUniqueId);
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 404);
+  } catch (e: any) {
+    Log.error('getPublicProgress error', { error: e });
+    return ApiResponse.error(res, e?.message || 'Failed to get progress', 500);
+  }
+}
+
 /** GET /profile/company/startup-progress */
 export async function getProgress(req: Request, res: Response) {
   try {

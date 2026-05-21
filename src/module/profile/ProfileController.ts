@@ -284,17 +284,15 @@ export class ProfileController {
       return ApiResponse.error(res, 'Unique ID is required', 400);
     }
 
-    // Check if blocked (either direction) — skip for own profile
+    // Check if target user has blocked the viewer — skip for own profile
     const viewerId = req.user?.id;
     if (viewerId) {
       const targetUser = await prisma.user.findUnique({ where: { unique_id: uniqueId }, select: { id: true } });
       if (targetUser && targetUser.id !== viewerId) {
         const block = await (prisma as any).blockedUser.findFirst({
           where: {
-            OR: [
-              { blocker_id: viewerId, blocked_user_id: targetUser.id },
-              { blocker_id: targetUser.id, blocked_user_id: viewerId },
-            ],
+            blocker_id: targetUser.id,
+            blocked_user_id: viewerId,
           },
         });
         if (block) {

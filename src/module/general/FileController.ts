@@ -136,7 +136,15 @@ export async function viewProtectedFile(req: Request, res: Response) {
 
     const isOwner = att.owner_user_id === userId
     const ids = att.accessible_user_ids as number[] | null | undefined
-    const hasAccess = isOwner || (Array.isArray(ids) && ids.includes(userId))
+    let hasAccess = isOwner || (Array.isArray(ids) && ids.includes(userId))
+
+    // Investors can access startup deliverable files
+    if (!hasAccess && att.path?.startsWith('startup-deliverables/')) {
+      const viewer = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+      if (viewer?.role === 'investor') {
+        hasAccess = true
+      }
+    }
 
     if (!hasAccess) {
       Log.info(`[viewFile] Access denied for file ${uniqueId}. userId=${userId}, owner=${att.owner_user_id}, accessible=${JSON.stringify(ids)}`)
