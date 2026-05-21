@@ -219,7 +219,12 @@ export class InvestorService {
       }
 
       if (params.industry?.trim()) {
-        where.industry = { name: { equals: params.industry.trim(), mode: 'insensitive' } };
+        const industries = params.industry.split(',').map(s => s.trim()).filter(Boolean);
+        if (industries.length === 1) {
+          where.industry = { name: { equals: industries[0], mode: 'insensitive' } };
+        } else if (industries.length > 1) {
+          where.industry = { name: { in: industries, mode: 'insensitive' } };
+        }
       }
 
       let orderBy: any = { created_at: 'desc' };

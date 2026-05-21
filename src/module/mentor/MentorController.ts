@@ -9,7 +9,7 @@ export class MentorController {
 
     const result = await MentorService.browseMentors({
       search: search as string,
-      categoryId: categoryId ? parseInt(String(categoryId)) : undefined,
+      categoryIds: categoryId ? String(categoryId).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : undefined,
       skills: skills ? String(skills).split(',').map(s => s.trim()).filter(Boolean) : undefined,
       sortBy: sortBy as any,
       minExperience: minExperience ? parseInt(String(minExperience)) : undefined,

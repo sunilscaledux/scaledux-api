@@ -11,7 +11,7 @@ export class MentorService {
    */
   static async browseMentors(params: {
     search?: string;
-    categoryId?: number;
+    categoryIds?: number[];
     skills?: string[];
     sortBy?: 'newest' | 'rating' | 'experience';
     minExperience?: number;
@@ -31,13 +31,7 @@ export class MentorService {
       const where: any = {
         role: 'mentor',
         status: 1,
-               personalInfo: {
-          isNot: null,
-          is: { title: { not: null, notIn: [''] } },
-        },
-        experience_years: { gt: 0 },
-        profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
- 
+        profile_completion_percentage: { gte: 75 },
       };
 
       if (params.search?.trim()) {
@@ -49,10 +43,22 @@ export class MentorService {
         ];
       }
 
-      if (params.categoryId) {
-        where.expertises = {
-          some: { categoryId: params.categoryId }
-        };
+      if (params.categoryIds && params.categoryIds.length > 0) {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              {
+                expertises: {
+                  some: params.categoryIds.length === 1
+                    ? { categoryId: params.categoryIds[0] }
+                    : { categoryId: { in: params.categoryIds } }
+                }
+              },
+              { expertises: { none: {} } },
+            ]
+          }
+        ];
       } else if (params.skills && params.skills.length > 0) {
         where.expertises = {
           some: {
