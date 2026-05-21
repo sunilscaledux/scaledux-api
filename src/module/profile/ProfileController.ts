@@ -304,15 +304,23 @@ export class ProfileController {
     const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
 
     if (personalInfo.success) {
-      // Include connection status if viewer is authenticated
+      // Include connection status and block info if viewer is authenticated
       let connection = null;
+      let isBlockedByMe = false;
       if (viewerId) {
         const connResult = await ConnectionService.getConnectionStatus(viewerId, uniqueId);
         if (connResult.success) {
           connection = connResult.data;
         }
+        const targetUser = await prisma.user.findUnique({ where: { unique_id: uniqueId }, select: { id: true } });
+        if (targetUser && targetUser.id !== viewerId) {
+          const block = await (prisma as any).blockedUser.findFirst({
+            where: { blocker_id: viewerId, blocked_user_id: targetUser.id },
+          });
+          isBlockedByMe = !!block;
+        }
       }
-      return ApiResponse.success(res, { ...personalInfo.data, connection }, personalInfo.message);
+      return ApiResponse.success(res, { ...personalInfo.data, connection, isBlockedByMe }, personalInfo.message);
     }
     return ApiResponse.error(res, 'Profile not found', null, 404);
   }
