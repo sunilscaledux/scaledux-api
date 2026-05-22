@@ -71,9 +71,9 @@ export function validateSafeUrl(value: string, helpers: Joi.CustomHelpers) {
 }
 
 export const safeUrlMessages = {
-  "string.urlNoProtocol": "Please enter website without http:// or https://",
-  "string.urlInvalid": "Invalid website format. Eg: scaledux.com or www.scaledux.com",
-  "string.urlNoHtml": "Website must not contain HTML tags",
-  "string.urlNoScript": "Website contains invalid characters",
-  "string.urlNoSql": "Website contains invalid characters",
+  "string.urlNoProtocol": "Please enter URL without http:// or https://",
+  "string.urlInvalid": "Invalid URL format. Follow format: www.google.com, www.scaledux.com, www.example.com",
+  "string.urlNoHtml": "URL must not contain HTML tags",
+  "string.urlNoScript": "URL contains invalid characters",
+  "string.urlNoSql": "URL contains invalid characters",
 };
