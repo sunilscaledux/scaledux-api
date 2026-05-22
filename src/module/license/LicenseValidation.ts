@@ -2,13 +2,17 @@ import Joi from 'joi'
 import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createLicenseSchema = Joi.object({
-  institute: Joi.string().required().messages({
+  institute: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'Institute is required',
-    'any.required': 'Institute is required'
+    'any.required': 'Institute is required',
+    'string.max': 'Institute must not exceed 150 characters',
+    ...noHtmlMessages,
   }),
-  license_name: Joi.string().required().messages({
+  license_name: Joi.string().required().max(120).custom(rejectAllHtml).messages({
     'string.empty': 'License name is required',
-    'any.required': 'License name is required'
+    'any.required': 'License name is required',
+    'string.max': 'License name must not exceed 120 characters',
+    ...noHtmlMessages,
   }),
   completed_month: Joi.string().required().messages({
     'string.empty': 'Completed month is required',
@@ -29,13 +33,17 @@ export const updateLicenseSchema = Joi.object({
     'number.positive': 'License ID must be positive',
     'any.required': 'License ID is required'
   }),
-  institute: Joi.string().required().messages({
+  institute: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'Institute is required',
-    'any.required': 'Institute is required'
+    'any.required': 'Institute is required',
+    'string.max': 'Institute must not exceed 150 characters',
+    ...noHtmlMessages,
   }),
-  license_name: Joi.string().required().messages({
+  license_name: Joi.string().required().max(120).custom(rejectAllHtml).messages({
     'string.empty': 'License name is required',
-    'any.required': 'License name is required'
+    'any.required': 'License name is required',
+    'string.max': 'License name must not exceed 120 characters',
+    ...noHtmlMessages,
   }),
   completed_month: Joi.string().required().messages({
     'string.empty': 'Completed month is required',

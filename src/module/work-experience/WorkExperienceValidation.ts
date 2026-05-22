@@ -2,13 +2,17 @@ import Joi from 'joi'
 import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createWorkExperienceSchema = Joi.object({
-  role: Joi.string().required().messages({
+  role: Joi.string().required().max(100).custom(rejectAllHtml).messages({
     'string.empty': 'Role is required',
-    'any.required': 'Role is required'
+    'any.required': 'Role is required',
+    'string.max': 'Role must not exceed 100 characters',
+    ...noHtmlMessages,
   }),
-  company: Joi.string().required().messages({
+  company: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'Company is required',
-    'any.required': 'Company is required'
+    'any.required': 'Company is required',
+    'string.max': 'Company must not exceed 150 characters',
+    ...noHtmlMessages,
   }),
   company_website: Joi.string().optional().allow(''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
@@ -32,13 +36,17 @@ export const updateWorkExperienceSchema = Joi.object({
     'number.positive': 'Work experience ID must be positive',
     'any.required': 'Work experience ID is required'
   }),
-  role: Joi.string().required().messages({
+  role: Joi.string().required().max(100).custom(rejectAllHtml).messages({
     'string.empty': 'Role is required',
-    'any.required': 'Role is required'
+    'any.required': 'Role is required',
+    'string.max': 'Role must not exceed 100 characters',
+    ...noHtmlMessages,
   }),
-  company: Joi.string().required().messages({
+  company: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'Company is required',
-    'any.required': 'Company is required'
+    'any.required': 'Company is required',
+    'string.max': 'Company must not exceed 150 characters',
+    ...noHtmlMessages,
   }),
   company_website: Joi.string().optional().allow(''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
