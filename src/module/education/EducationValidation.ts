@@ -3,10 +3,10 @@ import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
 import { rejectAllHtml, noHtmlMessages } from "../../utils/validation";
 
 export const createEducationSchema = Joi.object<CreateEducationInput>({
-  school: Joi.string().required().max(100).custom(rejectAllHtml).messages({
+  school: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'School/College name is required',
     'any.required': 'School/College name is required',
-    'string.max': 'School/College name must not exceed 100 characters',
+    'string.max': 'School/College name must not exceed 150 characters',
     ...noHtmlMessages,
   }),
   degree: Joi.string().required().max(100).custom(rejectAllHtml).messages({
@@ -45,10 +45,10 @@ export const updateEducationSchema = Joi.object<UpdateEducationInput>({
     'number.positive': 'Invalid education ID',
     'any.required': 'Education ID is required'
   }),
-  school: Joi.string().required().max(100).custom(rejectAllHtml).messages({
+  school: Joi.string().required().max(150).custom(rejectAllHtml).messages({
     'string.empty': 'School/College name is required',
     'any.required': 'School/College name is required',
-    'string.max': 'School/College name must not exceed 100 characters',
+    'string.max': 'School/College name must not exceed 150 characters',
     ...noHtmlMessages,
   }),
   degree: Joi.string().required().max(100).custom(rejectAllHtml).messages({
