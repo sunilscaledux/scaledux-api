@@ -27,7 +27,9 @@ export const createInvestmentPortfolioSchema = Joi.object({
   }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
-  investmentSize: Joi.number().min(0).optional(),
+  investmentSize: Joi.number().min(0).max(1000000000000).optional().messages({
+    'number.max': 'Investment size must not exceed 1 Trillion',
+  }),
   investmentSizeCurrency: Joi.string().valid('USD', 'INR').optional().allow(''),
   investmentDate: Joi.string().optional().allow(''),
   roundParticipatedIn: Joi.string().optional().allow(''),
@@ -51,7 +53,9 @@ export const updateInvestmentPortfolioSchema = Joi.object({
   }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
-  investmentSize: Joi.number().min(0).optional(),
+  investmentSize: Joi.number().min(0).max(1000000000000).optional().messages({
+    'number.max': 'Investment size must not exceed 1 Trillion',
+  }),
   investmentSizeCurrency: Joi.string().valid('USD', 'INR').optional().allow(''),
   investmentDate: Joi.string().optional().allow(''),
   roundParticipatedIn: Joi.string().optional().allow(''),
@@ -75,7 +79,9 @@ export const createDraftInvestmentPortfolioSchema = Joi.object({
   }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
-  investmentSize: Joi.number().min(0).optional(),
+  investmentSize: Joi.number().min(0).max(1000000000000).optional().messages({
+    'number.max': 'Investment size must not exceed 1 Trillion',
+  }),
   investmentSizeCurrency: Joi.string().valid('USD', 'INR').optional().allow(''),
   investmentDate: Joi.string().optional().allow(''),
   roundParticipatedIn: Joi.string().optional().allow(''),
@@ -99,7 +105,9 @@ export const updateDraftInvestmentPortfolioSchema = Joi.object({
   }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
-  investmentSize: Joi.number().min(0).optional(),
+  investmentSize: Joi.number().min(0).max(1000000000000).optional().messages({
+    'number.max': 'Investment size must not exceed 1 Trillion',
+  }),
   investmentSizeCurrency: Joi.string().valid('USD', 'INR').optional().allow(''),
   investmentDate: Joi.string().optional().allow(''),
   roundParticipatedIn: Joi.string().optional().allow(''),
