@@ -52,7 +52,7 @@ function buildBookingEmailBody(params: {
     if (recipientRole === 'user') {
       lines.push(isReschedule
         ? `<p>Your 1:1 video call with <strong>${escapeHtml(userName)}</strong> has been rescheduled and confirmed.</p>`
-        : `<p>Your 1:1 video call with <strong>${escapeHtml(userName)}</strong> has been confirmed. Payment received.</p>`
+        : `<p>Your 1:1 video call with <strong>${escapeHtml(userName)}</strong> has been confirmed.</p>`
       );
     } else {
       lines.push(isReschedule
@@ -437,7 +437,7 @@ export class BookingService {
       const chatPrefix = isReschedule ? '📅 Booking rescheduled & confirmed!' : '✅ New booking confirmed!';
       await ConversationService.syncSystemMessage(
         userId, booking.mentor_id,
-        `${chatPrefix} Payment received.`,
+        `${chatPrefix}`,
         {
           activityType: 'BOOKING_CONFIRMED',
           bookingTitle: '1:1 Video Call',
@@ -855,7 +855,7 @@ export class BookingService {
       const dayStart = new Date(y, m - 1, d, 0, 0, 0);
       const dayEnd = new Date(y, m - 1, d, 23, 59, 59);
 
-      const staleThreshold = new Date(Date.now() - 3 * 60 * 1000);
+      const staleThreshold = new Date(Date.now() - 2 * 60 * 1000);
 
       const bookings = await (prisma as any).booking.findMany({
         where: {
