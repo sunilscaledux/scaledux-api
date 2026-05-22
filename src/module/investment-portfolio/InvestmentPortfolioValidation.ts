@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().required().min(1).max(200).messages({
@@ -10,7 +10,10 @@ export const createInvestmentPortfolioSchema = Joi.object({
   }),
   companyLogo: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  companyWebsite: Joi.string().optional().allow(''),
+  companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
   investmentSize: Joi.number().min(0).optional(),
@@ -28,7 +31,10 @@ export const updateInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().min(1).max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  companyWebsite: Joi.string().optional().allow(''),
+  companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
   investmentSize: Joi.number().min(0).optional(),
@@ -46,7 +52,10 @@ export const createDraftInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().allow('').max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  companyWebsite: Joi.string().optional().allow(''),
+  companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
   investmentSize: Joi.number().min(0).optional(),
@@ -64,7 +73,10 @@ export const updateDraftInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().allow('').max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  companyWebsite: Joi.string().optional().allow(''),
+  companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
   investmentSize: Joi.number().min(0).optional(),

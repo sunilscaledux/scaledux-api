@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation';
+import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation';
 
 /**
  * Validation schema for updating company overview
@@ -19,10 +19,11 @@ export const updateOverviewSchema = Joi.object({
   company_website: Joi.string()
     .optional()
     .allow('', null)
-    .trim()
-    .pattern(/^(www\.)?[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$/)
+    .max(2048)
+    .custom(validateSafeUrl)
     .messages({
-      'string.pattern.base': 'Please provide a valid website URL (e.g., example.com or www.example.com)'
+      'string.max': 'Website URL must not exceed 2048 characters',
+      ...safeUrlMessages,
     }),
   founded_year: Joi.number().integer().min(1800).max(new Date().getFullYear()).optional().messages({
     'number.min': 'Founded year must be after 1800',

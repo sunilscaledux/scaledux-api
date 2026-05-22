@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createPortfolioSchema = Joi.object({
   title: Joi.string().required().min(1).max(125).messages({
@@ -42,21 +42,9 @@ export const createPortfolioSchema = Joi.object({
   media: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Media must be an array'
   }),
-  projectLink: Joi.string().optional().allow('').custom((value, helpers) => {
-    if (!value || value.trim() === '') {
-      return value
-    }
-    
-    // Validate URL format (example.com or www.example.com)
-    const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
-    if (!urlPattern.test(value.trim())) {
-      return helpers.error('string.pattern.base')
-    }
-    
-    return value.trim()
-  }).messages({
-    'string.base': 'Project link must be a string',
-    'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
+  projectLink: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Project link must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   completionMonth: Joi.string().optional().allow('').messages({
     'string.base': 'Completion month must be a string'
@@ -66,20 +54,9 @@ export const createPortfolioSchema = Joi.object({
   }),
   references: Joi.array().items(
     Joi.object({
-      url: Joi.string().custom((value, helpers) => {
-        if (!value || value.trim() === '') {
-          return value
-        }
-
-        // Validate URL format (example.com or www.example.com)
-        const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
-        if (!urlPattern.test(value.trim())) {
-          return helpers.error('string.pattern.base')
-        }
-
-        return value.trim()
-      }).messages({
-        'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
+      url: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+        'string.max': 'URL must not exceed 2048 characters',
+        ...safeUrlMessages,
       })
     }).options({ stripUnknown: true })
   ).optional().allow(null).messages({
@@ -126,21 +103,9 @@ export const updatePortfolioSchema = Joi.object({
   media: Joi.array().items(Joi.string()).optional().allow(null).messages({
     'array.base': 'Media must be an array'
   }),
-  projectLink: Joi.string().optional().allow('').custom((value, helpers) => {
-    if (!value || value.trim() === '') {
-      return value
-    }
-    
-    // Validate URL format (example.com or www.example.com)
-    const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
-    if (!urlPattern.test(value.trim())) {
-      return helpers.error('string.pattern.base')
-    }
-    
-    return value.trim()
-  }).messages({
-    'string.base': 'Project link must be a string',
-    'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
+  projectLink: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Project link must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   completionMonth: Joi.string().optional().allow('').messages({
     'string.base': 'Completion month must be a string'
@@ -150,20 +115,9 @@ export const updatePortfolioSchema = Joi.object({
   }),
   references: Joi.array().items(
     Joi.object({
-      url: Joi.string().custom((value, helpers) => {
-        if (!value || value.trim() === '') {
-          return value
-        }
-
-        // Validate URL format (example.com or www.example.com)
-        const urlPattern = /^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/
-        if (!urlPattern.test(value.trim())) {
-          return helpers.error('string.pattern.base')
-        }
-
-        return value.trim()
-      }).messages({
-        'string.pattern.base': 'Invalid website format. Eg scaledux.com or www.scaledux.com'
+      url: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+        'string.max': 'URL must not exceed 2048 characters',
+        ...safeUrlMessages,
       })
     }).options({ stripUnknown: true })
   ).optional().allow(null).messages({

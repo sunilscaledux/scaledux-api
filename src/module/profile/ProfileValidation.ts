@@ -1,6 +1,6 @@
 import Joi from "joi";
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from "./ProfileType";
-import { rejectDangerousHtml, dangerousHtmlMessages } from "../../utils/validation";
+import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMessages } from "../../utils/validation";
 
 export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
   title: Joi.string().max(120).required().custom((value, helpers) => {
@@ -26,21 +26,9 @@ export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
   countryId: Joi.number().integer().optional(),
   stateId: Joi.number().integer().optional().allow(null),
   city: Joi.string().optional(),
-  website: Joi.string().optional().allow('').custom((value, helpers) => {
-    if (!value || value.trim() === '') return value;
-    
-    // Reject if URL contains http:// or https://
-    if (/^https?:\/\//i.test(value)) {
-      throw new Error('Please enter website without http:// or https://');
-    }
-    
-    // Validate domain format
-    if (!/^(www\.)?[a-zA-Z0-9-]+(\.[a-zA-Z]{2,})+$/.test(value)) {
-      throw new Error('Invalid website format. Eg scaledux.com or www.scaledux.com');
-    }
-    
-    // Add https:// prefix for storage
-    return `https://${value}`;
+  website: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   hideEmail: Joi.boolean().optional(),
   hidePhone: Joi.boolean().optional(),

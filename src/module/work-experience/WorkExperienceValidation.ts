@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createWorkExperienceSchema = Joi.object({
   role: Joi.string().required().max(100).custom(rejectAllHtml).messages({
@@ -14,7 +14,10 @@ export const createWorkExperienceSchema = Joi.object({
     'string.max': 'Company must not exceed 150 characters',
     ...noHtmlMessages,
   }),
-  company_website: Joi.string().optional().allow(''),
+  company_website: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   start_month: Joi.string().required().messages({
     'string.empty': 'Start month is required',
@@ -48,7 +51,10 @@ export const updateWorkExperienceSchema = Joi.object({
     'string.max': 'Company must not exceed 150 characters',
     ...noHtmlMessages,
   }),
-  company_website: Joi.string().optional().allow(''),
+  company_website: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Website URL must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   start_month: Joi.string().required().messages({
     'string.empty': 'Start month is required',

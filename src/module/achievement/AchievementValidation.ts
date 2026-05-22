@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createAchievementSchema = Joi.object({
   title: Joi.string().required().min(2).max(255).messages({
@@ -31,7 +31,10 @@ export const createAchievementSchema = Joi.object({
     'string.empty': 'Completion year is required',
     'any.required': 'Completion year is required'
   }),
-  achievement_link: Joi.string().optional().allow(''),
+  achievement_link: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Achievement link must not exceed 2048 characters',
+    ...safeUrlMessages,
+  }),
   media_files: Joi.array().items(
     Joi.string().messages({
       'string.base': 'Media file must be a string (URL or path)'
@@ -78,29 +81,9 @@ export const updateAchievementSchema = Joi.object({
     'string.empty': 'Completion year is required',
     'any.required': 'Completion year is required'
   }),
-  achievement_link: Joi.string().optional().allow('').custom((value, helpers) => {
-    if (!value || value.trim() === '') {
-      return value;
-    }
-    
-    let url = value.trim();
-    
-    // Reject if user sends URL with protocol (frontend should strip it)
-    if (url.match(/^https?:\/\//i)) {
-      return helpers.error('string.protocol');
-    }
-    
-    // Validate the URL by adding protocol temporarily
-    try {
-      new URL(`https://${url}`);
-      return url; // Store without protocol
-    } catch (error) {
-      return helpers.error('string.uri');
-    }
-  }).messages({
-    'string.base': 'Achievement link must be a string',
-    'string.uri': 'Achievement link must be a valid URL',
-    'string.protocol': 'Achievement link should not include http:// or https://'
+  achievement_link: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'Achievement link must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   media_files: Joi.array().items(
     Joi.string().messages({
