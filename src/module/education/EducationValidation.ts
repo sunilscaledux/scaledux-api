@@ -1,5 +1,6 @@
 import Joi from "joi";
 import { CreateEducationInput, UpdateEducationInput } from "./EducationType";
+import { rejectDangerousHtml, dangerousHtmlMessages } from "../../utils/validation";
 
 export const createEducationSchema = Joi.object<CreateEducationInput>({
   school: Joi.string().required().messages({
@@ -25,7 +26,7 @@ export const createEducationSchema = Joi.object<CreateEducationInput>({
   end_month: Joi.string().optional().allow('', null),
   end_year: Joi.string().optional().allow('', null),
   is_ongoing: Joi.boolean().default(false),
-  description: Joi.string().optional().allow('', null),
+  description: Joi.string().optional().allow('', null).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   skills: Joi.array().items(Joi.string()).optional().default([])
 });
 
@@ -58,6 +59,6 @@ export const updateEducationSchema = Joi.object<UpdateEducationInput>({
   end_month: Joi.string().optional().allow('', null),
   end_year: Joi.string().optional().allow('', null),
   is_ongoing: Joi.boolean().default(false),
-  description: Joi.string().optional().allow('', null),
+  description: Joi.string().optional().allow('', null).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   skills: Joi.array().items(Joi.string()).optional().default([])
 });

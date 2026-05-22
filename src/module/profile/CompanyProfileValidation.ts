@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation';
 
 /**
  * Validation schema for updating company overview
@@ -7,8 +8,9 @@ export const updateOverviewSchema = Joi.object({
   company_name: Joi.string().optional().max(255).messages({
     'string.max': 'Company name must not exceed 255 characters'
   }),
-  company_description: Joi.string().optional().allow('', null).max(2000).messages({
-    'string.max': 'Company description must not exceed 2000 characters'
+  company_description: Joi.string().optional().allow('', null).max(2000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Company description must not exceed 2000 characters',
+    ...dangerousHtmlMessages,
   }),
   cin: Joi.string().optional().allow('', null).max(50).messages({
     'string.max': 'CIN must not exceed 50 characters'
@@ -212,11 +214,13 @@ export const raisingFundSchema = Joi.object({
  * Validation schema for updating problem and solution
  */
 export const updateProblemSolutionSchema = Joi.object({
-  problem_statement: Joi.string().optional().allow('', null).max(5000).messages({
-    'string.max': 'Problem statement must not exceed 5000 characters'
+  problem_statement: Joi.string().optional().allow('', null).max(5000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Problem statement must not exceed 5000 characters',
+    ...dangerousHtmlMessages,
   }),
-  solution_statement: Joi.string().optional().allow('', null).max(5000).messages({
-    'string.max': 'Solution statement must not exceed 5000 characters'
+  solution_statement: Joi.string().optional().allow('', null).max(5000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Solution statement must not exceed 5000 characters',
+    ...dangerousHtmlMessages,
   })
 });
 
@@ -240,8 +244,9 @@ export const updateRevenueModelSchema = Joi.object({
       is_secondary: Joi.boolean().optional().default(false)
     })
   ).max(5).optional().allow(null),
-  revenue_description: Joi.string().optional().allow('', null).max(5000).messages({
-    'string.max': 'Revenue description must not exceed 5000 characters'
+  revenue_description: Joi.string().optional().allow('', null).max(5000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Revenue description must not exceed 5000 characters',
+    ...dangerousHtmlMessages,
   })
 });
 
@@ -277,8 +282,9 @@ export const createTeamMemberSchema = Joi.object({
     'any.required': 'Role is required'
   }),
   is_cofounder: Joi.boolean().optional().default(false),
-  bio: Joi.string().optional().allow('', null).max(1000).messages({
-    'string.max': 'Bio must not exceed 1000 characters'
+  bio: Joi.string().optional().allow('', null).max(1000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Bio must not exceed 1000 characters',
+    ...dangerousHtmlMessages,
   }),
   linkedin_url: Joi.string()
     .optional()
@@ -303,8 +309,9 @@ export const updateTeamMemberSchema = Joi.object({
     'string.max': 'Role must not exceed 255 characters'
   }),
   is_cofounder: Joi.boolean().optional(),
-  bio: Joi.string().optional().allow('', null).max(1000).messages({
-    'string.max': 'Bio must not exceed 1000 characters'
+  bio: Joi.string().optional().allow('', null).max(1000).custom(rejectDangerousHtml).messages({
+    'string.max': 'Bio must not exceed 1000 characters',
+    ...dangerousHtmlMessages,
   }),
   linkedin_url: Joi.string()
     .optional()

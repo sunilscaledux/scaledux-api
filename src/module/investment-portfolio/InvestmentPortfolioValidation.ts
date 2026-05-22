@@ -1,4 +1,5 @@
 import Joi from 'joi'
+import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
 
 export const createInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().required().min(1).max(200).messages({
@@ -8,7 +9,7 @@ export const createInvestmentPortfolioSchema = Joi.object({
     'any.required': 'Company name is required'
   }),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow(''),
+  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyWebsite: Joi.string().optional().allow(''),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
@@ -26,7 +27,7 @@ export const createInvestmentPortfolioSchema = Joi.object({
 export const updateInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().min(1).max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow(''),
+  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyWebsite: Joi.string().optional().allow(''),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
@@ -44,7 +45,7 @@ export const updateInvestmentPortfolioSchema = Joi.object({
 export const createDraftInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().allow('').max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow(''),
+  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyWebsite: Joi.string().optional().allow(''),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),
@@ -62,7 +63,7 @@ export const createDraftInvestmentPortfolioSchema = Joi.object({
 export const updateDraftInvestmentPortfolioSchema = Joi.object({
   companyName: Joi.string().optional().allow('').max(200),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow(''),
+  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyWebsite: Joi.string().optional().allow(''),
   industryId: Joi.number().integer().positive().optional(),
   subIndustryId: Joi.number().integer().positive().optional(),

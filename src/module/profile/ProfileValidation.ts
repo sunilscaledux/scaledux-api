@@ -1,9 +1,22 @@
 import Joi from "joi";
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from "./ProfileType";
+import { rejectDangerousHtml, dangerousHtmlMessages } from "../../utils/validation";
 
 export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
-  title: Joi.string().required(),
-  about: Joi.string().required(),
+  title: Joi.string().max(120).required().custom((value, helpers) => {
+    if (/<[^>]*>/.test(value)) {
+      return helpers.error('string.htmlNotAllowed');
+    }
+    if (/('|--|;|\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC)\b)/i.test(value)) {
+      return helpers.error('string.sqlNotAllowed');
+    }
+    return value;
+  }).messages({
+    'string.max': 'Title must be at most 120 characters',
+    'string.htmlNotAllowed': 'Title must not contain HTML tags',
+    'string.sqlNotAllowed': 'Title contains invalid characters',
+  }),
+  about: Joi.string().required().custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
 });
 
 export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({

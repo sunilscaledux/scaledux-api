@@ -1,4 +1,5 @@
 import Joi from "joi";
+import { rejectDangerousHtml, dangerousHtmlMessages } from "../../utils/validation";
 
 export const createUserExpertiseSchema = Joi.object({
   expertise_category_id: Joi.number().integer().positive().required().messages({
@@ -18,9 +19,10 @@ export const createUserExpertiseSchema = Joi.object({
     'array.min': 'At least one specialty is required',
     'any.required': 'Specialty is required'
   }),
-  description: Joi.string().max(1000).optional().allow('').messages({
+  description: Joi.string().max(1000).optional().allow('').custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
-    'string.max': 'Description cannot exceed 1000 characters'
+    'string.max': 'Description cannot exceed 1000 characters',
+    ...dangerousHtmlMessages,
   }),
   skills: Joi.array().items(Joi.string().trim().min(1).max(100)).max(20).optional().messages({
     'array.base': 'Skills must be an array',

@@ -1,4 +1,5 @@
 import Joi from 'joi'
+import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
 
 export const createFounderProjectSchema = Joi.object({
   projectTitle: Joi.string().required().min(1).max(100).messages({
@@ -8,11 +9,12 @@ export const createFounderProjectSchema = Joi.object({
     'string.max': 'Project title is too long (max 50 characters)',
     'any.required': 'Project title is required'
   }),
-  projectDescription: Joi.string().required().min(1).max(3000).messages({
+  projectDescription: Joi.string().required().min(1).max(3000).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
     'string.empty': 'Description is required',
     'string.max': 'Description is too long (max 3000 characters)',
-    'any.required': 'Description is required'
+    'any.required': 'Description is required',
+    ...dangerousHtmlMessages,
   }),
   categoryId: Joi.number().integer().positive().required().messages({
     'number.base': 'Category ID must be a number',
@@ -122,7 +124,7 @@ export const saveDraftProjectSchema = Joi.object({
     'string.min': 'Project title is required',
     'any.required': 'Project title is required'
   }),
-  projectDescription: Joi.string().optional().allow('').max(3000),
+  projectDescription: Joi.string().optional().allow('').max(3000).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   categoryId: Joi.number().integer().positive().optional().allow(null),
   subCategoryId: Joi.number().integer().positive().optional().allow(null),
   projectFiles: Joi.array()
@@ -159,9 +161,10 @@ export const updateFounderProjectSchema = Joi.object({
     'string.min': 'Project title is required',
     'string.max': 'Project title is too long (max 50 characters)'
   }),
-  projectDescription: Joi.string().optional().allow('').max(3000).messages({
+  projectDescription: Joi.string().optional().allow('').max(3000).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
-    'string.max': 'Description is too long (max 3000 characters)'
+    'string.max': 'Description is too long (max 3000 characters)',
+    ...dangerousHtmlMessages,
   }),
   categoryId: Joi.number().integer().positive().messages({
     'number.base': 'Category ID must be a number',
