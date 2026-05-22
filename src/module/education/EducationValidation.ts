@@ -9,10 +9,10 @@ export const createEducationSchema = Joi.object<CreateEducationInput>({
     'string.max': 'School/College name must not exceed 150 characters',
     ...noHtmlMessages,
   }),
-  degree: Joi.string().required().max(100).custom(rejectAllHtml).messages({
+  degree: Joi.string().required().max(120).custom(rejectAllHtml).messages({
     'string.empty': 'Degree is required',
     'any.required': 'Degree is required',
-    'string.max': 'Degree must not exceed 100 characters',
+    'string.max': 'Degree must not exceed 120 characters',
     ...noHtmlMessages,
   }),
   area_of_study: Joi.string().required().max(100).custom(rejectAllHtml).messages({
@@ -51,10 +51,10 @@ export const updateEducationSchema = Joi.object<UpdateEducationInput>({
     'string.max': 'School/College name must not exceed 150 characters',
     ...noHtmlMessages,
   }),
-  degree: Joi.string().required().max(100).custom(rejectAllHtml).messages({
+  degree: Joi.string().required().max(120).custom(rejectAllHtml).messages({
     'string.empty': 'Degree is required',
     'any.required': 'Degree is required',
-    'string.max': 'Degree must not exceed 100 characters',
+    'string.max': 'Degree must not exceed 120 characters',
     ...noHtmlMessages,
   }),
   area_of_study: Joi.string().required().max(100).custom(rejectAllHtml).messages({
