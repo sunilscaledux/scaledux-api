@@ -35,24 +35,9 @@ export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
   links: Joi.array().items(
     Joi.object({
       platform: Joi.string().required(),
-      url: Joi.string().required().custom((value, helpers) => {
-        // Allow URLs with or without protocol
-        if (!value || value.trim() === '') {
-          throw new Error('URL is required');
-        }
-        
-        // Add https:// if not present
-        const urlWithProtocol = value.startsWith('http://') || value.startsWith('https://') 
-          ? value 
-          : `https://${value}`;
-        
-        // Basic URL validation
-        try {
-          new URL(urlWithProtocol);
-          return urlWithProtocol;
-        } catch (e) {
-          throw new Error('Invalid URL format');
-        }
+      url: Joi.string().required().max(2048).custom(validateSafeUrl).messages({
+        'string.max': 'URL must not exceed 2048 characters',
+        ...safeUrlMessages,
       })
     })
   ).optional(),

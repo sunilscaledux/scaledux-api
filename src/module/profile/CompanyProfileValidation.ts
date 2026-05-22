@@ -290,9 +290,11 @@ export const createTeamMemberSchema = Joi.object({
   linkedin_url: Joi.string()
     .optional()
     .allow('', null)
-    .pattern(/^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/)
+    .max(2048)
+    .custom(validateSafeUrl)
     .messages({
-      'string.pattern.base': 'Please provide a valid URL'
+      'string.max': 'URL must not exceed 2048 characters',
+      ...safeUrlMessages,
     })
 });
 
@@ -317,8 +319,10 @@ export const updateTeamMemberSchema = Joi.object({
   linkedin_url: Joi.string()
     .optional()
     .allow('', null)
-    .pattern(/^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/)
+    .max(2048)
+    .custom(validateSafeUrl)
     .messages({
-      'string.pattern.base': 'Please provide a valid URL'
+      'string.max': 'URL must not exceed 2048 characters',
+      ...safeUrlMessages,
     })
 });

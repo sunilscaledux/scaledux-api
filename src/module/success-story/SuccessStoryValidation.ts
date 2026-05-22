@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createSuccessStorySchema = Joi.object({
   title: Joi.string().required().min(2).max(255).messages({
@@ -29,9 +29,9 @@ export const createSuccessStorySchema = Joi.object({
     'string.base': 'Client name must be a string',
     'string.max': 'Client name must not exceed 255 characters'
   }),
-  linkedin_link: Joi.string().optional().allow('').max(500).messages({
-    'string.base': 'LinkedIn link must be a string',
-    'string.max': 'LinkedIn link must not exceed 500 characters'
+  linkedin_link: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'LinkedIn link must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   media_files: Joi.array().items(
     Joi.string().messages({
@@ -77,9 +77,9 @@ export const updateSuccessStorySchema = Joi.object({
     'string.base': 'Client name must be a string',
     'string.max': 'Client name must not exceed 255 characters'
   }),
-  linkedin_link: Joi.string().optional().allow('').max(500).messages({
-    'string.base': 'LinkedIn link must be a string',
-    'string.max': 'LinkedIn link must not exceed 500 characters'
+  linkedin_link: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
+    'string.max': 'LinkedIn link must not exceed 2048 characters',
+    ...safeUrlMessages,
   }),
   media_files: Joi.array().items(
     Joi.string().messages({
