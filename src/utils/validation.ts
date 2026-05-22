@@ -29,3 +29,18 @@ export function rejectDangerousHtml(value: string, helpers: Joi.CustomHelpers) {
 export const dangerousHtmlMessages = {
   "string.dangerousHtml": "{{#label}} contains disallowed HTML content",
 };
+
+const ANY_HTML_TAG = /<[^>]*>/;
+
+/** Joi custom validator that rejects ALL HTML tags in plain text fields. */
+export function rejectAllHtml(value: string, helpers: Joi.CustomHelpers) {
+  if (!value) return value;
+  if (ANY_HTML_TAG.test(value)) {
+    return helpers.error("string.noHtml");
+  }
+  return value;
+}
+
+export const noHtmlMessages = {
+  "string.noHtml": "{{#label}} must not contain HTML tags",
+};

@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createAchievementSchema = Joi.object({
   title: Joi.string().required().min(2).max(255).messages({
@@ -9,10 +9,10 @@ export const createAchievementSchema = Joi.object({
     'string.max': 'Achievement title must not exceed 255 characters',
     'any.required': 'Achievement title is required'
   }),
-  description: Joi.string().optional().allow('').max(1000).custom(rejectDangerousHtml).messages({
+  description: Joi.string().optional().allow('').max(1000).custom(rejectAllHtml).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description must not exceed 1000 characters',
-    ...dangerousHtmlMessages,
+    ...noHtmlMessages,
   }),
   company: Joi.string().required().min(2).max(255).messages({
     'string.base': 'Company/Organization must be a string',
@@ -56,10 +56,10 @@ export const updateAchievementSchema = Joi.object({
     'string.max': 'Achievement title must not exceed 255 characters',
     'any.required': 'Achievement title is required'
   }),
-  description: Joi.string().optional().allow('').max(1000).custom(rejectDangerousHtml).messages({
+  description: Joi.string().optional().allow('').max(1000).custom(rejectAllHtml).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description must not exceed 1000 characters',
-    ...dangerousHtmlMessages,
+    ...noHtmlMessages,
   }),
   company: Joi.string().required().min(2).max(255).messages({
     'string.base': 'Company/Organization must be a string',

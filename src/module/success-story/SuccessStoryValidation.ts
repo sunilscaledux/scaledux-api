@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createSuccessStorySchema = Joi.object({
   title: Joi.string().required().min(2).max(255).messages({
@@ -9,10 +9,10 @@ export const createSuccessStorySchema = Joi.object({
     'string.max': 'Story title must not exceed 255 characters',
     'any.required': 'Story title is required'
   }),
-  description: Joi.string().optional().allow('').max(900).custom(rejectDangerousHtml).messages({
+  description: Joi.string().optional().allow('').max(900).custom(rejectAllHtml).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description must not exceed 900 characters',
-    ...dangerousHtmlMessages,
+    ...noHtmlMessages,
   }),
   date: Joi.string().optional().allow('').isoDate().messages({
     'string.base': 'Date must be a string',
@@ -57,10 +57,10 @@ export const updateSuccessStorySchema = Joi.object({
     'string.max': 'Story title must not exceed 255 characters',
     'any.required': 'Story title is required'
   }),
-  description: Joi.string().optional().allow('').max(900).custom(rejectDangerousHtml).messages({
+  description: Joi.string().optional().allow('').max(900).custom(rejectAllHtml).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description must not exceed 900 characters',
-    ...dangerousHtmlMessages,
+    ...noHtmlMessages,
   }),
   date: Joi.string().optional().allow('').isoDate().messages({
     'string.base': 'Date must be a string',

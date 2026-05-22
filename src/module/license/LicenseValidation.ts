@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createLicenseSchema = Joi.object({
   institute: Joi.string().required().messages({
@@ -18,7 +18,7 @@ export const createLicenseSchema = Joi.object({
     'string.empty': 'Completed year is required',
     'any.required': 'Completed year is required'
   }),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   skills: Joi.array().items(Joi.string()).optional().default([])
 })
 
@@ -45,6 +45,6 @@ export const updateLicenseSchema = Joi.object({
     'string.empty': 'Completed year is required',
     'any.required': 'Completed year is required'
   }),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   skills: Joi.array().items(Joi.string()).optional().default([])
 })

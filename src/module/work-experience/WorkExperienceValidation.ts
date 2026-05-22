@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectAllHtml, noHtmlMessages } from '../../utils/validation'
 
 export const createWorkExperienceSchema = Joi.object({
   role: Joi.string().required().messages({
@@ -11,7 +11,7 @@ export const createWorkExperienceSchema = Joi.object({
     'any.required': 'Company is required'
   }),
   company_website: Joi.string().optional().allow(''),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   start_month: Joi.string().required().messages({
     'string.empty': 'Start month is required',
     'any.required': 'Start month is required'
@@ -41,7 +41,7 @@ export const updateWorkExperienceSchema = Joi.object({
     'any.required': 'Company is required'
   }),
   company_website: Joi.string().optional().allow(''),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
   start_month: Joi.string().required().messages({
     'string.empty': 'Start month is required',
     'any.required': 'Start month is required'
