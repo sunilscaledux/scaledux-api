@@ -115,6 +115,21 @@ export class BookingController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  static async completeBooking(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const { uniqueId } = req.params;
+    const { success, reason, remark } = req.body;
+    if (typeof success !== 'boolean') {
+      return ApiResponse.error(res, 'success (boolean) is required', 400);
+    }
+
+    const result = await BookingService.completeBooking(userId, uniqueId, { success, reason, remark });
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
   static async getOccupiedSlots(req: Request, res: Response) {
     const { mentorId } = req.params;
     const { date } = req.query;

@@ -1760,6 +1760,11 @@ model Booking {
   // Cancellation
   cancelled_by           Int?
   cancel_reason          String?   @db.Text
+  // Completion (set by mentor via Mark complete flow)
+  completed_at           DateTime?
+  completion_success     Boolean?  // true = call happened, false = didn't (no-show, tech issue, etc.)
+  completion_reason      String?   @db.VarChar(120) // matches one of BOOKING_INCOMPLETE_REASONS when success=false
+  completion_remark      String?   @db.Text
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 

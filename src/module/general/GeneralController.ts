@@ -7,6 +7,7 @@ import { getPublicUrl } from "@services/bunnyStorageService"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
 import { STARTUP_STAGES } from "../../constants/startupStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
+import { BOOKING_INCOMPLETE_REASONS } from "../../constants/bookingIncompleteReasons"
 import { ID_TYPES } from "../../constants/idTypes"
 
 // Country related functions
@@ -334,6 +335,14 @@ export async function getInvestmentProfileOptions(req: Request, res: Response) {
  */
 export async function getContractEndReasons(req: Request, res: Response) {
   return ApiResponse.success(res, CONTRACT_END_REASONS, "Contract end reasons retrieved successfully")
+}
+
+/**
+ * Get reasons a mentor can pick when marking a booking as not completed successfully.
+ * GET /api/v1/booking-incomplete-reasons
+ */
+export async function getBookingIncompleteReasons(req: Request, res: Response) {
+  return ApiResponse.success(res, BOOKING_INCOMPLETE_REASONS, "Booking incomplete reasons retrieved successfully")
 }
 
 /**
