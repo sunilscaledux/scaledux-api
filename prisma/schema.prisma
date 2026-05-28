@@ -1496,6 +1496,18 @@ model BillingTransaction {
   invoice_url     String?  @db.VarChar(500) // deprecated: use Invoice table
   meta            Json?    // deprecated: store in Invoice.meta; kept for backward compat
 
+  // Fee breakdown (new billing system)
+  platform_fee_amount  Decimal? @db.Decimal(10, 2)
+  platform_fee_gst     Decimal? @db.Decimal(10, 2)
+  commission_amount    Decimal? @db.Decimal(10, 2)
+  commission_gst       Decimal? @db.Decimal(10, 2)
+  processing_fee_amount Decimal? @db.Decimal(10, 2)
+  processing_fee_gst   Decimal? @db.Decimal(10, 2)
+  tcs_amount           Decimal? @db.Decimal(10, 2)
+  // Razorpay Route
+  razorpay_transfer_id String?  @db.VarChar(50)
+  on_hold              Boolean  @default(false)
+
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
@@ -1503,11 +1515,14 @@ model BillingTransaction {
   payer_invoice_id   Int?    @unique
   /** Receiver's invoice (freelancer side); set when invoice is generated for receiver */
   receiver_invoice_id Int?   @unique
+  /** Invoice A (freelancer→client service invoice) */
+  invoice_a_id       Int?    @unique
 
   currency Currency @relation(fields: [currency_id], references: [id], onDelete: Cascade)
   milestone Milestone? @relation(fields: [milestone_id], references: [id], onDelete: SetNull)
   payer_invoice   Invoice?  @relation("BillingPayerInvoice", fields: [payer_invoice_id], references: [id], onDelete: SetNull)
   receiver_invoice Invoice? @relation("BillingReceiverInvoice", fields: [receiver_invoice_id], references: [id], onDelete: SetNull)
+  invoice_a       Invoice?  @relation("BillingInvoiceA", fields: [invoice_a_id], references: [id], onDelete: SetNull)
   withdrawal_request WithdrawalRequest?
 
   @@index([actor_type, actor_id])
@@ -1524,8 +1539,10 @@ model BillingTransaction {
 model Invoice {
   id                    Int      @id @default(autoincrement())
   billing_transaction_id Int
-  /** payer | receiver - which party this invoice is for */
+  /** payer | receiver (legacy) — new invoices use invoice_type */
   party                 String   @db.VarChar(20)
+  /** C = ScaleDux→Client, A = Freelancer→Client, B = ScaleDux→Freelancer */
+  invoice_type          String?  @db.VarChar(5)
 
   sender_name           String   @db.VarChar(255)
   receiver_name         String   @db.VarChar(255)
@@ -1541,10 +1558,22 @@ model Invoice {
   sender_gst            String?  @db.VarChar(50)
   /** Receiver (to_id) GST if they have one */
   receiver_gst          String?  @db.VarChar(50)
-  /** Platform/service fee amount for this transaction (e.g. receiver invoice shows fee) */
+  /** Platform/service fee amount (legacy) */
   fee                    Decimal? @db.Decimal(10, 2)
   /** GST/tax amount if applicable */
   gst_amount            Decimal? @db.Decimal(10, 2)
+  // New fee breakdown fields
+  platform_fee_amount   Decimal? @db.Decimal(10, 2)
+  commission_amount     Decimal? @db.Decimal(10, 2)
+  processing_fee_amount Decimal? @db.Decimal(10, 2)
+  tcs_amount            Decimal? @db.Decimal(10, 2)
+  /** True if freelancer is not GST registered (Invoice A becomes Bill of Supply) */
+  is_bill_of_supply     Boolean  @default(false)
+  /** Financial year e.g. "2025-2026" */
+  financial_year        String?  @db.VarChar(9)
+  /** Sequential number within invoice_type + financial_year */
+  sequence_number       Int?
+
   file_url              String?  @db.VarChar(500)
   /** Razorpay payment/payout details; full metadata lives here */
   meta                  Json?
@@ -1554,10 +1583,22 @@ model Invoice {
 
   payer_billing_transaction   BillingTransaction? @relation("BillingPayerInvoice")
   receiver_billing_transaction BillingTransaction? @relation("BillingReceiverInvoice")
+  invoice_a_billing_transaction BillingTransaction? @relation("BillingInvoiceA")
 
   @@index([billing_transaction_id])
   @@index([invoice_number])
+  @@index([invoice_type, financial_year])
   @@map("scd_invoices")
+}
+
+model InvoiceSequence {
+  id             Int    @id @default(autoincrement())
+  invoice_type   String @db.VarChar(5)
+  financial_year String @db.VarChar(9)
+  last_number    Int    @default(0)
+
+  @@unique([invoice_type, financial_year])
+  @@map("scd_invoice_sequences")
 }
 
 model LoginDevice {

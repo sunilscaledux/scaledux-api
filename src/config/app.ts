@@ -1,12 +1,17 @@
 /**
  * App / billing config from env.
- * PLATFORM_GST_NUMBER, SERVICE_FEE_PERCENT, APP_FEE_FOUNDER, GST_PERCENT, RAZORPAY_PLATFORM_ACCOUNT_ID.
+ * Fee structure, GST, platform account, Razorpay config.
  */
 const platformGstRaw = (process.env.PLATFORM_GST_NUMBER ?? process.env.GST_NUMBER ?? '').trim();
 const serviceFeePercentRaw = process.env.SERVICE_FEE_PERCENT;
 const appFeeFounderRaw = process.env.APP_FEE_FOUNDER;
 const gstPercentRaw = process.env.GST_PERCENT;
 const razorpayPlatformAccountRaw = (process.env.RAZORPAY_PLATFORM_ACCOUNT_ID ?? '').trim();
+const platformFeeTypeRaw = (process.env.PLATFORM_FEE_TYPE ?? 'flat').trim().toLowerCase();
+const platformFeeAmountRaw = process.env.PLATFORM_FEE_AMOUNT;
+const processingFeePercentRaw = process.env.PROCESSING_FEE_PERCENT;
+const tcsPercentRaw = process.env.TCS_PERCENT;
+const razorpayWebhookSecretRaw = (process.env.RAZORPAY_WEBHOOK_SECRET ?? '').trim();
 
 const identityCooldownDays = Math.max(
   1,
@@ -42,10 +47,20 @@ export const appConfig = {
   frontendUrl,
   appUrl,
   platformGstNumber: platformGstRaw || null as string | null,
-  serviceFeePercent: Math.min(100, Math.max(0, Number(serviceFeePercentRaw) || 10)),
+  /** @deprecated Use platformFeeType + platformFeeAmount instead */
   appFeeFounder: Math.max(0, Number(appFeeFounderRaw) || 100),
+  serviceFeePercent: Math.min(100, Math.max(0, Number(serviceFeePercentRaw) || 10)),
   gstPercent: Math.min(100, Math.max(0, Number(gstPercentRaw) || 18)),
+  /** Platform fee: "flat" (fixed ₹) or "percentage" (% of milestone amount) */
+  platformFeeType: (platformFeeTypeRaw === 'percentage' ? 'percentage' : 'flat') as 'flat' | 'percentage',
+  /** Platform fee amount: ₹ if flat, % if percentage. Default 0. */
+  platformFeeAmount: Math.max(0, Number(platformFeeAmountRaw) || 0),
+  /** Processing fee deducted from freelancer payout (%). Default 1.5. */
+  processingFeePercent: Math.min(100, Math.max(0, Number(processingFeePercentRaw) || 1.5)),
+  /** TCS rate (%) — only applied if provider is GST registered. Default 0.5. */
+  tcsPercent: Math.min(100, Math.max(0, Number(tcsPercentRaw) || 0.5)),
   razorpayPlatformAccountId: razorpayPlatformAccountRaw || null as string | null,
+  razorpayWebhookSecret: razorpayWebhookSecretRaw || null as string | null,
   verification: {
     identityCooldownDays,
     agencyCooldownDays,
