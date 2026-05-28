@@ -5,15 +5,14 @@ import { NotificationEmailJob } from "../../jobs/NotificationEmailJob";
 import { appConfig } from "@config/app";
 
 /**
- * Email the mentor a one-time "please mark this call complete" nudge once scheduled_end has passed.
- * Skipped silently if the mentor has already marked the booking COMPLETED (status filter).
- * completion_reminder_sent_at is stamped so the same booking is never reminded twice.
+ * Email the mentor a one-time "please mark this call complete" nudge right after the call ends.
+ * Only picks bookings where scheduled_end passed within the last 2 minutes — so the reminder
+ * arrives promptly and is never re-sent (completion_reminder_sent_at stamp prevents duplicates).
  *
- * Email-only by design — mentors already received in-app notif + chat when the booking was confirmed;
- * this is just a gentle prod via email.
+ * Runs every 2 minutes to catch calls as they end.
  */
 export const name = "booking-completion-reminder";
-export const schedule = "*/5 * * * *"; // Every 5 minutes
+export const schedule = "*/2 * * * *";
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -29,10 +28,12 @@ function formatNotifDate(date: Date): string {
 export async function handle(): Promise<void> {
   const now = new Date();
 
+  const twoMinAgo = new Date(now.getTime() - 2 * 60 * 1000);
+
   const due = await (prisma as any).booking.findMany({
     where: {
       status: 'CONFIRMED',
-      scheduled_end: { lte: now },
+      scheduled_end: { gt: twoMinAgo, lte: now },
       completion_reminder_sent_at: null,
     },
     include: {

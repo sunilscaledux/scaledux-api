@@ -1,6 +1,7 @@
 import * as scheduledTermination from "./scheduledTermination";
 import * as processWithdrawals from "./processWithdrawals";
 import * as bookingCompletionReminder from "./bookingCompletionReminder";
+import * as meetingLinkReminder from "./meetingLinkReminder";
 
 
 export type ScheduledTaskDef = {
@@ -28,5 +29,10 @@ export const tasks: ScheduledTaskDef[] = [
     name: bookingCompletionReminder.name,
     schedule: bookingCompletionReminder.schedule,
     handle: bookingCompletionReminder.handle,
+  },
+  {
+    name: meetingLinkReminder.name,
+    schedule: meetingLinkReminder.schedule,
+    handle: meetingLinkReminder.handle,
   },
 ];

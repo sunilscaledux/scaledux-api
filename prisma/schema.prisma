@@ -1765,6 +1765,7 @@ model Booking {
   // Completion / Rejection
   completed_at           DateTime?
   rejected_at            DateTime?
+  completion_reminder_sent_at DateTime?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
