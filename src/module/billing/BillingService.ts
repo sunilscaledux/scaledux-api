@@ -6,6 +6,8 @@ import Razorpay from "razorpay";
 import razorpayConfig from "@config/razorpay";
 import { appConfig } from "@config/app";
 import { Log } from "@services/loggerService";
+import { getPlatformFee, calcFounderTotal, calcFreelancerDeductions, calcFreelancerPayout, calcTransaction } from "@utils/feeCalculations";
+import { getNextInvoiceNumber } from "@utils/invoiceNumbering";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
 import {
@@ -27,17 +29,11 @@ if (razorpayConfig.key_id && razorpayConfig.key_secret) {
 }
 
 export class BillingService {
-  /** Payer amount (base + platform fee + GST only on first milestone) and receiver amount (base - service fee - GST). */
-  private static getPayerAndReceiverAmounts(baseAmount: number, isFirstMilestone: boolean = true): { payerAmount: number; receiverAmount: number } {
-    const gstPercent = appConfig.gstPercent / 100;
-    const appFee = isFirstMilestone ? appConfig.appFeeFounder : 0;
-    const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
-    const serviceFeePercent = appConfig.serviceFeePercent / 100;
-    const serviceCharge = Math.round(baseAmount * serviceFeePercent * 100) / 100;
-    const gstOnServiceCharge = Math.round(serviceCharge * gstPercent * 100) / 100;
-    const payerAmount = Math.round((baseAmount + appFee + gstOnAppFee) * 100) / 100;
-    const receiverAmount = Math.round((baseAmount - serviceCharge - gstOnServiceCharge) * 100) / 100;
-    return { payerAmount, receiverAmount };
+  /** Payer amount (base + platform fee + GST) and receiver amount (base - all freelancer deductions). */
+  private static getPayerAndReceiverAmounts(baseAmount: number, isGstRegistered: boolean = false): { payerAmount: number; receiverAmount: number } {
+    const founder = calcFounderTotal(baseAmount);
+    const freelancerPayout = calcFreelancerPayout(baseAmount, isGstRegistered);
+    return { payerAmount: founder.totalClientPays, receiverAmount: freelancerPayout };
   }
 
   /**
@@ -84,11 +80,9 @@ export class BillingService {
     if (amount <= 0) {
       return { success: false, message: 'Invalid milestone amount' };
     }
-    const isFirstMilestone = milestoneIndex === 0;
-    const breakdown = this.getPaymentBreakdown(amount, isFirstMilestone);
-    const totalFounderPays = breakdown.totalFounderPays ?? amount;
-    const platformTransferAmountInr = (breakdown.appFee ?? 0) + (breakdown.gstOnAppFee ?? 0);
-    return { success: true, totalFounderPays, platformTransferAmountInr };
+    const founder = calcFounderTotal(amount);
+    const platformTransferAmountInr = founder.platformFee + founder.platformFeeGst;
+    return { success: true, totalFounderPays: founder.totalClientPays, platformTransferAmountInr };
   }
 
   /**
@@ -167,40 +161,32 @@ export class BillingService {
 
   /**
    * Get payment breakdown for display and Razorpay order amount.
-   * Platform fee (founder charge) is for the whole project: only first milestone gets appFee + gstOnAppFee; rest get 0, 0.
-   * Founder pays: milestoneAmount + (appFee + gstOnAppFee only if first milestone) = totalFounderPays.
-   * Freelancer (at release): milestoneAmount - serviceCharge - gstOnServiceCharge = net.
+   * Uses new fee structure: platform fee (flat/%) for founder, commission + processing fee + TCS for freelancer.
    */
-  static getPaymentBreakdown(milestoneAmount?: number, isFirstMilestone: boolean = true) {
-    const gstPercent = appConfig.gstPercent / 100;
-    const appFee = isFirstMilestone ? appConfig.appFeeFounder : 0;
-    const gstOnAppFee = Math.round(appFee * gstPercent * 100) / 100;
-    const totalFounderPays = milestoneAmount != null
-      ? Math.round((milestoneAmount + appFee + gstOnAppFee) * 100) / 100
-      : undefined;
-    const serviceFeePercent = appConfig.serviceFeePercent / 100;
-    const serviceCharge = milestoneAmount != null
-      ? Math.round(milestoneAmount * serviceFeePercent * 100) / 100
-      : undefined;
-    const gstOnServiceCharge = serviceCharge != null
-      ? Math.round(serviceCharge * gstPercent * 100) / 100
-      : undefined;
-    const netToFreelancer = (milestoneAmount != null && serviceCharge != null && gstOnServiceCharge != null)
-      ? Math.round((milestoneAmount - serviceCharge - gstOnServiceCharge) * 100) / 100
-      : undefined;
-    return {
-      appFeeFounder: appConfig.appFeeFounder,
-      gstPercent: appConfig.gstPercent,
+  static getPaymentBreakdown(milestoneAmount?: number, isGstRegistered: boolean = false) {
+    const config = {
+      platformFeeType: appConfig.platformFeeType,
+      platformFeeAmount: appConfig.platformFeeAmount,
       serviceFeePercent: appConfig.serviceFeePercent,
-      ...(milestoneAmount != null && {
-        milestoneAmount,
-        appFee,
-        gstOnAppFee,
-        totalFounderPays,
-        serviceCharge: serviceCharge ?? 0,
-        gstOnServiceCharge: gstOnServiceCharge ?? 0,
-        netToFreelancer,
-      }),
+      processingFeePercent: appConfig.processingFeePercent,
+      gstPercent: appConfig.gstPercent,
+      tcsPercent: appConfig.tcsPercent,
+    };
+    if (milestoneAmount == null) return config;
+
+    const tx = calcTransaction(milestoneAmount, isGstRegistered);
+    return {
+      ...config,
+      milestoneAmount,
+      platformFee: tx.platformFee,
+      platformFeeGst: tx.platformFeeGst,
+      totalFounderPays: tx.totalClientPays,
+      commission: tx.commission,
+      commissionGst: tx.commissionGst,
+      processingFee: tx.processingFee,
+      processingFeeGst: tx.processingFeeGst,
+      tcs: tx.tcs,
+      netToFreelancer: tx.freelancerPayout,
     };
   }
 
@@ -503,13 +489,17 @@ export class BillingService {
     meta?: Record<string, string>;
     status?: 'pending' | 'completed';
     milestoneId?: number | null;
+    isGstRegistered?: boolean;
   }) {
-    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = BillingTransactionStatus.COMPLETED, milestoneId } = params;
+    const { actorId, fromId, toId, subjectType, subjectId, amount, description, meta, status = BillingTransactionStatus.COMPLETED, milestoneId, isGstRegistered = false } = params;
     const currencyId = 1;
-    // Platform fee (founder charge) only on first milestone of project; rest get 0
-    const isFirstMilestone = meta?.milestone_index !== undefined ? meta.milestone_index === '0' : true;
-    const { payerAmount, receiverAmount } = this.getPayerAndReceiverAmounts(amount, isFirstMilestone);
-    // When fund loaded (pending): sender = funded, receiver = pending. When completed: both completed.
+
+    // Calculate full fee breakdown
+    const founder = calcFounderTotal(amount);
+    const deductions = calcFreelancerDeductions(amount, isGstRegistered);
+    const freelancerPayout = calcFreelancerPayout(amount, isGstRegistered);
+
+    // When fund loaded (pending): sender = funded, receiver = pending
     const senderStatus = status === BillingTransactionStatus.PENDING ? BillingTransactionSenderStatus.FUNDED : status;
     const receiverStatus = status === BillingTransactionStatus.PENDING ? BillingTransactionReceiverStatus.PENDING : status;
 
@@ -525,78 +515,82 @@ export class BillingService {
         subject_id: subjectId,
         milestone_id: milestoneId ?? undefined,
         amount,
-        payer_amount: payerAmount,
-        receiver_amount: receiverAmount,
+        payer_amount: founder.totalClientPays,
+        receiver_amount: freelancerPayout,
         currency_id: currencyId,
         type: BillingTransactionType.PAYMENT,
         status,
         sender_status: senderStatus,
         receiver_status: receiverStatus,
         description,
-        meta: meta ? (meta as object) : undefined
+        meta: meta ? (meta as object) : undefined,
+        // Fee breakdown
+        platform_fee_amount: founder.platformFee,
+        platform_fee_gst: founder.platformFeeGst,
+        commission_amount: deductions.commission,
+        commission_gst: deductions.commissionGst,
+        processing_fee_amount: deductions.processingFee,
+        processing_fee_gst: deductions.processingFeeGst,
+        tcs_amount: deductions.tcs,
+        on_hold: status === BillingTransactionStatus.PENDING,
       }
     });
-    if (status === BillingTransactionStatus.COMPLETED) {
-      await this.updateUserBillingTotalsAfterTransaction(BillingTransactionType.PAYMENT, BillingTransactionStatus.COMPLETED, fromId, toId, amount);
-    } else if (status === BillingTransactionStatus.PENDING && toId > 0) {
+
+    if (status === BillingTransactionStatus.PENDING && toId > 0) {
       await this.ensureUserWallet(toId);
-      // Pending amount = receiver amount only (from getPayerAndReceiverAmounts)
       await (prisma as any).userWallet.update({
         where: { user_id: toId },
-        data: { pending_amount: { increment: receiverAmount } },
+        data: { pending_amount: { increment: amount } },
       });
+    } else if (status === BillingTransactionStatus.COMPLETED) {
+      await this.updateUserBillingTotalsAfterTransaction(BillingTransactionType.PAYMENT, BillingTransactionStatus.COMPLETED, fromId, toId, amount, freelancerPayout, freelancerPayout);
     }
 
-    // Create both payer and receiver invoices at payment time; UI shows receiver download only when receiver status allows withdraw
-    await this.createInvoicesForTransaction(row.id);
+    // Generate Invoice C (ScaleDux → Founder) with platform fee
+    await this.createInvoiceC(row.id);
 
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
 
   /**
-   * Release a pending payment (founder only). Sets transaction to completed and credits freelancer (to_id) with net amount only.
-   * Founder (from_id) wallet is not changed on release. Platform fee (SERVICE_FEE_PERCENT) is deducted from the freelancer.
+   * Founder acknowledges milestone completion. Triggers Razorpay transfer and sets status to PAYMENT_PROCESSED.
+   * Freelancer wallet is NOT credited here — that happens via the transfer.settled webhook.
    */
-  static async releasePaymentTransaction(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
-    const tx = await prisma.billingTransaction.findUnique({
-      where: { unique_id: transactionUniqueId }
+  static async acknowledgeMilestonePayment(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
+    const tx = await (prisma as any).billingTransaction.findUnique({
+      where: { unique_id: transactionUniqueId },
+      include: { invoice_a: true }
     });
     if (!tx) return { success: false, message: 'Transaction not found' };
     if (tx.type !== BillingTransactionType.PAYMENT) return { success: false, message: 'Not a payment transaction' };
-    if (tx.status !== BillingTransactionStatus.PENDING) return { success: false, message: 'Payment is already completed or not pending' };
-    if (tx.from_id !== userId) return { success: false, message: 'Only the payer can release this payment' };
+    if (tx.status !== BillingTransactionStatus.PENDING) return { success: false, message: 'Payment is not in funded state' };
+    if (tx.from_id !== userId) return { success: false, message: 'Only the payer can acknowledge this payment' };
+    if (!tx.invoice_a) return { success: false, message: 'Freelancer must send invoice first' };
+
+    const amount = Number(tx.amount);
+    const isGstRegistered = tx.tcs_amount != null && Number(tx.tcs_amount) > 0;
+    const deductions = calcFreelancerDeductions(amount, isGstRegistered);
+    const netPayout = calcFreelancerPayout(amount, isGstRegistered);
+
+    // Generate Invoice B (ScaleDux → Freelancer, commission deduction)
+    await this.createInvoiceB(tx.id);
+
+    // TODO: Trigger Razorpay Route transfer to freelancer's linked account
+    // const transferId = await this.triggerRazorpayTransfer(tx, netPayout);
 
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
       data: {
-        status: BillingTransactionStatus.COMPLETED,
+        status: 'payment_processed',
         sender_status: BillingTransactionSenderStatus.RELEASED,
-        receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+        receiver_status: 'payment_processed',
+        on_hold: false,
+        // razorpay_transfer_id: transferId,
       }
     });
-    const amount = Number(tx.amount);
-    const feePercent = appConfig.serviceFeePercent;
-    const gstPercent = appConfig.gstPercent / 100;
-    const feeAmount = Math.round(amount * (feePercent / 100) * 100) / 100;
-    const gstOnServiceCharge = Math.round(feeAmount * gstPercent * 100) / 100;
-    const totalDeduction = feeAmount + gstOnServiceCharge;
-    const netAmount = Math.round((amount - totalDeduction) * 100) / 100;
 
-    // Remove receiver amount from freelancer's pending (same as what was added when founder funded)
-    if (tx.to_id > 0) {
-      await (prisma as any).userWallet.update({
-        where: { user_id: tx.to_id },
-        data: { pending_amount: { decrement: netAmount } },
-      });
-    }
-    // Credit freelancer: total_earning += netAmount, wallet += netAmount (receiver amount only; fee never hits wallet)
-    await this.updateUserBillingTotalsAfterTransaction(BillingTransactionType.PAYMENT, BillingTransactionStatus.COMPLETED, tx.from_id, tx.to_id, amount, netAmount, netAmount);
-
-    // Create receiver invoice so freelancer has invoice with fee/GST breakdown
-    await this.createInvoicesForTransaction(tx.id, { payer: false, receiver: true });
-
-    const milestoneId = (tx as any).milestone_id as number | null | undefined;
-    // Sync release payment to chat (founder + freelancer); same for both milestone flow and direct billing release
+    // Sync to chat
+    const milestoneId = tx.milestone_id as number | null | undefined;
     if (tx.subject_type === 'Proposal' && tx.subject_id != null && tx.from_id > 0 && tx.to_id > 0) {
       let proposal: any = null;
       let milestoneTitle = '';
@@ -615,14 +609,6 @@ export class BillingService {
           where: { id: tx.subject_id },
           include: { project: { select: { id: true, project_title: true } } }
         });
-        const metaObj = (tx as any).meta as Record<string, unknown> | null;
-        const milestoneIndexMeta = metaObj?.milestone_index != null ? parseInt(String(metaObj.milestone_index), 10) : 0;
-        const milestones = await (prisma as any).milestone.findMany({
-          where: { proposal_id: tx.subject_id },
-          orderBy: { order_index: 'asc' }
-        });
-        const row = milestones[milestoneIndexMeta];
-        milestoneTitle = row?.title ?? row?.description ?? `Milestone ${(milestoneIndexMeta ?? 0) + 1}`;
       }
       if (proposal) {
         const projectTitle = proposal.project?.project_title ?? '';
@@ -646,6 +632,98 @@ export class BillingService {
       }
     }
     return { success: true };
+  }
+
+  /**
+   * Razorpay webhook handler for transfer.settled. Credits freelancer wallet, sets status to PAID.
+   */
+  static async handleTransferSettled(transferId: string): Promise<{ success: boolean; message?: string }> {
+    const tx = await (prisma as any).billingTransaction.findFirst({
+      where: { razorpay_transfer_id: transferId }
+    });
+    if (!tx) return { success: false, message: 'Transaction not found for transfer' };
+    if (tx.status === 'paid') return { success: true, message: 'Already processed' };
+
+    const amount = Number(tx.amount);
+    const isGstRegistered = tx.tcs_amount != null && Number(tx.tcs_amount) > 0;
+    const netPayout = calcFreelancerPayout(amount, isGstRegistered);
+
+    await (prisma as any).billingTransaction.update({
+      where: { id: tx.id },
+      data: {
+        status: 'paid',
+        receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+      }
+    });
+
+    // Credit freelancer wallet
+    if (tx.to_id > 0) {
+      await this.ensureUserWallet(tx.to_id);
+      await (prisma as any).userWallet.update({
+        where: { user_id: tx.to_id },
+        data: {
+          pending_amount: { decrement: amount },
+          wallet_amount: { increment: netPayout },
+          total_earning: { increment: netPayout },
+        },
+      });
+    }
+
+    return { success: true };
+  }
+
+  /**
+   * Freelancer sends invoice (Invoice A) for a completed milestone.
+   */
+  static async sendFreelancerInvoice(freelancerId: number, milestoneId: number): Promise<{ success: boolean; message?: string }> {
+    const milestone = await (prisma as any).milestone.findUnique({
+      where: { id: milestoneId },
+      include: {
+        proposal: { include: { project: { select: { id: true, user_id: true, project_title: true } } } }
+      }
+    });
+    if (!milestone) return { success: false, message: 'Milestone not found' };
+    const proposal = milestone.proposal;
+    if (!proposal) return { success: false, message: 'Proposal not found' };
+    if (proposal.user_id !== freelancerId) return { success: false, message: 'You are not the freelancer on this contract' };
+
+    // Find the billing transaction for this milestone
+    const tx = await (prisma as any).billingTransaction.findFirst({
+      where: { milestone_id: milestoneId, type: BillingTransactionType.PAYMENT, status: BillingTransactionStatus.PENDING }
+    });
+    if (!tx) return { success: false, message: 'No funded payment found for this milestone' };
+    if (tx.invoice_a_id) return { success: false, message: 'Invoice already sent for this milestone' };
+
+    await this.createInvoiceA(tx.id);
+
+    // Notify founder
+    const { dispatch } = await import('@queues/Queue');
+    const { NotificationJob } = await import('../../jobs/NotificationJob');
+    const { NotificationEmailJob } = await import('../../jobs/NotificationEmailJob');
+    const freelancerName = await (async () => {
+      const u = await prisma.user.findUnique({ where: { id: freelancerId }, select: { first_name: true, last_name: true } });
+      return u ? [u.first_name, u.last_name].filter(Boolean).join(' ').trim() : 'Freelancer';
+    })();
+
+    const notifData = {
+      userId: proposal.project.user_id,
+      type: 'INVOICE_RECEIVED' as const,
+      notificationTitle: 'Invoice received',
+      notificationBody: `<p><strong>${freelancerName}</strong> has sent an invoice for milestone "${milestone.title || 'Milestone'}" on project "${proposal.project.project_title}".</p><p>Please review and acknowledge to release the payment.</p>`,
+      notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+      actorId: freelancerId,
+      subjectType: 'Proposal' as const,
+      subjectId: proposal.id,
+    };
+    await dispatch(NotificationJob, notifData);
+    await dispatch(NotificationEmailJob, notifData);
+
+    return { success: true, message: 'Invoice sent' };
+  }
+
+  /** @deprecated Use acknowledgeMilestonePayment instead. Kept for backward compatibility. */
+  static async releasePaymentTransaction(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
+    return this.acknowledgeMilestonePayment(transactionUniqueId, userId);
   }
 
   /** Receiver requests payout: create WithdrawalRequest (status pending) and set transaction to withdraw_in_process. Cron will process. */
@@ -1003,10 +1081,7 @@ export class BillingService {
           const invoiceUrlLegacy = t.invoice_url;
           const invoiceUrl = isCredit ? (receiverInv?.file_url ?? invoiceUrlLegacy) : (payerInv?.file_url ?? invoiceUrlLegacy);
           const baseAmt = parseFloat(t.amount?.toString() ?? '0');
-          const isFirstMilestone = (t.meta as Record<string, string> | null)?.milestone_index !== undefined
-            ? (t.meta as Record<string, string>).milestone_index === '0'
-            : true;
-          const computed = t.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmt, isFirstMilestone) : null;
+          const computed = t.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmt) : null;
           const payerAmt = t.payer_amount != null ? parseFloat(t.payer_amount.toString()) : (computed?.payerAmount ?? baseAmt);
           const receiverAmt = t.receiver_amount != null ? parseFloat(t.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmt);
           return {
@@ -1356,8 +1431,7 @@ export class BillingService {
     const invoiceUrlForUser = isCredit ? (receiverInv?.file_url ?? transaction.invoice_url) : (payerInv?.file_url ?? transaction.invoice_url);
     const baseAmount = parseFloat(transaction.amount.toString());
     const tAny = transaction as any;
-    const isFirstMilestone = metaMap.milestone_index !== undefined ? metaMap.milestone_index === '0' : true;
-    const computed = tAny.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmount, isFirstMilestone) : null;
+    const computed = tAny.type === BillingTransactionType.PAYMENT ? this.getPayerAndReceiverAmounts(baseAmount) : null;
     const payerAmt = tAny.payer_amount != null ? parseFloat(tAny.payer_amount.toString()) : (computed?.payerAmount ?? baseAmount);
     const receiverAmt = tAny.receiver_amount != null ? parseFloat(tAny.receiver_amount.toString()) : (computed?.receiverAmount ?? baseAmount);
     const wr = (transaction as any).withdrawal_request;
@@ -1432,5 +1506,176 @@ export class BillingService {
     return { success: true, data: base };
   }
 
+  // ── New Invoice Creation Methods (C / A / B) ──
+
+  /** Invoice C: ScaleDux → Client. Platform fee line item. Generated at milestone funding. */
+  private static async createInvoiceC(transactionId: number) {
+    const tx = await (prisma as any).billingTransaction.findUnique({
+      where: { id: transactionId },
+      include: { currency: true, payer_invoice: true }
+    });
+    if (!tx || tx.payer_invoice) return;
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: [tx.from_id, tx.to_id] } },
+      select: { id: true, first_name: true, last_name: true }
+    });
+    const userName = (uid: number) => {
+      const u = users.find(u => u.id === uid);
+      return u ? [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || '—' : '—';
+    };
+
+    const { invoiceNumber, financialYear, sequenceNumber } = await getNextInvoiceNumber('C');
+    const platformFee = Number(tx.platform_fee_amount ?? 0);
+    const platformFeeGst = Number(tx.platform_fee_gst ?? 0);
+
+    const inv = await (prisma as any).invoice.create({
+      data: {
+        billing_transaction_id: transactionId,
+        party: 'payer',
+        invoice_type: 'C',
+        sender_name: 'ScaleDux Software Innovations Pvt Ltd',
+        receiver_name: userName(tx.from_id),
+        amount: Number(tx.amount),
+        currency_code: tx.currency?.code ?? 'INR',
+        description: tx.description,
+        invoice_number: invoiceNumber,
+        gst_number: appConfig.platformGstNumber,
+        platform_gst: appConfig.platformGstNumber,
+        platform_fee_amount: platformFee,
+        fee: platformFee,
+        gst_amount: platformFeeGst,
+        financial_year: financialYear,
+        sequence_number: sequenceNumber,
+        meta: tx.meta ?? undefined,
+      }
+    });
+
+    await (prisma as any).billingTransaction.update({
+      where: { id: transactionId },
+      data: { payer_invoice_id: inv.id }
+    });
+  }
+
+  /** Invoice A: Freelancer → Client (generated by ScaleDux on behalf). Professional service. */
+  private static async createInvoiceA(transactionId: number) {
+    const tx = await (prisma as any).billingTransaction.findUnique({
+      where: { id: transactionId },
+      include: { currency: true, invoice_a: true }
+    });
+    if (!tx || tx.invoice_a) return;
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: [tx.from_id, tx.to_id] } },
+      select: { id: true, first_name: true, last_name: true }
+    });
+    const userName = (uid: number) => {
+      const u = users.find(u => u.id === uid);
+      return u ? [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || '—' : '—';
+    };
+
+    // Check if freelancer is GST registered
+    const taxInfo = await (prisma as any).taxInformation.findFirst({
+      where: { user_id: tx.to_id, has_gstin: true, gstin: { not: null } },
+      select: { gstin: true }
+    });
+    const freelancerGst = taxInfo?.gstin ?? null;
+    const isBillOfSupply = !freelancerGst;
+
+    // Client GST
+    const clientTax = await (prisma as any).taxInformation.findFirst({
+      where: { user_id: tx.from_id, has_gstin: true, gstin: { not: null } },
+      select: { gstin: true }
+    });
+
+    const { invoiceNumber, financialYear, sequenceNumber } = await getNextInvoiceNumber('A');
+
+    const inv = await (prisma as any).invoice.create({
+      data: {
+        billing_transaction_id: transactionId,
+        party: 'receiver',
+        invoice_type: 'A',
+        sender_name: userName(tx.to_id),
+        receiver_name: userName(tx.from_id),
+        amount: Number(tx.amount),
+        currency_code: tx.currency?.code ?? 'INR',
+        description: tx.description,
+        invoice_number: invoiceNumber,
+        gst_number: freelancerGst,
+        sender_gst: freelancerGst,
+        receiver_gst: clientTax?.gstin ?? null,
+        is_bill_of_supply: isBillOfSupply,
+        financial_year: financialYear,
+        sequence_number: sequenceNumber,
+        meta: tx.meta ?? undefined,
+      }
+    });
+
+    await (prisma as any).billingTransaction.update({
+      where: { id: transactionId },
+      data: { invoice_a_id: inv.id }
+    });
+  }
+
+  /** Invoice B: ScaleDux → Freelancer. Commission/fees deduction. Generated at acknowledge. */
+  private static async createInvoiceB(transactionId: number) {
+    const tx = await (prisma as any).billingTransaction.findUnique({
+      where: { id: transactionId },
+      include: { currency: true, receiver_invoice: true }
+    });
+    if (!tx || tx.receiver_invoice) return;
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: [tx.from_id, tx.to_id] } },
+      select: { id: true, first_name: true, last_name: true }
+    });
+    const userName = (uid: number) => {
+      const u = users.find(u => u.id === uid);
+      return u ? [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || '—' : '—';
+    };
+
+    const freelancerTax = await (prisma as any).taxInformation.findFirst({
+      where: { user_id: tx.to_id, has_gstin: true, gstin: { not: null } },
+      select: { gstin: true }
+    });
+
+    const { invoiceNumber, financialYear, sequenceNumber } = await getNextInvoiceNumber('B');
+    const commission = Number(tx.commission_amount ?? 0);
+    const commissionGst = Number(tx.commission_gst ?? 0);
+    const processingFee = Number(tx.processing_fee_amount ?? 0);
+    const processingFeeGst = Number(tx.processing_fee_gst ?? 0);
+    const tcs = Number(tx.tcs_amount ?? 0);
+    const totalDeduction = commission + commissionGst + processingFee + processingFeeGst + tcs;
+
+    const inv = await (prisma as any).invoice.create({
+      data: {
+        billing_transaction_id: transactionId,
+        party: 'receiver',
+        invoice_type: 'B',
+        sender_name: 'ScaleDux Software Innovations Pvt Ltd',
+        receiver_name: userName(tx.to_id),
+        amount: Number(tx.amount),
+        currency_code: tx.currency?.code ?? 'INR',
+        description: tx.description,
+        invoice_number: invoiceNumber,
+        gst_number: appConfig.platformGstNumber,
+        platform_gst: appConfig.platformGstNumber,
+        receiver_gst: freelancerTax?.gstin ?? null,
+        commission_amount: commission,
+        processing_fee_amount: processingFee,
+        tcs_amount: tcs,
+        fee: totalDeduction,
+        gst_amount: commissionGst + processingFeeGst,
+        financial_year: financialYear,
+        sequence_number: sequenceNumber,
+        meta: tx.meta ?? undefined,
+      }
+    });
+
+    await (prisma as any).billingTransaction.update({
+      where: { id: transactionId },
+      data: { receiver_invoice_id: inv.id }
+    });
+  }
 }
 

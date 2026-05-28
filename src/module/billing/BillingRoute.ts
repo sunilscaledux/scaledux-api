@@ -4,6 +4,9 @@ import { authenticateToken } from "@middleware/auth";
 
 const router = Router();
 
+// Razorpay webhook — no auth, signature verified in handler
+router.post("/webhook/razorpay", BillingController.razorpayWebhook);
+
 router.use(authenticateToken)
 
 router.get(
@@ -72,6 +75,16 @@ router.get(
 router.get(
   "/invoice/:uniqueId",
   BillingController.getInvoiceData
+);
+
+// New billing flow endpoints
+router.post(
+  "/milestone/:milestoneId/send-invoice",
+  BillingController.sendFreelancerInvoice
+);
+router.post(
+  "/milestone/acknowledge",
+  BillingController.acknowledgeMilestone
 );
 
 export default router;

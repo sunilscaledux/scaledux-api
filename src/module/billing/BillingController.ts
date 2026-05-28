@@ -449,4 +449,56 @@ export class BillingController {
     }
     return ApiResponse.success(res, result.data, "OK");
   }
+
+  /** Freelancer sends auto-generated invoice for a completed milestone. */
+  static async sendFreelancerInvoice(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+    const milestoneId = parseInt(req.params.milestoneId, 10);
+    if (!Number.isFinite(milestoneId)) return ApiResponse.error(res, "milestoneId is required", 400);
+    const result = await BillingService.sendFreelancerInvoice(userId, milestoneId);
+    if (!result.success) return ApiResponse.error(res, result.message, 400);
+    return ApiResponse.success(res, null, result.message);
+  }
+
+  /** Founder acknowledges milestone — triggers Razorpay transfer, generates Invoice B. */
+  static async acknowledgeMilestone(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+    const { transactionUniqueId } = req.body;
+    if (!transactionUniqueId) return ApiResponse.error(res, "transactionUniqueId is required", 400);
+    const result = await BillingService.acknowledgeMilestonePayment(transactionUniqueId, userId);
+    if (!result.success) return ApiResponse.error(res, result.message, 400);
+    return ApiResponse.success(res, null, "Payment acknowledged");
+  }
+
+  /** Razorpay webhook handler — verifies signature, processes transfer.settled events. */
+  static async razorpayWebhook(req: Request, res: Response) {
+    const { appConfig } = await import('@config/app');
+    const crypto = await import('crypto');
+    const secret = appConfig.razorpayWebhookSecret;
+    if (!secret) {
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    const signature = req.headers['x-razorpay-signature'] as string;
+    const body = JSON.stringify(req.body);
+    const expected = crypto.createHmac('sha256', secret).update(body).digest('hex');
+    if (expected !== signature) {
+      return res.status(400).json({ error: 'Invalid signature' });
+    }
+
+    const event = req.body?.event;
+    const payload = req.body?.payload;
+
+    if (event === 'transfer.settled') {
+      const transferId = payload?.transfer?.entity?.id;
+      if (transferId) {
+        await BillingService.handleTransferSettled(transferId);
+      }
+    }
+
+    // Always return 200 to Razorpay
+    return res.status(200).json({ status: 'ok' });
+  }
 }
