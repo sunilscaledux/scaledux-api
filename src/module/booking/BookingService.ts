@@ -9,6 +9,15 @@ import { appConfig } from '@config/app';
 import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
+import { isValidBookingIncompleteReason } from '../../constants/bookingIncompleteReasons';
+import { resolveAttachmentUrl } from '@services/attachmentService';
+
+/** Resolve a profileImage attachment key to its public URL (or null if missing). */
+async function resolveProfileImage(value: string | null | undefined): Promise<string | null> {
+  if (!value) return null;
+  const url = await resolveAttachmentUrl(value, 'profile_image');
+  return url || null;
+}
 
 const DURATION_MAP: Record<string, number> = {
   '15m': 15, '30m': 30, '45m': 45, '1 hr': 60,
@@ -18,10 +27,15 @@ const DURATION_MAP: Record<string, number> = {
 /** Minimum gap before a booking can be scheduled (2 hours 15 minutes). */
 const MIN_ADVANCE_MS = (2 * 60 + 15) * 60 * 1000;
 
-/** Format a date for notification text (email/DB). */
+/**
+ * Format a date for notification text (email/DB) in IST.
+ * The server typically runs in UTC, but bookings are entered in the user's local time (IST for now)
+ * — so we format with an explicit timeZone to match what the browser shows on the booking card.
+ */
+const NOTIF_TZ = 'Asia/Kolkata';
 function formatNotifDate(date: Date): string {
-  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' }).format(date);
-  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
+  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: NOTIF_TZ }).format(date);
+  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: NOTIF_TZ }).format(date);
   return `${d} at ${t}`;
 }
 
@@ -509,12 +523,13 @@ export class BookingService {
       const hasMore = rows.length > limit;
       const slice = hasMore ? rows.slice(0, limit) : rows;
 
-      const bookings = slice.map((b: any) => ({
+      const bookings = await Promise.all(slice.map(async (b: any) => ({
         uniqueId: b.unique_id,
         title: b.title,
         description: b.description,
         duration: b.duration,
         scheduledAt: b.scheduled_at,
+        scheduledEnd: b.scheduled_end,
         message: b.message,
         status: b.status,
         paymentStatus: b.payment_status,
@@ -525,20 +540,24 @@ export class BookingService {
         parentId: b.parent_id,
         meetingLink: b.meeting_link ?? null,
         meetingProvider: b.meeting_provider ?? null,
+        completedAt: b.completed_at ?? null,
+        completionSuccess: b.completion_success ?? null,
+        completionReason: b.completion_reason ?? null,
+        completionRemark: b.completion_remark ?? null,
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
           firstName: b.mentor.first_name,
           lastName: b.mentor.last_name,
-          profileImage: b.mentor.personalInfo?.profileImage || null,
+          profileImage: await resolveProfileImage(b.mentor.personalInfo?.profileImage),
         },
         user: {
           uniqueId: b.user.unique_id,
           firstName: b.user.first_name,
           lastName: b.user.last_name,
-          profileImage: b.user.personalInfo?.profileImage || null,
+          profileImage: await resolveProfileImage(b.user.personalInfo?.profileImage),
         },
-      }));
+      })));
 
       const nextCursor = hasMore && slice.length > 0
         ? slice[slice.length - 1].created_at.toISOString()
@@ -592,6 +611,7 @@ export class BookingService {
           description: booking.description,
           duration: booking.duration,
           scheduledAt: booking.scheduled_at,
+          scheduledEnd: booking.scheduled_end,
           message: booking.message,
           status: booking.status,
           paymentStatus: booking.payment_status,
@@ -603,19 +623,25 @@ export class BookingService {
           parentId: booking.parent_id,
           meetingLink: booking.meeting_link ?? null,
           meetingProvider: booking.meeting_provider ?? null,
+          completedAt: booking.completed_at ?? null,
+          completionSuccess: booking.completion_success ?? null,
+          completionReason: booking.completion_reason ?? null,
+          completionRemark: booking.completion_remark ?? null,
           createdAt: booking.created_at,
           mentor: {
+            id: booking.mentor.id,
             uniqueId: booking.mentor.unique_id,
             firstName: booking.mentor.first_name,
             lastName: booking.mentor.last_name,
-            profileImage: booking.mentor.personalInfo?.profileImage || null,
+            profileImage: await resolveProfileImage(booking.mentor.personalInfo?.profileImage),
             tagline: booking.mentor.personalInfo?.title || null,
           },
           user: {
+            id: booking.user.id,
             uniqueId: booking.user.unique_id,
             firstName: booking.user.first_name,
             lastName: booking.user.last_name,
-            profileImage: booking.user.personalInfo?.profileImage || null,
+            profileImage: await resolveProfileImage(booking.user.personalInfo?.profileImage),
           },
         },
       };
@@ -1007,6 +1033,171 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Add meeting link error', { error });
       return { success: false, message: error.message || 'Failed to add meeting link' };
+    }
+  }
+
+  /**
+   * Mark a confirmed booking as completed. Mentor-only action.
+   * On success=true: both parties get a rating prompt linking to /my-bookings/[id]/submit-review.
+   * On success=false: only the founder gets a BOOKING_COMPLETED confirmation with the reason/remark.
+   */
+  static async completeBooking(
+    mentorId: number,
+    bookingUniqueId: string,
+    data: { success: boolean; reason?: string | null; remark?: string | null }
+  ): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, mentor_id: mentorId },
+        include: {
+          mentor: { select: { id: true, first_name: true, last_name: true } },
+          user: { select: { id: true, first_name: true, last_name: true } },
+        },
+      });
+      if (!booking) return { success: false, message: 'Booking not found' };
+      if (booking.status !== 'CONFIRMED') {
+        return { success: false, message: 'Only confirmed bookings can be marked complete' };
+      }
+      if (new Date(booking.scheduled_end).getTime() > Date.now()) {
+        return { success: false, message: 'Call has not ended yet' };
+      }
+
+      const reason = data.success ? null : (data.reason?.trim() || null);
+      const remark = data.success ? null : (data.remark?.trim() || null);
+
+      if (!data.success) {
+        if (!reason) return { success: false, message: 'Reason is required when call did not complete successfully' };
+        if (!isValidBookingIncompleteReason(reason)) {
+          return { success: false, message: 'Invalid reason' };
+        }
+      }
+
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: {
+          status: 'COMPLETED',
+          completed_at: new Date(),
+          completion_success: data.success,
+          completion_reason: reason,
+          completion_remark: remark,
+          // Stamp the reminder flag so cron never tries to email again, regardless of which path finished first.
+          ...(booking.completion_reminder_sent_at ? {} : { completion_reminder_sent_at: new Date() }),
+        },
+      });
+
+      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const scheduledAt = new Date(booking.scheduled_at);
+      const dateStr = formatNotifDate(scheduledAt);
+
+      // Notify founder that the call was marked complete (success or not)
+      const founderBody = data.success
+        ? `<p><strong>${escapeHtml(mentorName)}</strong> has marked your 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> as completed.</p>
+           <p style="margin-top:12px;">We'd love to hear how it went — please leave a review.</p>`
+        : `<p><strong>${escapeHtml(mentorName)}</strong> has marked your 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> as not completed.</p>
+           <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
+             <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Reason</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${escapeHtml(reason!)}</td></tr>
+             ${remark ? `<tr><td style="padding:8px 0;color:#667085;font-size:14px;vertical-align:top;">Remark</td><td style="padding:8px 0;font-size:14px;">${escapeHtml(remark)}</td></tr>` : ''}
+           </table>`;
+
+      const reviewLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/submit-review`;
+      const bookingsLink = `${appConfig.frontendUrl}/my-bookings`;
+
+      const founderCompletedData = {
+        userId: booking.user_id,
+        type: 'BOOKING_COMPLETED' as const,
+        notificationTitle: data.success ? 'Your call was marked complete' : 'Your call was marked not completed',
+        notificationBody: founderBody,
+        notificationLink: data.success ? reviewLink : bookingsLink,
+        actorId: mentorId,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, founderCompletedData);
+      await dispatch(NotificationEmailJob, founderCompletedData);
+
+      // Chat sync — system message visible to both parties
+      const chatPrefix = data.success
+        ? '✅ Call marked complete by mentor.'
+        : `⚠️ Call marked not completed: ${reason}`;
+      await ConversationService.syncSystemMessage(
+        booking.user_id, booking.mentor_id,
+        chatPrefix,
+        {
+          activityType: 'BOOKING_COMPLETED',
+          bookingTitle: '1:1 Video Call',
+          bookingDuration: booking.duration,
+          bookingScheduledAt: booking.scheduled_at,
+          completionSuccess: data.success,
+          completionReason: reason,
+          completionRemark: remark,
+        },
+        undefined, mentorId
+      );
+
+      // Rating prompts only when the call actually happened
+      if (data.success) {
+        const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+        const rateBody = (otherName: string) => `<p>Your 1:1 video call with <strong>${escapeHtml(otherName)}</strong> on <strong>${escapeHtml(dateStr)}</strong> has been completed.</p>
+          <p>Please take a moment to leave a review — your public rating helps other founders and mentors on ScaleDux, and private feedback is shared only with ${escapeHtml(otherName)}.</p>`;
+
+        // Founder rates mentor
+        const founderRateData = {
+          userId: booking.user_id,
+          type: 'BOOKING_RATE_PROMPT' as const,
+          notificationTitle: `Rate your call with ${mentorName}`,
+          notificationBody: rateBody(mentorName),
+          notificationLink: reviewLink,
+          actorId: mentorId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, founderRateData);
+        await dispatch(NotificationEmailJob, founderRateData);
+
+        // Mentor rates founder
+        const mentorRateData = {
+          userId: booking.mentor_id,
+          type: 'BOOKING_RATE_PROMPT' as const,
+          notificationTitle: `Rate your call with ${founderName}`,
+          notificationBody: rateBody(founderName),
+          notificationLink: reviewLink,
+          actorId: booking.user_id,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, mentorRateData);
+        await dispatch(NotificationEmailJob, mentorRateData);
+
+        // Single chat nudge — frontend can render a CTA based on activityType
+        await ConversationService.syncSystemMessage(
+          booking.user_id, booking.mentor_id,
+          '⭐ Time to rate your call — share public and private feedback.',
+          {
+            activityType: 'BOOKING_RATE_PROMPT',
+            bookingTitle: '1:1 Video Call',
+            bookingScheduledAt: booking.scheduled_at,
+            bookingUniqueId: booking.unique_id,
+          },
+          undefined, mentorId
+        );
+      }
+
+      return {
+        success: true,
+        message: data.success ? 'Booking marked complete' : 'Booking marked not completed',
+        data: {
+          booking: {
+            unique_id: booking.unique_id,
+            status: 'COMPLETED',
+            completion_success: data.success,
+            completion_reason: reason,
+            completion_remark: remark,
+          },
+        },
+      };
+    } catch (error: any) {
+      Log.error('Complete booking error', { error });
+      return { success: false, message: error.message || 'Failed to mark booking complete' };
     }
   }
 }

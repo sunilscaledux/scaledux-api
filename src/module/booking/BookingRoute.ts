@@ -13,5 +13,6 @@ router.post('/:uniqueId/create-order', authenticateToken, BookingController.crea
 router.post('/:uniqueId/verify-payment', authenticateToken, BookingController.verifyPayment);
 router.post('/:uniqueId/cancel', authenticateToken, BookingController.cancelBooking);
 router.post('/:uniqueId/meeting-link', authenticateToken, BookingController.addMeetingLink);
+router.post('/:uniqueId/complete', authenticateToken, BookingController.completeBooking);
 
 export default router;

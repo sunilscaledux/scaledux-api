@@ -3,7 +3,7 @@
 
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     container_name: scaledux-postgres
     restart: unless-stopped
     ports:

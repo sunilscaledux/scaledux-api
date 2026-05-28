@@ -4,6 +4,7 @@ import { isValidContractEndReason } from "../../constants/contractEndReasons";
 import { Log } from '@services/loggerService';
 
 const ACTION_TYPE_PROPOSAL_CONTRACT = 'PROPOSAL_CONTRACT';
+const ACTION_TYPE_BOOKING = 'BOOKING';
 
 /**
  * Recalculate and persist the cached avg_rating on the User row.
@@ -63,8 +64,38 @@ export async function validateProposalContractForReview(
 }
 
 /**
+ * For action_type BOOKING: checks the booking exists, is COMPLETED with completion_success=true,
+ * and that reviewer + reviewee are the two parties (mentor and user) on it.
+ */
+export async function validateBookingForReview(
+  reviewFromId: number,
+  reviewToId: number,
+  actionId: string
+): Promise<ServiceResponse> {
+  const booking = await (prisma as any).booking.findFirst({
+    where: { unique_id: actionId },
+    select: { mentor_id: true, user_id: true, status: true, completion_success: true },
+  });
+  if (!booking) return { success: false, message: 'Booking not found' };
+  if (booking.status !== 'COMPLETED') {
+    return { success: false, message: 'You can only review a completed booking' };
+  }
+  if (booking.completion_success !== true) {
+    return { success: false, message: 'This booking was marked as not completed and cannot be reviewed' };
+  }
+  const isBetweenParties =
+    (reviewFromId === booking.mentor_id && reviewToId === booking.user_id) ||
+    (reviewFromId === booking.user_id && reviewToId === booking.mentor_id);
+  if (!isBetweenParties) {
+    return { success: false, message: 'You can only review the other party of this booking' };
+  }
+  return { success: true, message: 'OK' };
+}
+
+/**
  * Create a single review row (either PUBLIC or PRIVATE).
  * For PROPOSAL_CONTRACT: validates proposal exists and is between reviewer and reviewee via validateProposalContractForReview.
+ * For BOOKING: validates booking exists, is COMPLETED, and reviewer/reviewee are the two parties.
  */
 export async function createReview(
   reviewFromId: number,
@@ -91,9 +122,18 @@ export async function createReview(
       if (!validation.success) {
         return validation;
       }
+    } else if (action_type === ACTION_TYPE_BOOKING) {
+      const validation = await validateBookingForReview(reviewFromId, review_to_id, action_id);
+      if (!validation.success) {
+        return validation;
+      }
     }
 
-    if (review_type === 'PRIVATE' && end_reason != null && end_reason !== '') {
+    if (
+      review_type === 'PRIVATE' &&
+      action_type === ACTION_TYPE_PROPOSAL_CONTRACT &&
+      end_reason != null && end_reason !== ''
+    ) {
       if (!isValidContractEndReason(end_reason)) {
         return { success: false, message: 'Invalid reason for ending this contract' };
       }
@@ -188,6 +228,17 @@ export async function getReviewsForProposal(
       if (!verification.success) {
         return { success: false, message: verification.message, statusCode: verification.statusCode };
        }
+    } else if (actionType === ACTION_TYPE_BOOKING) {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: actionId },
+        select: { mentor_id: true, user_id: true },
+      });
+      if (!booking) {
+        return { success: false, message: 'Booking not found', statusCode: 404 };
+      }
+      if (userId !== booking.mentor_id && userId !== booking.user_id) {
+        return { success: false, message: 'You do not have access to reviews for this booking', statusCode: 403 };
+      }
     }
 
     const where = { action_type: actionType, action_id: actionId };

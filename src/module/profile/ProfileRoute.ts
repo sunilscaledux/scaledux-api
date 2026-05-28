@@ -115,6 +115,13 @@ router.post(
   uploadFile,
   handleMulterError
 );
+router.post(
+  '/investment-profile/upload-diligence-document',
+  authenticateToken,
+  FileUpload({ uploadPath: 'documents/diligence', fileFilter: 'any', maxSize: 50, maxFiles: 1, fieldName: 'diligence_document' }).single('document'),
+  uploadFile,
+  handleMulterError
+);
 
 router.get("/notification-preferences/types", authenticateToken, NotificationPreferencesController.getTypes);
 router.get("/notification-preferences", authenticateToken, NotificationPreferencesController.getPreferences);
