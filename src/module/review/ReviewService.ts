@@ -64,7 +64,7 @@ export async function validateProposalContractForReview(
 }
 
 /**
- * For action_type BOOKING: checks the booking exists, is COMPLETED with completion_success=true,
+ * For action_type BOOKING: checks the booking exists, has status COMPLETED,
  * and that reviewer + reviewee are the two parties (mentor and user) on it.
  */
 export async function validateBookingForReview(
@@ -74,14 +74,11 @@ export async function validateBookingForReview(
 ): Promise<ServiceResponse> {
   const booking = await (prisma as any).booking.findFirst({
     where: { unique_id: actionId },
-    select: { mentor_id: true, user_id: true, status: true, completion_success: true },
+    select: { mentor_id: true, user_id: true, status: true },
   });
   if (!booking) return { success: false, message: 'Booking not found' };
   if (booking.status !== 'COMPLETED') {
     return { success: false, message: 'You can only review a completed booking' };
-  }
-  if (booking.completion_success !== true) {
-    return { success: false, message: 'This booking was marked as not completed and cannot be reviewed' };
   }
   const isBetweenParties =
     (reviewFromId === booking.mentor_id && reviewToId === booking.user_id) ||

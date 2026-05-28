@@ -91,6 +91,7 @@ model User {
   successStories               SuccessStory[]
   bookingsAsMentor             Booking[] @relation("BookingMentor")
   bookingsAsUser               Booking[] @relation("BookingUser")
+  bookingActivities            BookingActivity[] @relation("BookingActivityActor")
   attachmentsOwned              Attachment[] @relation("AttachmentOwner")
   attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
   /** Temporary state token for DigiLocker OAuth callback validation */
@@ -1742,7 +1743,7 @@ model Booking {
   scheduled_end          DateTime
   message                String?   @db.Text  // discussion points from booker
   status                 String    @default("PENDING") @db.VarChar(20)
-  // PENDING → CONFIRMED (after payment) → COMPLETED | CANCELLED
+  // PENDING → CONFIRMED (after payment) → COMPLETED | CANCELLED | REJECTED | RESCHEDULED
   payment_status         String    @default("UNPAID") @db.VarChar(20)
   // UNPAID → PAID → RELEASED | REFUNDED
   amount                 Decimal   @db.Decimal(12, 2)
@@ -1757,28 +1758,45 @@ model Booking {
   parent_id              Int?      // original booking this was rescheduled from
   is_reschedule          Boolean   @default(false)
   rescheduled_by         Int?      // user who initiated the reschedule
+  reschedule_count       Int       @default(0) // how many times this booking chain has been rescheduled
   // Cancellation
   cancelled_by           Int?
-  cancel_reason          String?   @db.Text
-  // Completion (set by mentor via Mark complete flow)
+  cancelled_at           DateTime?
+  // Completion / Rejection
   completed_at           DateTime?
-  completion_success     Boolean?  // true = call happened, false = didn't (no-show, tech issue, etc.)
-  completion_reason      String?   @db.VarChar(120) // matches one of BOOKING_INCOMPLETE_REASONS when success=false
-  completion_remark      String?   @db.Text
+  rejected_at            DateTime?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
   mentor                 User      @relation("BookingMentor", fields: [mentor_id], references: [id])
   user                   User      @relation("BookingUser", fields: [user_id], references: [id])
   currency               Currency  @relation(fields: [currency_id], references: [id])
-  parent                 Booking?  @relation("BookingReschedule", fields: [parent_id], references: [id])
-  rescheduled            Booking[] @relation("BookingReschedule")
+  parent                 Booking?          @relation("BookingReschedule", fields: [parent_id], references: [id])
+  rescheduled            Booking[]         @relation("BookingReschedule")
+  activities             BookingActivity[] @relation("BookingActivities")
 
   @@index([mentor_id, scheduled_at])
   @@index([user_id, status])
   @@index([status])
   @@index([parent_id])
   @@map("scd_bookings")
+}
+
+model BookingActivity {
+  id          Int      @id @default(autoincrement())
+  booking_id  Int
+  action      String   @db.VarChar(20) // CANCELLED | RESCHEDULED | REJECTED | COMPLETED
+  reason      String?  @db.VarChar(120)
+  remark      String?  @db.Text
+  acted_by    Int
+  created_at  DateTime @default(now())
+
+  booking     Booking  @relation("BookingActivities", fields: [booking_id], references: [id])
+  actor       User     @relation("BookingActivityActor", fields: [acted_by], references: [id])
+
+  @@index([booking_id])
+  @@index([acted_by])
+  @@map("scd_booking_activities")
 }
 
 model SuccessStory {

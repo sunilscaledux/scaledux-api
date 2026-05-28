@@ -19,7 +19,7 @@ import {
   getInvestorTypes,
   getInvestmentProfileOptions,
   getContractEndReasons,
-  getBookingIncompleteReasons,
+  getMeetingReasons,
   getIdTypes,
   searchSkills,
   getAllSkills,
@@ -50,7 +50,7 @@ router.get("/startup-stages", getStartupStages)
 router.get("/investor-types", getInvestorTypes)
 router.get("/investment-profile-options", getInvestmentProfileOptions)
 router.get("/contract-end-reasons", getContractEndReasons)
-router.get("/booking-incomplete-reasons", getBookingIncompleteReasons)
+router.get("/meeting-reasons", getMeetingReasons)
 router.get("/id-types", getIdTypes)
 
 router.get("/skills/search", searchSkills)

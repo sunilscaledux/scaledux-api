@@ -7,7 +7,7 @@ import { getPublicUrl } from "@services/bunnyStorageService"
 import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
 import { STARTUP_STAGES } from "../../constants/startupStages"
 import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
-import { BOOKING_INCOMPLETE_REASONS } from "../../constants/bookingIncompleteReasons"
+import { MEETING_REASONS, MeetingAction } from "../../constants/meetingReasons"
 import { ID_TYPES } from "../../constants/idTypes"
 
 // Country related functions
@@ -338,11 +338,20 @@ export async function getContractEndReasons(req: Request, res: Response) {
 }
 
 /**
- * Get reasons a mentor can pick when marking a booking as not completed successfully.
- * GET /api/v1/booking-incomplete-reasons
+ * Get predefined meeting reasons by action type.
+ * GET /api/v1/meeting-reasons?type=CANCEL|RESCHEDULE|REJECT
+ * Without type param, returns all reason groups.
  */
-export async function getBookingIncompleteReasons(req: Request, res: Response) {
-  return ApiResponse.success(res, BOOKING_INCOMPLETE_REASONS, "Booking incomplete reasons retrieved successfully")
+export async function getMeetingReasons(req: Request, res: Response) {
+  const type = req.query.type as string | undefined;
+  if (type) {
+    const upper = type.toUpperCase() as MeetingAction;
+    if (!(upper in MEETING_REASONS)) {
+      return ApiResponse.error(res, "Invalid type. Must be one of: CANCEL, RESCHEDULE, REJECT", 400);
+    }
+    return ApiResponse.success(res, MEETING_REASONS[upper], "Meeting reasons retrieved successfully");
+  }
+  return ApiResponse.success(res, MEETING_REASONS, "Meeting reasons retrieved successfully");
 }
 
 /**

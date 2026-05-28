@@ -7,7 +7,7 @@ export class BookingController {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
 
-    const { mentorUniqueId, duration, scheduledAt, message, rescheduleFromId } = req.body;
+    const { mentorUniqueId, duration, scheduledAt, message, rescheduleFromId, rescheduleReason, rescheduleRemark } = req.body;
     if (!mentorUniqueId || !duration || !scheduledAt) {
       return ApiResponse.error(res, 'mentorUniqueId, duration, and scheduledAt are required', 400);
     }
@@ -18,6 +18,8 @@ export class BookingController {
       scheduledAt,
       message,
       rescheduleFromId,
+      rescheduleReason,
+      rescheduleRemark,
     });
 
     if (result.success) return ApiResponse.success(res, result.data, result.message, 201);
@@ -95,8 +97,8 @@ export class BookingController {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
 
-    const { reason } = req.body;
-    const result = await BookingService.cancelBooking(userId, req.params.uniqueId, reason);
+    const { reason, remark } = req.body;
+    const result = await BookingService.cancelBooking(userId, req.params.uniqueId, reason, remark);
 
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message, 400);

@@ -9,7 +9,7 @@ import { appConfig } from '@config/app';
 import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
-import { isValidBookingIncompleteReason } from '../../constants/bookingIncompleteReasons';
+import { isValidMeetingReason } from '../../constants/meetingReasons';
 import { resolveAttachmentUrl } from '@services/attachmentService';
 
 /** Resolve a profileImage attachment key to its public URL (or null if missing). */
@@ -110,6 +110,8 @@ export class BookingService {
       scheduledAt: string;
       message?: string;
       rescheduleFromId?: string;
+      rescheduleReason?: string;
+      rescheduleRemark?: string;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -178,12 +180,19 @@ export class BookingService {
       // Handle reschedule: cancel old booking and link
       let parentId: number | null = null;
       let bookingUserId = userId; // the founder who booked
+      let rescheduleCount = 0;
       if (data.rescheduleFromId) {
         const oldBooking = await (prisma as any).booking.findFirst({
           where: { unique_id: data.rescheduleFromId, OR: [{ user_id: userId }, { mentor_id: userId }] },
         });
         if (!oldBooking) return { success: false, message: 'Original booking not found' };
-        if (oldBooking.status === 'CANCELLED') return { success: false, message: 'Original booking is already cancelled' };
+        if (oldBooking.status === 'CANCELLED' || oldBooking.status === 'RESCHEDULED') return { success: false, message: 'Original booking is already cancelled' };
+
+        // Enforce max 3 reschedules per booking chain
+        rescheduleCount = (oldBooking.reschedule_count || 0) + 1;
+        if (rescheduleCount > 3) {
+          return { success: false, message: 'This booking has already been rescheduled 3 times. Please create a new booking instead.' };
+        }
 
         // Must be at least 1 hour before scheduled time to reschedule
         const minsUntil = (new Date(oldBooking.scheduled_at).getTime() - Date.now()) / 60000;
@@ -193,8 +202,19 @@ export class BookingService {
 
         await (prisma as any).booking.update({
           where: { id: oldBooking.id },
-          data: { status: 'CANCELLED', cancelled_by: userId, cancel_reason: 'Rescheduled' },
+          data: { status: 'RESCHEDULED', cancelled_by: userId, cancelled_at: new Date() },
         });
+
+        await (prisma as any).bookingActivity.create({
+          data: {
+            booking_id: oldBooking.id,
+            action: 'RESCHEDULED',
+            reason: data.rescheduleReason?.trim() || null,
+            remark: data.rescheduleRemark?.trim() || null,
+            acted_by: userId,
+          },
+        });
+
         parentId = oldBooking.id;
         // Preserve original booking's user (founder) — mentor may be the one rescheduling
         bookingUserId = oldBooking.user_id;
@@ -216,7 +236,7 @@ export class BookingService {
           amount,
           currency_id: 1, // INR default
           ...(isReschedule
-            ? { parent_id: parentId, is_reschedule: true, rescheduled_by: userId, status: 'CONFIRMED', payment_status: 'PAID' }
+            ? { parent_id: parentId, is_reschedule: true, rescheduled_by: userId, reschedule_count: rescheduleCount, status: 'CONFIRMED', payment_status: 'PAID' }
             : {}),
         },
       });
@@ -537,13 +557,12 @@ export class BookingService {
         currency: b.currency?.code || 'INR',
         currencySymbol: b.currency?.symbol || '₹',
         isReschedule: b.is_reschedule,
+        rescheduleCount: b.reschedule_count ?? 0,
         parentId: b.parent_id,
         meetingLink: b.meeting_link ?? null,
         meetingProvider: b.meeting_provider ?? null,
         completedAt: b.completed_at ?? null,
-        completionSuccess: b.completion_success ?? null,
-        completionReason: b.completion_reason ?? null,
-        completionRemark: b.completion_remark ?? null,
+        rejectedAt: b.rejected_at ?? null,
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
@@ -598,6 +617,10 @@ export class BookingService {
             },
           },
           currency: { select: { code: true, symbol: true } },
+          activities: {
+            orderBy: { created_at: 'desc' },
+            select: { action: true, reason: true, remark: true, acted_by: true, created_at: true },
+          },
         },
       });
       if (!booking) return { success: false, message: 'Booking not found' };
@@ -620,13 +643,13 @@ export class BookingService {
           currencySymbol: booking.currency?.symbol || '₹',
           platformFee: booking.platform_fee ? Number(booking.platform_fee) : null,
           isReschedule: booking.is_reschedule,
+          rescheduleCount: booking.reschedule_count ?? 0,
           parentId: booking.parent_id,
           meetingLink: booking.meeting_link ?? null,
           meetingProvider: booking.meeting_provider ?? null,
           completedAt: booking.completed_at ?? null,
-          completionSuccess: booking.completion_success ?? null,
-          completionReason: booking.completion_reason ?? null,
-          completionRemark: booking.completion_remark ?? null,
+          rejectedAt: booking.rejected_at ?? null,
+          activities: booking.activities,
           createdAt: booking.created_at,
           mentor: {
             id: booking.mentor.id,
@@ -657,7 +680,8 @@ export class BookingService {
   static async cancelBooking(
     userId: number,
     uniqueId: string,
-    reason?: string
+    reason?: string,
+    remark?: string
   ): Promise<ServiceResponse> {
     try {
       const booking = await (prisma as any).booking.findFirst({
@@ -674,12 +698,26 @@ export class BookingService {
       if (booking.status === 'CANCELLED') return { success: false, message: 'Booking is already cancelled' };
       if (booking.status === 'COMPLETED') return { success: false, message: 'Cannot cancel a completed booking' };
 
+      if (reason && !isValidMeetingReason('CANCEL', reason)) {
+        return { success: false, message: 'Invalid cancel reason' };
+      }
+
       await (prisma as any).booking.update({
         where: { id: booking.id },
         data: {
           status: 'CANCELLED',
           cancelled_by: userId,
-          cancel_reason: reason?.trim() || null,
+          cancelled_at: new Date(),
+        },
+      });
+
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'CANCELLED',
+          reason: reason?.trim() || null,
+          remark: remark?.trim() || null,
+          acted_by: userId,
         },
       });
 
@@ -1067,21 +1105,31 @@ export class BookingService {
 
       if (!data.success) {
         if (!reason) return { success: false, message: 'Reason is required when call did not complete successfully' };
-        if (!isValidBookingIncompleteReason(reason)) {
+        if (!isValidMeetingReason('REJECT', reason)) {
           return { success: false, message: 'Invalid reason' };
         }
       }
 
+      const newStatus = data.success ? 'COMPLETED' : 'REJECTED';
+      const now = new Date();
+
       await (prisma as any).booking.update({
         where: { id: booking.id },
         data: {
-          status: 'COMPLETED',
-          completed_at: new Date(),
-          completion_success: data.success,
-          completion_reason: reason,
-          completion_remark: remark,
+          status: newStatus,
+          ...(data.success ? { completed_at: now } : { rejected_at: now }),
           // Stamp the reminder flag so cron never tries to email again, regardless of which path finished first.
-          ...(booking.completion_reminder_sent_at ? {} : { completion_reminder_sent_at: new Date() }),
+          ...(booking.completion_reminder_sent_at ? {} : { completion_reminder_sent_at: now }),
+        },
+      });
+
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: data.success ? 'COMPLETED' : 'REJECTED',
+          reason,
+          remark,
+          acted_by: mentorId,
         },
       });
 
@@ -1188,10 +1236,9 @@ export class BookingService {
         data: {
           booking: {
             unique_id: booking.unique_id,
-            status: 'COMPLETED',
-            completion_success: data.success,
-            completion_reason: reason,
-            completion_remark: remark,
+            status: newStatus,
+            reason,
+            remark,
           },
         },
       };
