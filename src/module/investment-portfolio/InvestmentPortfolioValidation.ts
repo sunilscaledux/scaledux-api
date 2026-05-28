@@ -14,9 +14,10 @@ export const createInvestmentPortfolioSchema = Joi.object({
     'string.empty': 'Upload company logo',
     'any.required': 'Upload company logo',
   }),
-  description: Joi.string().required().min(1).custom(rejectAllHtml).messages({
+  description: Joi.string().required().min(1).max(3000).custom(rejectAllHtml).messages({
     'string.empty': 'Company description is required',
     'any.required': 'Company description is required',
+    'string.max': 'Company description must not exceed 3000 characters',
     ...noHtmlMessages,
   }),
   companyWebsite: Joi.string().required().max(2048).custom(validateSafeUrl).messages({
@@ -46,7 +47,10 @@ export const updateInvestmentPortfolioSchema = Joi.object({
     ...noHtmlMessages,
   }),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
+  description: Joi.string().optional().allow('').max(3000).custom(rejectAllHtml).messages({
+    'string.max': 'Company description must not exceed 3000 characters',
+    ...noHtmlMessages,
+  }),
   companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
     'string.max': 'Website URL must not exceed 2048 characters',
     ...safeUrlMessages,
@@ -72,7 +76,10 @@ export const createDraftInvestmentPortfolioSchema = Joi.object({
     ...noHtmlMessages,
   }),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
+  description: Joi.string().optional().allow('').max(3000).custom(rejectAllHtml).messages({
+    'string.max': 'Company description must not exceed 3000 characters',
+    ...noHtmlMessages,
+  }),
   companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
     'string.max': 'Website URL must not exceed 2048 characters',
     ...safeUrlMessages,
@@ -98,7 +105,10 @@ export const updateDraftInvestmentPortfolioSchema = Joi.object({
     ...noHtmlMessages,
   }),
   companyLogo: Joi.string().optional().allow(null, ''),
-  description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
+  description: Joi.string().optional().allow('').max(3000).custom(rejectAllHtml).messages({
+    'string.max': 'Company description must not exceed 3000 characters',
+    ...noHtmlMessages,
+  }),
   companyWebsite: Joi.string().optional().allow('').max(2048).custom(validateSafeUrl).messages({
     'string.max': 'Website URL must not exceed 2048 characters',
     ...safeUrlMessages,

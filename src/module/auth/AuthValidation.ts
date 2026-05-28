@@ -5,7 +5,18 @@ import {
   ResendOtpInput,
   LoginInput,
 } from "./AuthTypes";
+import { isDisposableEmail } from "@utils/disposableEmailValidator";
 
+function rejectDisposableEmail(value: string, helpers: Joi.CustomHelpers) {
+  if (value && value.includes('@') && isDisposableEmail(value)) {
+    return helpers.error('string.disposableEmail');
+  }
+  return value;
+}
+
+const disposableEmailMessage = {
+  'string.disposableEmail': 'Disposable or temporary email addresses are not allowed. Please use a permanent email address.',
+};
 
 export const registerUserSchema = Joi.object({
   first_name: Joi.string().min(2).max(50).required().messages({
@@ -17,8 +28,9 @@ export const registerUserSchema = Joi.object({
     "string.min": "Last name must be at least 2 characters long",
     "string.max": "Last name must not exceed 50 characters",
   }),
-  email: Joi.string().required().messages({
+  email: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
+    ...disposableEmailMessage,
   }),
   password: Joi.string().min(8).required().messages({
     "any.required": "Password is required",
@@ -29,9 +41,10 @@ export const registerUserSchema = Joi.object({
 });
 
 export const loginUserSchema = Joi.object<LoginInput>({
-  email: Joi.string().email().optional().allow(null, "").messages({
+  email: Joi.string().email().optional().allow(null, "").custom(rejectDisposableEmail).messages({
     "any.required": "Email is required",
     "string.email": "Please enter valid email address",
+    ...disposableEmailMessage,
   }),
   password: Joi.string().required().messages({
     "any.required": "Password is required",
@@ -56,14 +69,16 @@ export const verifyOtpSchema = Joi.object<VerifyOtpInput>({
 });
 
 export const resendOtpSchema = Joi.object<ResendOtpInput>({
-  identifier: Joi.string().required().messages({
+  identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
+    ...disposableEmailMessage,
   }),
 });
 
 export const unifiedOtpRequestSchema = Joi.object({
-  identifier: Joi.string().required().messages({
+  identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
+    ...disposableEmailMessage,
   }),
   type: Joi.string()
     .valid("registration", "login", "forgot")
@@ -97,8 +112,9 @@ export const unifiedVerifyOtpSchema = Joi.object({
 });
 
 export const resetPasswordSchema = Joi.object({
-  identifier: Joi.string().required().messages({
+  identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
+    ...disposableEmailMessage,
   }),
   password: Joi.string().min(8).required().messages({
     "any.required": "Password is required",

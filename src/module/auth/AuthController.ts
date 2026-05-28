@@ -35,6 +35,7 @@ import {
   resetPasswordSchema,
 } from "./AuthValidation";
 import { ApiResponse } from "@utils/ApiResponse";
+import { isDisposableEmail } from "@utils/disposableEmailValidator";
 import * as AuthService from "@module/auth/AuthService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { normalizeContact, generateKeycode } from '@utils/General';
@@ -54,6 +55,11 @@ export async function initiateRegistration(req: Request, res: Response) {
 
   const body: ResendOtpInput = value;
   const contactMethod = contactInfo.email ? "email" : "phone";
+
+  // Block disposable/temporary email addresses
+  if (contactInfo.email && isDisposableEmail(contactInfo.email)) {
+    return ApiResponse.error(res, "Disposable or temporary email addresses are not allowed. Please use a permanent email address.");
+  }
 
   const isUserExist = await checkUserExists(body.identifier);
 
@@ -95,6 +101,11 @@ export async function register(req: Request, res: Response) {
   const identifier = contactInfo.email || contactInfo.phone;
   if (!identifier) {
     return ApiResponse.error(res, "Valid email or phone number is required");
+  }
+
+  // Block disposable/temporary email addresses
+  if (contactInfo.email && isDisposableEmail(contactInfo.email)) {
+    return ApiResponse.error(res, "Disposable or temporary email addresses are not allowed. Please use a permanent email address.");
   }
 
   // Check if user already exists
