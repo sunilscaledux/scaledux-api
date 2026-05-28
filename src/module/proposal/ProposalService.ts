@@ -149,10 +149,28 @@ async function flattenNdaToProposal(proposal: any): Promise<any> {
 /** Build milestones array from Milestone table rows; deliverables from Deliverable table. */
 async function milestonesFromRows(rows: any[] | null | undefined): Promise<any[]> {
   if (!Array.isArray(rows)) return [];
+  // Fetch invoice_a status for funded milestones in one query
+  const milestoneIds = rows.map((r: any) => r.id).filter(Boolean);
+  const invoiceStatuses = milestoneIds.length > 0
+    ? await (prisma as any).billingTransaction.findMany({
+        where: { milestone_id: { in: milestoneIds }, type: 'payment' },
+        select: { milestone_id: true, invoice_a_id: true, unique_id: true, status: true }
+      })
+    : [];
+  const invoiceMap = new Map<number, { invoiceSent: boolean; transactionUniqueId: string | null; paymentStatus: string }>();
+  for (const tx of invoiceStatuses) {
+    invoiceMap.set(tx.milestone_id, {
+      invoiceSent: tx.invoice_a_id != null,
+      transactionUniqueId: tx.unique_id,
+      paymentStatus: tx.status,
+    });
+  }
+
   return Promise.all(rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map(async (row) => {
       const deliverables = await buildDeliverablesFromRow(row);
+      const txInfo = invoiceMap.get(row.id);
       return {
         id: row.unique_id,
         milestoneId: row.id,
@@ -165,7 +183,10 @@ async function milestonesFromRows(rows: any[] | null | undefined): Promise<any[]
         milestone_status: row.status ?? MilestoneStatus.PENDING,
         submitted_file: [],
         is_approved: row.is_approved === true,
-        remark: row.remark ?? undefined
+        remark: row.remark ?? undefined,
+        invoice_sent: txInfo?.invoiceSent ?? false,
+        transaction_unique_id: txInfo?.transactionUniqueId ?? null,
+        billing_status: txInfo?.paymentStatus ?? null,
       };
     }));
 }
