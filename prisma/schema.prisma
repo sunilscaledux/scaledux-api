@@ -1028,7 +1028,7 @@ model Review {
   action_id       String    @db.VarChar(100)  // e.g. proposal unique_id
 
   review_type     String    @db.VarChar(20)  // PUBLIC | PRIVATE
-  rating          Decimal   @db.Decimal(3, 2) // 0-10 private, 0-5 public overall
+  rating          Decimal   @db.Decimal(4, 2) // 0-10 private, 0-5 public overall
   feedback        String?   @db.Text
   end_reason      String?   @db.VarChar(255) // For PRIVATE; null for PUBLIC
   ratings_extra   Json?     // For PUBLIC category breakdown { skills, qualityOfWork, ... }; null for PRIVATE
@@ -1763,7 +1763,8 @@ model Booking {
   cancelled_by           Int?
   cancelled_at           DateTime?
   // Completion / Rejection
-  completed_at           DateTime?
+  completed_at           DateTime?  // mentor confirmed
+  user_approved_at       DateTime?  // user accepted the confirmation
   rejected_at            DateTime?
   completion_reminder_sent_at DateTime?
   created_at             DateTime  @default(now())

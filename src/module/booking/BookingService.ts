@@ -563,6 +563,7 @@ export class BookingService {
         meetingProvider: b.meeting_provider ?? null,
         completedAt: b.completed_at ?? null,
         rejectedAt: b.rejected_at ?? null,
+        userApprovedAt: b.user_approved_at ?? null,
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
@@ -649,6 +650,7 @@ export class BookingService {
           meetingProvider: booking.meeting_provider ?? null,
           completedAt: booking.completed_at ?? null,
           rejectedAt: booking.rejected_at ?? null,
+          userApprovedAt: booking.user_approved_at ?? null,
           activities: booking.activities,
           createdAt: booking.created_at,
           mentor: {
@@ -1137,94 +1139,72 @@ export class BookingService {
       const scheduledAt = new Date(booking.scheduled_at);
       const dateStr = formatNotifDate(scheduledAt);
 
-      // Notify founder that the call was marked complete (success or not)
-      const founderBody = data.success
-        ? `<p><strong>${escapeHtml(mentorName)}</strong> has marked your 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> as completed.</p>
-           <p style="margin-top:12px;">We'd love to hear how it went — please leave a review.</p>`
-        : `<p><strong>${escapeHtml(mentorName)}</strong> has marked your 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> as not completed.</p>
+      const acceptLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/accept-confirmation`;
+      const bookingsLink = `${appConfig.frontendUrl}/my-bookings`;
+
+      if (data.success) {
+        // Notify founder to accept the meeting confirmation
+        const founderBody = `<p><strong>${escapeHtml(mentorName)}</strong> has confirmed your 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> as completed.</p>
+           <p style="margin-top:12px;">Please accept the confirmation to proceed with reviews.</p>`;
+
+        const founderCompletedData = {
+          userId: booking.user_id,
+          type: 'BOOKING_COMPLETED' as const,
+          notificationTitle: 'Meeting confirmation received',
+          notificationBody: founderBody,
+          notificationLink: acceptLink,
+          actorId: mentorId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, founderCompletedData);
+        await dispatch(NotificationEmailJob, founderCompletedData);
+
+        // Chat with accept link
+        await ConversationService.syncSystemMessage(
+          booking.user_id, booking.mentor_id,
+          `✅ ${mentorName} has confirmed the meeting as completed. Accept confirmation to proceed.`,
+          {
+            activityType: 'BOOKING_ACCEPT_PROMPT',
+            bookingTitle: '1:1 Video Call',
+            bookingDuration: booking.duration,
+            bookingScheduledAt: booking.scheduled_at,
+            bookingUniqueId: booking.unique_id,
+            acceptLink,
+          },
+          undefined, mentorId
+        );
+      } else {
+        // Notify founder that call didn't happen
+        const founderBody = `<p><strong>${escapeHtml(mentorName)}</strong> has reported that the 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> did not take place.</p>
            <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
              <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Reason</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${escapeHtml(reason!)}</td></tr>
              ${remark ? `<tr><td style="padding:8px 0;color:#667085;font-size:14px;vertical-align:top;">Remark</td><td style="padding:8px 0;font-size:14px;">${escapeHtml(remark)}</td></tr>` : ''}
            </table>`;
 
-      const reviewLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/submit-review`;
-      const bookingsLink = `${appConfig.frontendUrl}/my-bookings`;
-
-      const founderCompletedData = {
-        userId: booking.user_id,
-        type: 'BOOKING_COMPLETED' as const,
-        notificationTitle: data.success ? 'Your call was marked complete' : 'Your call was marked not completed',
-        notificationBody: founderBody,
-        notificationLink: data.success ? reviewLink : bookingsLink,
-        actorId: mentorId,
-        subjectType: 'Booking' as const,
-        subjectId: booking.id,
-      };
-      await dispatch(NotificationJob, founderCompletedData);
-      await dispatch(NotificationEmailJob, founderCompletedData);
-
-      // Chat sync — system message visible to both parties
-      const chatPrefix = data.success
-        ? '✅ Call marked complete by mentor.'
-        : `⚠️ Call marked not completed: ${reason}`;
-      await ConversationService.syncSystemMessage(
-        booking.user_id, booking.mentor_id,
-        chatPrefix,
-        {
-          activityType: 'BOOKING_COMPLETED',
-          bookingTitle: '1:1 Video Call',
-          bookingDuration: booking.duration,
-          bookingScheduledAt: booking.scheduled_at,
-          completionSuccess: data.success,
-          completionReason: reason,
-          completionRemark: remark,
-        },
-        undefined, mentorId
-      );
-
-      // Rating prompts only when the call actually happened
-      if (data.success) {
-        const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
-        const rateBody = (otherName: string) => `<p>Your 1:1 video call with <strong>${escapeHtml(otherName)}</strong> on <strong>${escapeHtml(dateStr)}</strong> has been completed.</p>
-          <p>Please take a moment to leave a review — your public rating helps other founders and mentors on ScaleDux, and private feedback is shared only with ${escapeHtml(otherName)}.</p>`;
-
-        // Founder rates mentor
-        const founderRateData = {
+        const founderCompletedData = {
           userId: booking.user_id,
-          type: 'BOOKING_RATE_PROMPT' as const,
-          notificationTitle: `Rate your call with ${mentorName}`,
-          notificationBody: rateBody(mentorName),
-          notificationLink: reviewLink,
+          type: 'BOOKING_COMPLETED' as const,
+          notificationTitle: 'Call did not take place',
+          notificationBody: founderBody,
+          notificationLink: bookingsLink,
           actorId: mentorId,
           subjectType: 'Booking' as const,
           subjectId: booking.id,
         };
-        await dispatch(NotificationJob, founderRateData);
-        await dispatch(NotificationEmailJob, founderRateData);
+        await dispatch(NotificationJob, founderCompletedData);
+        await dispatch(NotificationEmailJob, founderCompletedData);
 
-        // Mentor rates founder
-        const mentorRateData = {
-          userId: booking.mentor_id,
-          type: 'BOOKING_RATE_PROMPT' as const,
-          notificationTitle: `Rate your call with ${founderName}`,
-          notificationBody: rateBody(founderName),
-          notificationLink: reviewLink,
-          actorId: booking.user_id,
-          subjectType: 'Booking' as const,
-          subjectId: booking.id,
-        };
-        await dispatch(NotificationJob, mentorRateData);
-        await dispatch(NotificationEmailJob, mentorRateData);
-
-        // Single chat nudge — frontend can render a CTA based on activityType
         await ConversationService.syncSystemMessage(
           booking.user_id, booking.mentor_id,
-          '⭐ Time to rate your call — share public and private feedback.',
+          `⚠️ Call did not take place: ${reason}`,
           {
-            activityType: 'BOOKING_RATE_PROMPT',
+            activityType: 'BOOKING_COMPLETED',
             bookingTitle: '1:1 Video Call',
+            bookingDuration: booking.duration,
             bookingScheduledAt: booking.scheduled_at,
-            bookingUniqueId: booking.unique_id,
+            completionReason: reason,
+            completionRemark: remark,
           },
           undefined, mentorId
         );
@@ -1232,7 +1212,7 @@ export class BookingService {
 
       return {
         success: true,
-        message: data.success ? 'Booking marked complete' : 'Booking marked not completed',
+        message: data.success ? 'Meeting confirmation sent' : 'Call reported as not completed',
         data: {
           booking: {
             unique_id: booking.unique_id,
@@ -1245,6 +1225,106 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Complete booking error', { error });
       return { success: false, message: error.message || 'Failed to mark booking complete' };
+    }
+  }
+
+  /**
+   * User (founder) accepts the mentor's meeting completion confirmation.
+   * Triggers rate prompts for both parties with review links.
+   */
+  static async acceptCompletion(
+    userId: number,
+    bookingUniqueId: string
+  ): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, user_id: userId },
+        include: {
+          mentor: { select: { id: true, first_name: true, last_name: true } },
+          user: { select: { id: true, first_name: true, last_name: true } },
+        },
+      });
+      if (!booking) return { success: false, message: 'Booking not found' };
+      if (booking.status !== 'COMPLETED') {
+        return { success: false, message: 'Booking is not in completed state' };
+      }
+      if (booking.user_approved_at) {
+        return { success: false, message: 'You have already accepted this confirmation' };
+      }
+
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: { user_approved_at: new Date() },
+      });
+
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'USER_ACCEPTED',
+          acted_by: userId,
+        },
+      });
+
+      // Now send rate prompts to both parties
+      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+      const scheduledAt = new Date(booking.scheduled_at);
+      const dateStr = formatNotifDate(scheduledAt);
+      const reviewLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/submit-review`;
+
+      const rateBody = (otherName: string) => `<p>Your 1:1 video call with <strong>${escapeHtml(otherName)}</strong> on <strong>${escapeHtml(dateStr)}</strong> has been completed.</p>
+        <p>Please take a moment to leave a review — your public rating helps other founders and mentors on ScaleDux, and private feedback is shared only with ${escapeHtml(otherName)}.</p>`;
+
+      // Founder rates mentor
+      const founderRateData = {
+        userId: booking.user_id,
+        type: 'BOOKING_RATE_PROMPT' as const,
+        notificationTitle: `Rate your call with ${mentorName}`,
+        notificationBody: rateBody(mentorName),
+        notificationLink: reviewLink,
+        actorId: booking.mentor_id,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, founderRateData);
+      await dispatch(NotificationEmailJob, founderRateData);
+
+      // Mentor rates founder
+      const mentorRateData = {
+        userId: booking.mentor_id,
+        type: 'BOOKING_RATE_PROMPT' as const,
+        notificationTitle: `Rate your call with ${founderName}`,
+        notificationBody: rateBody(founderName),
+        notificationLink: reviewLink,
+        actorId: booking.user_id,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, mentorRateData);
+      await dispatch(NotificationEmailJob, mentorRateData);
+
+      // Chat with review link
+      await ConversationService.syncSystemMessage(
+        booking.user_id, booking.mentor_id,
+        `⭐ ${founderName} accepted the meeting confirmation. Time to rate your call!`,
+        {
+          activityType: 'BOOKING_RATE_PROMPT',
+          bookingTitle: '1:1 Video Call',
+          bookingScheduledAt: booking.scheduled_at,
+          bookingUniqueId: booking.unique_id,
+          reviewLink,
+        },
+        undefined, userId
+      );
+
+      return {
+        success: true,
+        message: 'Confirmation accepted',
+        data: { booking: { unique_id: booking.unique_id, status: 'COMPLETED' } },
+      };
+    } catch (error: any) {
+      Log.error('Accept completion error', { error });
+      return { success: false, message: error.message || 'Failed to accept confirmation' };
     }
   }
 }
