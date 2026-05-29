@@ -68,13 +68,13 @@ export const normalizeContact = (email: string) => {
   }
 
   const isEmail = /@/.test(incoming);
-  const digitsOnly = incoming.replace(/\D/g, "");
-  const isPhone = /^\d{10}$/.test(digitsOnly);
+  // Accept 10-digit local numbers and 10-15 digit international numbers (with optional + prefix)
+  const isPhone = !isEmail && /^\+?\d{10,15}$/.test(incoming.trim());
 
   if (isEmail) {
     return { email: incoming, phone: null };
   } else if (isPhone) {
-    return { email: null, phone: digitsOnly };
+    return { email: null, phone: incoming.trim() };
   } else {
     // Keep as-is and let Joi raise validation error
     return { email: incoming, phone: null };
