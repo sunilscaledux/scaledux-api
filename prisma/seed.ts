@@ -5,7 +5,6 @@ import { seedLanguages } from "./seeds/languages-seed";
 import { seedExpertise } from "./seeds/expertise-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
-import { seedBillingData } from "./seeds/billing-seed";
 import { seedStartupPhases } from "./seeds/startup-phases-seed";
 
 const prisma = new PrismaClient();
@@ -34,7 +33,7 @@ async function main() {
   // // 7. Seed Revenue Models — skipped (not needed yet)
   // await seedRevenueModels(prisma);
 
-  await seedBillingData(prisma);
+  // Billing seed removed — billing data is created by actual payment flow
 
   // 8. Seed Startup Phases (Phase 0 to Phase 7)
   await seedStartupPhases(prisma);
