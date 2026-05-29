@@ -360,7 +360,6 @@ export class BookingService {
 
       const result = await BillingService.createVerificationOrder(String(userId), totalAmount, {
         receiptPrefix: 'booking',
-        platformTransferAmountPaise: platformTransferPaise,
         notes: { purpose: 'mentor_booking', booking_id: String(booking.id), user_id: String(userId) },
       });
 
