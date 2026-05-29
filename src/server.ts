@@ -28,6 +28,7 @@ import bankInformationRoutes from './module/bank-information/BankInformationRout
 import taxInformationRoutes from './module/tax-information/TaxInformationRoute';
 import reviewRoutes from './module/review/ReviewRoute';
 import mentorRoutes from './module/mentor/MentorRoute';
+import freelancerRoutes from './module/freelancer/FreelancerRoute';
 import investorRoutes from './module/investor/InvestorRoute';
 import mentorPackageRoutes from './module/mentor-package/MentorPackageRoute';
 import reportRoutes from './module/report/ReportRoute';
@@ -88,6 +89,7 @@ app.use("/api/v1/billing", bankInformationRoutes);
 app.use("/api/v1/billing", taxInformationRoutes);
 app.use("/api/v1/reviews", reviewRoutes);
 app.use("/api/v1/mentors", mentorRoutes);
+app.use("/api/v1/freelancers", freelancerRoutes);
 app.use("/api/v1/investors", investorRoutes);
 app.use("/api/v1/mentor-packages", mentorPackageRoutes);
 app.use("/api/v1/success-stories", successStoryRoutes);
