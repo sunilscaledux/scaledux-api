@@ -41,14 +41,10 @@ export class BillingController {
       if (!orderAmounts.success || orderAmounts.totalFounderPays == null) {
         return ApiResponse.error(res, orderAmounts.message ?? "Invalid milestone", 400);
       }
-      const platformTransferPaise =
-        orderAmounts.platformTransferAmountInr != null && orderAmounts.platformTransferAmountInr > 0
-          ? Math.round(orderAmounts.platformTransferAmountInr * 100)
-          : undefined;
       const result = await BillingService.createVerificationOrder(userId.toString(), orderAmounts.totalFounderPays, {
-        platformTransferAmountPaise: platformTransferPaise,
         receiptPrefix: "pay",
-        notes: { purpose: "milestone_payment", milestone_id: String(milestoneIdNum), user_id: userId.toString() }
+        notes: { purpose: "milestone_payment", milestone_id: String(milestoneIdNum), user_id: userId.toString() },
+        freelancerTransfer: orderAmounts.freelancerTransfer
       });
       if (!result.success) return ApiResponse.error(res, result.message);
       return ApiResponse.success(res, result.data, "Order created successfully");

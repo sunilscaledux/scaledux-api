@@ -44,14 +44,21 @@ export class BillingService {
     userId: number,
     milestoneId: number,
     milestoneIndexFromFrontend?: number
-  ): Promise<{ success: boolean; message?: string; totalFounderPays?: number; platformTransferAmountInr?: number }> {
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    totalFounderPays?: number;
+    platformTransferAmountInr?: number;
+    freelancerTransfer?: { accountId: string; amountInr: number };
+  }> {
     const milestoneRow = await (prisma as any).milestone.findUnique({
       where: { id: milestoneId },
       include: {
         proposal: {
           include: {
             project: { select: { id: true, user_id: true } },
-            milestonesRows: { orderBy: { order_index: 'asc' } }
+            milestonesRows: { orderBy: { order_index: 'asc' } },
+            provider: { select: { id: true, razorpay_account_id: true } }
           }
         }
       }
@@ -82,7 +89,27 @@ export class BillingService {
     }
     const founder = calcFounderTotal(amount);
     const platformTransferAmountInr = founder.platformFee + founder.platformFeeGst;
-    return { success: true, totalFounderPays: founder.totalClientPays, platformTransferAmountInr };
+
+    // Check freelancer's Razorpay linked account for Route transfer
+    const freelancerAccountId = proposal.provider?.razorpay_account_id as string | null;
+    if (!freelancerAccountId) {
+      return { success: false, message: 'Freelancer has not completed Razorpay account linking. Payment cannot proceed.' };
+    }
+
+    // Check if freelancer is GST registered (for TCS calculation)
+    const taxInfo = await (prisma as any).taxInformation.findFirst({
+      where: { user_id: proposal.provider.id },
+      select: { has_gstin: true }
+    });
+    const isGstRegistered = taxInfo?.has_gstin === true;
+    const netPayout = calcFreelancerPayout(amount, isGstRegistered);
+
+    return {
+      success: true,
+      totalFounderPays: founder.totalClientPays,
+      platformTransferAmountInr,
+      freelancerTransfer: { accountId: freelancerAccountId, amountInr: netPayout }
+    };
   }
 
   /**
@@ -92,7 +119,11 @@ export class BillingService {
   static async createVerificationOrder(
     userId: string,
     amount: number = 1,
-    options?: { platformTransferAmountPaise?: number; receiptPrefix?: string; notes?: Record<string, string> }
+    options?: {
+      receiptPrefix?: string;
+      notes?: Record<string, string>;
+      freelancerTransfer?: { accountId: string; amountInr: number };
+    }
   ) {
     if (!razorpay) {
       return {
@@ -104,15 +135,13 @@ export class BillingService {
     const amountPaise = Math.round(amount * 100);
     const receiptPrefix = options?.receiptPrefix ?? 'verify';
     const notes = options?.notes ?? { purpose: 'card_verification', user_id: userId };
-    const platformAccountId = appConfig.razorpayPlatformAccountId;
-    const platformTransferPaise = options?.platformTransferAmountPaise ?? 0;
 
     const orderPayload: {
       amount: number;
       currency: string;
       receipt: string;
       notes: Record<string, string>;
-      transfers?: Array<{ account: string; amount: number; currency: string }>;
+      transfers?: Array<{ account: string; amount: number; currency: string; on_hold: boolean; notes?: Record<string, string> }>;
     } = {
       amount: amountPaise,
       currency: 'INR',
@@ -120,10 +149,17 @@ export class BillingService {
       notes
     };
 
-    if (platformAccountId && platformTransferPaise > 0) {
-      orderPayload.transfers = [
-        { account: platformAccountId, amount: platformTransferPaise, currency: 'INR' }
-      ];
+    // Razorpay Route: transfer net payout to freelancer's linked account (on_hold)
+    // ScaleDux keeps the remainder (platform fee + commission + GST + TCS)
+    if (options?.freelancerTransfer) {
+      const { accountId, amountInr } = options.freelancerTransfer;
+      orderPayload.transfers = [{
+        account: accountId,
+        amount: Math.round(amountInr * 100),
+        currency: 'INR',
+        on_hold: true,
+        notes: { type: 'milestone_payout', ...notes }
+      }];
     }
 
     try {
@@ -549,6 +585,23 @@ export class BillingService {
     // Generate Invoice C (ScaleDux → Founder) with platform fee
     await this.createInvoiceC(row.id);
 
+    // Store Razorpay Route transfer ID (for releasing hold on acknowledge)
+    const razorpayPaymentId = (meta as Record<string, string>)?.razorpay_payment_id;
+    if (razorpayPaymentId && razorpay) {
+      try {
+        const payment = await razorpay.payments.fetch(razorpayPaymentId, { 'expand[]': 'transfers' });
+        const transferId = payment?.transfers?.items?.[0]?.id ?? null;
+        if (transferId) {
+          await (prisma as any).billingTransaction.update({
+            where: { id: row.id },
+            data: { razorpay_transfer_id: transferId }
+          });
+        }
+      } catch (err) {
+        Log.error('Failed to fetch Razorpay transfer ID', { err, paymentId: razorpayPaymentId });
+      }
+    }
+
     return { success: true, data: { transactionId: row.id, transactionUniqueId: row.unique_id } };
   }
 
@@ -575,8 +628,15 @@ export class BillingService {
     // Generate Invoice B (ScaleDux → Freelancer, commission deduction)
     await this.createInvoiceB(tx.id);
 
-    // TODO: Trigger Razorpay Route transfer to freelancer's linked account
-    // const transferId = await this.triggerRazorpayTransfer(tx, netPayout);
+    // Release Razorpay Route transfer hold → freelancer gets paid (T+2)
+    if (tx.razorpay_transfer_id && razorpay) {
+      try {
+        await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: false });
+      } catch (err: any) {
+        Log.error('Failed to release Razorpay transfer hold', { err, transferId: tx.razorpay_transfer_id });
+        return { success: false, message: 'Failed to release payment to freelancer. Please try again.' };
+      }
+    }
 
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
@@ -585,7 +645,6 @@ export class BillingService {
         sender_status: BillingTransactionSenderStatus.RELEASED,
         receiver_status: 'payment_processed',
         on_hold: false,
-        // razorpay_transfer_id: transferId,
       }
     });
 
@@ -1341,7 +1400,29 @@ export class BillingService {
   static async getInvoiceData(uniqueId: string, userId: number) {
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: uniqueId },
-      include: { currency: true, payer_invoice: true, receiver_invoice: true }
+      include: {
+        currency: true,
+        payer_invoice: true,
+        receiver_invoice: true,
+        milestone: {
+          select: {
+            id: true,
+            title: true,
+            amount: true,
+            order_index: true,
+            proposal: {
+              select: {
+                unique_id: true,
+                proposed_amount: true,
+                milestonesRows: { select: { id: true } },
+                project: {
+                  select: { unique_id: true, project_title: true, budget_amount: true, budget_currency: true }
+                }
+              }
+            }
+          }
+        }
+      }
     });
     if (!transaction) return { success: false as const, message: 'Transaction not found' };
     if (transaction.from_id !== userId && transaction.to_id !== userId) {
@@ -1387,7 +1468,22 @@ export class BillingService {
         type: transaction.type,
         status: transaction.status,
         issuedAt: invoice.issued_at,
-        meta: invoice.meta ?? undefined
+        meta: invoice.meta ?? undefined,
+        contractRef: transaction.milestone ? {
+          projectId: transaction.milestone.proposal?.project?.unique_id ?? null,
+          projectTitle: transaction.milestone.proposal?.project?.project_title ?? null,
+          projectBudget: transaction.milestone.proposal?.project?.budget_amount != null
+            ? parseFloat(transaction.milestone.proposal.project.budget_amount.toString()) : null,
+          projectCurrency: transaction.milestone.proposal?.project?.budget_currency ?? null,
+          contractId: transaction.milestone.proposal?.unique_id ?? null,
+          contractAmount: transaction.milestone.proposal?.proposed_amount != null
+            ? parseFloat(transaction.milestone.proposal.proposed_amount.toString()) : null,
+          milestoneTitle: transaction.milestone.title ?? null,
+          milestoneAmount: transaction.milestone.amount != null
+            ? parseFloat(transaction.milestone.amount.toString()) : null,
+          milestoneIndex: transaction.milestone.order_index ?? null,
+          totalMilestones: transaction.milestone.proposal?.milestonesRows?.length ?? null,
+        } : undefined
       }
     };
   }

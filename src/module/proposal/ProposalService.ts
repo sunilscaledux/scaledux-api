@@ -1805,7 +1805,32 @@ export class ProposalService {
   }
 
   /**
+   * Check if freelancer has verified bank info and Razorpay linked account.
+   * Must be done before accepting a contract so payments can be processed.
    */
+  private static async checkFreelancerBankInfo(userId: number): Promise<ServiceResponse> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { razorpay_account_id: true }
+    });
+    if (!user?.razorpay_account_id) {
+      const bankInfo = await (prisma as any).bankInformation.findFirst({
+        where: { user_id: userId, verification_status: 'verified' }
+      });
+      if (!bankInfo) {
+        return {
+          success: false,
+          message: 'Please add and verify your bank information before accepting a contract. Go to Settings → Bank Information.'
+        };
+      }
+      return {
+        success: false,
+        message: 'Your bank account is verified but Razorpay account linking is not complete. Please contact support.'
+      };
+    }
+    return { success: true, message: '' };
+  }
+
   static async updateProposalNda(
     userId: number,
     proposalId: string,
@@ -1916,6 +1941,10 @@ export class ProposalService {
 
       // Freelancer: accept offer when NDA not required (OFFER_SENT -> OFFER_ACCEPTED)
       if (isProvider && !isNdaRequired && data.accept_offer === true && proposal.status === ProposalStatus.OFFER_SENT) {
+        // Check freelancer has verified bank info and Razorpay linked account
+        const bankCheck = await this.checkFreelancerBankInfo(userId);
+        if (!bankCheck.success) return bankCheck;
+
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
@@ -2066,6 +2095,10 @@ export class ProposalService {
 
       // When freelancer signs NDA, move status from OFFER_SENT to OFFER_ACCEPTED (so founder can proceed to payment)
       if (isProvider && (data.is_nda_signed === true || data.nda_signed_file_link) && proposal.status === ProposalStatus.OFFER_SENT) {
+        // Check freelancer has verified bank info and Razorpay linked account
+        const bankCheck = await this.checkFreelancerBankInfo(userId);
+        if (!bankCheck.success) return bankCheck;
+
         await (prisma as any).proposal.update({
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
