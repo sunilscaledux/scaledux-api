@@ -15,6 +15,9 @@ export interface CommonProfileInput {
     countryId?: number;
     stateId?: number;
     city?: string;
+    /** ISO yyyy-MM-dd date string */
+    dob?: string | null;
+    gender?: 'male' | 'female' | 'other' | null;
     website?: string;
     hideEmail?: boolean;
     hidePhone?: boolean;

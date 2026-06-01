@@ -536,6 +536,16 @@ export class PersonalInfoService {
           state: true,
         },
       });
+      // dob + gender live on the User table (collected in the same Personal
+      // Info modal but not a column on PersonalInfo). Only write when the
+      // client explicitly sent the field so a partial update can't blank
+      // them out.
+      const userPatch: { dob?: string | null; gender?: string | null } = {};
+      if (data.dob !== undefined) userPatch.dob = data.dob || null;
+      if (data.gender !== undefined) userPatch.gender = data.gender || null;
+      if (Object.keys(userPatch).length > 0) {
+        await prisma.user.update({ where: { id: userId }, data: userPatch });
+      }
       const personalInfoComplete = !!(profile.address && profile.city && profile.country_id);
       await updateCompletionSection(userId, 'personalInfo', personalInfoComplete);
       return {
