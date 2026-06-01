@@ -7,8 +7,10 @@ export interface NotificationJobPayload {
   type: string; // NotificationEmailType
   /** Same title for in-app notification and email subject */
   notificationTitle: string;
-  /** Same body for in-app notification and email content */
+  /** HTML body used for email; also used for in-app if inAppBody is not set */
   notificationBody?: string | null;
+  /** Plain-text or simple HTML body for in-app notifications (overrides notificationBody) */
+  inAppBody?: string | null;
   notificationLink?: string | null;
   actorId?: number | null;
   subjectType?: string | null;

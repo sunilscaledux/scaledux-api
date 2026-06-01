@@ -26,7 +26,7 @@ export class NotificationJob extends BaseJob<NotificationJobPayload> {
         user_id: data.userId,
         type: data.type,
         title: data.notificationTitle,
-        body: data.notificationBody ?? null,
+        body: data.inAppBody ?? data.notificationBody ?? null,
         link: data.notificationLink ?? null,
         actor_id: data.actorId ?? null,
         subject_type: data.subjectType ?? null,

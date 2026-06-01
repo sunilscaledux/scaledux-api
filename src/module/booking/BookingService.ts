@@ -98,6 +98,29 @@ function buildBookingEmailBody(params: {
   return lines.join('');
 }
 
+/** Build a short plain-text body for in-app notifications. */
+function buildBookingInAppBody(params: {
+  userName: string;
+  duration: number;
+  scheduledAt: Date;
+  isReschedule?: boolean;
+  cancelledBy?: string;
+  cancelReason?: string | null;
+  type: 'confirmed' | 'cancelled';
+}): string {
+  const { userName, duration, scheduledAt, isReschedule, cancelledBy, cancelReason, type } = params;
+  const dateStr = formatNotifDate(scheduledAt);
+  if (type === 'cancelled') {
+    const parts = [`${cancelledBy || userName} cancelled the ${duration}-min call scheduled for ${dateStr}.`];
+    if (cancelReason) parts.push(`Reason: ${cancelReason}`);
+    return parts.join(' ');
+  }
+  if (isReschedule) {
+    return `${userName} rescheduled the call. New time: ${dateStr} (${duration} min).`;
+  }
+  return `${userName} booked a ${duration}-min 1:1 call on ${dateStr}.`;
+}
+
 export class BookingService {
   /**
    * Create a PENDING booking request.
@@ -179,19 +202,16 @@ export class BookingService {
       }
       const amount = Math.round((hourlyRate / 60) * data.duration * 100) / 100;
 
-      // Handle reschedule: cancel old booking and link
-      let parentId: number | null = null;
-      let bookingUserId = userId; // the founder who booked
-      let rescheduleCount = 0;
+      // Handle reschedule: update the same booking in place
       if (data.rescheduleFromId) {
         const oldBooking = await (prisma as any).booking.findFirst({
           where: { unique_id: data.rescheduleFromId, OR: [{ user_id: userId }, { mentor_id: userId }] },
         });
         if (!oldBooking) return { success: false, message: 'Original booking not found' };
-        if (oldBooking.status === 'CANCELLED' || oldBooking.status === 'RESCHEDULED') return { success: false, message: 'Original booking is already cancelled' };
+        if (oldBooking.status === 'CANCELLED') return { success: false, message: 'Original booking is already cancelled' };
 
-        // Enforce max 3 reschedules per booking chain
-        rescheduleCount = (oldBooking.reschedule_count || 0) + 1;
+        // Enforce max 3 reschedules
+        const rescheduleCount = (oldBooking.reschedule_count || 0) + 1;
         if (rescheduleCount > 3) {
           return { success: false, message: 'This booking has already been rescheduled 3 times. Please create a new booking instead.' };
         }
@@ -202,9 +222,18 @@ export class BookingService {
           return { success: false, message: 'Cannot reschedule less than 1 hour before the call' };
         }
 
-        await (prisma as any).booking.update({
+        const scheduledEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+
+        const booking = await (prisma as any).booking.update({
           where: { id: oldBooking.id },
-          data: { status: 'RESCHEDULED', cancelled_by: userId, cancelled_at: new Date() },
+          data: {
+            scheduled_at: scheduledAt,
+            scheduled_end: scheduledEnd,
+            duration: data.duration,
+            is_reschedule: true,
+            rescheduled_by: userId,
+            reschedule_count: rescheduleCount,
+          },
         });
 
         await (prisma as any).bookingActivity.create({
@@ -217,86 +246,59 @@ export class BookingService {
           },
         });
 
-        parentId = oldBooking.id;
-        // Preserve original booking's user (founder) — mentor may be the one rescheduling
-        bookingUserId = oldBooking.user_id;
-      }
-
-      const scheduledEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
-
-      const isReschedule = !!parentId;
-
-      const booking = await (prisma as any).booking.create({
-        data: {
-          mentor_id: mentor.id,
-          user_id: bookingUserId,
-          title: '1:1 Video Call',
-          duration: data.duration,
-          scheduled_at: scheduledAt,
-          scheduled_end: scheduledEnd,
-          message: data.message?.trim() || null,
-          amount,
-          currency_id: 1, // INR default
-          ...(isReschedule
-            ? { parent_id: parentId, is_reschedule: true, rescheduled_by: userId, reschedule_count: rescheduleCount, status: 'CONFIRMED', payment_status: 'PAID' }
-            : {}),
-        },
-      });
-
-      // Reschedule: auto-confirm (no payment needed) and send notifications to both parties
-      if (isReschedule) {
+        // Send notifications to both parties
         const reschedulerName = await getUserFullName(userId);
         const mentorName = `${mentor.first_name} ${mentor.last_name}`.trim();
         const isMentorRescheduling = userId === mentor.id;
+        const bookingUserId = oldBooking.user_id;
 
-        // Notify mentor (skip if mentor is the one rescheduling)
-        if (!isMentorRescheduling) {
-          const mentorNotifBody = buildBookingEmailBody({
-            userName: reschedulerName,
-            duration: booking.duration,
-            scheduledAt: new Date(booking.scheduled_at),
-            isReschedule: true,
-            message: booking.message,
-            type: 'confirmed',
-          });
-          const mentorNotifData = {
-            userId: mentor.id,
-            type: 'BOOKING_CONFIRMED' as const,
-            notificationTitle: 'Call rescheduled & confirmed',
-            notificationBody: mentorNotifBody,
-            notificationLink: `${appConfig.frontendUrl}/my-bookings`,
-            actorId: userId,
-            subjectType: 'Booking' as const,
-            subjectId: booking.id,
-          };
-          await dispatch(NotificationJob, mentorNotifData);
-          await dispatch(NotificationEmailJob, mentorNotifData);
-        }
+        const rescheduleInAppParams = {
+          duration: booking.duration,
+          scheduledAt: new Date(booking.scheduled_at),
+          isReschedule: true as const,
+          type: 'confirmed' as const,
+        };
 
-        // Notify user (founder) — skip if founder is the one rescheduling
-        if (isMentorRescheduling || bookingUserId !== userId) {
-          const userNotifBody = buildBookingEmailBody({
-            userName: isMentorRescheduling ? mentorName : reschedulerName,
-            duration: booking.duration,
-            scheduledAt: new Date(booking.scheduled_at),
-            isReschedule: true,
-            message: booking.message,
-            type: 'confirmed',
-            recipientRole: 'user',
-          });
-          const userNotifData = {
-            userId: bookingUserId,
-            type: 'BOOKING_CONFIRMED' as const,
-            notificationTitle: 'Call rescheduled & confirmed',
-            notificationBody: userNotifBody,
-            notificationLink: `${appConfig.frontendUrl}/my-bookings`,
-            actorId: userId,
-            subjectType: 'Booking' as const,
-            subjectId: booking.id,
-          };
-          await dispatch(NotificationJob, userNotifData);
-          await dispatch(NotificationEmailJob, userNotifData);
-        }
+        // Notify mentor
+        const mentorNotifBody = buildBookingEmailBody({
+          userName: reschedulerName,
+          ...rescheduleInAppParams,
+          message: booking.message,
+        });
+        const mentorNotifData = {
+          userId: mentor.id,
+          type: 'BOOKING_CONFIRMED' as const,
+          notificationTitle: 'Call rescheduled & confirmed',
+          notificationBody: mentorNotifBody,
+          inAppBody: buildBookingInAppBody({ userName: reschedulerName, ...rescheduleInAppParams }),
+          notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+          actorId: userId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, mentorNotifData);
+        await dispatch(NotificationEmailJob, mentorNotifData);
+
+        // Notify user (founder)
+        const userNotifBody = buildBookingEmailBody({
+          userName: isMentorRescheduling ? mentorName : reschedulerName,
+          ...rescheduleInAppParams,
+          message: booking.message,
+          recipientRole: 'user',
+        });
+        const userNotifData = {
+          userId: bookingUserId,
+          type: 'BOOKING_CONFIRMED' as const,
+          notificationTitle: 'Call rescheduled & confirmed',
+          notificationBody: userNotifBody,
+          inAppBody: buildBookingInAppBody({ userName: isMentorRescheduling ? mentorName : reschedulerName, ...rescheduleInAppParams }),
+          notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+          actorId: userId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, userNotifData);
+        await dispatch(NotificationEmailJob, userNotifData);
 
         await ConversationService.syncSystemMessage(
           bookingUserId, mentor.id,
@@ -317,6 +319,22 @@ export class BookingService {
           data: { booking: { unique_id: booking.unique_id, status: 'CONFIRMED', isReschedule: true } },
         };
       }
+
+      // New booking (non-reschedule)
+      const scheduledEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
+      const booking = await (prisma as any).booking.create({
+        data: {
+          mentor_id: mentor.id,
+          user_id: userId,
+          title: '1:1 Video Call',
+          duration: data.duration,
+          scheduled_at: scheduledAt,
+          scheduled_end: scheduledEnd,
+          message: data.message?.trim() || null,
+          amount,
+          currency_id: 1, // INR default
+        },
+      });
 
       // No notifications/email/chat here — triggered only after payment in verifyPayment
 
@@ -423,19 +441,23 @@ export class BookingService {
 
       // Notify mentor
       const mentorNotifTitle = isReschedule ? 'Call rescheduled & confirmed' : '1:1 Call booked';
-      const mentorNotifBody = buildBookingEmailBody({
-        userName,
+      const confirmBaseParams = {
         duration: booking.duration,
         scheduledAt: new Date(booking.scheduled_at),
         isReschedule,
+        type: 'confirmed' as const,
+      };
+      const mentorNotifBody = buildBookingEmailBody({
+        userName,
+        ...confirmBaseParams,
         message: booking.message,
-        type: 'confirmed',
       });
       const mentorNotifData = {
         userId: booking.mentor_id,
         type: 'BOOKING_CONFIRMED' as const,
         notificationTitle: mentorNotifTitle,
         notificationBody: mentorNotifBody,
+        inAppBody: buildBookingInAppBody({ userName, ...confirmBaseParams }),
         notificationLink: `${appConfig.frontendUrl}/my-bookings`,
         actorId: userId,
         subjectType: 'Booking' as const,
@@ -448,11 +470,8 @@ export class BookingService {
       const userNotifTitle = isReschedule ? 'Call rescheduled & confirmed' : 'Booking confirmed';
       const userNotifBody = buildBookingEmailBody({
         userName: mentorName,
-        duration: booking.duration,
-        scheduledAt: new Date(booking.scheduled_at),
-        isReschedule,
+        ...confirmBaseParams,
         message: booking.message,
-        type: 'confirmed',
         recipientRole: 'user',
       });
       const userNotifData = {
@@ -460,6 +479,7 @@ export class BookingService {
         type: 'BOOKING_CONFIRMED' as const,
         notificationTitle: userNotifTitle,
         notificationBody: userNotifBody,
+        inAppBody: buildBookingInAppBody({ userName: mentorName, ...confirmBaseParams }),
         notificationLink: `${appConfig.frontendUrl}/my-bookings`,
         actorId: booking.mentor_id,
         subjectType: 'Booking' as const,
@@ -724,28 +744,34 @@ export class BookingService {
         },
       });
 
-      // Notify the other party
-      const otherUserId = userId === booking.mentor_id ? booking.user_id : booking.mentor_id;
+      // Notify both parties
       const cancellerName = await getUserFullName(userId);
-      const notifData = {
-        userId: otherUserId,
-        type: 'BOOKING_CANCELLED' as const,
-        notificationTitle: '1:1 Call cancelled',
-        notificationBody: buildBookingEmailBody({
-          userName: cancellerName,
-          duration: booking.duration,
-          scheduledAt: new Date(booking.scheduled_at),
-          cancelledBy: cancellerName,
-          cancelReason: reason?.trim(),
-          type: 'cancelled',
-        }),
-        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
-        actorId: userId,
-        subjectType: 'Booking' as const,
-        subjectId: booking.id,
+      const cancelParams = {
+        userName: cancellerName,
+        duration: booking.duration,
+        scheduledAt: new Date(booking.scheduled_at),
+        cancelledBy: cancellerName,
+        cancelReason: reason?.trim(),
+        type: 'cancelled' as const,
       };
-      await dispatch(NotificationJob, notifData);
-      await dispatch(NotificationEmailJob, notifData);
+      const emailBody = buildBookingEmailBody(cancelParams);
+      const inAppBody = buildBookingInAppBody(cancelParams);
+
+      for (const recipientId of [booking.mentor_id, booking.user_id]) {
+        const notifData = {
+          userId: recipientId,
+          type: 'BOOKING_CANCELLED' as const,
+          notificationTitle: '1:1 Call cancelled',
+          notificationBody: emailBody,
+          inAppBody,
+          notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+          actorId: userId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
+      }
 
       // Sync to chat — raw data in metadata, frontend formats
       await ConversationService.syncSystemMessage(
