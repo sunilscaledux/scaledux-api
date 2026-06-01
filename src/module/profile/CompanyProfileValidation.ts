@@ -5,8 +5,8 @@ import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMes
  * Validation schema for updating company overview
  */
 export const updateOverviewSchema = Joi.object({
-  company_name: Joi.string().optional().max(255).messages({
-    'string.max': 'Company name must not exceed 255 characters'
+  company_name: Joi.string().optional().max(100).messages({
+    'string.max': 'Company name must not exceed 100 characters'
   }),
   company_description: Joi.string().optional().allow('', null).max(2000).custom(rejectDangerousHtml).messages({
     'string.max': 'Company description must not exceed 2000 characters',
