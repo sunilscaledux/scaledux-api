@@ -91,7 +91,8 @@ export const updateNameSchema = Joi.object({
     'string.empty': 'First name is required',
     'string.max': 'First name must be at most 50 characters',
   }),
-  last_name: Joi.string().trim().max(50).allow('', null).optional().messages({
+  last_name: Joi.string().trim().min(1).max(50).required().messages({
+    'string.empty': 'Last name is required',
     'string.max': 'Last name must be at most 50 characters',
   }),
 });
