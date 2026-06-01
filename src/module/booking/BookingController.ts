@@ -12,6 +12,11 @@ export class BookingController {
       return ApiResponse.error(res, 'mentorUniqueId, duration, and scheduledAt are required', 400);
     }
 
+    const plainMessage = (message || '').replace(/<[^>]*>/g, '').trim();
+    if (!rescheduleFromId && !plainMessage) {
+      return ApiResponse.error(res, 'Message is required', 400);
+    }
+
     const result = await BookingService.createBooking(userId, {
       mentorUniqueId,
       duration: Number(duration),
@@ -146,7 +151,7 @@ export class BookingController {
     const { date } = req.query;
     if (!mentorId || !date) return ApiResponse.error(res, 'mentorId and date are required', 400);
 
-    const result = await BookingService.getOccupiedSlots(mentorId, String(date));
+    const result = await BookingService.getOccupiedSlots(mentorId, String(date), req.user?.id);
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message);
   }

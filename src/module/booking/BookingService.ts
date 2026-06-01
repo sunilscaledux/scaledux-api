@@ -149,6 +149,7 @@ export class BookingService {
       const newEnd = new Date(scheduledAt.getTime() + data.duration * 60 * 1000);
 
       // Two bookings overlap when: existingStart < newEnd AND existingEnd > newStart
+      // Exclude the current user's own PENDING bookings so they can re-book the same slot
       const overlap = await (prisma as any).booking.findFirst({
         where: {
           mentor_id: mentor.id,
@@ -158,6 +159,7 @@ export class BookingService {
             { status: 'CONFIRMED' },
             { status: 'PENDING', created_at: { gt: staleThreshold } },
           ],
+          NOT: { user_id: userId, status: 'PENDING' },
         },
         select: { id: true },
       });
@@ -906,7 +908,8 @@ export class BookingService {
    */
   static async getOccupiedSlots(
     mentorUniqueId: string,
-    date: string // YYYY-MM-DD
+    date: string, // YYYY-MM-DD
+    viewerId?: number
   ): Promise<ServiceResponse> {
     try {
       const mentor = await prisma.user.findFirst({
@@ -932,6 +935,8 @@ export class BookingService {
             { status: 'CONFIRMED' },
             { status: 'PENDING', created_at: { gt: staleThreshold } },
           ],
+          // Exclude the viewer's own PENDING bookings so they can re-select their slot
+          ...(viewerId ? { NOT: { user_id: viewerId, status: 'PENDING' } } : {}),
         },
         select: { scheduled_at: true, scheduled_end: true },
       });
