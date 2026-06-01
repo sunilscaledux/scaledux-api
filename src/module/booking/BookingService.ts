@@ -11,6 +11,20 @@ import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
 import { isValidMeetingReason } from '../../constants/meetingReasons';
 import { resolveAttachmentUrl } from '@services/attachmentService';
+import { calcBookingMentorDeductions, calcBookingMentorPayout, calcBookingFounderTotal } from '@utils/feeCalculations';
+import {
+  BillingTransactionType,
+  BillingTransactionStatus,
+  BillingTransactionSenderStatus,
+  BillingTransactionReceiverStatus,
+} from '../../constants/status';
+import Razorpay from 'razorpay';
+import razorpayConfig from '@config/razorpay';
+
+let razorpay: any = null;
+if (razorpayConfig.key_id && razorpayConfig.key_secret) {
+  razorpay = new Razorpay({ key_id: razorpayConfig.key_id, key_secret: razorpayConfig.key_secret });
+}
 
 /** Resolve a profileImage attachment key to its public URL (or null if missing). */
 async function resolveProfileImage(value: string | null | undefined): Promise<string | null> {
@@ -356,6 +370,7 @@ export class BookingService {
     try {
       const booking = await (prisma as any).booking.findFirst({
         where: { unique_id: bookingUniqueId, user_id: userId },
+        include: { mentor: { select: { id: true, razorpay_account_id: true } } },
       });
       if (!booking) return { success: false, message: 'Booking not found' };
       if (booking.status !== 'PENDING') return { success: false, message: 'Booking is not in pending state' };
@@ -364,23 +379,27 @@ export class BookingService {
       const baseAmount = Number(booking.amount);
       if (baseAmount <= 0) return { success: false, message: 'Invalid booking amount' };
 
-      // Platform fee + GST — same constants as frontend checkout
-      const PLATFORM_FEE_PERCENT = 5;
-      const GST_PERCENT = 18;
-      const platformFee = Math.round(baseAmount * PLATFORM_FEE_PERCENT) / 100;
-      const gstOnFee = Math.round(platformFee * GST_PERCENT) / 100;
-      const totalAmount = baseAmount + platformFee + gstOnFee;
-      const platformTransferPaise = Math.round((platformFee + gstOnFee) * 100);
+      // Mentor must have Razorpay linked account for Route transfer
+      const mentorAccountId = booking.mentor?.razorpay_account_id as string | null;
+      if (!mentorAccountId) {
+        return { success: false, message: 'Mentor has not completed Razorpay account linking. Payment cannot proceed.' };
+      }
+
+      // Platform fee (configurable, currently 0%) + service fee deducted from mentor at release
+      const founderCalc = calcBookingFounderTotal(baseAmount);
+      const deductions = calcBookingMentorDeductions(baseAmount);
+      const mentorPayout = calcBookingMentorPayout(baseAmount);
 
       // Store platform fee on booking
       await (prisma as any).booking.update({
         where: { id: booking.id },
-        data: { platform_fee: platformFee + gstOnFee },
+        data: { platform_fee: founderCalc.platformFee + founderCalc.platformFeeGst },
       });
 
-      const result = await BillingService.createVerificationOrder(String(userId), totalAmount, {
+      const result = await BillingService.createVerificationOrder(String(userId), founderCalc.totalBookerPays, {
         receiptPrefix: 'booking',
         notes: { purpose: 'mentor_booking', booking_id: String(booking.id), user_id: String(userId) },
+        freelancerTransfer: { accountId: mentorAccountId, amountInr: mentorPayout },
       });
 
       if (!result.success) return { success: false, message: (result as any).message || 'Failed to create order' };
@@ -394,7 +413,20 @@ export class BookingService {
       return {
         success: true,
         message: 'Order created',
-        data: result.data,
+        data: {
+          ...result.data,
+          breakdown: {
+            baseAmount,
+            platformFee: founderCalc.platformFee,
+            platformFeeGst: founderCalc.platformFeeGst,
+            totalBookerPays: founderCalc.totalBookerPays,
+            mentorPayout,
+            serviceFee: deductions.serviceFee,
+            serviceFeeGst: deductions.serviceFeeGst,
+            processingFee: deductions.processingFee,
+            processingFeeGst: deductions.processingFeeGst,
+          },
+        },
       };
     } catch (error: any) {
       Log.error('Create booking order error', { error });
@@ -421,18 +453,85 @@ export class BookingService {
       const isValid = BillingService.verifyPaymentSignature(data);
       if (!isValid) return { success: false, message: 'Payment verification failed' };
 
-      // Update booking
+      const baseAmount = Number(booking.amount);
+      const founderCalc = calcBookingFounderTotal(baseAmount);
+      const deductions = calcBookingMentorDeductions(baseAmount);
+      const mentorPayout = calcBookingMentorPayout(baseAmount);
+
+      // Create BillingTransaction for billing history
+      const billingTx = await (prisma as any).billingTransaction.create({
+        data: {
+          actor_type: 'User',
+          actor_id: userId,
+          from_type: 'User',
+          from_id: userId,
+          to_type: 'User',
+          to_id: booking.mentor_id,
+          subject_type: 'Booking',
+          subject_id: booking.id,
+          amount: baseAmount,
+          payer_amount: founderCalc.totalBookerPays,
+          receiver_amount: mentorPayout,
+          currency_id: booking.currency_id ?? 1,
+          type: BillingTransactionType.PAYMENT,
+          status: BillingTransactionStatus.PENDING,
+          sender_status: BillingTransactionSenderStatus.FUNDED,
+          receiver_status: BillingTransactionReceiverStatus.PENDING,
+          description: `1:1 Video Call booking — ${booking.duration} min session`,
+          meta: {
+            razorpay_order_id: data.razorpayOrderId,
+            razorpay_payment_id: data.razorpayPaymentId,
+          },
+          platform_fee_amount: founderCalc.platformFee,
+          platform_fee_gst: founderCalc.platformFeeGst,
+          commission_amount: deductions.serviceFee,
+          commission_gst: deductions.serviceFeeGst,
+          processing_fee_amount: deductions.processingFee,
+          processing_fee_gst: deductions.processingFeeGst,
+          tcs_amount: 0,
+          on_hold: true,
+        },
+      });
+
+      // Fetch & store Razorpay Route transfer ID
+      if (data.razorpayPaymentId && razorpay) {
+        try {
+          const payment = await razorpay.payments.fetch(data.razorpayPaymentId, { 'expand[]': 'transfers' });
+          const transferId = payment?.transfers?.items?.[0]?.id ?? null;
+          if (transferId) {
+            await (prisma as any).billingTransaction.update({
+              where: { id: billingTx.id },
+              data: { razorpay_transfer_id: transferId },
+            });
+          }
+        } catch (err) {
+          Log.error('Failed to fetch Razorpay transfer ID for booking', { err, paymentId: data.razorpayPaymentId });
+        }
+      }
+
+      // Update booking with payment info and link to billing transaction
       await (prisma as any).booking.update({
         where: { id: booking.id },
         data: {
           status: 'CONFIRMED',
           payment_status: 'PAID',
+          billing_transaction_id: billingTx.id,
           meta: {
             razorpay_order_id: data.razorpayOrderId,
             razorpay_payment_id: data.razorpayPaymentId,
           },
         },
       });
+
+      // Ensure mentor wallet exists & track pending amount
+      await BillingService.ensureUserWallet(booking.mentor_id);
+      await (prisma as any).userWallet.update({
+        where: { user_id: booking.mentor_id },
+        data: { pending_amount: { increment: baseAmount } },
+      });
+
+      // Generate Invoice C (ScaleDux → Founder, booking receipt)
+      await BillingService.createInvoiceC(billingTx.id);
 
       // Notify both mentor and user after successful payment
       const userName = await getUserFullName(userId);
@@ -1204,6 +1303,11 @@ export class BookingService {
           },
           undefined, mentorId
         );
+
+        // Auto-generate Invoice A (Mentor → Booker, service invoice)
+        if (booking.billing_transaction_id) {
+          await BillingService.createInvoiceA(booking.billing_transaction_id);
+        }
       } else {
         // Notify founder that call didn't happen
         const founderBody = `<p><strong>${escapeHtml(mentorName)}</strong> has reported that the 1:1 video call on <strong>${escapeHtml(dateStr)}</strong> did not take place.</p>
@@ -1284,7 +1388,7 @@ export class BookingService {
 
       await (prisma as any).booking.update({
         where: { id: booking.id },
-        data: { user_approved_at: new Date() },
+        data: { user_approved_at: new Date(), payment_status: 'RELEASED' },
       });
 
       await (prisma as any).bookingActivity.create({
@@ -1294,6 +1398,38 @@ export class BookingService {
           acted_by: userId,
         },
       });
+
+      // Generate Invoice B + release Razorpay Route transfer to mentor
+      if (booking.billing_transaction_id) {
+        const tx = await (prisma as any).billingTransaction.findUnique({
+          where: { id: booking.billing_transaction_id },
+        });
+
+        if (tx) {
+          // Generate Invoice B (ScaleDux → Mentor, service fee + processing fee deduction)
+          await BillingService.createInvoiceB(tx.id);
+
+          // Release Razorpay Route transfer hold → mentor gets paid (T+2)
+          if (tx.razorpay_transfer_id && razorpay) {
+            try {
+              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: false });
+            } catch (err: any) {
+              Log.error('Failed to release Razorpay transfer hold for booking', { err, transferId: tx.razorpay_transfer_id });
+            }
+          }
+
+          // Update BillingTransaction status
+          await (prisma as any).billingTransaction.update({
+            where: { id: tx.id },
+            data: {
+              status: 'payment_processed',
+              sender_status: BillingTransactionSenderStatus.RELEASED,
+              receiver_status: 'payment_processed',
+              on_hold: false,
+            },
+          });
+        }
+      }
 
       // Now send rate prompts to both parties
       const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();

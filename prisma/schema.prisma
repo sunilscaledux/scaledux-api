@@ -1549,6 +1549,7 @@ model BillingTransaction {
   receiver_invoice Invoice? @relation("BillingReceiverInvoice", fields: [receiver_invoice_id], references: [id], onDelete: SetNull)
   invoice_a       Invoice?  @relation("BillingInvoiceA", fields: [invoice_a_id], references: [id], onDelete: SetNull)
   withdrawal_request WithdrawalRequest?
+  booking            Booking?  @relation("BookingBillingTransaction")
 
   @@index([actor_type, actor_id])
   @@index([from_type, from_id])
@@ -1833,6 +1834,8 @@ model Booking {
   user_approved_at       DateTime?  // user accepted the confirmation
   rejected_at            DateTime?
   completion_reminder_sent_at DateTime?
+  // Billing
+  billing_transaction_id Int?      @unique
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
@@ -1842,6 +1845,7 @@ model Booking {
   parent                 Booking?          @relation("BookingReschedule", fields: [parent_id], references: [id])
   rescheduled            Booking[]         @relation("BookingReschedule")
   activities             BookingActivity[] @relation("BookingActivities")
+  billing_transaction    BillingTransaction? @relation("BookingBillingTransaction", fields: [billing_transaction_id], references: [id])
 
   @@index([mentor_id, scheduled_at])
   @@index([user_id, status])

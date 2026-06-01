@@ -7,6 +7,8 @@ const serviceFeePercentRaw = process.env.SERVICE_FEE_PERCENT;
 const appFeeFounderRaw = process.env.APP_FEE_FOUNDER;
 const gstPercentRaw = process.env.GST_PERCENT;
 const razorpayPlatformAccountRaw = (process.env.RAZORPAY_PLATFORM_ACCOUNT_ID ?? '').trim();
+const bookingServiceFeePercentRaw = process.env.BOOKING_SERVICE_FEE_PERCENT;
+const bookingPlatformFeePercentRaw = process.env.BOOKING_PLATFORM_FEE_PERCENT;
 const platformFeeTypeRaw = (process.env.PLATFORM_FEE_TYPE ?? 'flat').trim().toLowerCase();
 const platformFeeAmountRaw = process.env.PLATFORM_FEE_AMOUNT;
 const processingFeePercentRaw = process.env.PROCESSING_FEE_PERCENT;
@@ -50,6 +52,10 @@ export const appConfig = {
   /** @deprecated Use platformFeeType + platformFeeAmount instead */
   appFeeFounder: Math.max(0, Number(appFeeFounderRaw) || 100),
   serviceFeePercent: Math.min(100, Math.max(0, Number(serviceFeePercentRaw) || 10)),
+  /** Booking service fee deducted from mentor payout (%). Default 10. */
+  bookingServiceFeePercent: Math.min(100, Math.max(0, Number(bookingServiceFeePercentRaw) || 10)),
+  /** Booking platform fee charged to booker (%). Default 0. */
+  bookingPlatformFeePercent: Math.min(100, Math.max(0, Number(bookingPlatformFeePercentRaw) || 0)),
   gstPercent: Math.min(100, Math.max(0, Number(gstPercentRaw) || 18)),
   /** Platform fee: "flat" (fixed ₹) or "percentage" (% of milestone amount) */
   platformFeeType: (platformFeeTypeRaw === 'percentage' ? 'percentage' : 'flat') as 'flat' | 'percentage',

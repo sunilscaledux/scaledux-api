@@ -65,6 +65,61 @@ export function calcFreelancerPayout(milestoneAmount: number, isGstRegistered: b
 }
 
 /**
+ * Booking platform fee charged to the booker (founder). Currently 0%.
+ */
+export function getBookingPlatformFee(amount: number): { base: number; gst: number; total: number } {
+  const gstRate = appConfig.gstPercent / 100;
+  const base = round(amount * (appConfig.bookingPlatformFeePercent / 100));
+  const gst = round(base * gstRate);
+  return { base, gst, total: round(base + gst) };
+}
+
+/**
+ * What the booker pays for a booking (base amount + platform fee + GST on fee).
+ */
+export function calcBookingFounderTotal(amount: number): {
+  amount: number;
+  platformFee: number;
+  platformFeeGst: number;
+  totalBookerPays: number;
+} {
+  const pf = getBookingPlatformFee(amount);
+  return {
+    amount,
+    platformFee: pf.base,
+    platformFeeGst: pf.gst,
+    totalBookerPays: round(amount + pf.total),
+  };
+}
+
+/**
+ * Calculate deductions from mentor booking payout (service fee + processing fee + GST).
+ */
+export function calcBookingMentorDeductions(amount: number): {
+  serviceFee: number;
+  serviceFeeGst: number;
+  processingFee: number;
+  processingFeeGst: number;
+  totalDeductions: number;
+} {
+  const gstRate = appConfig.gstPercent / 100;
+  const serviceFee = round(amount * (appConfig.bookingServiceFeePercent / 100));
+  const serviceFeeGst = round(serviceFee * gstRate);
+  const processingFee = round(amount * (appConfig.processingFeePercent / 100));
+  const processingFeeGst = round(processingFee * gstRate);
+  const totalDeductions = round(serviceFee + serviceFeeGst + processingFee + processingFeeGst);
+  return { serviceFee, serviceFeeGst, processingFee, processingFeeGst, totalDeductions };
+}
+
+/**
+ * Net payout to mentor after booking deductions.
+ */
+export function calcBookingMentorPayout(amount: number): number {
+  const { totalDeductions } = calcBookingMentorDeductions(amount);
+  return round(amount - totalDeductions);
+}
+
+/**
  * Full transaction breakdown for a milestone payment.
  */
 export function calcTransaction(milestoneAmount: number, isGstRegistered: boolean) {
