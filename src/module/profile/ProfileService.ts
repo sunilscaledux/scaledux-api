@@ -1,7 +1,9 @@
 import bcrypt from 'bcrypt';
+import type { Request } from 'express';
 import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 import { ServiceResponse } from '@utils/ApiResponse';
+import { assertNotReused, recordPasswordChange } from '@module/auth/PasswordHistoryService';
 import { getDisplayName } from '@utils/General';
 import { resolveAttachmentUrl, resolveAttachmentUrls, createAttachment } from '@services/attachmentService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
@@ -807,7 +809,11 @@ export class PersonalInfoService {
    * Set password for users who have none (e.g. signed up via Google/LinkedIn).
    * Allowed only when provider is 'google' or 'linkedin' and password is null.
    */
-  static async setPassword(userId: number, newPassword: string): Promise<ServiceResponse> {
+  static async setPassword(
+    userId: number,
+    newPassword: string,
+    req?: Request
+  ): Promise<ServiceResponse> {
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
@@ -823,11 +829,18 @@ export class PersonalInfoService {
       if (provider !== 'google' && provider !== 'linkedin') {
         return { success: false, message: 'Set password is only available for Google or LinkedIn sign-in accounts.' };
       }
+      // Even on first set, an OAuth user may have a history row from a
+      // previous set→clear cycle; honour the no-reuse rule.
+      const reuseCheck = await assertNotReused(userId, null, newPassword);
+      if (!reuseCheck.ok) {
+        return { success: false, message: reuseCheck.message };
+      }
       const hashedPassword = await bcrypt.hash(newPassword, 12);
       await prisma.user.update({
         where: { id: userId },
         data: { password: hashedPassword },
       });
+      await recordPasswordChange({ userId, hashedPassword, source: 'set', req });
       return {
         success: true,
         message: 'Password set successfully',
@@ -868,7 +881,8 @@ export class PersonalInfoService {
   static async updatePassword(
     userId: number,
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    req?: Request
   ): Promise<ServiceResponse> {
     try {
       const user = await prisma.user.findUnique({
@@ -885,11 +899,17 @@ export class PersonalInfoService {
       if (!valid) {
         return { success: false, message: 'Current password is incorrect' };
       }
+      // Block reuse of the current password or any previously-used password.
+      const reuseCheck = await assertNotReused(userId, user.password, newPassword);
+      if (!reuseCheck.ok) {
+        return { success: false, message: reuseCheck.message };
+      }
       const hashedPassword = await bcrypt.hash(newPassword, 12);
       await prisma.user.update({
         where: { id: userId },
         data: { password: hashedPassword },
       });
+      await recordPasswordChange({ userId, hashedPassword, source: 'update', req });
       return {
         success: true,
         message: 'Password updated successfully',

@@ -116,11 +116,32 @@ model User {
   connectionsReceived           Connection[] @relation("ConnectionReceiver")
   blockedUsers                  BlockedUser[] @relation("BlockedByUser")
   blockedByUsers                BlockedUser[] @relation("BlockedTargetUser")
+  passwordHistory               PasswordHistory[]
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
   @@index([linkedinId])
   @@map("scd_users")
+}
+
+/**
+ * Append-only log of every bcrypt password hash a user has ever used.
+ * Acts as both the audit trail for password changes and the source for
+ * reuse-prevention checks on update / reset / set flows.
+ */
+model PasswordHistory {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  /** bcrypt hash — never compare with === ; always use bcrypt.compare */
+  password    String
+  /** Where the change originated: 'update' | 'reset' | 'set' | 'register' */
+  source      String
+  ip_address  String?  @db.VarChar(64)
+  user_agent  String?  @db.Text
+  created_at  DateTime @default(now())
+  @@index([user_id, created_at])
+  @@map("scd_password_history")
 }
 
 /** Section completion + email notification preferences (moved off User). */

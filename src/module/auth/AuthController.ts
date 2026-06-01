@@ -37,6 +37,7 @@ import {
 import { ApiResponse } from "@utils/ApiResponse";
 import { isDisposableEmail } from "@utils/disposableEmailValidator";
 import * as AuthService from "@module/auth/AuthService";
+import { assertNotReused, recordPasswordChange } from "@module/auth/PasswordHistoryService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { normalizeContact, generateKeycode } from '@utils/General';
 import { Log } from '@services/loggerService';
@@ -551,9 +552,18 @@ export async function resetPassword(req: Request, res: Response) {
 
   const contactInfo = normalizeContact(identifier);
 
-  // Check if user exists
-  const isUserExist = await checkUserExists(identifier);
-  if (!isUserExist) {
+  // Look up the user so we can compare the new password against both their
+  // current hash and their full history before writing anything.
+  const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [{ email: contactInfo.email }, { phone: contactInfo.phone }].filter(
+        Boolean
+      ),
+    },
+    select: { id: true, password: true },
+  });
+
+  if (!existingUser) {
     const contactMethod = contactInfo.email ? "email" : "phone";
     return ApiResponse.error(
       res,
@@ -561,28 +571,41 @@ export async function resetPassword(req: Request, res: Response) {
     );
   }
 
+  // Block reuse of the current password or any previously-used password.
+  const reuseCheck = await assertNotReused(
+    existingUser.id,
+    existingUser.password,
+    password
+  );
+  if (!reuseCheck.ok) {
+    return ApiResponse.error(res, reuseCheck.message);
+  }
+
   // Hash the new password
   const hashedPassword = await bcrypt.hash(password, 12);
 
   // Update user password in database
-  const updatedUser = await prisma.user.updateMany({
-    where: {
-      OR: [{ email: contactInfo.email }, { phone: contactInfo.phone }].filter(
-        Boolean
-      ),
-    },
+  const updatedUser = await prisma.user.update({
+    where: { id: existingUser.id },
     data: {
       password: hashedPassword,
       updated_at: new Date(),
     },
   });
 
-  if (updatedUser.count === 0) {
+  if (!updatedUser) {
     return ApiResponse.error(
       res,
       "Failed to update password. User not found."
     );
   }
+
+  await recordPasswordChange({
+    userId: existingUser.id,
+    hashedPassword,
+    source: 'reset',
+    req,
+  });
 
   // Invalidate all existing OTPs for this user
   await prisma.otp.updateMany({

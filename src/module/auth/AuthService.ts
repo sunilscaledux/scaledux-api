@@ -10,6 +10,7 @@ import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
 import SmsService from '@services/SmsService';
 import { OtpType } from "@prisma/client";
+import { recordPasswordChange } from "@module/auth/PasswordHistoryService";
 
 // ─── OTP type constants ─────────────────────────────────────────────────────
 
@@ -302,6 +303,14 @@ export async function createUserAfterOtpVerification(
     });
     await prisma.personalInfo.create({
       data: { user_id: user.id, keycode: generateKeycode() },
+    });
+    // Seed password history with the initial hash so the reuse check has a
+    // record from day 1 (otherwise the very first update could re-set the
+    // signup password without rejection).
+    await recordPasswordChange({
+      userId: user.id,
+      hashedPassword,
+      source: 'register',
     });
     const { password, ...safeUser } = user;
     return {

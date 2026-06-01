@@ -183,7 +183,7 @@ export class ProfileController {
       return ApiResponse.joiValidationError(res, error);
     }
     const userId = req.user.id;
-    const result = await PersonalInfoService.setPassword(userId, value.new_password);
+    const result = await PersonalInfoService.setPassword(userId, value.new_password, req);
     if (result.success) {
       return ApiResponse.success(res, result.data, result.message);
     }
@@ -203,7 +203,8 @@ export class ProfileController {
     const result = await PersonalInfoService.updatePassword(
       userId,
       value.current_password,
-      value.new_password
+      value.new_password,
+      req
     );
     if (result.success) {
       return ApiResponse.success(res, result.data, result.message);
