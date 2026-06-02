@@ -29,7 +29,7 @@ function formatNotifDate(date: Date): string {
 }
 
 const REMINDERS = [
-  { key: 'LINK_REMINDER_AFTER_BOOKING', urgency: "Don't forget to add a meeting link" },
+  { key: 'LINK_REMINDER_AFTER_BOOKING', urgency: "Don't forget to add a meeting link — booking just confirmed" },
   { key: 'LINK_REMINDER_1HR_BEFORE', urgency: 'Your call starts in about 1 hour' },
   { key: 'LINK_REMINDER_10MIN_BEFORE', urgency: 'Your call starts in ~10 minutes' },
 ] as const;
@@ -52,6 +52,10 @@ async function sendReminder(booking: any, key: string, urgency: string): Promise
     <p>Your 1:1 video call with <strong>${escapeHtml(founderName)}</strong> is scheduled for <strong>${escapeHtml(dateStr)}</strong> (${booking.duration} minutes).</p>
     <p>Please add a meeting link so ${escapeHtml(founderName)} can join the call.</p>`;
 
+  await (prisma as any).bookingActivity.create({
+    data: { booking_id: booking.id, action: key, acted_by: booking.mentor_id },
+  });
+
   await dispatch(NotificationEmailJob, {
     userId: booking.mentor_id,
     type: 'MEETING_LINK_REMINDER' as const,
@@ -61,10 +65,6 @@ async function sendReminder(booking: any, key: string, urgency: string): Promise
     actorId: booking.user_id,
     subjectType: 'Booking' as const,
     subjectId: booking.id,
-  });
-
-  await (prisma as any).bookingActivity.create({
-    data: { booking_id: booking.id, action: key, acted_by: booking.mentor_id },
   });
 
   return true;
@@ -81,9 +81,9 @@ export async function handle(): Promise<void> {
     scheduled_at: { gt: now },
   };
 
-  // 1. Bookings confirmed >= 10 min ago
+  // 1. Bookings confirmed within the last 5 min
   const afterBooking = await (prisma as any).booking.findMany({
-    where: { ...base, created_at: { lte: new Date(nowMs - 10 * 60 * 1000) } },
+    where: { ...base, created_at: { gte: new Date(nowMs - 5 * 60 * 1000) } },
     include: { user: { select: { first_name: true, last_name: true } } },
     take: 50,
   });
