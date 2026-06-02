@@ -175,9 +175,11 @@ export class BillingService {
         }
       };
     } catch (error: any) {
+      const razorpayError = error?.error?.description || error?.response?.data?.error?.description || error?.message || 'Failed to create order';
+      Log.error('Razorpay order creation failed', { error: razorpayError, statusCode: error?.statusCode, raw: JSON.stringify(error?.error || error?.response?.data || {}) });
       return {
         success: false,
-        message: error.message || 'Failed to create order'
+        message: razorpayError
       };
     }
   }
