@@ -149,6 +149,7 @@ export class BookingService {
       rescheduleFromId?: string;
       rescheduleReason?: string;
       rescheduleRemark?: string;
+      wantsRecording?: boolean;
     }
   ): Promise<ServiceResponse> {
     try {
@@ -214,7 +215,15 @@ export class BookingService {
       ) {
         hourlyRate = Math.round(hourlyRate * (1 - settings.discount_percent / 100) * 100) / 100;
       }
-      const amount = Math.round((hourlyRate / 60) * data.duration * 100) / 100;
+      const callAmount = Math.round((hourlyRate / 60) * data.duration * 100) / 100;
+
+      // Recording add-on
+      const wantsRecording = data.wantsRecording === true && settings.recording_enabled;
+      const recordingAmount =
+        wantsRecording && settings.recording_type === 'paid' && settings.recording_amount != null
+          ? Math.round(Number(settings.recording_amount) * 100) / 100
+          : 0;
+      const amount = callAmount + recordingAmount;
 
       // Handle reschedule: update the same booking in place
       if (data.rescheduleFromId) {
@@ -347,6 +356,8 @@ export class BookingService {
           message: data.message?.trim() || null,
           amount,
           currency_id: 1, // INR default
+          wants_recording: wantsRecording,
+          recording_amount: recordingAmount > 0 ? recordingAmount : null,
         },
       });
 
@@ -763,6 +774,8 @@ export class BookingService {
           currency: booking.currency?.code || 'INR',
           currencySymbol: booking.currency?.symbol || '₹',
           platformFee: booking.platform_fee ? Number(booking.platform_fee) : null,
+          wantsRecording: booking.wants_recording ?? false,
+          recordingAmount: booking.recording_amount ? Number(booking.recording_amount) : null,
           isReschedule: booking.is_reschedule,
           rescheduleCount: booking.reschedule_count ?? 0,
           parentId: booking.parent_id,
@@ -793,6 +806,59 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Get booking error', { error });
       return { success: false, message: error.message || 'Failed to fetch booking' };
+    }
+  }
+
+  /**
+   * Toggle recording add-on on a PENDING (unpaid) booking.
+   */
+  static async updateRecording(userId: number, bookingUniqueId: string, wantsRecording: boolean): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, user_id: userId, status: 'PENDING', payment_status: 'UNPAID' },
+        include: { mentor: { select: { id: true } } },
+      });
+      if (!booking) return { success: false, message: 'Booking not found or already paid' };
+
+      const settings = await (prisma as any).mentorOnRequest.findUnique({ where: { user_id: booking.mentor.id } });
+      if (!settings || !settings.recording_enabled) {
+        return { success: false, message: 'Recording is not available for this booking' };
+      }
+
+      // Recompute call-only amount
+      let hourlyRate = settings.price_amount != null ? Number(settings.price_amount) : 0;
+      if (
+        settings.discount_enabled &&
+        settings.discount_percent > 0 &&
+        (!settings.discount_available_till || new Date(settings.discount_available_till) > new Date())
+      ) {
+        hourlyRate = Math.round(hourlyRate * (1 - settings.discount_percent / 100) * 100) / 100;
+      }
+      const callAmount = Math.round((hourlyRate / 60) * booking.duration * 100) / 100;
+
+      const recordingAmount =
+        wantsRecording && settings.recording_type === 'paid' && settings.recording_amount != null
+          ? Math.round(Number(settings.recording_amount) * 100) / 100
+          : 0;
+      const newAmount = callAmount + recordingAmount;
+
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: {
+          wants_recording: wantsRecording,
+          recording_amount: recordingAmount > 0 ? recordingAmount : null,
+          amount: newAmount,
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Recording preference updated',
+        data: { wantsRecording, recordingAmount: recordingAmount > 0 ? recordingAmount : null, amount: newAmount },
+      };
+    } catch (error: any) {
+      Log.error('Update recording error', { error });
+      return { success: false, message: error.message || 'Failed to update recording preference' };
     }
   }
 
@@ -1368,7 +1434,8 @@ export class BookingService {
    */
   static async acceptCompletion(
     userId: number,
-    bookingUniqueId: string
+    bookingUniqueId: string,
+    opts: { accepted: boolean; reason?: string; remark?: string } = { accepted: true }
   ): Promise<ServiceResponse> {
     try {
       const booking = await (prisma as any).booking.findFirst({
@@ -1386,6 +1453,44 @@ export class BookingService {
         return { success: false, message: 'You have already accepted this confirmation' };
       }
 
+      // ── Rejection path ──────────────────────────────────────────────────────
+      if (!opts.accepted) {
+        await (prisma as any).bookingActivity.create({
+          data: {
+            booking_id: booking.id,
+            action: 'USER_REJECTED',
+            reason: opts.reason ?? null,
+            remark: opts.remark ?? null,
+            acted_by: userId,
+          },
+        });
+
+        // Notify mentor of the dispute
+        const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+        const disputeBody = `<p><strong>${escapeHtml(founderName)}</strong> has indicated that the call did not happen as expected.</p>
+          ${opts.reason ? `<p><strong>Reason:</strong> ${escapeHtml(opts.reason)}</p>` : ''}
+          ${opts.remark ? `<p><strong>Details:</strong> ${escapeHtml(opts.remark)}</p>` : ''}
+          <p>Please contact ScaleDux support if you believe this is incorrect.</p>`;
+
+        await dispatch(NotificationJob, {
+          userId: booking.mentor_id,
+          type: 'BOOKING_RATE_PROMPT' as const,
+          notificationTitle: `${founderName} disputed the meeting confirmation`,
+          notificationBody: disputeBody,
+          notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+          actorId: userId,
+          subjectType: 'Booking' as const,
+          subjectId: booking.id,
+        });
+
+        return {
+          success: true,
+          message: 'Dispute recorded',
+          data: { booking: { unique_id: booking.unique_id, status: booking.status } },
+        };
+      }
+
+      // ── Acceptance path ─────────────────────────────────────────────────────
       await (prisma as any).booking.update({
         where: { id: booking.id },
         data: { user_approved_at: new Date(), payment_status: 'RELEASED' },

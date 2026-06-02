@@ -1834,6 +1834,9 @@ model Booking {
   user_approved_at       DateTime?  // user accepted the confirmation
   rejected_at            DateTime?
   completion_reminder_sent_at DateTime?
+  // Recording
+  wants_recording        Boolean   @default(false)
+  recording_amount       Decimal?  @db.Decimal(12, 2)
   // Billing
   billing_transaction_id Int?      @unique
   created_at             DateTime  @default(now())

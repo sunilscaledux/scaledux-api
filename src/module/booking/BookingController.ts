@@ -7,7 +7,7 @@ export class BookingController {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
 
-    const { mentorUniqueId, duration, scheduledAt, message, rescheduleFromId, rescheduleReason, rescheduleRemark } = req.body;
+    const { mentorUniqueId, duration, scheduledAt, message, rescheduleFromId, rescheduleReason, rescheduleRemark, wantsRecording } = req.body;
     if (!mentorUniqueId || !duration || !scheduledAt) {
       return ApiResponse.error(res, 'mentorUniqueId, duration, and scheduledAt are required', 400);
     }
@@ -25,6 +25,7 @@ export class BookingController {
       rescheduleFromId,
       rescheduleReason,
       rescheduleRemark,
+      wantsRecording: !!wantsRecording,
     });
 
     if (result.success) return ApiResponse.success(res, result.data, result.message, 201);
@@ -141,7 +142,30 @@ export class BookingController {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
 
-    const result = await BookingService.acceptCompletion(userId, req.params.uniqueId);
+    const { accepted, reason, remark } = req.body;
+    if (accepted === false && !reason) {
+      return ApiResponse.error(res, 'reason is required when rejecting', 400);
+    }
+
+    const result = await BookingService.acceptCompletion(userId, req.params.uniqueId, {
+      accepted: accepted !== false,
+      reason,
+      remark,
+    });
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
+  static async updateRecording(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const { wantsRecording } = req.body;
+    if (typeof wantsRecording !== 'boolean') {
+      return ApiResponse.error(res, 'wantsRecording (boolean) is required', 400);
+    }
+
+    const result = await BookingService.updateRecording(userId, req.params.uniqueId, wantsRecording);
     if (result.success) return ApiResponse.success(res, result.data, result.message);
     return ApiResponse.error(res, result.message, 400);
   }
