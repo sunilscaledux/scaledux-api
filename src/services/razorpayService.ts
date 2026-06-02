@@ -208,6 +208,103 @@ export async function createContactAndFundAccount(params: {
   return { contactId, fundAccountId: fundAccount.id };
 }
 
+/**
+ * Razorpay X: create a payout to a fund account.
+ * Used to pay mentors/freelancers after session completion.
+ */
+export async function createPayout(params: {
+  fundAccountId: string;
+  amountPaise: number;
+  purpose?: string;
+  narration?: string;
+  referenceId?: string;
+}): Promise<{ id: string; status: string }> {
+  const baseUrl = getXBaseUrl();
+  const auth = getAuthHeader();
+  const platformAccount = process.env.RAZORPAY_X_ACCOUNT_NUMBER;
+  if (!platformAccount) {
+    throw new Error("RAZORPAY_X_ACCOUNT_NUMBER is required for payouts");
+  }
+  const res = await axios.post(
+    `${baseUrl}/payouts`,
+    {
+      account_number: platformAccount,
+      fund_account_id: params.fundAccountId,
+      amount: params.amountPaise,
+      currency: "INR",
+      mode: "NEFT",
+      purpose: params.purpose ?? "payout",
+      queue_if_low_balance: true,
+      reference_id: params.referenceId,
+      narration: params.narration?.slice(0, 30),
+    },
+    { headers: { Authorization: auth, "Content-Type": "application/json" } }
+  );
+  return { id: res.data?.id, status: res.data?.status };
+}
+
+/**
+ * Razorpay Route: create a linked account (sub-merchant) for receiving transfers.
+ * Returns acc_xxx (18-char ID) required for Route order transfers.
+ */
+export async function createRouteLinkedAccount(params: {
+  email: string;
+  phone?: string;
+  legalBusinessName: string;
+  businessType?: string;
+}): Promise<{ accountId: string }> {
+  const { key_id, key_secret } = razorpayConfig;
+  if (!key_id || !key_secret) {
+    throw new Error("Razorpay is not configured");
+  }
+  const auth = `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString("base64")}`;
+  try {
+    const res = await axios.post(
+      "https://api.razorpay.com/v2/accounts",
+      {
+        email: params.email,
+        phone: params.phone || "9999999999",
+        type: "route",
+        legal_business_name: params.legalBusinessName.slice(0, 200),
+        business_type: params.businessType || "not_yet_registered",
+        legal_info: { pan: "AANFA0000Z" },
+        profile: {
+          category: "healthcare",
+          subcategory: "clinic",
+          addresses: {
+            registered: {
+              street1: "NA",
+              street2: "NA",
+              city: "Mumbai",
+              state: "Maharashtra",
+              postal_code: 400001,
+              country: "IN",
+            },
+          },
+        },
+      },
+      { headers: { Authorization: auth, "Content-Type": "application/json" } }
+    );
+    const accountId = res.data?.id;
+    if (!accountId) throw new Error("No account id in Razorpay Route response");
+    return { accountId };
+  } catch (err: any) {
+    // If email already exists, fetch the existing account ID from error
+    const desc = err?.response?.data?.error?.description || "";
+    const match = desc.match(/already exists for account\s*-\s*(\S+)/i);
+    if (match?.[1]) {
+      try {
+        const fetchRes = await axios.get(
+          `https://api.razorpay.com/v2/accounts/${match[1]}`,
+          { headers: { Authorization: auth, "Content-Type": "application/json" } }
+        );
+        if (fetchRes.data?.id) return { accountId: fetchRes.data.id };
+      } catch { /* fall through */ }
+    }
+    throw err;
+  }
+}
+
 export function isRazorpayConfigured(): boolean {
   return !!(razorpayConfig.key_id && razorpayConfig.key_secret);
 }

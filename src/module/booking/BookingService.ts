@@ -1399,7 +1399,7 @@ export class BookingService {
         },
       });
 
-      // Generate Invoice B + release Razorpay Route transfer to mentor
+      // Generate Invoice B + payout mentor via Razorpay X
       if (booking.billing_transaction_id) {
         const tx = await (prisma as any).billingTransaction.findUnique({
           where: { id: booking.billing_transaction_id },
@@ -1493,4 +1493,5 @@ export class BookingService {
       return { success: false, message: error.message || 'Failed to accept confirmation' };
     }
   }
+
 }

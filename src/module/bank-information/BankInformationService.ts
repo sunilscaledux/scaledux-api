@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
-import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
+import { createRouteLinkedAccount, isRazorpayConfigured } from "@services/razorpayService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
@@ -386,34 +386,31 @@ export class BankInformationService {
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { email: true, phone: true, razorpay_contact_id: true, first_name: true, last_name: true }
+        select: { email: true, phone: true, razorpay_account_id: true, first_name: true, last_name: true }
       });
       if (!user?.email) return;
+      // Skip if already has a Route linked account (acc_xxx)
+      if (user.razorpay_account_id?.startsWith('acc_')) return;
 
       const fullName = bank.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User';
-      const result = await createContactAndFundAccount({
-        name: fullName,
+      const result = await createRouteLinkedAccount({
         email: user.email,
-        contact: user.phone || '',
-        ifsc: bank.ifsc,
-        accountNumber: bank.accountNumber,
-        existingContactId: user.razorpay_contact_id || undefined,
+        phone: user.phone || undefined,
+        legalBusinessName: fullName,
       });
 
       await prisma.user.update({
         where: { id: userId },
         data: {
-          razorpay_contact_id: result.contactId,
-          razorpay_account_id: result.fundAccountId,
+          razorpay_account_id: result.accountId,
         }
       });
 
-      Log.info(`Razorpay linked account created for user ${userId}`, {
-        contactId: result.contactId,
-        fundAccountId: result.fundAccountId,
+      Log.info(`Razorpay Route linked account created for user ${userId}`, {
+        accountId: result.accountId,
       });
     } catch (err) {
-      Log.error(`Failed to create Razorpay linked account for user ${userId}`, { err });
+      Log.error(`Failed to create Razorpay Route linked account for user ${userId}`, { err });
     }
   }
 }
