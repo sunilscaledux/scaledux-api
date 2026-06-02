@@ -38,6 +38,7 @@ router.post(
   handleMulterError
 );
 router.get('/password-status', authenticateToken, ProfileController.getPasswordStatus);
+router.get('/password-activity', authenticateToken, ProfileController.getPasswordActivity);
 router.patch('/set-password', authenticateToken, ProfileController.setPassword);
 router.patch('/password', authenticateToken, ProfileController.updatePassword);
 router.patch('/privacy', authenticateToken, ProfileController.updatePrivacySettings);

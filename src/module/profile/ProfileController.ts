@@ -174,6 +174,25 @@ export class ProfileController {
   }
 
   /**
+   * Get password change activity log.
+   * GET /api/v1/profile/password-activity
+   */
+  static async getPasswordActivity(req: Request, res: Response) {
+    try {
+      const userId = req.user.id;
+      const records = await prisma.passwordHistory.findMany({
+        where: { user_id: userId },
+        select: { id: true, source: true, ip_address: true, user_agent: true, created_at: true },
+        orderBy: { created_at: 'desc' },
+        take: 20,
+      });
+      return ApiResponse.success(res, { activity: records }, 'Password activity fetched');
+    } catch {
+      return ApiResponse.error(res, 'Failed to fetch password activity', 400);
+    }
+  }
+
+  /**
    * Set password for Google/LinkedIn users who have no password (no current password required).
    * PATCH /api/v1/profile/set-password
    */

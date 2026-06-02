@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
+import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
@@ -181,6 +182,13 @@ export class BankInformationService {
       `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
     );
 
+    // Create Razorpay X contact + fund account so Route transfers work
+    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+      name: verifiedName || data.displayLabel || 'User',
+      ifsc,
+      accountNumber,
+    });
+
     return {
       success: true,
       message: 'Bank account verified and saved successfully.',
@@ -229,6 +237,13 @@ export class BankInformationService {
         verification_failure_reason: null,
         verified_at: new Date(),
       }
+    });
+
+    // Re-create Razorpay X contact + fund account with updated details
+    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+      name: verification.accountHolderName || record.account_holder_name || 'User',
+      ifsc,
+      accountNumber,
     });
 
     return {
@@ -321,6 +336,13 @@ export class BankInformationService {
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
       `;
+
+      // Re-create Razorpay X contact + fund account with updated bank details
+      void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+        name: verifiedName || 'User',
+        ifsc,
+        accountNumber,
+      });
     } else {
       // Only label/name/bank name changed — no re-verification needed
       await (prisma as any).bankInformation.update({
@@ -349,5 +371,49 @@ export class BankInformationService {
       message: needsReverification ? 'Bank account verified and updated successfully.' : 'Bank details updated successfully.',
       data: updated ? BankInformationService.mapRecord(updated) : undefined
     };
+  }
+
+  /**
+   * Create Razorpay X contact + fund account after bank verification
+   * and store IDs on the user so Route transfers work for bookings/proposals.
+   */
+  private static async ensureRazorpayLinkedAccount(
+    userId: number,
+    bank: { name: string; ifsc: string; accountNumber: string }
+  ) {
+    if (!isRazorpayConfigured()) return;
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, phone: true, razorpay_contact_id: true, first_name: true, last_name: true }
+      });
+      if (!user?.email) return;
+
+      const fullName = bank.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User';
+      const result = await createContactAndFundAccount({
+        name: fullName,
+        email: user.email,
+        contact: user.phone || '',
+        ifsc: bank.ifsc,
+        accountNumber: bank.accountNumber,
+        existingContactId: user.razorpay_contact_id || undefined,
+      });
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          razorpay_contact_id: result.contactId,
+          razorpay_account_id: result.fundAccountId,
+        }
+      });
+
+      Log.info(`Razorpay linked account created for user ${userId}`, {
+        contactId: result.contactId,
+        fundAccountId: result.fundAccountId,
+      });
+    } catch (err) {
+      Log.error(`Failed to create Razorpay linked account for user ${userId}`, { err });
+    }
   }
 }
