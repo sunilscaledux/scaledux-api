@@ -1,5 +1,6 @@
 import Joi from 'joi'
 import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { appConfig } from '../../config/app'
 
 export const createFounderProjectSchema = Joi.object({
   projectTitle: Joi.string().required().min(1).max(100).messages({
@@ -54,7 +55,7 @@ export const createFounderProjectSchema = Joi.object({
     }),
     amount: Joi.string().required().custom((value, helpers) => {
       const num = parseFloat(value);
-      if (isNaN(num) || num < 500) {
+      if (isNaN(num) || num < appConfig.minProjectBudget) {
         return helpers.error('any.invalid');
       }
       return value;
@@ -62,7 +63,7 @@ export const createFounderProjectSchema = Joi.object({
       'string.base': 'Amount must be a string',
       'string.empty': 'Amount is required',
       'any.required': 'Amount is required',
-      'any.invalid': 'Minimum budget should be ₹500'
+      'any.invalid': `Minimum budget should be ₹${appConfig.minProjectBudget}`
     })
   }).required().messages({
     'any.required': 'Budget is required'

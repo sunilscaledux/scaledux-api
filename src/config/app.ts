@@ -43,6 +43,7 @@ const minProfileCompletionPercent = Math.min(
   100,
   Math.max(0, Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 75)
 );
+const minProjectBudget = Math.max(1, parseInt(process.env.MIN_PROJECT_BUDGET || '500', 10));
 
 export const appConfig = {
   appEnv: process.env.NODE_ENV,
@@ -76,4 +77,6 @@ export const appConfig = {
   },
   /** Minimum profile completion % required to perform gated actions. */
   minProfileCompletionPercent,
+  /** Minimum budget (₹) required when posting a project. */
+  minProjectBudget,
 };
