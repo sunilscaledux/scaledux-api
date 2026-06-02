@@ -695,6 +695,8 @@ export class BookingService {
         completedAt: b.completed_at ?? null,
         rejectedAt: b.rejected_at ?? null,
         userApprovedAt: b.user_approved_at ?? null,
+        wantsRecording: b.wants_recording ?? false,
+        recordingAmount: b.recording_amount ? Number(b.recording_amount) : null,
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
