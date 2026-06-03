@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '@services/prismaService';
+import { prisma } from '@services/prismaService';
 
 const FRONTEND_URL = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/$/, '');
 
