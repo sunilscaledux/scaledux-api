@@ -33,7 +33,7 @@ async function main() {
   // // 7. Seed Revenue Models — skipped (not needed yet)
   // await seedRevenueModels(prisma);
 
-  // Billing seed removed — billing data is created by actual payment flow
+  // Billing/transaction history seed intentionally skipped — records are created by the actual payment flow, not seeded
 
   // 8. Seed Startup Phases (Phase 0 to Phase 7)
   await seedStartupPhases(prisma);
