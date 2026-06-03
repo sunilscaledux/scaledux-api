@@ -40,6 +40,7 @@ import googleCalendarRoutes from './module/google-calendar/GoogleCalendarRoute';
 import videoConferencingRoutes from './module/video-conferencing/VideoConferencingRoute';
 import { startupPhaseRouter, startupProgressRouter } from './module/startup-phase/StartupPhaseRoute';
 import connectionRoutes from './module/connection/ConnectionRoute';
+import sitemapRoutes from './module/sitemap/SitemapRoute';
 
 import path from "path";
 import { corsMiddleware } from "@middleware/cors";
@@ -65,6 +66,7 @@ app.use(corsMiddleware());
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(sitemapRoutes);
 /** Private file download — /files/view/:uniqueId?f=originalName */
 app.get("/files/view/:uniqueId", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
