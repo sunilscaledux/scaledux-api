@@ -1532,9 +1532,9 @@ export class BookingService {
           await (prisma as any).billingTransaction.update({
             where: { id: tx.id },
             data: {
-              status: 'payment_processed',
+              status: BillingTransactionStatus.COMPLETED,
               sender_status: BillingTransactionSenderStatus.RELEASED,
-              receiver_status: 'payment_processed',
+              receiver_status: BillingTransactionReceiverStatus.COMPLETED,
               on_hold: false,
             },
           });
