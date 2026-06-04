@@ -1,5 +1,6 @@
 import axios from "axios";
 import razorpayConfig from "@config/razorpay";
+import { Log } from "@services/loggerService";
 
 function getAuthHeader(): string {
   const { key_id, key_secret } = razorpayConfig;
@@ -174,65 +175,224 @@ export async function createContactAndFundAccount(params: {
 }
 
 /**
- * Razorpay Route: create a linked account (sub-merchant) for receiving transfers.
- * Returns acc_xxx (18-char ID) required for Route order transfers.
+ * Razorpay Route: create a linked account (sub-merchant) with stakeholder + bank account.
+ * Steps: 1) Create account → 2) Add stakeholder (KYC) → 3) Add bank account → 4) Request activation.
+ * Returns acc_xxx ID required for Route order transfers.
  */
 export async function createRouteLinkedAccount(params: {
   email: string;
   phone?: string;
   legalBusinessName: string;
   businessType?: string;
+  pan?: string;
+  address?: { street1?: string; street2?: string; city?: string; state?: string; postalCode?: string };
+  stakeholder?: { name: string; email: string; phone?: string; pan?: string };
+  bankAccount?: { name: string; ifsc: string; accountNumber: string };
+  /** If provided, skip account creation (Step 1) and use this existing account ID. */
+  existingAccountId?: string;
 }): Promise<{ accountId: string }> {
   const { key_id, key_secret } = razorpayConfig;
   if (!key_id || !key_secret) {
     throw new Error("Razorpay is not configured");
   }
   const auth = `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString("base64")}`;
-  try {
-    const res = await axios.post(
-      "https://api.razorpay.com/v2/accounts",
-      {
+  const headers = { Authorization: auth, "Content-Type": "application/json" };
+
+  const businessType = params.businessType || "individual";
+  const isIndividual = businessType === "individual";
+
+  // Normalize phone to 10 digits (strip +91 / 0 prefix)
+  const rawPhone = (params.phone || "").replace(/\D/g, "");
+  const phone = rawPhone.length >= 10 ? rawPhone.slice(-10) : "9999999999";
+
+  // postal_code must be a valid 6-digit number
+  const postalCode = parseInt(params.address?.postalCode || "") || 400001;
+
+  let accountId: string;
+
+  // Step 1: Create linked account (skip if existing account ID provided)
+  if (params.existingAccountId) {
+    accountId = params.existingAccountId;
+  } else {
+    try {
+      const body: any = {
         email: params.email,
-        phone: params.phone || "9999999999",
+        phone,
         type: "route",
         legal_business_name: params.legalBusinessName.slice(0, 200),
-        business_type: params.businessType || "not_yet_registered",
-        legal_info: { pan: "AANFA0000Z" },
+        business_type: businessType,
+        ...(!isIndividual && params.pan ? { legal_info: { pan: params.pan } } : {}),
         profile: {
-          category: "healthcare",
-          subcategory: "clinic",
+          category: "education",
+          subcategory: "coaching",
           addresses: {
             registered: {
-              street1: "NA",
-              street2: "NA",
-              city: "Mumbai",
-              state: "Maharashtra",
-              postal_code: 400001,
+              street1: params.address?.street1 || "Not provided",
+              street2: params.address?.street2 || "NA",
+              city: params.address?.city || "Mumbai",
+              state: params.address?.state || "Maharashtra",
+              postal_code: postalCode,
               country: "IN",
             },
           },
         },
-      },
-      { headers: { Authorization: auth, "Content-Type": "application/json" } }
-    );
-    const accountId = res.data?.id;
-    if (!accountId) throw new Error("No account id in Razorpay Route response");
-    return { accountId };
-  } catch (err: any) {
-    // If email already exists, fetch the existing account ID from error
-    const desc = err?.response?.data?.error?.description || "";
-    const match = desc.match(/already exists for account\s*-\s*(\S+)/i);
-    if (match?.[1]) {
-      try {
-        const fetchRes = await axios.get(
-          `https://api.razorpay.com/v2/accounts/${match[1]}`,
-          { headers: { Authorization: auth, "Content-Type": "application/json" } }
-        );
-        if (fetchRes.data?.id) return { accountId: fetchRes.data.id };
-      } catch { /* fall through */ }
+      };
+
+      const res = await axios.post("https://api.razorpay.com/v2/accounts", body, { headers });
+      accountId = res.data?.id;
+      if (!accountId) throw new Error("No account id in Razorpay Route response");
+    } catch (err: any) {
+      // If email already exists, find the existing linked account
+      const desc = err?.response?.data?.error?.description || "";
+      if (/already exists/i.test(desc)) {
+        try {
+          const searchRes = await axios.get(
+            `https://api.razorpay.com/v1/beta/accounts?email=${encodeURIComponent(params.email)}`,
+            { headers }
+          );
+          // Find a non-suspended account
+          const active = searchRes.data?.items?.find(
+            (a: any) => a.id?.startsWith('acc_') && a.activation_details?.status !== 'suspended'
+          );
+          if (active?.id) {
+            accountId = active.id;
+          } else {
+            throw new Error('A suspended account already exists for this email on Razorpay. Please contact support or use a different email.');
+          }
+        } catch { throw err; }
+      } else {
+        throw err;
+      }
     }
-    throw err;
   }
+
+  // Step 2: Add or update stakeholder (KYC holder) — required for activation
+  if (params.stakeholder) {
+    const stakeholderBody = {
+      name: params.stakeholder.name.slice(0, 200),
+      email: params.stakeholder.email,
+      phone: { primary: phone },
+      ...(params.stakeholder.pan ? { kyc: { pan: params.stakeholder.pan } } : {}),
+    };
+    try {
+      const stakRes = await axios.post(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders`, stakeholderBody, { headers });
+      Log.info(`[createRouteLinkedAccount] Stakeholder created for ${accountId}`, { stakeholderId: stakRes.data?.id });
+    } catch (err: any) {
+      const desc = err?.response?.data?.error?.description || "";
+      if (/(already|duplicate)/i.test(desc)) {
+        Log.info(`[createRouteLinkedAccount] Stakeholder already exists for ${accountId}, fetching to update`);
+        // Stakeholder exists — fetch and update with latest KYC/details
+        try {
+          const listRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders`, { headers });
+          Log.info(`[createRouteLinkedAccount] Stakeholders fetch response`, { data: JSON.stringify(listRes.data) });
+          // Handle both { items: [...] } and direct array response formats
+          const items = listRes.data?.items || listRes.data;
+          const existing = Array.isArray(items) ? items[0] : null;
+          if (existing?.id) {
+            await axios.patch(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders/${existing.id}`, stakeholderBody, { headers });
+            Log.info(`[createRouteLinkedAccount] Stakeholder ${existing.id} updated with KYC for ${accountId}`);
+          } else {
+            Log.warn(`[createRouteLinkedAccount] Could not find stakeholder ID from response for ${accountId}`);
+          }
+        } catch (updateErr: any) {
+          Log.error(`[createRouteLinkedAccount] Failed to update stakeholder for ${accountId}`, {
+            status: updateErr?.response?.status,
+            data: updateErr?.response?.data,
+            message: updateErr?.message,
+          });
+        }
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  // Step 3: Request product activation + add/update bank account via product config
+  if (params.bankAccount) {
+    let productId: string | undefined;
+
+    // Try to request Route product
+    try {
+      const productRes = await axios.post(`https://api.razorpay.com/v2/accounts/${accountId}/products`, {
+        product_name: "route",
+      }, { headers });
+      productId = productRes.data?.id;
+      Log.info(`[createRouteLinkedAccount] Product requested for ${accountId}`, { productId });
+    } catch (err: any) {
+      const errData = err?.response?.data;
+      const desc = errData?.error?.description || err?.message || "";
+      if (/(already|duplicate|exists)/i.test(desc)) {
+        Log.info(`[createRouteLinkedAccount] Product already requested for ${accountId}, finding product ID`);
+
+        // Approach 1: Check error response for product ID
+        productId = errData?.id || errData?.error?.metadata?.product_id;
+
+        // Approach 2: Fetch account details to find product ID
+        if (!productId) {
+          try {
+            const accRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}`, { headers });
+            Log.info(`[createRouteLinkedAccount] Account fetch response for product lookup`, {
+              activatedProducts: JSON.stringify(accRes.data?.activated_products),
+              products: JSON.stringify(accRes.data?.products),
+            });
+            // Try various response formats Razorpay might use
+            const products = accRes.data?.products;
+            if (products?.route?.id) {
+              productId = products.route.id;
+            } else if (Array.isArray(products)) {
+              productId = products.find((p: any) => p.product_name === "route")?.id;
+            }
+          } catch (accErr: any) {
+            Log.error(`[createRouteLinkedAccount] Failed to fetch account ${accountId}`, {
+              status: accErr?.response?.status,
+              data: accErr?.response?.data,
+            });
+          }
+        }
+
+        // Approach 3: Try list products endpoint
+        if (!productId) {
+          try {
+            const prodListRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/products`, { headers });
+            Log.info(`[createRouteLinkedAccount] Products list response`, { data: JSON.stringify(prodListRes.data) });
+            const items = prodListRes.data?.items || prodListRes.data;
+            const routeProduct = Array.isArray(items)
+              ? items.find((p: any) => p.product_name === "route")
+              : null;
+            productId = routeProduct?.id;
+          } catch (listErr: any) {
+            Log.error(`[createRouteLinkedAccount] Failed to list products for ${accountId}`, {
+              status: listErr?.response?.status,
+              data: listErr?.response?.data,
+            });
+          }
+        }
+
+        Log.info(`[createRouteLinkedAccount] Resolved productId for ${accountId}: ${productId || 'NONE'}`);
+      } else {
+        throw err;
+      }
+    }
+
+    // Update product config with bank details for settlements
+    if (productId) {
+      const patchRes = await axios.patch(`https://api.razorpay.com/v2/accounts/${accountId}/products/${productId}`, {
+        settlements: {
+          account_number: params.bankAccount.accountNumber,
+          ifsc_code: params.bankAccount.ifsc,
+          beneficiary_name: params.bankAccount.name.slice(0, 120),
+        },
+      }, { headers });
+      Log.info(`[createRouteLinkedAccount] Product ${productId} updated with bank details for ${accountId}`, {
+        activeConfig: JSON.stringify(patchRes.data?.active_configuration),
+        requirements: JSON.stringify(patchRes.data?.requirements),
+      });
+    } else {
+      Log.error(`[createRouteLinkedAccount] Could not determine product ID for ${accountId} — bank settlement config NOT updated`);
+    }
+  }
+
+  return { accountId };
 }
 
 export function isRazorpayConfigured(): boolean {

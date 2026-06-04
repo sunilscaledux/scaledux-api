@@ -156,9 +156,40 @@ export class BankInformationService {
       return { success: false, message: verification.error || 'Bank account verification failed. Please check your details.' };
     }
 
+    // Validate account holder name matches bank records
+    if (accountHolderName && verification.accountHolderName) {
+      const submittedName = accountHolderName.trim().toLowerCase();
+      const bankName = verification.accountHolderName.trim().toLowerCase();
+      if (submittedName && bankName && !bankName.includes(submittedName) && !submittedName.includes(bankName)) {
+        return {
+          success: false,
+          message: 'Account holder name does not match bank records. Please enter the name exactly as registered with your bank.'
+        };
+      }
+    }
+
     // Use verified account holder name from bank if available
     const verifiedName = verification.accountHolderName || accountHolderName;
     const verifiedBankName = verification.bankName || cleanedBankName || null;
+
+    // Create Razorpay Route linked account BEFORE saving bank info
+    const razorpayResult = await BankInformationService.ensureRazorpayLinkedAccount(userIdNum, entityType, {
+      name: verifiedName || data.displayLabel || 'User',
+      ifsc,
+      accountNumber,
+    });
+
+    if (!razorpayResult.success) {
+      void notifySensitiveUpdate(
+        userIdNum,
+        'Bank verification failed',
+        `Your ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+      );
+      return {
+        success: false,
+        message: `Bank verified but payment account setup failed: ${razorpayResult.error}`
+      };
+    }
 
     const record = await (prisma as any).bankInformation.create({
       data: {
@@ -181,13 +212,6 @@ export class BankInformationService {
       'Your bank details were updated',
       `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
     );
-
-    // Create Razorpay Route linked account so transfers work
-    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, entityType, {
-      name: verifiedName || data.displayLabel || 'User',
-      ifsc,
-      accountNumber,
-    });
 
     return {
       success: true,
@@ -228,6 +252,22 @@ export class BankInformationService {
       return { success: false, message: reason };
     }
 
+    // Re-create Razorpay Route linked account before saving
+    const razorpayResult = await BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
+      name: verification.accountHolderName || record.account_holder_name || 'User',
+      ifsc,
+      accountNumber,
+    });
+
+    if (!razorpayResult.success) {
+      void notifySensitiveUpdate(
+        userIdNum,
+        'Bank verification failed',
+        `Your bank account was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+      );
+      return { success: false, message: `Bank verified but payment account setup failed: ${razorpayResult.error}` };
+    }
+
     await (prisma as any).bankInformation.update({
       where: { id: record.id },
       data: {
@@ -237,13 +277,6 @@ export class BankInformationService {
         verification_failure_reason: null,
         verified_at: new Date(),
       }
-    });
-
-    // Re-create Razorpay Route linked account with updated details
-    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
-      name: verification.accountHolderName || record.account_holder_name || 'User',
-      ifsc,
-      accountNumber,
     });
 
     return {
@@ -327,6 +360,22 @@ export class BankInformationService {
       const verifiedBankName = verification.bankName || bankName;
       const accountNumberLast4 = accountNumber.slice(-4);
 
+      // Create Razorpay Route linked account before saving bank details
+      const razorpayResult = await BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
+        name: verifiedName || 'User',
+        ifsc,
+        accountNumber,
+      });
+
+      if (!razorpayResult.success) {
+        void notifySensitiveUpdate(
+          userIdNum,
+          'Bank update failed',
+          `Your bank account was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+        );
+        return { success: false, message: `Bank verified but payment account setup failed: ${razorpayResult.error}` };
+      }
+
       await prisma.$executeRaw`
         UPDATE scd_bank_information
         SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
@@ -336,13 +385,6 @@ export class BankInformationService {
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
       `;
-
-      // Re-create Razorpay Route linked account with updated bank details
-      void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
-        name: verifiedName || 'User',
-        ifsc,
-        accountNumber,
-      });
     } else {
       // Only label/name/bank name changed — no re-verification needed
       await (prisma as any).bankInformation.update({
@@ -382,8 +424,11 @@ export class BankInformationService {
     userId: number,
     entityType: string,
     bank: { name: string; ifsc: string; accountNumber: string }
-  ) {
-    if (!isRazorpayConfigured()) return;
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!isRazorpayConfigured()) {
+      Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured — skipping for user ${userId}`);
+      return { success: false, error: 'Payment service is not configured. Please contact support.' };
+    }
 
     const isAgency = entityType === 'AGENCY';
     const field = isAgency ? 'razorpay_agency_account_id' : 'razorpay_account_id';
@@ -391,30 +436,67 @@ export class BankInformationService {
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { email: true, phone: true, razorpay_account_id: true, razorpay_agency_account_id: true, first_name: true, last_name: true }
+        select: {
+          email: true, phone: true, razorpay_account_id: true, razorpay_agency_account_id: true,
+          first_name: true, last_name: true,
+          personalInfo: {
+            select: { address: true, address_line_2: true, city: true, zipCode: true, state: { select: { name: true } } }
+          }
+        }
       });
-      if (!user?.email) return;
-      // Skip if already has a Route linked account for this entity type
+      if (!user?.email) {
+        Log.warn(`[ensureRazorpayLinkedAccount] No email for user ${userId} — skipping`);
+        return { success: false, error: 'User email not found.' };
+      }
       const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;
-      if (existingId?.startsWith('acc_')) return;
+
+      // Fetch PAN from tax information
+      const taxInfo = await (prisma as any).taxInformation.findFirst({
+        where: { user_id: userId, entity_type: entityType },
+        select: { pan_number: true }
+      });
 
       const fullName = bank.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User';
+      const info = user.personalInfo;
+      const pan = taxInfo?.pan_number || undefined;
+
+      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType}), name: ${fullName}`);
+
       const result = await createRouteLinkedAccount({
         email: user.email,
         phone: user.phone || undefined,
         legalBusinessName: fullName,
+        businessType: isAgency ? 'not_yet_registered' : 'individual',
+        pan,
+        existingAccountId: existingId || undefined,
+        address: info ? {
+          street1: info.address || undefined,
+          street2: info.address_line_2 || undefined,
+          city: info.city || undefined,
+          state: info.state?.name || undefined,
+          postalCode: info.zipCode || undefined,
+        } : undefined,
+        stakeholder: { name: fullName, email: user.email, phone: user.phone || undefined, pan },
+        bankAccount: { name: fullName, ifsc: bank.ifsc, accountNumber: bank.accountNumber },
       });
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { [field]: result.accountId }
-      });
+      if (!existingId) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { [field]: result.accountId }
+        });
+      }
 
-      Log.info(`Razorpay Route linked account created for user ${userId} (${entityType})`, {
-        accountId: result.accountId,
+      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updated' : 'Created'} ${result.accountId} for user ${userId} (${entityType})`);
+      return { success: true };
+    } catch (err: any) {
+      const razorpayError = err?.response?.data?.error?.description || err?.message || 'Unknown error';
+      Log.error(`[ensureRazorpayLinkedAccount] Failed for user ${userId} (${entityType})`, {
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data,
       });
-    } catch (err) {
-      Log.error(`Failed to create Razorpay Route linked account for user ${userId} (${entityType})`, { err });
+      return { success: false, error: razorpayError };
     }
   }
 }
