@@ -58,7 +58,7 @@ export class BillingService {
           include: {
             project: { select: { id: true, user_id: true } },
             milestonesRows: { orderBy: { order_index: 'asc' } },
-            provider: { select: { id: true, razorpay_account_id: true } }
+            provider: { select: { id: true, razorpay_account_id: true, razorpay_agency_account_id: true, show_as_agency: true } }
           }
         }
       }
@@ -90,8 +90,11 @@ export class BillingService {
     const founder = calcFounderTotal(amount);
     const platformTransferAmountInr = founder.platformFee + founder.platformFeeGst;
 
-    // Check freelancer's Razorpay linked account for Route transfer
-    const freelancerAccountId = proposal.provider?.razorpay_account_id as string | null;
+    // Check freelancer's Razorpay linked account for Route transfer (agency account if show_as_agency)
+    const provider = proposal.provider;
+    const freelancerAccountId = (provider?.show_as_agency && provider?.razorpay_agency_account_id)
+      ? provider.razorpay_agency_account_id as string
+      : provider?.razorpay_account_id as string | null;
     if (!freelancerAccountId) {
       return { success: false, message: 'Freelancer has not completed Razorpay account linking. Payment cannot proceed.' };
     }

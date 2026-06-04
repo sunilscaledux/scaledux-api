@@ -381,7 +381,7 @@ export class BookingService {
     try {
       const booking = await (prisma as any).booking.findFirst({
         where: { unique_id: bookingUniqueId, user_id: userId },
-        include: { mentor: { select: { id: true, razorpay_account_id: true } } },
+        include: { mentor: { select: { id: true, razorpay_account_id: true, razorpay_agency_account_id: true, show_as_agency: true } } },
       });
       if (!booking) return { success: false, message: 'Booking not found' };
       if (booking.status !== 'PENDING') return { success: false, message: 'Booking is not in pending state' };
@@ -390,8 +390,11 @@ export class BookingService {
       const baseAmount = Number(booking.amount);
       if (baseAmount <= 0) return { success: false, message: 'Invalid booking amount' };
 
-      // Mentor must have Razorpay linked account for Route transfer
-      const mentorAccountId = booking.mentor?.razorpay_account_id as string | null;
+      // Mentor must have Razorpay linked account for Route transfer (agency account if show_as_agency)
+      const mentor = booking.mentor;
+      const mentorAccountId = (mentor?.show_as_agency && mentor?.razorpay_agency_account_id)
+        ? mentor.razorpay_agency_account_id as string
+        : mentor?.razorpay_account_id as string | null;
       if (!mentorAccountId) {
         return { success: false, message: 'Mentor has not completed Razorpay account linking. Payment cannot proceed.' };
       }

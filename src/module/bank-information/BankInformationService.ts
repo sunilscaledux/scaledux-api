@@ -182,8 +182,8 @@ export class BankInformationService {
       `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
     );
 
-    // Create Razorpay X contact + fund account so Route transfers work
-    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+    // Create Razorpay Route linked account so transfers work
+    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, entityType, {
       name: verifiedName || data.displayLabel || 'User',
       ifsc,
       accountNumber,
@@ -239,8 +239,8 @@ export class BankInformationService {
       }
     });
 
-    // Re-create Razorpay X contact + fund account with updated details
-    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+    // Re-create Razorpay Route linked account with updated details
+    void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
       name: verification.accountHolderName || record.account_holder_name || 'User',
       ifsc,
       accountNumber,
@@ -337,8 +337,8 @@ export class BankInformationService {
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
       `;
 
-      // Re-create Razorpay X contact + fund account with updated bank details
-      void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, {
+      // Re-create Razorpay Route linked account with updated bank details
+      void BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
         name: verifiedName || 'User',
         ifsc,
         accountNumber,
@@ -374,23 +374,29 @@ export class BankInformationService {
   }
 
   /**
-   * Create Razorpay X contact + fund account after bank verification
-   * and store IDs on the user so Route transfers work for bookings/proposals.
+   * Create Razorpay Route linked account after bank verification
+   * and store the account ID on the user so Route transfers work for bookings/proposals.
+   * Stores in `razorpay_account_id` for INDIVIDUAL or `razorpay_agency_account_id` for AGENCY.
    */
   private static async ensureRazorpayLinkedAccount(
     userId: number,
+    entityType: string,
     bank: { name: string; ifsc: string; accountNumber: string }
   ) {
     if (!isRazorpayConfigured()) return;
 
+    const isAgency = entityType === 'AGENCY';
+    const field = isAgency ? 'razorpay_agency_account_id' : 'razorpay_account_id';
+
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { email: true, phone: true, razorpay_account_id: true, first_name: true, last_name: true }
+        select: { email: true, phone: true, razorpay_account_id: true, razorpay_agency_account_id: true, first_name: true, last_name: true }
       });
       if (!user?.email) return;
-      // Skip if already has a Route linked account (acc_xxx)
-      if (user.razorpay_account_id?.startsWith('acc_')) return;
+      // Skip if already has a Route linked account for this entity type
+      const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;
+      if (existingId?.startsWith('acc_')) return;
 
       const fullName = bank.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User';
       const result = await createRouteLinkedAccount({
@@ -401,16 +407,14 @@ export class BankInformationService {
 
       await prisma.user.update({
         where: { id: userId },
-        data: {
-          razorpay_account_id: result.accountId,
-        }
+        data: { [field]: result.accountId }
       });
 
-      Log.info(`Razorpay Route linked account created for user ${userId}`, {
+      Log.info(`Razorpay Route linked account created for user ${userId} (${entityType})`, {
         accountId: result.accountId,
       });
     } catch (err) {
-      Log.error(`Failed to create Razorpay Route linked account for user ${userId}`, { err });
+      Log.error(`Failed to create Razorpay Route linked account for user ${userId} (${entityType})`, { err });
     }
   }
 }

@@ -18,41 +18,6 @@ function getXBaseUrl(): string {
 }
 
 /**
- * Razorpay X: verify bank account (penny drop).
- * Uses POST /v1/fund_accounts/validations. Returns status and beneficiary name from bank.
- * Note: Official Razorpay X API may require fund_account.id (validate after creating fund account).
- * If this endpoint fails, consider createContactAndFundAccountThenValidate or Razorpay Composite Account Validation.
- */
-export async function verifyBankAccount(params: {
-  accountNumber: string;
-  ifsc: string;
-}): Promise<{ status: string; beneficiaryName?: string }> {
-  const baseUrl = getXBaseUrl();
-  const auth = getAuthHeader();
-  const res = await axios.post(
-    `${baseUrl}/fund_accounts/validations`,
-    {
-      account_number: params.accountNumber,
-      ifsc: params.ifsc,
-    },
-    {
-      headers: {
-        Authorization: auth,
-        "Content-Type": "application/json",
-      },
-    }
-  );
-  const data = res.data ?? {};
-  const status = data.status ?? data.results?.account_status ?? "";
-  const beneficiaryName =
-    data.beneficiary_name ?? data.results?.registered_name ?? data.fund_account?.bank_account?.name;
-  return {
-    status: String(status).toLowerCase(),
-    beneficiaryName: beneficiaryName ? String(beneficiaryName).trim() : undefined,
-  };
-}
-
-/**
  * Razorpay X: validate an existing fund account (penny drop ₹1).
  * Use when validation API requires fund_account.id (create contact → fund account first, then call this).
  * Needs platform's RazorpayX account number (RAZORPAY_X_ACCOUNT_NUMBER env).
@@ -151,7 +116,7 @@ export async function createContactAndFundAccount(params: {
   contact: string;
   ifsc: string;
   accountNumber: string;
-  /** Reuse existing Razorpay contact (e.g. User.razorpay_contact_id) to avoid duplicate contacts. */
+  /** Reuse existing Razorpay contact to avoid duplicate contacts. */
   existingContactId?: string;
   /** If true, run penny-drop validation after creating fund account. */
   validateBeneficiaryName?: boolean;
@@ -206,41 +171,6 @@ export async function createContactAndFundAccount(params: {
   }
 
   return { contactId, fundAccountId: fundAccount.id };
-}
-
-/**
- * Razorpay X: create a payout to a fund account.
- * Used to pay mentors/freelancers after session completion.
- */
-export async function createPayout(params: {
-  fundAccountId: string;
-  amountPaise: number;
-  purpose?: string;
-  narration?: string;
-  referenceId?: string;
-}): Promise<{ id: string; status: string }> {
-  const baseUrl = getXBaseUrl();
-  const auth = getAuthHeader();
-  const platformAccount = process.env.RAZORPAY_X_ACCOUNT_NUMBER;
-  if (!platformAccount) {
-    throw new Error("RAZORPAY_X_ACCOUNT_NUMBER is required for payouts");
-  }
-  const res = await axios.post(
-    `${baseUrl}/payouts`,
-    {
-      account_number: platformAccount,
-      fund_account_id: params.fundAccountId,
-      amount: params.amountPaise,
-      currency: "INR",
-      mode: "NEFT",
-      purpose: params.purpose ?? "payout",
-      queue_if_low_balance: true,
-      reference_id: params.referenceId,
-      narration: params.narration?.slice(0, 30),
-    },
-    { headers: { Authorization: auth, "Content-Type": "application/json" } }
-  );
-  return { id: res.data?.id, status: res.data?.status };
 }
 
 /**
@@ -309,6 +239,3 @@ export function isRazorpayConfigured(): boolean {
   return !!(razorpayConfig.key_id && razorpayConfig.key_secret);
 }
 
-export function getRazorpayXBaseUrl(): string {
-  return razorpayConfig.xBaseUrl || "https://api.razorpay.com/v1";
-}

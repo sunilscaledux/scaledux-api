@@ -88,10 +88,11 @@ model User {
   deactivated_reason           String?   @db.Text
   startupProgress              UserStartupProgress?
   scheduleTermination          ScheduleTermination?
-  /** Razorpay X contact id (cont_xxx); reused when user updates bank so we don't create duplicate contacts. */
   razorpay_contact_id          String?   @db.VarChar(64)
-  /** Razorpay X fund account id (fa_xxx) for freelancer payouts (set after bank verification). */
+  /** Razorpay Route linked account id (acc_xxx) for individual payouts (set after bank verification). */
   razorpay_account_id          String?   @db.VarChar(64)
+  /** Razorpay Route linked account id (acc_xxx) for agency payouts (set after agency bank verification). */
+  razorpay_agency_account_id   String?   @db.VarChar(64)
   successStories               SuccessStory[]
   bookingsAsMentor             Booking[] @relation("BookingMentor")
   bookingsAsUser               Booking[] @relation("BookingUser")

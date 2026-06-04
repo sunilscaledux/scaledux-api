@@ -1811,16 +1811,20 @@ export class ProposalService {
   private static async checkFreelancerBankInfo(userId: number): Promise<ServiceResponse> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { razorpay_account_id: true }
+      select: { razorpay_account_id: true, razorpay_agency_account_id: true, show_as_agency: true }
     });
-    if (!user?.razorpay_account_id) {
+    const requiredAccountId = user?.show_as_agency
+      ? user.razorpay_agency_account_id
+      : user?.razorpay_account_id;
+    if (!requiredAccountId) {
+      const entityType = user?.show_as_agency ? 'AGENCY' : 'INDIVIDUAL';
       const bankInfo = await (prisma as any).bankInformation.findFirst({
-        where: { user_id: userId, verification_status: 'verified' }
+        where: { user_id: userId, entity_type: entityType, verification_status: 'verified' }
       });
       if (!bankInfo) {
         return {
           success: false,
-          message: 'Please add and verify your bank information before accepting a contract. Go to Settings → Bank Information.'
+          message: `Please add and verify your ${user?.show_as_agency ? 'agency ' : ''}bank information before accepting a contract. Go to Settings → Bank Information.`
         };
       }
       return {
