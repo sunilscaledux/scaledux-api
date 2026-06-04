@@ -40,7 +40,7 @@ services:
       target: dev
     container_name: scaledux-app
     restart: unless-stopped
-    command: ["sh", "-c", "npm install && npx prisma generate && npx prisma migrate deploy && npm run dev:docker"]
+    command: ["sh", "-c", "npm install --include=dev && npx prisma generate && npx prisma migrate deploy && npm run dev:docker"]
     ports:
       - "4000:4000"
     volumes:
