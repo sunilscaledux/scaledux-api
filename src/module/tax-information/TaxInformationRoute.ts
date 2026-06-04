@@ -10,7 +10,7 @@ router.use(authenticateToken);
 
 router.post(
   "/tax-information",
-  createRateLimiter(24 * 60 * 60, 2),
+  createRateLimiter(24 * 60 * 60, 5),
   requirePasswordConfirmation,
   TaxInformationController.saveTaxInformation
 );
