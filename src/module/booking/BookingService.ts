@@ -1682,7 +1682,7 @@ export class BookingService {
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
         chatMsg,
-        { activityType: 'BOOKING_RESCHEDULE_REQUESTED', bookingTitle: '1:1 Video Call', bookingScheduledAt: booking.scheduled_at },
+        { activityType: 'BOOKING_RESCHEDULE_REQUESTED', bookingTitle: '1:1 Video Call', bookingDuration: booking.duration, bookingScheduledAt: booking.scheduled_at },
         undefined, userId
       );
 
