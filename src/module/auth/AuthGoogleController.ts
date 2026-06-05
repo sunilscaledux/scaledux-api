@@ -59,17 +59,26 @@ const googleCallback = async (req: Request, res: Response) => {
 
     const googleUser = userResponse.data;
 
-    // Step 3: Check if user exists with this email
+    // Step 3: Check if user exists by email or googleId
     let user = await prisma.user.findUnique({
       where: { email: googleUser.email }
     });
 
+    if (!user && googleUser.id) {
+      user = await prisma.user.findUnique({
+        where: { googleId: googleUser.id }
+      });
+    }
+
     if (user) {
       // User exists, update their Google info if needed; ensure unique_id if missing
-      const updates: { googleId?: string; provider?: string; unique_id?: string } = {};
+      const updates: { googleId?: string; provider?: string; unique_id?: string; email?: string } = {};
       if (!user.googleId && googleUser.id) {
         updates.googleId = googleUser.id;
         updates.provider = "google";
+      }
+      if (user.email !== googleUser.email) {
+        updates.email = googleUser.email;
       }
       if (!user.unique_id || user.unique_id.trim() === '') {
         updates.unique_id = ulid();

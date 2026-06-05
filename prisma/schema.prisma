@@ -1209,6 +1209,7 @@ enum OtpType {
   EMAIL_VERIFICATION
   DEACTIVATE_ACCOUNT
   TWO_FA_VERIFICATION
+  BANK_EMAIL_VERIFICATION
 }
 
 model ScheduleTermination {
@@ -1374,6 +1375,8 @@ model BankInformation {
   account_number_last4  String?  @db.VarChar(4)
   ifsc                  String?  @db.VarChar(11)
   razorpay_fund_account_id String? @db.VarChar(64)
+  /** Email used for Razorpay linked account; can differ from ScaleDux registered email; must be unique across all records. */
+  razorpay_email           String?  @unique @db.VarChar(255)
   /** pending = verification in process; verified = razorpay_fund_account_id set; failed = verification failed */
   verification_status   String   @db.VarChar(20)   @default("pending")
   /** Reason for failure when verification_status = failed; shown to user so they can fix and resubmit. */

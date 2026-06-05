@@ -1,11 +1,12 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
-import { createRouteLinkedAccount, isRazorpayConfigured } from "@services/razorpayService";
+import { createRouteLinkedAccount, isRazorpayConfigured, checkRazorpayEmailStatus } from "@services/razorpayService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
+import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
 
 /** Bank name and account holder name: letters and spaces only. */
 const BANK_NAME_PATTERN = /^[A-Za-z ]+$/;
@@ -18,10 +19,13 @@ export class BankInformationService {
 
   static async getBankInformation(userId: string) {
     const userIdNum = parseInt(userId);
-    const records = await (prisma as any).bankInformation.findMany({
-      where: { user_id: userIdNum },
-      orderBy: { created_at: 'desc' }
-    });
+    const [records, user] = await Promise.all([
+      (prisma as any).bankInformation.findMany({
+        where: { user_id: userIdNum },
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.user.findUnique({ where: { id: userIdNum }, select: { email: true } }),
+    ]);
 
     const individual = records.find((m: any) => m.entity_type === 'INDIVIDUAL') || null;
     const agency = records.find((m: any) => m.entity_type === 'AGENCY') || null;
@@ -29,6 +33,7 @@ export class BankInformationService {
     return {
       success: true,
       data: {
+        defaultEmail: user?.email || null,
         individual: individual ? BankInformationService.mapRecordWithCooldown(individual) : null,
         agency: agency ? BankInformationService.mapRecordWithCooldown(agency) : null,
       }
@@ -65,6 +70,7 @@ export class BankInformationService {
       ifsc: mask ? BankInformationService.maskIFSC(ifsc) : ifsc,
       verificationStatus: m.verification_status ?? 'pending',
       verificationFailureReason: m.verification_failure_reason ?? null,
+      razorpayEmail: m.razorpay_email || null,
       verifiedAt: m.verified_at || null,
       createdAt: m.created_at
     };
@@ -82,6 +88,47 @@ export class BankInformationService {
       nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
       cooldownDays: appConfig.verification.bankCooldownDays,
     };
+  }
+
+  /**
+   * Send OTP to an email for bank information verification.
+   * Email can differ from user's ScaleDux email but must be unique across all bank records.
+   */
+  static async sendEmailOtp(userId: number, email?: string): Promise<{ success: boolean; message: string }> {
+    if (!email?.trim()) {
+      // Default to user's registered email
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+      email = user?.email || undefined;
+    }
+    if (!email?.trim()) {
+      return { success: false, message: 'Email is required.' };
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Check uniqueness: email must not be used by another user's bank record
+    const existing = await (prisma as any).bankInformation.findFirst({
+      where: { razorpay_email: normalizedEmail, user_id: { not: userId } }
+    });
+    if (existing) {
+      return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
+    }
+
+    // Check Razorpay: if this email already has a suspended account, block early
+    if (isRazorpayConfigured()) {
+      const razorpayStatus = await checkRazorpayEmailStatus(normalizedEmail);
+      if (razorpayStatus.status === 'suspended') {
+        return { success: false, message: 'This email has a suspended payment account on ScaleDux. Please use a different email to add your bank account.' };
+      }
+    }
+
+    const result = await generateAndSendOtp({
+      email: normalizedEmail,
+      otpType: OTP_TYPES.BANK_EMAIL_VERIFICATION,
+      userId,
+    });
+
+    return { success: result.success, message: result.message };
   }
 
   /**
@@ -110,6 +157,35 @@ export class BankInformationService {
     }
 
     const entityType = data.entityType || 'INDIVIDUAL';
+
+    // ── Email OTP verification ──
+    if (!data.otpCode?.trim()) {
+      return { success: false, message: 'Email OTP is required. Please verify your email first.' };
+    }
+
+    // Resolve email: use provided or default to user's ScaleDux email
+    let razorpayEmail = data.email?.trim().toLowerCase() || null;
+    if (!razorpayEmail) {
+      const user = await prisma.user.findUnique({ where: { id: userIdNum }, select: { email: true } });
+      razorpayEmail = user?.email?.toLowerCase() || null;
+    }
+    if (!razorpayEmail) {
+      return { success: false, message: 'Email is required for bank verification.' };
+    }
+
+    // Verify the OTP
+    const otpResult = await verifyOtpByType(razorpayEmail, data.otpCode.trim(), OTP_TYPES.BANK_EMAIL_VERIFICATION);
+    if (!otpResult.success) {
+      return { success: false, message: otpResult.message || 'Invalid or expired OTP.' };
+    }
+
+    // Check email uniqueness across other users
+    const emailTaken = await (prisma as any).bankInformation.findFirst({
+      where: { razorpay_email: razorpayEmail, user_id: { not: userIdNum } }
+    });
+    if (emailTaken) {
+      return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
+    }
 
     if (entityType === 'AGENCY') {
       const user = await prisma.user.findUnique({
@@ -177,7 +253,7 @@ export class BankInformationService {
       name: verifiedName || data.displayLabel || 'User',
       ifsc,
       accountNumber,
-    });
+    }, razorpayEmail);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -202,6 +278,7 @@ export class BankInformationService {
         account_number_last4: accountNumberLast4,
         account_holder_name: verifiedName,
         ifsc,
+        razorpay_email: razorpayEmail,
         verification_status: 'verified',
         verified_at: new Date(),
       }
@@ -257,7 +334,7 @@ export class BankInformationService {
       name: verification.accountHolderName || record.account_holder_name || 'User',
       ifsc,
       accountNumber,
-    });
+    }, record.razorpay_email);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -308,6 +385,25 @@ export class BankInformationService {
           success: false,
           message: `Bank information is verified and locked. You can update after ${cooldown.nextSubmitAllowedAt?.toISOString().split('T')[0]}.`
         };
+      }
+    }
+
+    // ── Email change with OTP verification ──
+    const newEmail = data.email?.trim().toLowerCase() || null;
+    const emailChanging = newEmail && newEmail !== record.razorpay_email;
+    if (emailChanging) {
+      if (!data.otpCode?.trim()) {
+        return { success: false, message: 'Email OTP is required to change the Razorpay email.' };
+      }
+      const otpResult = await verifyOtpByType(newEmail, data.otpCode.trim(), OTP_TYPES.BANK_EMAIL_VERIFICATION);
+      if (!otpResult.success) {
+        return { success: false, message: otpResult.message || 'Invalid or expired OTP.' };
+      }
+      const emailTaken = await (prisma as any).bankInformation.findFirst({
+        where: { razorpay_email: newEmail, user_id: { not: userIdNum } }
+      });
+      if (emailTaken) {
+        return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
       }
     }
 
@@ -365,7 +461,7 @@ export class BankInformationService {
         name: verifiedName || 'User',
         ifsc,
         accountNumber,
-      });
+      }, emailChanging ? newEmail : record.razorpay_email);
 
       if (!razorpayResult.success) {
         void notifySensitiveUpdate(
@@ -376,24 +472,27 @@ export class BankInformationService {
         return { success: false, message: `Bank verified but payment account setup failed: ${razorpayResult.error}` };
       }
 
+      const updatedEmail = emailChanging ? newEmail : record.razorpay_email;
       await prisma.$executeRaw`
         UPDATE scd_bank_information
         SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
             account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
-            account_holder_name = ${verifiedName},
+            account_holder_name = ${verifiedName}, razorpay_email = ${updatedEmail},
             verification_status = 'verified', verification_failure_reason = NULL,
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
       `;
     } else {
-      // Only label/name/bank name changed — no re-verification needed
+      // Only label/name/bank name/email changed — no re-verification needed
+      const updateData: any = {
+        display_label: displayLabel,
+        bank_name: bankName,
+        account_holder_name: accountHolderName,
+      };
+      if (emailChanging) updateData.razorpay_email = newEmail;
       await (prisma as any).bankInformation.update({
         where: { id: recordIdNum },
-        data: {
-          display_label: displayLabel,
-          bank_name: bankName,
-          account_holder_name: accountHolderName,
-        }
+        data: updateData,
       });
     }
 
@@ -423,7 +522,8 @@ export class BankInformationService {
   private static async ensureRazorpayLinkedAccount(
     userId: number,
     entityType: string,
-    bank: { name: string; ifsc: string; accountNumber: string }
+    bank: { name: string; ifsc: string; accountNumber: string },
+    razorpayEmail?: string | null,
   ): Promise<{ success: boolean; error?: string }> {
     if (!isRazorpayConfigured()) {
       Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured — skipping for user ${userId}`);
@@ -434,7 +534,7 @@ export class BankInformationService {
     const field = isAgency ? 'razorpay_agency_account_id' : 'razorpay_account_id';
 
     try {
-      const user = await prisma.user.findUnique({
+      const user = await (prisma as any).user.findUnique({
         where: { id: userId },
         select: {
           email: true, phone: true, razorpay_account_id: true, razorpay_agency_account_id: true,
@@ -444,9 +544,15 @@ export class BankInformationService {
           }
         }
       });
-      if (!user?.email) {
+      if (!user) {
+        Log.warn(`[ensureRazorpayLinkedAccount] User ${userId} not found — skipping`);
+        return { success: false, error: 'User not found.' };
+      }
+      // Use razorpay_email (from bank record) if provided, otherwise fall back to user's ScaleDux email
+      const emailForRazorpay = razorpayEmail || user.email;
+      if (!emailForRazorpay) {
         Log.warn(`[ensureRazorpayLinkedAccount] No email for user ${userId} — skipping`);
-        return { success: false, error: 'User email not found.' };
+        return { success: false, error: 'Email not found. Please provide an email for Razorpay.' };
       }
       const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;
 
@@ -463,8 +569,8 @@ export class BankInformationService {
       Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType}), name: ${fullName}`);
 
       const result = await createRouteLinkedAccount({
-        email: user.email,
-        phone: user.phone || undefined,
+        email: emailForRazorpay,
+        phone: user?.phone || undefined,
         legalBusinessName: fullName,
         businessType: isAgency ? 'not_yet_registered' : 'individual',
         pan,
@@ -476,18 +582,20 @@ export class BankInformationService {
           state: info.state?.name || undefined,
           postalCode: info.zipCode || undefined,
         } : undefined,
-        stakeholder: { name: fullName, email: user.email, phone: user.phone || undefined, pan },
+        stakeholder: { name: fullName, email: emailForRazorpay, phone: user?.phone || undefined, pan },
         bankAccount: { name: fullName, ifsc: bank.ifsc, accountNumber: bank.accountNumber },
       });
 
       if (!existingId) {
-        await prisma.user.update({
+        await (prisma as any).user.update({
           where: { id: userId },
           data: { [field]: result.accountId }
         });
       }
 
-      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updated' : 'Created'} ${result.accountId} for user ${userId} (${entityType})`);
+      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updated' : 'Created'} ${result.accountId} for user ${userId} (${entityType})`, {
+        activationStatus: result.activationStatus,
+      });
       return { success: true };
     } catch (err: any) {
       const razorpayError = err?.response?.data?.error?.description || err?.message || 'Unknown error';

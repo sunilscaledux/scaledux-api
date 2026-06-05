@@ -175,6 +175,62 @@ export async function createContactAndFundAccount(params: {
 }
 
 /**
+ * Check if an email already has a Razorpay Route linked account and its status.
+ * Returns 'none' if no account exists, 'suspended' if all accounts are suspended,
+ * or 'active' with the account ID if a usable account exists.
+ */
+/**
+ * Check if an email already has a Razorpay linked account and whether it's suspended.
+ * Searches Razorpay directly by email — no DB lookups.
+ */
+export async function checkRazorpayEmailStatus(email: string): Promise<
+  { status: 'none' } | { status: 'suspended' } | { status: 'active'; accountId: string }
+> {
+  const { key_id, key_secret } = razorpayConfig;
+  if (!key_id || !key_secret) return { status: 'none' };
+
+  const auth = `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString("base64")}`;
+  const headers = { Authorization: auth, "Content-Type": "application/json" };
+
+  const searchUrls = [
+    `https://api.razorpay.com/v2/accounts?email=${encodeURIComponent(email)}`,
+    `https://api.razorpay.com/v1/beta/accounts?email=${encodeURIComponent(email)}`,
+  ];
+
+  for (const url of searchUrls) {
+    try {
+      const res = await axios.get(url, { headers });
+      const items = res.data?.items || res.data;
+      if (!Array.isArray(items) || items.length === 0) continue;
+
+      Log.info(`[checkRazorpayEmailStatus] Found ${items.length} account(s) for ${email}`, {
+        accounts: JSON.stringify(items.map((a: any) => ({
+          id: a.id,
+          status: a.activation_details?.status || a.status,
+        }))),
+      });
+
+      const active = items.find(
+        (a: any) => a.id?.startsWith('acc_') && a.activation_details?.status !== 'suspended'
+      );
+      if (active?.id) return { status: 'active', accountId: active.id };
+
+      // All accounts for this email are suspended
+      return { status: 'suspended' };
+    } catch (err: any) {
+      Log.warn(`[checkRazorpayEmailStatus] Search failed at ${url}`, {
+        status: err?.response?.status,
+        message: err?.message,
+      });
+      continue;
+    }
+  }
+
+  // No search endpoint returned results — email not found on Razorpay
+  return { status: 'none' };
+}
+
+/**
  * Razorpay Route: create a linked account (sub-merchant) with stakeholder + bank account.
  * Steps: 1) Create account → 2) Add stakeholder (KYC) → 3) Add bank account → 4) Request activation.
  * Returns acc_xxx ID required for Route order transfers.
@@ -190,7 +246,7 @@ export async function createRouteLinkedAccount(params: {
   bankAccount?: { name: string; ifsc: string; accountNumber: string };
   /** If provided, skip account creation (Step 1) and use this existing account ID. */
   existingAccountId?: string;
-}): Promise<{ accountId: string }> {
+}): Promise<{ accountId: string; activationStatus?: string }> {
   const { key_id, key_secret } = razorpayConfig;
   if (!key_id || !key_secret) {
     throw new Error("Razorpay is not configured");
@@ -257,7 +313,7 @@ export async function createRouteLinkedAccount(params: {
           if (active?.id) {
             accountId = active.id;
           } else {
-            throw new Error('A suspended account already exists for this email on Razorpay. Please contact support or use a different email.');
+            throw new Error('This email has a suspended payment account on ScaleDux. Please use a different email to add your bank account.');
           }
         } catch { throw err; }
       } else {
@@ -382,11 +438,84 @@ export async function createRouteLinkedAccount(params: {
           ifsc_code: params.bankAccount.ifsc,
           beneficiary_name: params.bankAccount.name.slice(0, 120),
         },
+        tnc_accepted: true,
       }, { headers });
       Log.info(`[createRouteLinkedAccount] Product ${productId} updated with bank details for ${accountId}`, {
         activeConfig: JSON.stringify(patchRes.data?.active_configuration),
         requirements: JSON.stringify(patchRes.data?.requirements),
+        activationStatus: patchRes.data?.activation_status,
       });
+
+      // Check activation_status and resolve outstanding requirements
+      let activationStatus = patchRes.data?.activation_status;
+
+      if (activationStatus === 'needs_clarification') {
+        // Attempt to resolve requirements by re-fetching and patching up to 3 times
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const productGet = await axios.get(
+            `https://api.razorpay.com/v2/accounts/${accountId}/products/${productId}`,
+            { headers }
+          );
+          activationStatus = productGet.data?.activation_status;
+          const requirements = productGet.data?.requirements || [];
+          const pending = requirements;
+
+          Log.info(`[createRouteLinkedAccount] Activation check attempt ${attempt + 1} for ${accountId}`, {
+            activationStatus,
+            pendingRequirements: JSON.stringify(pending),
+          });
+
+          if (activationStatus === 'activated' || pending.length === 0) break;
+
+          // Build a patch body from the pending requirements
+          const patchBody: any = {};
+          for (const req of pending) {
+            const field = req.field_reference;
+            if (!field) continue;
+            // Map known requirement fields to their values
+            if (field === 'settlements.beneficiary_name') {
+              patchBody.settlements = { ...patchBody.settlements, beneficiary_name: params.bankAccount.name.slice(0, 120) };
+            } else if (field === 'settlements.account_number') {
+              patchBody.settlements = { ...patchBody.settlements, account_number: params.bankAccount.accountNumber };
+            } else if (field === 'settlements.ifsc_code') {
+              patchBody.settlements = { ...patchBody.settlements, ifsc_code: params.bankAccount.ifsc };
+            } else if (field === 'name') {
+              patchBody.name = params.bankAccount.name.slice(0, 120);
+            } else if (field === 'tnc_accepted') {
+              patchBody.tnc_accepted = true;
+            } else {
+              Log.warn(`[createRouteLinkedAccount] Unhandled requirement field: ${field} for ${accountId}`);
+            }
+          }
+
+          if (Object.keys(patchBody).length === 0) {
+            Log.warn(`[createRouteLinkedAccount] No resolvable requirements left for ${accountId}`, { pending: JSON.stringify(pending) });
+            break;
+          }
+
+          try {
+            const rePatchRes = await axios.patch(
+              `https://api.razorpay.com/v2/accounts/${accountId}/products/${productId}`,
+              patchBody,
+              { headers }
+            );
+            activationStatus = rePatchRes.data?.activation_status;
+            Log.info(`[createRouteLinkedAccount] Re-patched requirements for ${accountId}`, {
+              activationStatus,
+              requirements: JSON.stringify(rePatchRes.data?.requirements),
+            });
+            if (activationStatus === 'activated') break;
+          } catch (rePatchErr: any) {
+            Log.error(`[createRouteLinkedAccount] Failed to re-patch requirements for ${accountId}`, {
+              status: rePatchErr?.response?.status,
+              data: rePatchErr?.response?.data,
+            });
+            break;
+          }
+        }
+      }
+
+      return { accountId, activationStatus };
     } else {
       Log.error(`[createRouteLinkedAccount] Could not determine product ID for ${accountId} — bank settlement config NOT updated`);
     }

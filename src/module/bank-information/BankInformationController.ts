@@ -12,6 +12,15 @@ export class BankInformationController {
     return ApiResponse.success(res, result.data);
   }
 
+  static async sendEmailOtp(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
+    const { email } = req.body;
+    const result = await BankInformationService.sendEmailOtp(userId, email);
+    if (!result.success) return ApiResponse.error(res, result.message, 400);
+    return ApiResponse.success(res, null, result.message);
+  }
+
   static async createBankInformation(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
