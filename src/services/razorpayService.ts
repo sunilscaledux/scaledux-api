@@ -524,6 +524,24 @@ export async function createRouteLinkedAccount(params: {
   return { accountId };
 }
 
+/**
+ * Fetch the current activation status of a Razorpay Route linked account.
+ */
+export async function getRouteAccountActivationStatus(accountId: string): Promise<string | null> {
+  const { key_id, key_secret } = razorpayConfig;
+  if (!key_id || !key_secret) return null;
+  const auth = `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString("base64")}`;
+  try {
+    const res = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}`, {
+      headers: { Authorization: auth, "Content-Type": "application/json" },
+    });
+    return res.data?.activation_details?.status || res.data?.status || null;
+  } catch (err: any) {
+    Log.error(`[getRouteAccountActivationStatus] Failed for ${accountId}`, { message: err?.message });
+    return null;
+  }
+}
+
 export function isRazorpayConfigured(): boolean {
   return !!(razorpayConfig.key_id && razorpayConfig.key_secret);
 }

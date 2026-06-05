@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
-import { createRouteLinkedAccount, isRazorpayConfigured, checkRazorpayEmailStatus } from "@services/razorpayService";
+import { createRouteLinkedAccount, isRazorpayConfigured, checkRazorpayEmailStatus, getRouteAccountActivationStatus } from "@services/razorpayService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
@@ -27,8 +27,36 @@ export class BankInformationService {
       prisma.user.findUnique({ where: { id: userIdNum }, select: { email: true } }),
     ]);
 
-    const individual = records.find((m: any) => m.entity_type === 'INDIVIDUAL') || null;
-    const agency = records.find((m: any) => m.entity_type === 'AGENCY') || null;
+    let individual = records.find((m: any) => m.entity_type === 'INDIVIDUAL') || null;
+    let agency = records.find((m: any) => m.entity_type === 'AGENCY') || null;
+
+    // Refresh activation status from Razorpay for non-activated records
+    if (individual || agency) {
+      const userRecord = await (prisma as any).user.findUnique({
+        where: { id: userIdNum },
+        select: { razorpay_account_id: true, razorpay_agency_account_id: true },
+      });
+      const refreshTasks: Promise<void>[] = [];
+      for (const [rec, accId] of [
+        [individual, userRecord?.razorpay_account_id],
+        [agency, userRecord?.razorpay_agency_account_id],
+      ] as [any, string | null][]) {
+        if (rec && accId && rec.razorpay_activation_status !== 'activated') {
+          refreshTasks.push(
+            getRouteAccountActivationStatus(accId).then(async (status) => {
+              if (status && status !== rec.razorpay_activation_status) {
+                await (prisma as any).bankInformation.update({
+                  where: { id: rec.id },
+                  data: { razorpay_activation_status: status },
+                });
+                rec.razorpay_activation_status = status;
+              }
+            }).catch(() => {})
+          );
+        }
+      }
+      if (refreshTasks.length > 0) await Promise.all(refreshTasks);
+    }
 
     return {
       success: true,
@@ -71,6 +99,7 @@ export class BankInformationService {
       verificationStatus: m.verification_status ?? 'pending',
       verificationFailureReason: m.verification_failure_reason ?? null,
       razorpayEmail: m.razorpay_email || null,
+      razorpayActivationStatus: m.razorpay_activation_status || null,
       verifiedAt: m.verified_at || null,
       createdAt: m.created_at
     };
@@ -279,6 +308,7 @@ export class BankInformationService {
         account_holder_name: verifiedName,
         ifsc,
         razorpay_email: razorpayEmail,
+        razorpay_activation_status: razorpayResult.activationStatus || null,
         verification_status: 'verified',
         verified_at: new Date(),
       }
@@ -290,9 +320,13 @@ export class BankInformationService {
       `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
     );
 
+    const activationMsg = razorpayResult.activationStatus === 'activated'
+      ? 'Bank account verified and saved successfully.'
+      : 'Bank account verified and saved. Your payment account is being activated and will be ready shortly.';
+
     return {
       success: true,
-      message: 'Bank account verified and saved successfully.',
+      message: activationMsg,
       data: BankInformationService.mapRecord(record)
     };
   }
@@ -350,6 +384,7 @@ export class BankInformationService {
       data: {
         account_holder_name: verification.accountHolderName || record.account_holder_name,
         bank_name: verification.bankName || record.bank_name,
+        razorpay_activation_status: razorpayResult.activationStatus || null,
         verification_status: 'verified',
         verification_failure_reason: null,
         verified_at: new Date(),
@@ -358,7 +393,9 @@ export class BankInformationService {
 
     return {
       success: true,
-      message: 'Bank account verified successfully.',
+      message: razorpayResult.activationStatus === 'activated'
+        ? 'Bank account verified successfully.'
+        : 'Bank account verified. Your payment account is being activated and will be ready shortly.',
       data: { id: record.id, verificationStatus: 'verified', verificationFailureReason: null }
     };
   }
@@ -478,6 +515,7 @@ export class BankInformationService {
         SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
             account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
             account_holder_name = ${verifiedName}, razorpay_email = ${updatedEmail},
+            razorpay_activation_status = ${razorpayResult.activationStatus || null},
             verification_status = 'verified', verification_failure_reason = NULL,
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
@@ -524,7 +562,7 @@ export class BankInformationService {
     entityType: string,
     bank: { name: string; ifsc: string; accountNumber: string },
     razorpayEmail?: string | null,
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; activationStatus?: string }> {
     if (!isRazorpayConfigured()) {
       Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured — skipping for user ${userId}`);
       return { success: false, error: 'Payment service is not configured. Please contact support.' };
@@ -596,7 +634,7 @@ export class BankInformationService {
       Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updated' : 'Created'} ${result.accountId} for user ${userId} (${entityType})`, {
         activationStatus: result.activationStatus,
       });
-      return { success: true };
+      return { success: true, activationStatus: result.activationStatus };
     } catch (err: any) {
       const razorpayError = err?.response?.data?.error?.description || err?.message || 'Unknown error';
       Log.error(`[ensureRazorpayLinkedAccount] Failed for user ${userId} (${entityType})`, {

@@ -1377,6 +1377,8 @@ model BankInformation {
   razorpay_fund_account_id String? @db.VarChar(64)
   /** Email used for Razorpay linked account; can differ from ScaleDux registered email; must be unique across all records. */
   razorpay_email           String?  @unique @db.VarChar(255)
+  /** Razorpay Route linked account activation status: needs_clarification, under_review, activated, suspended, etc. */
+  razorpay_activation_status String? @db.VarChar(30)
   /** pending = verification in process; verified = razorpay_fund_account_id set; failed = verification failed */
   verification_status   String   @db.VarChar(20)   @default("pending")
   /** Reason for failure when verification_status = failed; shown to user so they can fix and resubmit. */
