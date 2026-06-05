@@ -30,34 +30,35 @@ export class BankInformationService {
     let individual = records.find((m: any) => m.entity_type === 'INDIVIDUAL') || null;
     let agency = records.find((m: any) => m.entity_type === 'AGENCY') || null;
 
-    // Refresh activation status from Razorpay for non-activated records
+    // Refresh activation status from Razorpay for records still in_review after 5 minutes
     if (individual || agency) {
       const userRecord = await (prisma as any).user.findUnique({
         where: { id: userIdNum },
         select: { razorpay_account_id: true, razorpay_agency_account_id: true },
       });
+      const reviewMs = 5 * 60 * 1000; // 5 minutes
       const refreshTasks: Promise<void>[] = [];
       for (const [rec, accId] of [
         [individual, userRecord?.razorpay_account_id],
         [agency, userRecord?.razorpay_agency_account_id],
       ] as [any, string | null][]) {
-        const staleMs = 5 * 60 * 1000; // 5 minutes
-        const lastChecked = rec?.updated_at ? new Date(rec.updated_at).getTime() : 0;
-        const needsRefresh = rec && accId
-          && rec.razorpay_activation_status !== 'activated'
-          && (Date.now() - lastChecked > staleMs);
-        if (needsRefresh) {
-          refreshTasks.push(
-            getRouteAccountActivationStatus(accId).then(async (status) => {
-              if (status && status !== rec.razorpay_activation_status) {
+        if (!rec || !accId) continue;
+        const status = rec.razorpay_activation_status;
+        // Only check Razorpay if still in_review and 5+ minutes have passed since verification
+        if (status === 'in_review') {
+          const verifiedAt = rec.verified_at ? new Date(rec.verified_at).getTime() : 0;
+          if (Date.now() - verifiedAt >= reviewMs) {
+            refreshTasks.push(
+              getRouteAccountActivationStatus(accId).then(async (rpStatus) => {
+                const newStatus = rpStatus === 'activated' ? 'activated' : 'failed';
                 await (prisma as any).bankInformation.update({
                   where: { id: rec.id },
-                  data: { razorpay_activation_status: status },
+                  data: { razorpay_activation_status: newStatus },
                 });
-                rec.razorpay_activation_status = status;
-              }
-            }).catch(() => {})
-          );
+                rec.razorpay_activation_status = newStatus;
+              }).catch(() => {})
+            );
+          }
         }
       }
       if (refreshTasks.length > 0) await Promise.all(refreshTasks);
@@ -313,7 +314,7 @@ export class BankInformationService {
         account_holder_name: verifiedName,
         ifsc,
         razorpay_email: razorpayEmail,
-        razorpay_activation_status: razorpayResult.activationStatus || null,
+        razorpay_activation_status: 'in_review',
         verification_status: 'verified',
         verified_at: new Date(),
       }
@@ -325,13 +326,9 @@ export class BankInformationService {
       `A new ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} (${verifiedBankName || 'bank'}) was added to your ScaleDux account.`,
     );
 
-    const activationMsg = razorpayResult.activationStatus === 'activated'
-      ? 'Bank account verified and saved successfully.'
-      : 'Bank account verified and saved. Your payment account is being activated and will be ready shortly.';
-
     return {
       success: true,
-      message: activationMsg,
+      message: 'Bank account verified and saved. Your payment account is under review and will be activated shortly.',
       data: BankInformationService.mapRecord(record)
     };
   }
@@ -389,7 +386,7 @@ export class BankInformationService {
       data: {
         account_holder_name: verification.accountHolderName || record.account_holder_name,
         bank_name: verification.bankName || record.bank_name,
-        razorpay_activation_status: razorpayResult.activationStatus || null,
+        razorpay_activation_status: 'in_review',
         verification_status: 'verified',
         verification_failure_reason: null,
         verified_at: new Date(),
@@ -398,9 +395,7 @@ export class BankInformationService {
 
     return {
       success: true,
-      message: razorpayResult.activationStatus === 'activated'
-        ? 'Bank account verified successfully.'
-        : 'Bank account verified. Your payment account is being activated and will be ready shortly.',
+      message: 'Bank account verified. Your payment account is under review and will be activated shortly.',
       data: { id: record.id, verificationStatus: 'verified', verificationFailureReason: null }
     };
   }
@@ -520,7 +515,7 @@ export class BankInformationService {
         SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
             account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
             account_holder_name = ${verifiedName}, razorpay_email = ${updatedEmail},
-            razorpay_activation_status = ${razorpayResult.activationStatus || null},
+            razorpay_activation_status = 'in_review',
             verification_status = 'verified', verification_failure_reason = NULL,
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
