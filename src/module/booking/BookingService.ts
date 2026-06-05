@@ -233,6 +233,11 @@ export class BookingService {
         if (!oldBooking) return { success: false, message: 'Original booking not found' };
         if (oldBooking.status === 'CANCELLED') return { success: false, message: 'Original booking is already cancelled' };
 
+        // Mentors can only request a reschedule, not reschedule directly
+        if (userId === oldBooking.mentor_id) {
+          return { success: false, message: 'Mentors can only request a reschedule. Use the request reschedule option instead.' };
+        }
+
         // Enforce max 3 reschedules
         const rescheduleCount = (oldBooking.reschedule_count || 0) + 1;
         if (rescheduleCount > 3) {
@@ -1601,6 +1606,90 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Accept completion error', { error });
       return { success: false, message: error.message || 'Failed to accept confirmation' };
+    }
+  }
+
+  /**
+   * Mentor requests a reschedule — does NOT reschedule directly.
+   * Sends notification, email, and chat message to the founder.
+   */
+  static async requestReschedule(
+    userId: number,
+    bookingUniqueId: string,
+    reason?: string,
+    remark?: string,
+  ): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, mentor_id: userId, status: 'CONFIRMED' },
+        include: {
+          user: { select: { id: true, first_name: true, last_name: true, email: true } },
+          mentor: { select: { id: true, first_name: true, last_name: true } },
+        },
+      });
+      if (!booking) return { success: false, message: 'Booking not found or you are not the mentor' };
+
+      const minsUntil = (new Date(booking.scheduled_at).getTime() - Date.now()) / 60000;
+      if (minsUntil < 60) {
+        return { success: false, message: 'Cannot request reschedule less than 1 hour before the call' };
+      }
+
+      if (reason && !isValidMeetingReason('RESCHEDULE', reason)) {
+        return { success: false, message: 'Invalid reschedule reason' };
+      }
+
+      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const dateStr = formatNotifDate(new Date(booking.scheduled_at));
+      const reasonText = reason ? ` Reason: ${reason}.` : '';
+      const remarkText = remark?.trim() ? ` Note: "${remark.trim()}"` : '';
+
+      // Activity log
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'RESCHEDULE_REQUESTED',
+          reason: reason?.trim() || null,
+          remark: remark?.trim() || null,
+          acted_by: userId,
+        },
+      });
+
+      // Email body
+      const emailBody = `<p><strong>${escapeHtml(mentorName)}</strong> has requested to reschedule the 1:1 video call scheduled for <strong>${escapeHtml(dateStr)}</strong>.</p>` +
+        (reason ? `<p style="font-size:13px;color:#667085;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : '') +
+        (remark?.trim() ? `<p style="font-size:13px;color:#667085;"><strong>Note:</strong> ${escapeHtml(remark.trim())}</p>` : '') +
+        `<p>You can reschedule the call from your <a href="${appConfig.frontendUrl}/my-bookings">bookings page</a>.</p>`;
+
+      const inAppBody = `${mentorName} requested to reschedule the call on ${dateStr}.${reasonText}${remarkText}`;
+
+      // Notify founder
+      const notifData = {
+        userId: booking.user_id,
+        type: 'BOOKING_RESCHEDULE_REQUESTED' as const,
+        notificationTitle: 'Reschedule requested',
+        notificationBody: emailBody,
+        inAppBody,
+        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+        actorId: userId,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+
+      // Chat message
+      const chatMsg = `📅 ${mentorName} has requested to reschedule the call.${reasonText}${remarkText}`;
+      await ConversationService.syncSystemMessage(
+        booking.user_id, booking.mentor_id,
+        chatMsg,
+        { activityType: 'BOOKING_RESCHEDULE_REQUESTED', bookingTitle: '1:1 Video Call', bookingScheduledAt: booking.scheduled_at },
+        undefined, userId
+      );
+
+      return { success: true, message: 'Reschedule request sent' };
+    } catch (error: any) {
+      Log.error('Request reschedule error', { error });
+      return { success: false, message: error.message || 'Failed to send reschedule request' };
     }
   }
 

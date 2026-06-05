@@ -32,6 +32,7 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'BOOKING_REQUESTED', label: 'A new booking request is received', category: 'Bookings' },
   { type: 'BOOKING_CONFIRMED', label: 'A booking is confirmed after payment', category: 'Bookings' },
   { type: 'BOOKING_CANCELLED', label: 'A booking is cancelled', category: 'Bookings' },
+  { type: 'BOOKING_RESCHEDULE_REQUESTED', label: 'A mentor requests to reschedule a booking', category: 'Bookings' },
   { type: 'MEETING_LINK_ADDED', label: 'A meeting link is added or updated', category: 'Bookings' },
   { type: 'BOOKING_COMPLETED', label: 'A booking is marked complete by the mentor', category: 'Bookings' },
   { type: 'BOOKING_RATE_PROMPT', label: 'A completed booking is ready to review', category: 'Bookings' },

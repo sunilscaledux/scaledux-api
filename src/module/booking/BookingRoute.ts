@@ -13,6 +13,7 @@ router.post('/:uniqueId/create-order', authenticateToken, BookingController.crea
 router.post('/:uniqueId/verify-payment', authenticateToken, BookingController.verifyPayment);
 router.patch('/:uniqueId/recording', authenticateToken, BookingController.updateRecording);
 router.post('/:uniqueId/cancel', authenticateToken, BookingController.cancelBooking);
+router.post('/:uniqueId/request-reschedule', authenticateToken, BookingController.requestReschedule);
 router.post('/:uniqueId/meeting-link', authenticateToken, BookingController.addMeetingLink);
 router.post('/:uniqueId/complete', authenticateToken, BookingController.completeBooking);
 router.post('/:uniqueId/accept-completion', authenticateToken, BookingController.acceptCompletion);

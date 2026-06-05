@@ -170,6 +170,17 @@ export class BookingController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  static async requestReschedule(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const { reason, remark } = req.body;
+    const result = await BookingService.requestReschedule(userId, req.params.uniqueId, reason, remark);
+
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
   static async getOccupiedSlots(req: Request, res: Response) {
     const { mentorId } = req.params;
     const { date } = req.query;
