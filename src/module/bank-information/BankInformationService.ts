@@ -41,7 +41,12 @@ export class BankInformationService {
         [individual, userRecord?.razorpay_account_id],
         [agency, userRecord?.razorpay_agency_account_id],
       ] as [any, string | null][]) {
-        if (rec && accId && rec.razorpay_activation_status !== 'activated') {
+        const staleMs = 5 * 60 * 1000; // 5 minutes
+        const lastChecked = rec?.updated_at ? new Date(rec.updated_at).getTime() : 0;
+        const needsRefresh = rec && accId
+          && rec.razorpay_activation_status !== 'activated'
+          && (Date.now() - lastChecked > staleMs);
+        if (needsRefresh) {
           refreshTasks.push(
             getRouteAccountActivationStatus(accId).then(async (status) => {
               if (status && status !== rec.razorpay_activation_status) {
