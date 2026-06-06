@@ -246,7 +246,7 @@ export async function createRouteLinkedAccount(params: {
   bankAccount?: { name: string; ifsc: string; accountNumber: string };
   /** If provided, skip account creation (Step 1) and use this existing account ID. */
   existingAccountId?: string;
-}): Promise<{ accountId: string; activationStatus?: string }> {
+}): Promise<{ accountId: string; productId?: string; activationStatus?: string }> {
   const { key_id, key_secret } = razorpayConfig;
   if (!key_id || !key_secret) {
     throw new Error("Razorpay is not configured");
@@ -515,7 +515,7 @@ export async function createRouteLinkedAccount(params: {
         }
       }
 
-      return { accountId, activationStatus };
+      return { accountId, productId, activationStatus };
     } else {
       Log.error(`[createRouteLinkedAccount] Could not determine product ID for ${accountId} — bank settlement config NOT updated`);
     }
@@ -525,19 +525,27 @@ export async function createRouteLinkedAccount(params: {
 }
 
 /**
- * Fetch the current activation status of a Razorpay Route linked account.
+ * Fetch the current Route activation status.
+ *
+ * For Route, activation lives on the PRODUCT (activation_status: activated/needs_clarification/
+ * under_review/...), NOT the account (whose `status` stays "created"). So when a productId is
+ * known we read the product; we only fall back to the account status when it is missing.
+ * Returns null on auth/network error so callers can treat it as "still pending", never "failed".
  */
-export async function getRouteAccountActivationStatus(accountId: string): Promise<string | null> {
+export async function getRouteAccountActivationStatus(accountId: string, productId?: string | null): Promise<string | null> {
   const { key_id, key_secret } = razorpayConfig;
   if (!key_id || !key_secret) return null;
   const auth = `Basic ${Buffer.from(`${key_id}:${key_secret}`).toString("base64")}`;
+  const headers = { Authorization: auth, "Content-Type": "application/json" };
   try {
-    const res = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}`, {
-      headers: { Authorization: auth, "Content-Type": "application/json" },
-    });
+    if (productId) {
+      const res = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/products/${productId}`, { headers });
+      return res.data?.activation_status || null;
+    }
+    const res = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}`, { headers });
     return res.data?.activation_details?.status || res.data?.status || null;
   } catch (err: any) {
-    Log.error(`[getRouteAccountActivationStatus] Failed for ${accountId}`, { message: err?.message });
+    Log.error(`[getRouteAccountActivationStatus] Failed for ${accountId}/${productId || 'acct'}`, { message: err?.message });
     return null;
   }
 }

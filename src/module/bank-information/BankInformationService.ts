@@ -36,7 +36,7 @@ export class BankInformationService {
         where: { id: userIdNum },
         select: { razorpay_account_id: true, razorpay_agency_account_id: true },
       });
-      const reviewMs = 5 * 60 * 1000; // 5 minutes
+      const reviewMs = 60 * 1000; // 1 minute — Route activation usually completes within a minute
       const refreshTasks: Promise<void>[] = [];
       for (const [rec, accId] of [
         [individual, userRecord?.razorpay_account_id],
@@ -44,18 +44,25 @@ export class BankInformationService {
       ] as [any, string | null][]) {
         if (!rec || !accId) continue;
         const status = rec.razorpay_activation_status;
-        // Only check Razorpay if still in_review and 5+ minutes have passed since verification
+        // Re-check pending payouts against the Route PRODUCT activation status (the account
+        // `status` stays "created" even once the product is activated).
         if (status === 'in_review') {
           const verifiedAt = rec.verified_at ? new Date(rec.verified_at).getTime() : 0;
           if (Date.now() - verifiedAt >= reviewMs) {
             refreshTasks.push(
-              getRouteAccountActivationStatus(accId).then(async (rpStatus) => {
-                const newStatus = rpStatus === 'activated' ? 'activated' : 'failed';
-                await (prisma as any).bankInformation.update({
-                  where: { id: rec.id },
-                  data: { razorpay_activation_status: newStatus },
-                });
-                rec.razorpay_activation_status = newStatus;
+              getRouteAccountActivationStatus(accId, rec.razorpay_product_id).then(async (rpStatus) => {
+                // activated -> activated; suspended/rejected -> failed; anything else
+                // (needs_clarification, under_review, null/API error) stays pending — never false-fail.
+                let newStatus = 'in_review';
+                if (rpStatus === 'activated') newStatus = 'activated';
+                else if (rpStatus === 'suspended' || rpStatus === 'rejected') newStatus = 'failed';
+                if (newStatus !== status) {
+                  await (prisma as any).bankInformation.update({
+                    where: { id: rec.id },
+                    data: { razorpay_activation_status: newStatus },
+                  });
+                  rec.razorpay_activation_status = newStatus;
+                }
               }).catch(() => {})
             );
           }
@@ -314,7 +321,8 @@ export class BankInformationService {
         account_holder_name: verifiedName,
         ifsc,
         razorpay_email: razorpayEmail,
-        razorpay_activation_status: 'in_review',
+        razorpay_product_id: razorpayResult.productId || null,
+        razorpay_activation_status: razorpayResult.activationStatus === 'activated' ? 'activated' : 'in_review',
         verification_status: 'verified',
         verified_at: new Date(),
       }
@@ -386,7 +394,8 @@ export class BankInformationService {
       data: {
         account_holder_name: verification.accountHolderName || record.account_holder_name,
         bank_name: verification.bankName || record.bank_name,
-        razorpay_activation_status: 'in_review',
+        razorpay_product_id: razorpayResult.productId || null,
+        razorpay_activation_status: razorpayResult.activationStatus === 'activated' ? 'activated' : 'in_review',
         verification_status: 'verified',
         verification_failure_reason: null,
         verified_at: new Date(),
@@ -510,12 +519,14 @@ export class BankInformationService {
       }
 
       const updatedEmail = emailChanging ? newEmail : record.razorpay_email;
+      const newActivationStatus = razorpayResult.activationStatus === 'activated' ? 'activated' : 'in_review';
       await prisma.$executeRaw`
         UPDATE scd_bank_information
         SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
             account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
             account_holder_name = ${verifiedName}, razorpay_email = ${updatedEmail},
-            razorpay_activation_status = 'in_review',
+            razorpay_product_id = ${razorpayResult.productId || null},
+            razorpay_activation_status = ${newActivationStatus},
             verification_status = 'verified', verification_failure_reason = NULL,
             verified_at = NOW(), updated_at = NOW()
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
@@ -562,7 +573,7 @@ export class BankInformationService {
     entityType: string,
     bank: { name: string; ifsc: string; accountNumber: string },
     razorpayEmail?: string | null,
-  ): Promise<{ success: boolean; error?: string; activationStatus?: string }> {
+  ): Promise<{ success: boolean; error?: string; activationStatus?: string; productId?: string }> {
     if (!isRazorpayConfigured()) {
       Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured — skipping for user ${userId}`);
       return { success: false, error: 'Payment service is not configured. Please contact support.' };
@@ -633,8 +644,9 @@ export class BankInformationService {
 
       Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updated' : 'Created'} ${result.accountId} for user ${userId} (${entityType})`, {
         activationStatus: result.activationStatus,
+        productId: result.productId,
       });
-      return { success: true, activationStatus: result.activationStatus };
+      return { success: true, activationStatus: result.activationStatus, productId: result.productId };
     } catch (err: any) {
       const razorpayError = err?.response?.data?.error?.description || err?.message || 'Unknown error';
       Log.error(`[ensureRazorpayLinkedAccount] Failed for user ${userId} (${entityType})`, {
