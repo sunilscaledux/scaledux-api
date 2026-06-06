@@ -347,7 +347,7 @@ export async function getMeetingReasons(req: Request, res: Response) {
   if (type) {
     const upper = type.toUpperCase() as MeetingAction;
     if (!(upper in MEETING_REASONS)) {
-      return ApiResponse.error(res, "Invalid type. Must be one of: CANCEL, RESCHEDULE, REJECT", 400);
+      return ApiResponse.error(res, "Invalid type. Must be one of: CANCEL, RESCHEDULE, REJECT, DECLINE_RESCHEDULE", 400);
     }
     return ApiResponse.success(res, MEETING_REASONS[upper], "Meeting reasons retrieved successfully");
   }

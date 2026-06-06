@@ -1834,6 +1834,7 @@ model Booking {
   is_reschedule          Boolean   @default(false)
   rescheduled_by         Int?      // user who initiated the reschedule
   reschedule_count       Int       @default(0) // how many times this booking chain has been rescheduled
+  reschedule_requested_at DateTime? // set when the mentor requests a reschedule (pending the founder's response)
   // Cancellation
   cancelled_by           Int?
   cancelled_at           DateTime?

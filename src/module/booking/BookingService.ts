@@ -261,6 +261,7 @@ export class BookingService {
             is_reschedule: true,
             rescheduled_by: userId,
             reschedule_count: rescheduleCount,
+            reschedule_requested_at: null,
           },
         });
 
@@ -697,6 +698,7 @@ export class BookingService {
         currencySymbol: b.currency?.symbol || '₹',
         isReschedule: b.is_reschedule,
         rescheduleCount: b.reschedule_count ?? 0,
+        rescheduleRequestedAt: b.reschedule_requested_at ?? null,
         parentId: b.parent_id,
         meetingLink: b.meeting_link ?? null,
         meetingProvider: b.meeting_provider ?? null,
@@ -793,6 +795,7 @@ export class BookingService {
           recordingAmount: booking.recording_amount ? Number(booking.recording_amount) : null,
           isReschedule: booking.is_reschedule,
           rescheduleCount: booking.reschedule_count ?? 0,
+          rescheduleRequestedAt: booking.reschedule_requested_at ?? null,
           parentId: booking.parent_id,
           meetingLink: booking.meeting_link ?? null,
           meetingProvider: booking.meeting_provider ?? null,
@@ -901,7 +904,8 @@ export class BookingService {
       if (booking.status === 'CANCELLED') return { success: false, message: 'Booking is already cancelled' };
       if (booking.status === 'COMPLETED') return { success: false, message: 'Cannot cancel a completed booking' };
 
-      if (reason && !isValidMeetingReason('CANCEL', reason)) {
+      // Reason may come from a normal cancellation (CANCEL) or from declining a reschedule request (DECLINE_RESCHEDULE).
+      if (reason && !isValidMeetingReason('CANCEL', reason) && !isValidMeetingReason('DECLINE_RESCHEDULE', reason)) {
         return { success: false, message: 'Invalid cancel reason' };
       }
 
@@ -911,6 +915,7 @@ export class BookingService {
           status: 'CANCELLED',
           cancelled_by: userId,
           cancelled_at: new Date(),
+          reschedule_requested_at: null,
         },
       });
 
@@ -1649,6 +1654,12 @@ export class BookingService {
       const remarkText = remark?.trim() ? ` Note: "${remark.trim()}"` : '';
       // Deep link that takes the founder straight into picking a new time for this call.
       const rescheduleLink = `${appConfig.frontendUrl}/book-a-call/${booking.mentor.unique_id}?reschedule=${booking.unique_id}`;
+
+      // Mark the booking as having a pending reschedule request (drives the founder's "Reschedule meeting" button).
+      await (prisma as any).booking.update({
+        where: { id: booking.id },
+        data: { reschedule_requested_at: new Date() },
+      });
 
       // Activity log
       await (prisma as any).bookingActivity.create({

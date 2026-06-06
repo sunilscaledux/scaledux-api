@@ -20,6 +20,14 @@ export const MEETING_REASONS = {
     'Call ended early by mutual agreement',
     'Other',
   ],
+  // Founder declines the mentor's reschedule request and cancels the meeting instead.
+  DECLINE_RESCHEDULE: [
+    'The new schedule does not suit me',
+    'No longer need the session',
+    'Prefer a different mentor',
+    'Personal emergency',
+    'Other',
+  ],
 } as const;
 
 export type MeetingAction = keyof typeof MEETING_REASONS;
