@@ -1406,14 +1406,18 @@ export class BillingService {
     }
   }
 
-  /** Get invoice data for client-side PDF. Uses existing Invoice (created at payment time); fallback create for legacy. */
-  static async getInvoiceData(uniqueId: string, userId: number) {
+  /** Get invoice data for client-side PDF. Uses existing Invoice (created at payment time); fallback create for legacy.
+   *  invoiceType selects a specific invoice: 'A' (service, mentor→client), 'B' (commission, ScaleDux→receiver),
+   *  'C' (platform fee, ScaleDux→payer). When omitted, returns the payer/receiver invoice for the requesting user. */
+  static async getInvoiceData(uniqueId: string, userId: number, invoiceType?: 'A' | 'B' | 'C') {
     const transaction = await (prisma as any).billingTransaction.findUnique({
       where: { unique_id: uniqueId },
       include: {
         currency: true,
         payer_invoice: true,
         receiver_invoice: true,
+        invoice_a: true,
+        booking: { select: { unique_id: true, title: true, scheduled_at: true, duration: true, amount: true } },
         milestone: {
           select: {
             id: true,
@@ -1439,9 +1443,16 @@ export class BillingService {
       return { success: false as const, message: 'Unauthorized' };
     }
     const isPayer = transaction.from_id === userId;
-    const party = isPayer ? 'payer' : 'receiver';
-    let invoice = isPayer ? transaction.payer_invoice : transaction.receiver_invoice;
-    if (!invoice && isPayer) {
+    // Invoice A (service) is shared by both parties; B (commission) is the receiver's, C (platform fee) is the payer's.
+    if (invoiceType === 'B' && isPayer) return { success: false as const, message: 'Unauthorized' };
+    if (invoiceType === 'C' && !isPayer) return { success: false as const, message: 'Unauthorized' };
+    let invoice: any;
+    let party: 'payer' | 'receiver';
+    if (invoiceType === 'A') { invoice = transaction.invoice_a; party = 'receiver'; }
+    else if (invoiceType === 'B') { invoice = transaction.receiver_invoice; party = 'receiver'; }
+    else if (invoiceType === 'C') { invoice = transaction.payer_invoice; party = 'payer'; }
+    else { party = isPayer ? 'payer' : 'receiver'; invoice = isPayer ? transaction.payer_invoice : transaction.receiver_invoice; }
+    if (!invoice && !invoiceType && isPayer) {
       await this.createInvoicesForTransaction(transaction.id, { receiver: false });
       const refreshed = await (prisma as any).billingTransaction.findUnique({
         where: { id: transaction.id },
@@ -1449,7 +1460,7 @@ export class BillingService {
       });
       invoice = refreshed?.payer_invoice ?? null;
     }
-    if (!invoice) return { success: false as const, message: 'Invoice not found' };
+    if (!invoice) return { success: false as const, message: 'Invoice not available yet' };
     const inv = invoice as any;
     const platformGstForResponse = inv.gst_number ?? inv.platform_gst ?? (appConfig.platformGstNumber ?? undefined);
     return {
@@ -1493,6 +1504,15 @@ export class BillingService {
             ? parseFloat(transaction.milestone.amount.toString()) : null,
           milestoneIndex: transaction.milestone.order_index ?? null,
           totalMilestones: transaction.milestone.proposal?.milestonesRows?.length ?? null,
+        } : (transaction.booking && invoice?.invoice_type === 'C') ? {
+          // Only Invoice C (ScaleDux → user) shows "Amount Paid" = total the user paid (base + platform fee + GST).
+          // Invoice A already shows the actual base the founder pays the mentor; B only covers ScaleDux's charge.
+          amountPaid: transaction.payer_amount != null
+            ? parseFloat(transaction.payer_amount.toString())
+            : parseFloat(transaction.amount.toString()),
+          bookingTitle: transaction.booking.title ?? '1:1 Video Call',
+          bookingScheduledAt: transaction.booking.scheduled_at ?? null,
+          bookingDuration: transaction.booking.duration ?? null,
         } : undefined
       }
     };

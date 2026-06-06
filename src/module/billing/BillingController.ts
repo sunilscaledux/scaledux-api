@@ -439,7 +439,9 @@ export class BillingController {
     }
     const userId = req.user?.id;
     if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
-    const result = await BillingService.getInvoiceData(uniqueId as string, userId);
+    const invoiceParam = String(req.query.invoice ?? '').toUpperCase();
+    const invoiceType = (['A', 'B', 'C'].includes(invoiceParam) ? invoiceParam : undefined) as 'A' | 'B' | 'C' | undefined;
+    const result = await BillingService.getInvoiceData(uniqueId as string, userId, invoiceType);
     if (!result.success) {
       return ApiResponse.error(res, result.message, 404);
     }

@@ -759,6 +759,7 @@ export class BookingService {
             },
           },
           currency: { select: { code: true, symbol: true } },
+          billing_transaction: { select: { unique_id: true, payer_amount: true } },
           activities: {
             orderBy: { created_at: 'desc' },
             select: { action: true, reason: true, remark: true, acted_by: true, created_at: true },
@@ -781,6 +782,10 @@ export class BookingService {
           status: booking.status,
           paymentStatus: booking.payment_status,
           amount: Number(booking.amount),
+          billingTransactionUniqueId: booking.billing_transaction?.unique_id ?? null,
+          amountPaid: booking.billing_transaction?.payer_amount != null
+            ? Number(booking.billing_transaction.payer_amount)
+            : Number(booking.amount),
           currency: booking.currency?.code || 'INR',
           currencySymbol: booking.currency?.symbol || '₹',
           platformFee: booking.platform_fee ? Number(booking.platform_fee) : null,
@@ -1624,7 +1629,7 @@ export class BookingService {
         where: { unique_id: bookingUniqueId, mentor_id: userId, status: 'CONFIRMED' },
         include: {
           user: { select: { id: true, first_name: true, last_name: true, email: true } },
-          mentor: { select: { id: true, first_name: true, last_name: true } },
+          mentor: { select: { id: true, unique_id: true, first_name: true, last_name: true } },
         },
       });
       if (!booking) return { success: false, message: 'Booking not found or you are not the mentor' };
@@ -1642,6 +1647,8 @@ export class BookingService {
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
       const reasonText = reason ? ` Reason: ${reason}.` : '';
       const remarkText = remark?.trim() ? ` Note: "${remark.trim()}"` : '';
+      // Deep link that takes the founder straight into picking a new time for this call.
+      const rescheduleLink = `${appConfig.frontendUrl}/book-a-call/${booking.mentor.unique_id}?reschedule=${booking.unique_id}`;
 
       // Activity log
       await (prisma as any).bookingActivity.create({
@@ -1658,7 +1665,7 @@ export class BookingService {
       const emailBody = `<p><strong>${escapeHtml(mentorName)}</strong> has requested to reschedule the 1:1 video call scheduled for <strong>${escapeHtml(dateStr)}</strong>.</p>` +
         (reason ? `<p style="font-size:13px;color:#667085;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : '') +
         (remark?.trim() ? `<p style="font-size:13px;color:#667085;"><strong>Note:</strong> ${escapeHtml(remark.trim())}</p>` : '') +
-        `<p>You can reschedule the call from your <a href="${appConfig.frontendUrl}/my-bookings">bookings page</a>.</p>`;
+        `<p>You can <a href="${rescheduleLink}">pick a new time</a> for the call, or manage it from your <a href="${appConfig.frontendUrl}/my-bookings">bookings page</a>.</p>`;
 
       const inAppBody = `${mentorName} requested to reschedule the call on ${dateStr}.${reasonText}${remarkText}`;
 
@@ -1669,7 +1676,7 @@ export class BookingService {
         notificationTitle: 'Reschedule requested',
         notificationBody: emailBody,
         inAppBody,
-        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+        notificationLink: rescheduleLink,
         actorId: userId,
         subjectType: 'Booking' as const,
         subjectId: booking.id,
@@ -1677,12 +1684,13 @@ export class BookingService {
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
-      // Chat message
+      // Chat message — rescheduleLink + rescheduleUserId let the UI show a
+      // "Reschedule call" button to the founder only (mentor can only request).
       const chatMsg = `📅 ${mentorName} has requested to reschedule the call.${reasonText}${remarkText}`;
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
         chatMsg,
-        { activityType: 'BOOKING_RESCHEDULE_REQUESTED', bookingTitle: '1:1 Video Call', bookingDuration: booking.duration, bookingScheduledAt: booking.scheduled_at },
+        { activityType: 'BOOKING_RESCHEDULE_REQUESTED', bookingTitle: '1:1 Video Call', bookingDuration: booking.duration, bookingScheduledAt: booking.scheduled_at, rescheduleLink, rescheduleUserId: booking.user_id },
         undefined, userId
       );
 
