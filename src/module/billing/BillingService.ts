@@ -1469,6 +1469,7 @@ export class BillingService {
         uniqueId: transaction.unique_id,
         invoiceNumber: invoice.invoice_number,
         party,
+        subjectType: transaction.subject_type,
         gstNumber: platformGstForResponse,
         platformGst: inv.platform_gst ?? undefined,
         senderGst: inv.sender_gst ?? undefined,
