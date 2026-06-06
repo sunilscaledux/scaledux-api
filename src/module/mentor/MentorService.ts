@@ -417,12 +417,12 @@ export class MentorService {
         return { success: true, message: "OK", data: null };
       }
 
-      // Hide listing if mentor has no verified bank account
-      const hasVerifiedBank = await (prisma as any).bankInformation.findFirst({
-        where: { user_id: user.id, verification_status: 'verified' },
+      // Hide listing unless the mentor has a verified bank AND an activated payout account
+      const payoutReadyBank = await (prisma as any).bankInformation.findFirst({
+        where: { user_id: user.id, verification_status: 'verified', razorpay_activation_status: 'activated' },
         select: { id: true },
       });
-      if (!hasVerifiedBank) {
+      if (!payoutReadyBank) {
         return { success: true, message: "OK", data: null };
       }
 
