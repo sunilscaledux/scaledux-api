@@ -62,4 +62,75 @@ export class GoogleMeetService {
 
     return meetLink;
   }
+
+  /**
+   * Create a Google Calendar event with a Meet link on the host's primary
+   * calendar, inviting the given attendees. With sendUpdates=all, Google emails
+   * the invites and the event auto-appears on any attendee who uses Google
+   * Calendar. Returns the Meet link and the created event id.
+   */
+  static async createBookingEvent(params: {
+    hostUserId: number;
+    summary: string;
+    description?: string;
+    startTime: Date;
+    durationMinutes: number;
+    attendeeEmails: string[];
+  }): Promise<{ meetLink: string; eventId: string }> {
+    const { hostUserId, summary, description, startTime, durationMinutes, attendeeEmails } = params;
+    const accessToken = await this.getAccessToken(hostUserId);
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
+
+    const res = await axios.post(
+      `${GOOGLE_CALENDAR_API}/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all`,
+      {
+        summary,
+        description,
+        start: { dateTime: startTime.toISOString() },
+        end: { dateTime: endTime.toISOString() },
+        attendees: attendeeEmails.filter(Boolean).map((email) => ({ email })),
+        conferenceData: {
+          createRequest: {
+            requestId: randomUUID(),
+            conferenceSolutionKey: { type: 'hangoutsMeet' },
+          },
+        },
+      },
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    const meetLink = res.data.hangoutLink;
+    const eventId = res.data.id;
+    if (!meetLink) {
+      throw new Error('Google Meet link was not generated — the calendar may not support Meet.');
+    }
+
+    return { meetLink, eventId };
+  }
+
+  /**
+   * Patch the time of an existing booking event (used on reschedule) and
+   * re-notify attendees. Returns the (unchanged) Meet link and event id.
+   */
+  static async updateBookingEvent(params: {
+    hostUserId: number;
+    eventId: string;
+    startTime: Date;
+    durationMinutes: number;
+  }): Promise<{ meetLink: string; eventId: string }> {
+    const { hostUserId, eventId, startTime, durationMinutes } = params;
+    const accessToken = await this.getAccessToken(hostUserId);
+    const endTime = new Date(startTime.getTime() + durationMinutes * 60_000);
+
+    const res = await axios.patch(
+      `${GOOGLE_CALENDAR_API}/calendars/primary/events/${eventId}?sendUpdates=all`,
+      {
+        start: { dateTime: startTime.toISOString() },
+        end: { dateTime: endTime.toISOString() },
+      },
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+
+    return { meetLink: res.data.hangoutLink, eventId: res.data.id };
+  }
 }

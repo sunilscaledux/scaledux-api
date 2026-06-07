@@ -9,6 +9,7 @@ import { appConfig } from '@config/app';
 import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
+import { GoogleMeetService } from '../video-conferencing/GoogleMeetService';
 import { isValidMeetingReason } from '../../constants/meetingReasons';
 import { resolveAttachmentUrl } from '@services/attachmentService';
 import { calcBookingMentorDeductions, calcBookingMentorPayout, calcBookingFounderTotal } from '@utils/feeCalculations';
@@ -275,6 +276,10 @@ export class BookingService {
           },
         });
 
+        // Re-sync the calendar event to the new time (patches the existing
+        // event if one was created, else creates it). Best-effort.
+        await this.syncBookingToCalendar(booking.id);
+
         // Send notifications to both parties
         const reschedulerName = await getUserFullName(userId);
         const mentorName = `${mentor.first_name} ${mentor.last_name}`.trim();
@@ -410,6 +415,16 @@ export class BookingService {
       const deductions = calcBookingMentorDeductions(baseAmount);
       const mentorPayout = calcBookingMentorPayout(baseAmount);
 
+      // Razorpay rejects orders (and Route transfers) below ₹1. Guard here so
+      // the user gets a clear message instead of the raw gateway error.
+      const MIN_ORDER_INR = 1;
+      if (founderCalc.totalBookerPays < MIN_ORDER_INR || mentorPayout < MIN_ORDER_INR) {
+        return {
+          success: false,
+          message: `Booking total must be at least ₹${MIN_ORDER_INR}. Please pick a longer session duration.`,
+        };
+      }
+
       // Store platform fee on booking
       await (prisma as any).booking.update({
         where: { id: booking.id },
@@ -457,6 +472,76 @@ export class BookingService {
   /**
    * Verify Razorpay payment and confirm booking.
    */
+  /**
+   * Auto-sync a confirmed booking to Google Calendar via the mentor's connected
+   * calendar: creates (or, on reschedule, patches) an event with a Google Meet
+   * link and the founder as an attendee, so it lands on both participants'
+   * calendars. Best-effort — never throws, so it can't break the booking flow.
+   */
+  private static async syncBookingToCalendar(bookingId: number): Promise<void> {
+    try {
+      const booking = await (prisma as any).booking.findUnique({
+        where: { id: bookingId },
+        include: {
+          mentor: {
+            select: { id: true, first_name: true, last_name: true, email: true, google_calendar_refresh_token: true },
+          },
+          user: { select: { first_name: true, last_name: true, email: true } },
+        },
+      });
+      if (!booking) return;
+
+      // Sync happens through the mentor's calendar — it's the one that generates
+      // the Meet link. If the mentor hasn't connected, leave it to the manual
+      // "add meeting link" flow.
+      if (!booking.mentor?.google_calendar_refresh_token) {
+        Log.info(`Booking ${bookingId}: mentor has no Google Calendar connected — skipping auto-sync`);
+        return;
+      }
+
+      const mentorName = `${booking.mentor.first_name ?? ''} ${booking.mentor.last_name ?? ''}`.trim();
+      const founderName = `${booking.user.first_name ?? ''} ${booking.user.last_name ?? ''}`.trim();
+      const summary = `${booking.title} — ${mentorName} & ${founderName}`.trim();
+      const description = booking.message ? `Discussion points:\n${booking.message}` : undefined;
+      const attendeeEmails = [booking.mentor.email, booking.user.email].filter(Boolean) as string[];
+      const startTime = new Date(booking.scheduled_at);
+      const existingEventId = (booking.meta as any)?.google_calendar_event_id as string | undefined;
+
+      const result = existingEventId
+        ? await GoogleMeetService.updateBookingEvent({
+            hostUserId: booking.mentor.id,
+            eventId: existingEventId,
+            startTime,
+            durationMinutes: booking.duration,
+          })
+        : await GoogleMeetService.createBookingEvent({
+            hostUserId: booking.mentor.id,
+            summary,
+            description,
+            startTime,
+            durationMinutes: booking.duration,
+            attendeeEmails,
+          });
+
+      await (prisma as any).booking.update({
+        where: { id: bookingId },
+        data: {
+          meeting_link: result.meetLink ?? booking.meeting_link,
+          meeting_provider: 'google_meet',
+          meta: { ...((booking.meta as any) || {}), google_calendar_event_id: result.eventId },
+        },
+      });
+
+      Log.info(`Booking ${bookingId}: synced to Google Calendar (event ${result.eventId})`);
+    } catch (err: any) {
+      Log.error('Failed to auto-sync booking to Google Calendar', {
+        bookingId,
+        message: err?.message,
+        googleError: err?.response?.data,
+      });
+    }
+  }
+
   static async verifyPayment(
     userId: number,
     bookingUniqueId: string,
@@ -542,6 +627,10 @@ export class BookingService {
           },
         },
       });
+
+      // Auto-create the Google Calendar event + Meet link and invite the
+      // founder (best-effort; won't block confirmation if it fails).
+      await this.syncBookingToCalendar(booking.id);
 
       // Ensure mentor wallet exists & track pending amount
       await BillingService.ensureUserWallet(booking.mentor_id);
