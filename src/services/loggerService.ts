@@ -10,6 +10,22 @@ function ensureLogDir(filePath: string): void {
 
 const { format } = winston;
 
+/** JSON.stringify that won't throw on circular structures (e.g. Axios errors). */
+function safeStringify(value: unknown): string {
+  const seen = new WeakSet();
+  try {
+    return JSON.stringify(value, (_key, val) => {
+      if (typeof val === 'object' && val !== null) {
+        if (seen.has(val)) return '[Circular]';
+        seen.add(val);
+      }
+      return val;
+    });
+  } catch {
+    return '[Unserializable]';
+  }
+}
+
 type LoggerInstance = winston.Logger;
 const channelLoggers: Map<string, LoggerInstance> = new Map();
 
@@ -17,7 +33,7 @@ const defaultFormat = format.combine(
   format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   format.errors({ stack: true }),
   format.printf(({ level, message, timestamp, stack, ...meta }) => {
-    const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+    const metaStr = Object.keys(meta).length ? ` ${safeStringify(meta)}` : '';
     const stackStr = stack ? `\n${stack}` : '';
     return `${timestamp} [${level.toUpperCase()}] ${message}${metaStr}${stackStr}`;
   })

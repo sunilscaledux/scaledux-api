@@ -11,7 +11,7 @@ export class GoogleCalendarController {
       if (!redirectUri) {
         return ApiResponse.error(res, 'redirectUri query parameter is required');
       }
-      const url = GoogleCalendarService.getAuthUrl(redirectUri);
+      const url = GoogleCalendarService.getAuthUrl(redirectUri, req.user?.email);
       return ApiResponse.success(res, { url }, 'Auth URL generated');
     } catch (err: any) {
       Log.error('Google Calendar getAuthUrl error', err);
@@ -29,8 +29,17 @@ export class GoogleCalendarController {
       const result = await GoogleCalendarService.handleCallback(req.user.id, code, redirectUri);
       return ApiResponse.success(res, result, 'Google Calendar connected');
     } catch (err: any) {
-      Log.error('Google Calendar callback error', err);
-      return ApiResponse.error(res, err.message || 'Failed to connect Google Calendar');
+      // Surface Google's actual OAuth error (err.response.data) instead of the
+      // raw circular Axios error, which is otherwise unloggable/uninformative.
+      const googleError = err?.response?.data;
+      Log.error('Google Calendar callback error', {
+        message: err?.message,
+        status: err?.response?.status,
+        googleError,
+      });
+      const detail =
+        googleError?.error_description || googleError?.error || err?.message || 'Failed to connect Google Calendar';
+      return ApiResponse.error(res, detail);
     }
   }
 

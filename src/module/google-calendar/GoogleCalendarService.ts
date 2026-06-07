@@ -9,13 +9,15 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 const CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/calendar.events',
+  // Needed so the access token can read the account email from userinfo.
+  'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
 export class GoogleCalendarService {
   /**
    * Build Google OAuth URL for calendar consent.
    */
-  static getAuthUrl(redirectUri: string): string {
+  static getAuthUrl(redirectUri: string, loginHint?: string | null): string {
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
       redirect_uri: redirectUri,
@@ -24,6 +26,9 @@ export class GoogleCalendarService {
       access_type: 'offline',
       prompt: 'consent',
     });
+    // Pre-select the user's Google account so they skip the account chooser and
+    // land straight on the consent screen.
+    if (loginHint) params.set('login_hint', loginHint);
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
@@ -46,11 +51,18 @@ export class GoogleCalendarService {
       throw new Error('No refresh token received. The user may need to revoke access and reconnect.');
     }
 
-    // Fetch the email associated with the Google account
-    const userInfoRes = await axios.get(GOOGLE_USERINFO_URL, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const email: string = userInfoRes.data.email;
+    // Fetch the email associated with the Google account. Best-effort: the
+    // calendar connection (refresh token) is what matters, so a userinfo
+    // failure must not abort the whole flow.
+    let email: string | null = null;
+    try {
+      const userInfoRes = await axios.get(GOOGLE_USERINFO_URL, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      email = userInfoRes.data.email ?? null;
+    } catch (err: any) {
+      Log.warn(`Could not fetch Google account email — connecting without it (${err?.response?.status ?? err?.message})`);
+    }
 
     // Store refresh token and mark as connected
     await prisma.user.update({
