@@ -1869,7 +1869,7 @@ model Booking {
 model BookingActivity {
   id          Int      @id @default(autoincrement())
   booking_id  Int
-  action      String   @db.VarChar(20) // CANCELLED | RESCHEDULED | REJECTED | COMPLETED
+  action      String   @db.VarChar(50) // CANCELLED | RESCHEDULED | REJECTED | COMPLETED | MEETING_LINK_REQUESTED | LINK_REMINDER_*
   reason      String?  @db.VarChar(120)
   remark      String?  @db.Text
   acted_by    Int
