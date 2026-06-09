@@ -646,12 +646,13 @@ export class BillingService {
       }
     }
 
+    // Mark as payment_processed; COMPLETED/RELEASED will be set via Razorpay webhook on settlement
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
       data: {
-        status: BillingTransactionStatus.COMPLETED,
-        sender_status: BillingTransactionSenderStatus.RELEASED,
-        receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+        status: BillingTransactionStatus.PAYMENT_PROCESSED,
+        sender_status: BillingTransactionSenderStatus.FUNDED,
+        receiver_status: BillingTransactionReceiverStatus.PENDING,
         on_hold: false,
       }
     });
@@ -826,7 +827,7 @@ export class BillingService {
     });
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
-      data: { receiver_status: BillingTransactionReceiverStatus.WITHDRAW_IN_PROCESS }
+      data: { receiver_status: 'withdraw_in_process' }
     });
     return { success: true };
   }

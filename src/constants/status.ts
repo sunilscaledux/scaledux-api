@@ -16,11 +16,11 @@ export type BillingTransactionTypeValue = (typeof BillingTransactionType)[keyof 
 
 export const BillingTransactionStatus = {
   PENDING: 'pending',
+  PAYMENT_PROCESSED: 'payment_processed',
   COMPLETED: 'completed',
   FAILED: 'failed',
   REFUND: 'refund',
   AVAILABLE: 'available',
-  WITHDRAW_IN_PROCESS: 'withdraw_in_process',
 } as const;
 
 export type BillingTransactionStatusValue = (typeof BillingTransactionStatus)[keyof typeof BillingTransactionStatus];
@@ -38,7 +38,6 @@ export const BillingTransactionReceiverStatus = {
   PENDING: 'pending',
   COMPLETED: 'completed',
   RELEASED: 'released',
-  WITHDRAW_IN_PROCESS: 'withdraw_in_process',
   PAID_OUT: 'paid_out',
 } as const;
 

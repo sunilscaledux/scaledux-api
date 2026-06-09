@@ -1671,13 +1671,13 @@ export class BookingService {
             });
           }
 
-          // Update BillingTransaction status
+          // Update BillingTransaction status — mark as payment_processed; COMPLETED/RELEASED set via webhook
           await (prisma as any).billingTransaction.update({
             where: { id: tx.id },
             data: {
-              status: BillingTransactionStatus.COMPLETED,
-              sender_status: BillingTransactionSenderStatus.RELEASED,
-              receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+              status: BillingTransactionStatus.PAYMENT_PROCESSED,
+              sender_status: BillingTransactionSenderStatus.FUNDED,
+              receiver_status: BillingTransactionReceiverStatus.PENDING,
               on_hold: false,
             },
           });
