@@ -160,7 +160,7 @@ export class BillingService {
         account: accountId,
         amount: Math.round(amountInr * 100),
         currency: 'INR',
-        on_hold: 1,
+        on_hold: 1 as any,
         notes: { type: 'milestone_payout', ...notes }
       }];
     }

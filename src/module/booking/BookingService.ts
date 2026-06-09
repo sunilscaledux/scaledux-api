@@ -1628,7 +1628,7 @@ export class BookingService {
           // Release Razorpay Route transfer hold → mentor gets paid (T+2)
           if (tx.razorpay_transfer_id && razorpay) {
             try {
-              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0 });
+              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0 as any });
             } catch (err: any) {
               Log.error('Failed to release Razorpay transfer hold for booking', { err, transferId: tx.razorpay_transfer_id });
             }
