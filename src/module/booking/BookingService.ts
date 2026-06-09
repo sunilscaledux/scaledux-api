@@ -372,6 +372,15 @@ export class BookingService {
         },
       });
 
+      // Activity log
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'CREATED',
+          acted_by: userId,
+        },
+      });
+
       // No notifications/email/chat here — triggered only after payment in verifyPayment
 
       return {
@@ -625,6 +634,15 @@ export class BookingService {
             razorpay_order_id: data.razorpayOrderId,
             razorpay_payment_id: data.razorpayPaymentId,
           },
+        },
+      });
+
+      // Activity log
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'CONFIRMED',
+          acted_by: userId,
         },
       });
 
@@ -1333,6 +1351,15 @@ export class BookingService {
         data: { meeting_link: meetingLink, meeting_provider: meetingProvider },
       });
 
+      // Activity log
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: isUpdate ? 'MEETING_LINK_UPDATED' : 'MEETING_LINK_ADDED',
+          acted_by: mentorId,
+        },
+      });
+
       // Notify the user (mentee) about the meeting link
       const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
@@ -1856,19 +1883,20 @@ export class BookingService {
 
       const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
+      const bookingLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}`;
 
       const emailBody = `<p><strong>${escapeHtml(founderName)}</strong> is requesting you to add a meeting link for the upcoming 1:1 video call on <strong>${escapeHtml(dateStr)}</strong>.</p>
         <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
           <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Duration</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${booking.duration} minutes</td></tr>
         </table>
-        <p>Please add a meeting link from your <a href="${appConfig.frontendUrl}/my-bookings" style="color:#7C3AED;">bookings page</a>.</p>`;
+        <p>Please add a meeting link from your <a href="${bookingLink}" style="color:#7C3AED;">booking page</a>.</p>`;
 
       const notifData = {
         userId: booking.mentor_id,
         type: 'MEETING_LINK_REQUESTED' as const,
         notificationTitle: 'Meeting link requested',
         notificationBody: emailBody,
-        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+        notificationLink: bookingLink,
         actorId: userId,
         subjectType: 'Booking' as const,
         subjectId: booking.id,
@@ -1879,12 +1907,13 @@ export class BookingService {
       // Sync to chat
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
-        `🔗 ${founderName} requested a meeting link for the upcoming call.`,
+        `🔗 ${founderName} requested a meeting link for the upcoming call.\n📅 ${dateStr} · ${booking.duration} min\n👉 ${bookingLink}`,
         {
           activityType: 'MEETING_LINK_REQUESTED',
           bookingTitle: '1:1 Video Call',
           bookingDuration: booking.duration,
           bookingScheduledAt: booking.scheduled_at,
+          bookingLink,
         },
         undefined, userId
       );
