@@ -458,6 +458,19 @@ export class ConversationService {
       const receiverAccepted = status === "ACCEPTED";
       const isBlocked = status === "BLOCKED";
       const blockedByMe = isBlocked && blockedByUserId != null && blockedByUserId === userId;
+
+      const connRow = await (prisma as any).connection.findFirst({
+        where: {
+          status: 'CONNECTED',
+          OR: [
+            { sender_id: userId, receiver_id: other.id },
+            { sender_id: other.id, receiver_id: userId },
+          ],
+        },
+        select: { id: true },
+      });
+      const isConnected = !!connRow;
+
       return {
         success: true,
         message: "OK",
@@ -472,7 +485,8 @@ export class ConversationService {
           receiverAccepted,
           isInitiator,
           isBlocked,
-          blockedByMe
+          blockedByMe,
+          isConnected
         }
       };
     } catch (error: any) {

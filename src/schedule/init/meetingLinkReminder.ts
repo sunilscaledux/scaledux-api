@@ -6,13 +6,15 @@ import { appConfig } from "@config/app";
 
 /**
  * Remind mentors to add a meeting link. Runs every 2 min.
- * Sends up to 3 emails per booking (only if meeting_link is still null):
- *   1. ~10 min after booking confirmed
- *   2. ~1 hour before the call
- *   3. ~10 min before the call
+ *
+ * Reminder schedule:
+ *   1. Immediately after booking is confirmed (first cron tick)
+ *   2. Once per day (daily digest) while the call is >1 hour away
+ *   3. 1 hour before the call
+ *   4. 10 minutes before the call
  *
  * Uses BookingActivity to track which reminders were already sent.
- * If mentor adds the link at any point → meeting_link is no longer null → skipped.
+ * If mentor adds the link at any point the booking is skipped.
  */
 export const name = "meeting-link-reminder";
 export const schedule = "*/2 * * * *";
@@ -28,11 +30,9 @@ function formatNotifDate(date: Date): string {
   return `${d} at ${t}`;
 }
 
-const REMINDERS = [
-  { key: 'LINK_REMINDER_AFTER_BOOKING', urgency: "Don't forget to add a meeting link — booking just confirmed" },
-  { key: 'LINK_REMINDER_1HR_BEFORE', urgency: 'Your call starts in about 1 hour' },
-  { key: 'LINK_REMINDER_10MIN_BEFORE', urgency: 'Your call starts in ~10 minutes' },
-] as const;
+function todayDateKey(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: NOTIF_TZ }).format(new Date());
+}
 
 async function alreadySent(bookingId: number, key: string): Promise<boolean> {
   const existing = await (prisma as any).bookingActivity.findFirst({
@@ -74,52 +74,57 @@ export async function handle(): Promise<void> {
   const now = new Date();
   const nowMs = now.getTime();
 
-  // Base filter: confirmed, no meeting link, call hasn't started yet
-  const base = {
-    status: 'CONFIRMED',
-    meeting_link: null,
-    scheduled_at: { gt: now },
-  };
-
-  // 1. Bookings confirmed within the last 5 min
-  const afterBooking = await (prisma as any).booking.findMany({
-    where: { ...base, created_at: { gte: new Date(nowMs - 5 * 60 * 1000) } },
+  // All confirmed bookings with no meeting link and call still in the future
+  const bookings = await (prisma as any).booking.findMany({
+    where: {
+      status: 'CONFIRMED',
+      meeting_link: null,
+      scheduled_at: { gt: now },
+    },
     include: { user: { select: { first_name: true, last_name: true } } },
-    take: 50,
-  });
-
-  // 2. Call starts within 1 hour
-  const oneHrBefore = await (prisma as any).booking.findMany({
-    where: { ...base, scheduled_at: { gt: now, lte: new Date(nowMs + 60 * 60 * 1000) } },
-    include: { user: { select: { first_name: true, last_name: true } } },
-    take: 50,
-  });
-
-  // 3. Call starts within 10 min
-  const tenMinBefore = await (prisma as any).booking.findMany({
-    where: { ...base, scheduled_at: { gt: now, lte: new Date(nowMs + 10 * 60 * 1000) } },
-    include: { user: { select: { first_name: true, last_name: true } } },
-    take: 50,
+    take: 200,
   });
 
   let sent = 0;
 
-  for (const b of afterBooking) {
-    try { if (await sendReminder(b, REMINDERS[0].key, REMINDERS[0].urgency)) sent++; }
-    catch (err) { Log.error(`[meeting-link-reminder] Failed for booking ${b.id}`, { err }); }
-  }
+  for (const b of bookings) {
+    try {
+      const callMs = new Date(b.scheduled_at).getTime();
+      const msUntilCall = callMs - nowMs;
 
-  for (const b of oneHrBefore) {
-    try { if (await sendReminder(b, REMINDERS[1].key, REMINDERS[1].urgency)) sent++; }
-    catch (err) { Log.error(`[meeting-link-reminder] Failed for booking ${b.id}`, { err }); }
-  }
+      // 1. Immediate — first cron tick after confirmation
+      if (await tryReminder(b, 'LINK_REMINDER_AFTER_BOOKING', "Don't forget to add a meeting link for your upcoming call")) sent++;
 
-  for (const b of tenMinBefore) {
-    try { if (await sendReminder(b, REMINDERS[2].key, REMINDERS[2].urgency)) sent++; }
-    catch (err) { Log.error(`[meeting-link-reminder] Failed for booking ${b.id}`, { err }); }
+      // 2. Daily — one per calendar day while call is >1 hour away
+      if (msUntilCall > 60 * 60 * 1000) {
+        const dailyKey = `LINK_REMINDER_DAILY_${todayDateKey()}`;
+        if (await tryReminder(b, dailyKey, 'Reminder: please add a meeting link for your upcoming call')) sent++;
+      }
+
+      // 3. 1 hour before
+      if (msUntilCall <= 60 * 60 * 1000) {
+        if (await tryReminder(b, 'LINK_REMINDER_1HR_BEFORE', 'Your call starts in about 1 hour — please add a meeting link')) sent++;
+      }
+
+      // 4. 10 minutes before
+      if (msUntilCall <= 10 * 60 * 1000) {
+        if (await tryReminder(b, 'LINK_REMINDER_10MIN_BEFORE', 'Your call starts in ~10 minutes — add a meeting link now!')) sent++;
+      }
+    } catch (err) {
+      Log.error(`[meeting-link-reminder] Failed for booking ${b.id}`, { err });
+    }
   }
 
   if (sent > 0) {
     Log.info(`[meeting-link-reminder] Sent ${sent} reminder(s)`);
+  }
+}
+
+async function tryReminder(booking: any, key: string, urgency: string): Promise<boolean> {
+  try {
+    return await sendReminder(booking, key, urgency);
+  } catch (err) {
+    Log.error(`[meeting-link-reminder] Failed ${key} for booking ${booking.id}`, { err });
+    return false;
   }
 }

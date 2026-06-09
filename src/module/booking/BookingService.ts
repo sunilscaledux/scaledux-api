@@ -791,6 +791,7 @@ export class BookingService {
         parentId: b.parent_id,
         meetingLink: b.meeting_link ?? null,
         meetingProvider: b.meeting_provider ?? null,
+        meetingLinkRequested: !b.meeting_link && await (prisma as any).bookingActivity.count({ where: { booking_id: b.id, action: 'MEETING_LINK_REQUESTED' } }) > 0,
         completedAt: b.completed_at ?? null,
         rejectedAt: b.rejected_at ?? null,
         userApprovedAt: b.user_approved_at ?? null,
@@ -888,6 +889,7 @@ export class BookingService {
           parentId: booking.parent_id,
           meetingLink: booking.meeting_link ?? null,
           meetingProvider: booking.meeting_provider ?? null,
+          meetingLinkRequested: !booking.meeting_link && (booking.activities ?? []).some((a: any) => a.action === 'MEETING_LINK_REQUESTED'),
           completedAt: booking.completed_at ?? null,
           rejectedAt: booking.rejected_at ?? null,
           userApprovedAt: booking.user_approved_at ?? null,
@@ -1798,6 +1800,82 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Request reschedule error', { error });
       return { success: false, message: error.message || 'Failed to send reschedule request' };
+    }
+  }
+
+  /**
+   * Founder requests the mentor to add a meeting link.
+   * Rate-limited to one request per booking via BookingActivity.
+   */
+  static async requestMeetingLink(
+    userId: number,
+    bookingUniqueId: string,
+  ): Promise<ServiceResponse> {
+    try {
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: bookingUniqueId, user_id: userId, status: 'CONFIRMED' },
+        include: {
+          user: { select: { id: true, first_name: true, last_name: true } },
+          mentor: { select: { id: true, first_name: true, last_name: true } },
+        },
+      });
+      if (!booking) return { success: false, message: 'Booking not found or you are not the attendee' };
+      if (booking.meeting_link) return { success: false, message: 'Meeting link has already been added' };
+
+      // Rate-limit: allow only one request per booking
+      const existing = await (prisma as any).bookingActivity.findFirst({
+        where: { booking_id: booking.id, action: 'MEETING_LINK_REQUESTED' },
+      });
+      if (existing) return { success: false, message: 'Meeting link request already sent' };
+
+      // Activity log
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: 'MEETING_LINK_REQUESTED',
+          acted_by: userId,
+        },
+      });
+
+      const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+      const dateStr = formatNotifDate(new Date(booking.scheduled_at));
+
+      const emailBody = `<p><strong>${escapeHtml(founderName)}</strong> is requesting you to add a meeting link for the upcoming 1:1 video call on <strong>${escapeHtml(dateStr)}</strong>.</p>
+        <table style="border-collapse:collapse;margin:16px 0;width:100%;max-width:480px;">
+          <tr><td style="padding:8px 0;color:#667085;font-size:14px;">Duration</td><td style="padding:8px 0;font-weight:600;font-size:14px;">${booking.duration} minutes</td></tr>
+        </table>
+        <p>Please add a meeting link from your <a href="${appConfig.frontendUrl}/my-bookings" style="color:#7C3AED;">bookings page</a>.</p>`;
+
+      const notifData = {
+        userId: booking.mentor_id,
+        type: 'MEETING_LINK_REQUESTED' as const,
+        notificationTitle: 'Meeting link requested',
+        notificationBody: emailBody,
+        notificationLink: `${appConfig.frontendUrl}/my-bookings`,
+        actorId: userId,
+        subjectType: 'Booking' as const,
+        subjectId: booking.id,
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+
+      // Sync to chat
+      await ConversationService.syncSystemMessage(
+        booking.user_id, booking.mentor_id,
+        `🔗 ${founderName} requested a meeting link for the upcoming call.`,
+        {
+          activityType: 'MEETING_LINK_REQUESTED',
+          bookingTitle: '1:1 Video Call',
+          bookingDuration: booking.duration,
+          bookingScheduledAt: booking.scheduled_at,
+        },
+        undefined, userId
+      );
+
+      return { success: true, message: 'Meeting link request sent' };
+    } catch (error: any) {
+      Log.error('Request meeting link error', { error });
+      return { success: false, message: error.message || 'Failed to request meeting link' };
     }
   }
 

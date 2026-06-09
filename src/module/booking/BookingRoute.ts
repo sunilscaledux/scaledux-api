@@ -15,6 +15,7 @@ router.patch('/:uniqueId/recording', authenticateToken, BookingController.update
 router.post('/:uniqueId/cancel', authenticateToken, BookingController.cancelBooking);
 router.post('/:uniqueId/request-reschedule', authenticateToken, BookingController.requestReschedule);
 router.post('/:uniqueId/meeting-link', authenticateToken, BookingController.addMeetingLink);
+router.post('/:uniqueId/request-meeting-link', authenticateToken, BookingController.requestMeetingLink);
 router.post('/:uniqueId/complete', authenticateToken, BookingController.completeBooking);
 router.post('/:uniqueId/accept-completion', authenticateToken, BookingController.acceptCompletion);
 
