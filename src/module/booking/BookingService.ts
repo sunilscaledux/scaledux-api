@@ -239,10 +239,10 @@ export class BookingService {
           return { success: false, message: 'Mentors can only request a reschedule. Use the request reschedule option instead.' };
         }
 
-        // Enforce max 3 reschedules
+        // Enforce max 2 reschedules
         const rescheduleCount = (oldBooking.reschedule_count || 0) + 1;
-        if (rescheduleCount > 3) {
-          return { success: false, message: 'This booking has already been rescheduled 3 times. Please create a new booking instead.' };
+        if (rescheduleCount > 2) {
+          return { success: false, message: 'This booking has already been rescheduled 2 times. Please create a new booking instead.' };
         }
 
         // Must be at least 1 hour before scheduled time to reschedule
