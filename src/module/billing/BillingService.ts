@@ -156,13 +156,16 @@ export class BillingService {
     // ScaleDux keeps the remainder (platform fee + commission + GST + TCS)
     if (options?.freelancerTransfer) {
       const { accountId, amountInr } = options.freelancerTransfer;
+      // Hold until manually released on founder acceptance; 90-day fallback so it never stays indefinite
+      const onHoldUntil = Math.floor(Date.now() / 1000) + 90 * 24 * 60 * 60;
       orderPayload.transfers = [{
         account: accountId,
         amount: Math.round(amountInr * 100),
         currency: 'INR',
-        on_hold: 1 as any,
+        on_hold: 1,
+        on_hold_until: onHoldUntil,
         notes: { type: 'milestone_payout', ...notes }
-      }];
+      } as any];
     }
 
     try {

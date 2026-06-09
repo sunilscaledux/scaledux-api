@@ -1655,10 +1655,20 @@ export class BookingService {
           // Release Razorpay Route transfer hold → mentor gets paid (T+2)
           if (tx.razorpay_transfer_id && razorpay) {
             try {
-              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0 as any });
+              const editRes = await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: false });
+              Log.info('Razorpay transfer hold released', { transferId: tx.razorpay_transfer_id, settlement_status: editRes?.settlement_status });
             } catch (err: any) {
-              Log.error('Failed to release Razorpay transfer hold for booking', { err, transferId: tx.razorpay_transfer_id });
+              Log.error('Failed to release Razorpay transfer hold for booking', {
+                transferId: tx.razorpay_transfer_id,
+                message: err?.message,
+                statusCode: err?.statusCode,
+                error: err?.error,
+              });
             }
+          } else {
+            Log.warn('Cannot release transfer hold — missing transfer ID or Razorpay client', {
+              transferId: tx.razorpay_transfer_id, hasRazorpay: !!razorpay,
+            });
           }
 
           // Update BillingTransaction status
