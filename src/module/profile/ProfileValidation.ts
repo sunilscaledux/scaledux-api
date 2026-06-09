@@ -28,9 +28,8 @@ export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
   city: Joi.string().optional(),
   // DOB stored as a YYYY-MM-DD string; the UI also caps to 18+ but we
   // re-check max-date here so a non-UI client can't bypass it.
-  dob: Joi.string().isoDate().max(10).optional().allow('', null).messages({
+  dob: Joi.string().isoDate().optional().allow('', null).messages({
     'string.isoDate': 'Date of birth must be a valid date',
-    'string.max': 'Date of birth must be a valid date',
   }),
   gender: Joi.string().valid('male', 'female', 'other').optional().allow('', null).messages({
     'any.only': 'Gender must be male, female or other',

@@ -541,7 +541,7 @@ export class PersonalInfoService {
       // client explicitly sent the field so a partial update can't blank
       // them out.
       const userPatch: { dob?: string | null; gender?: string | null } = {};
-      if (data.dob !== undefined) userPatch.dob = data.dob || null;
+      if (data.dob !== undefined) userPatch.dob = data.dob ? data.dob.slice(0, 10) : null;
       if (data.gender !== undefined) userPatch.gender = data.gender || null;
       if (Object.keys(userPatch).length > 0) {
         await prisma.user.update({ where: { id: userId }, data: userPatch });

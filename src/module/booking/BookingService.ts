@@ -1628,7 +1628,7 @@ export class BookingService {
           // Release Razorpay Route transfer hold → mentor gets paid (T+2)
           if (tx.razorpay_transfer_id && razorpay) {
             try {
-              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: false });
+              await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0 });
             } catch (err: any) {
               Log.error('Failed to release Razorpay transfer hold for booking', { err, transferId: tx.razorpay_transfer_id });
             }
@@ -1642,6 +1642,23 @@ export class BookingService {
               sender_status: BillingTransactionSenderStatus.RELEASED,
               receiver_status: BillingTransactionReceiverStatus.COMPLETED,
               on_hold: false,
+            },
+          });
+
+          // Move funds from pending → available in mentor's wallet
+          const txAmount = Number(tx.amount) || 0;
+          const txCommission = Number(tx.commission_amount) || 0;
+          const txCommissionGst = Number(tx.commission_gst) || 0;
+          const txProcessingFee = Number(tx.processing_fee_amount) || 0;
+          const txProcessingFeeGst = Number(tx.processing_fee_gst) || 0;
+          const txTcs = Number(tx.tcs_amount) || 0;
+          const netPayout = txAmount - txCommission - txCommissionGst - txProcessingFee - txProcessingFeeGst - txTcs;
+          await (prisma as any).userWallet.update({
+            where: { user_id: booking.mentor_id },
+            data: {
+              pending_amount: { decrement: txAmount },
+              wallet_amount: { increment: netPayout },
+              total_earning: { increment: netPayout },
             },
           });
         }
