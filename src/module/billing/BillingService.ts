@@ -652,7 +652,7 @@ export class BillingService {
       data: {
         status: BillingTransactionStatus.PAYMENT_PROCESSED,
         sender_status: BillingTransactionSenderStatus.FUNDED,
-        receiver_status: BillingTransactionReceiverStatus.PENDING,
+        receiver_status: BillingTransactionReceiverStatus.PAYMENT_PROCESSED,
         on_hold: false,
       }
     });
@@ -709,8 +709,13 @@ export class BillingService {
     const tx = await (prisma as any).billingTransaction.findFirst({
       where: { razorpay_transfer_id: transferId }
     });
-    if (!tx) return { success: false, message: 'Transaction not found for transfer' };
-    if (tx.status === 'paid') return { success: true, message: 'Already processed' };
+    if (!tx) {
+      Log.warn('Webhook transfer.settled: no transaction found', { transferId });
+      return { success: false, message: 'Transaction not found for transfer' };
+    }
+    if (tx.status === BillingTransactionStatus.COMPLETED) {
+      return { success: true, message: 'Already processed' };
+    }
 
     const amount = Number(tx.amount);
     let netPayout: number;
@@ -721,16 +726,20 @@ export class BillingService {
       netPayout = calcFreelancerPayout(amount, isGstRegistered);
     }
 
+    // Only move wallet funds if not already moved (payment_processed means wallet was updated on approval)
+    const walletAlreadyUpdated = tx.status === BillingTransactionStatus.PAYMENT_PROCESSED;
+
     await (prisma as any).billingTransaction.update({
       where: { id: tx.id },
       data: {
-        status: 'paid',
-        receiver_status: BillingTransactionReceiverStatus.COMPLETED,
+        status: BillingTransactionStatus.COMPLETED,
+        sender_status: BillingTransactionSenderStatus.RELEASED,
+        receiver_status: BillingTransactionReceiverStatus.RELEASED,
       }
     });
 
-    // Credit freelancer wallet
-    if (tx.to_id > 0) {
+    // Credit wallet only if not already done during approval
+    if (!walletAlreadyUpdated && tx.to_id > 0) {
       await this.ensureUserWallet(tx.to_id);
       await (prisma as any).userWallet.update({
         where: { user_id: tx.to_id },
@@ -741,6 +750,11 @@ export class BillingService {
         },
       });
     }
+
+    Log.info('Webhook transfer.settled processed', {
+      transferId, txId: tx.id, uniqueId: tx.unique_id,
+      subjectType: tx.subject_type, walletAlreadyUpdated,
+    });
 
     return { success: true };
   }

@@ -36,6 +36,7 @@ export type BillingTransactionSenderStatusValue =
 
 export const BillingTransactionReceiverStatus = {
   PENDING: 'pending',
+  PAYMENT_PROCESSED: 'payment_processed',
   COMPLETED: 'completed',
   RELEASED: 'released',
   PAID_OUT: 'paid_out',

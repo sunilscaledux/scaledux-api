@@ -1677,7 +1677,7 @@ export class BookingService {
             data: {
               status: BillingTransactionStatus.PAYMENT_PROCESSED,
               sender_status: BillingTransactionSenderStatus.FUNDED,
-              receiver_status: BillingTransactionReceiverStatus.PENDING,
+              receiver_status: BillingTransactionReceiverStatus.PAYMENT_PROCESSED,
               on_hold: false,
             },
           });
