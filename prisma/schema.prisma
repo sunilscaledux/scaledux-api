@@ -1455,6 +1455,7 @@ enum BillingTransactionStatus {
   pending
   completed
   failed
+  payment_processed
 }
 
 /** Payer (from_id) view status; receiver (to_id) view status; admin internal status. */
@@ -1470,6 +1471,7 @@ enum BillingTransactionReceiverStatus {
   released
   withdraw_in_process
   paid_out
+  payment_processed
 }
 
 enum BillingTransactionAdminStatus {
