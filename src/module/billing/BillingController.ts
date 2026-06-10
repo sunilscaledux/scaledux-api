@@ -489,7 +489,7 @@ export class BillingController {
     const event = req.body?.event;
     const payload = req.body?.payload;
 
-    if (event === 'transfer.settled') {
+    if (event === 'transfer.processed') {
       const transferId = payload?.transfer?.entity?.id;
       if (transferId) {
         await BillingService.handleTransferSettled(transferId);
