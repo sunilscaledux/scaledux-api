@@ -434,10 +434,14 @@ export class BookingService {
         };
       }
 
-      // Store platform fee on booking
+      // Store platform fee and reset created_at to extend the 3-min slot hold
+      // while the user completes payment (gives another 10 min from now)
       await (prisma as any).booking.update({
         where: { id: booking.id },
-        data: { platform_fee: founderCalc.platformFee + founderCalc.platformFeeGst },
+        data: {
+          platform_fee: founderCalc.platformFee + founderCalc.platformFeeGst,
+          created_at: new Date(Date.now() + 7 * 60 * 1000),
+        },
       });
 
       const result = await BillingService.createVerificationOrder(String(userId), founderCalc.totalBookerPays, {
@@ -1243,7 +1247,7 @@ export class BookingService {
       const dayStart = new Date(y, m - 1, d, 0, 0, 0);
       const dayEnd = new Date(y, m - 1, d, 23, 59, 59);
 
-      const staleThreshold = new Date(Date.now() - 2 * 60 * 1000);
+      const staleThreshold = new Date(Date.now() - 3 * 60 * 1000);
 
       const bookings = await (prisma as any).booking.findMany({
         where: {
@@ -1653,13 +1657,32 @@ export class BookingService {
           await BillingService.createInvoiceB(tx.id);
 
           // Release Razorpay Route transfer hold → mentor gets paid (T+2)
-          if (tx.razorpay_transfer_id && razorpay) {
+          let transferId = tx.razorpay_transfer_id;
+
+          // If transfer ID wasn't stored earlier, try fetching it now from the payment
+          if (!transferId && razorpay && tx.meta?.razorpay_payment_id) {
             try {
-              const editRes = await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: false });
-              Log.info('Razorpay transfer hold released', { transferId: tx.razorpay_transfer_id, settlement_status: editRes?.settlement_status });
+              const payment = await razorpay.payments.fetch(tx.meta.razorpay_payment_id, { 'expand[]': 'transfers' });
+              transferId = payment?.transfers?.items?.[0]?.id ?? null;
+              if (transferId) {
+                await (prisma as any).billingTransaction.update({
+                  where: { id: tx.id },
+                  data: { razorpay_transfer_id: transferId },
+                });
+                Log.info('Recovered missing transfer ID from payment', { transferId, paymentId: tx.meta.razorpay_payment_id });
+              }
+            } catch (err: any) {
+              Log.error('Failed to recover transfer ID from payment', { err: err?.message, paymentId: tx.meta.razorpay_payment_id });
+            }
+          }
+
+          if (transferId && razorpay) {
+            try {
+              const editRes = await razorpay.transfers.edit(transferId, { on_hold: false });
+              Log.info('Razorpay transfer hold released', { transferId, settlement_status: editRes?.settlement_status });
             } catch (err: any) {
               Log.error('Failed to release Razorpay transfer hold for booking', {
-                transferId: tx.razorpay_transfer_id,
+                transferId,
                 message: err?.message,
                 statusCode: err?.statusCode,
                 error: err?.error,
@@ -1667,7 +1690,7 @@ export class BookingService {
             }
           } else {
             Log.warn('Cannot release transfer hold — missing transfer ID or Razorpay client', {
-              transferId: tx.razorpay_transfer_id, hasRazorpay: !!razorpay,
+              transferId, hasRazorpay: !!razorpay,
             });
           }
 
@@ -1783,6 +1806,19 @@ export class BookingService {
         },
       });
       if (!booking) return { success: false, message: 'Booking not found or you are not the mentor' };
+
+      // Block if a reschedule request is already pending
+      if (booking.reschedule_requested_at) {
+        return { success: false, message: 'A reschedule request is already pending' };
+      }
+
+      // Max 2 reschedule requests per booking
+      const rescheduleRequestCount = await (prisma as any).bookingActivity.count({
+        where: { booking_id: booking.id, action: 'RESCHEDULE_REQUESTED' },
+      });
+      if (rescheduleRequestCount >= 2) {
+        return { success: false, message: 'Maximum 2 reschedule requests allowed per booking' };
+      }
 
       const minsUntil = (new Date(booking.scheduled_at).getTime() - Date.now()) / 60000;
       if (minsUntil < 60) {
