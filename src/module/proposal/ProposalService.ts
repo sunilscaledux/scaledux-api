@@ -154,15 +154,18 @@ async function milestonesFromRows(rows: any[] | null | undefined): Promise<any[]
   const invoiceStatuses = milestoneIds.length > 0
     ? await (prisma as any).billingTransaction.findMany({
         where: { milestone_id: { in: milestoneIds }, type: 'payment' },
-        select: { milestone_id: true, invoice_a_id: true, unique_id: true, status: true }
+        select: { milestone_id: true, invoice_a_id: true, payer_invoice_id: true, receiver_invoice_id: true, unique_id: true, status: true }
       })
     : [];
-  const invoiceMap = new Map<number, { invoiceSent: boolean; transactionUniqueId: string | null; paymentStatus: string }>();
+  const invoiceMap = new Map<number, { invoiceSent: boolean; transactionUniqueId: string | null; paymentStatus: string; hasInvoiceA: boolean; hasInvoiceB: boolean; hasInvoiceC: boolean }>();
   for (const tx of invoiceStatuses) {
     invoiceMap.set(tx.milestone_id, {
       invoiceSent: tx.invoice_a_id != null,
       transactionUniqueId: tx.unique_id,
       paymentStatus: tx.status,
+      hasInvoiceA: tx.invoice_a_id != null,
+      hasInvoiceB: tx.receiver_invoice_id != null,
+      hasInvoiceC: tx.payer_invoice_id != null,
     });
   }
 
@@ -187,6 +190,9 @@ async function milestonesFromRows(rows: any[] | null | undefined): Promise<any[]
         invoice_sent: txInfo?.invoiceSent ?? false,
         transaction_unique_id: txInfo?.transactionUniqueId ?? null,
         billing_status: txInfo?.paymentStatus ?? null,
+        has_invoice_a: txInfo?.hasInvoiceA ?? false,
+        has_invoice_b: txInfo?.hasInvoiceB ?? false,
+        has_invoice_c: txInfo?.hasInvoiceC ?? false,
       };
     }));
 }

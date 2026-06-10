@@ -1461,7 +1461,7 @@ export class BillingService {
               select: {
                 unique_id: true,
                 proposed_amount: true,
-                milestonesRows: { select: { id: true } },
+                milestonesRows: { select: { id: true, amount: true, payment_status: true } },
                 project: {
                   select: { unique_id: true, project_title: true, budget_amount: true, budget_currency: true }
                 }
@@ -1533,6 +1533,9 @@ export class BillingService {
           contractId: transaction.milestone.proposal?.unique_id ?? null,
           contractAmount: transaction.milestone.proposal?.proposed_amount != null
             ? parseFloat(transaction.milestone.proposal.proposed_amount.toString()) : null,
+          totalFundedAmount: (transaction.milestone.proposal?.milestonesRows ?? [])
+            .filter((ms: any) => ms.payment_status === 'FUNDED' || ms.payment_status === 'RELEASED')
+            .reduce((sum: number, ms: any) => sum + (ms.amount != null ? parseFloat(ms.amount.toString()) : 0), 0) || null,
           milestoneTitle: transaction.milestone.title ?? null,
           milestoneAmount: transaction.milestone.amount != null
             ? parseFloat(transaction.milestone.amount.toString()) : null,
