@@ -276,8 +276,8 @@ export class BankInformationService {
 
     // Validate account holder name matches bank records
     if (accountHolderName && verification.accountHolderName) {
-      const submittedName = accountHolderName.trim().toLowerCase();
-      const bankName = verification.accountHolderName.trim().toLowerCase();
+      const submittedName = accountHolderName.trim().replace(/\s+/g, ' ').toLowerCase();
+      const bankName = verification.accountHolderName.trim().replace(/\s+/g, ' ').toLowerCase();
       if (submittedName && bankName && !bankName.includes(submittedName) && !submittedName.includes(bankName)) {
         return {
           success: false,
