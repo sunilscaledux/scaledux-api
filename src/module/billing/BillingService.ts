@@ -597,8 +597,8 @@ export class BillingService {
     const razorpayPaymentId = (meta as Record<string, string>)?.razorpay_payment_id;
     if (razorpayPaymentId && razorpay) {
       try {
-        const payment = await razorpay.payments.fetch(razorpayPaymentId, { 'expand[]': 'transfers' });
-        const transferId = payment?.transfers?.items?.[0]?.id ?? null;
+        const transfers = await razorpay.payments.fetchTransfer(razorpayPaymentId);
+        const transferId = transfers?.items?.[0]?.id ?? null;
         if (transferId) {
           await (prisma as any).billingTransaction.update({
             where: { id: row.id },
@@ -749,6 +749,20 @@ export class BillingService {
           total_earning: { increment: netPayout },
         },
       });
+    }
+
+    // If this transaction is for a booking, update the booking's payment_status to RELEASED
+    if (tx.subject_type === 'Booking' && tx.subject_id) {
+      try {
+        await (prisma as any).booking.update({
+          where: { id: tx.subject_id },
+          data: { payment_status: 'RELEASED' },
+        });
+      } catch (err: any) {
+        Log.error('Webhook transfer.settled: failed to update booking payment_status', {
+          bookingId: tx.subject_id, err: err?.message,
+        });
+      }
     }
 
     Log.info('Webhook transfer.settled processed', {

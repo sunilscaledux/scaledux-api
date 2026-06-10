@@ -614,8 +614,8 @@ export class BookingService {
       // Fetch & store Razorpay Route transfer ID
       if (data.razorpayPaymentId && razorpay) {
         try {
-          const payment = await razorpay.payments.fetch(data.razorpayPaymentId, { 'expand[]': 'transfers' });
-          const transferId = payment?.transfers?.items?.[0]?.id ?? null;
+          const transfers = await razorpay.payments.fetchTransfer(data.razorpayPaymentId);
+          const transferId = transfers?.items?.[0]?.id ?? null;
           if (transferId) {
             await (prisma as any).billingTransaction.update({
               where: { id: billingTx.id },
@@ -1662,8 +1662,8 @@ export class BookingService {
           // If transfer ID wasn't stored earlier, try fetching it now from the payment
           if (!transferId && razorpay && tx.meta?.razorpay_payment_id) {
             try {
-              const payment = await razorpay.payments.fetch(tx.meta.razorpay_payment_id, { 'expand[]': 'transfers' });
-              transferId = payment?.transfers?.items?.[0]?.id ?? null;
+              const transfers = await razorpay.payments.fetchTransfer(tx.meta.razorpay_payment_id);
+              transferId = transfers?.items?.[0]?.id ?? null;
               if (transferId) {
                 await (prisma as any).billingTransaction.update({
                   where: { id: tx.id },
