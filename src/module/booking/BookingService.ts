@@ -873,7 +873,7 @@ export class BookingService {
             },
           },
           currency: { select: { code: true, symbol: true } },
-          billing_transaction: { select: { unique_id: true, payer_amount: true } },
+          billing_transaction: { select: { unique_id: true, payer_amount: true, invoice_a_id: true, receiver_invoice_id: true, payer_invoice_id: true } },
           activities: {
             orderBy: { created_at: 'desc' },
             select: { action: true, reason: true, remark: true, acted_by: true, created_at: true },
@@ -900,6 +900,9 @@ export class BookingService {
           amountPaid: booking.billing_transaction?.payer_amount != null
             ? Number(booking.billing_transaction.payer_amount)
             : Number(booking.amount),
+          hasInvoiceA: !!booking.billing_transaction?.invoice_a_id,
+          hasInvoiceB: !!booking.billing_transaction?.receiver_invoice_id,
+          hasInvoiceC: !!booking.billing_transaction?.payer_invoice_id,
           currency: booking.currency?.code || 'INR',
           currencySymbol: booking.currency?.symbol || '₹',
           platformFee: booking.platform_fee ? Number(booking.platform_fee) : null,

@@ -1202,6 +1202,7 @@ export class BillingService {
             invoiceUrl,
             payerInvoiceId: payerInv?.id ?? null,
             receiverInvoiceId: receiverInv?.id ?? null,
+            invoiceAId: t.invoice_a_id ?? null,
             payerInvoiceUrl: payerInv?.file_url ?? null,
             receiverInvoiceUrl: receiverInv?.file_url ?? null,
             fromId: t.from_id,
