@@ -8,8 +8,8 @@ import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
 
-/** Bank name and account holder name: letters and spaces only. */
-const BANK_NAME_PATTERN = /^[A-Za-z ]+$/;
+/** Bank name and account holder name: letters, dots, and spaces only. */
+const BANK_NAME_PATTERN = /^[A-Za-z. ]+$/;
 
 /** Trim and collapse internal whitespace. */
 const cleanName = (v?: string | null) =>
