@@ -639,7 +639,7 @@ export class BillingService {
     // Release Razorpay Route transfer hold → freelancer gets paid (T+2)
     if (tx.razorpay_transfer_id && razorpay) {
       try {
-        await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0, on_hold_until: null });
+        await razorpay.transfers.edit(tx.razorpay_transfer_id, { on_hold: 0 });
       } catch (err: any) {
         Log.error('Failed to release Razorpay transfer hold', { err, transferId: tx.razorpay_transfer_id });
         return { success: false, message: 'Failed to release payment to freelancer. Please try again.' };

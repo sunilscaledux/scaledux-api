@@ -1678,7 +1678,7 @@ export class BookingService {
 
           if (transferId && razorpay) {
             try {
-              const editRes = await razorpay.transfers.edit(transferId, { on_hold: 0, on_hold_until: null });
+              const editRes = await razorpay.transfers.edit(transferId, { on_hold: 0 });
               Log.info('Razorpay transfer hold released', { transferId, settlement_status: editRes?.settlement_status });
             } catch (err: any) {
               Log.error('Failed to release Razorpay transfer hold for booking', {
