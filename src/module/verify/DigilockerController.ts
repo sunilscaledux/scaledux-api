@@ -39,7 +39,7 @@ export async function initiateDigilocker(req: Request, res: Response) {
     data: { digilocker_state: stateToken },
   });
 
-  const redirectUrl = `${FRONTEND_URL}/callback/digilocker`;
+  const redirectUrl = req.body?.redirectUrl || `${FRONTEND_URL}/callback/digilocker`;
 
   const result = await digilockerInitiateSession(
     redirectUrl,

@@ -27,7 +27,7 @@ import { createRateLimiter } from "@middleware/rateLimiter"
 const router = Router()
 
 // 2 verification attempts per 24 hours
-const verifyLimit = createRateLimiter(24 * 60 * 60, 2)
+const verifyLimit = createRateLimiter(24 * 60 * 60, 10)
 
 // OTP send: 5 requests per 10 minutes (per IP). Tightened from the previous
 // 15/15min so users can't spam the channel — they get the initial code, plus

@@ -1034,6 +1034,12 @@ export class BookingService {
       if (booking.status === 'CANCELLED') return { success: false, message: 'Booking is already cancelled' };
       if (booking.status === 'COMPLETED') return { success: false, message: 'Cannot cancel a completed booking' };
 
+      // Mentor cannot cancel while their own reschedule request is pending — they must wait for the founder to respond.
+      const isMentorCancelling = userId === booking.mentor_id;
+      if (isMentorCancelling && booking.reschedule_requested_at) {
+        return { success: false, message: 'You cannot cancel while your reschedule request is pending. Please wait for the founder to respond.' };
+      }
+
       // Reason may come from a normal cancellation (CANCEL) or from declining a reschedule request (DECLINE_RESCHEDULE).
       if (reason && !isValidMeetingReason('CANCEL', reason) && !isValidMeetingReason('DECLINE_RESCHEDULE', reason)) {
         return { success: false, message: 'Invalid cancel reason' };
