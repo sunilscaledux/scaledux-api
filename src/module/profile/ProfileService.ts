@@ -401,6 +401,8 @@ export class PersonalInfoService {
           profile.user as { first_name: string; last_name?: string | null; is_deactivated?: boolean },
           { maskLastName: false }
         ),
+        dob: profile.user.dob || null,
+        gender: profile.user.gender || null,
         email: profile.user.email,
         phone: profile.user.phone,
         emailVerified: !!profile.user.email_verified_at,

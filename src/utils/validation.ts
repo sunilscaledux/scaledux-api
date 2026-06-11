@@ -64,7 +64,7 @@ export const noHtmlMessages = {
   "string.noHtml": "{{#label}} must not contain HTML tags",
 };
 
-const SAFE_URL_PATTERN = /^(www\.)?[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}(\/[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]*)?$/;
+const SAFE_URL_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}(\.[a-zA-Z]{2,})*(\/[a-zA-Z0-9._~:/?#\[\]@!$&'()*+,;=%-]*)?$/;
 const SQL_PATTERN = /('|--|;|\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|EXEC)\b)/i;
 
 /** Joi custom validator for safe website URLs. Accepts: www.scaledux.com or scaledux.com */
@@ -83,7 +83,7 @@ export function validateSafeUrl(value: string, helpers: Joi.CustomHelpers) {
   if (SQL_PATTERN.test(trimmed)) {
     return helpers.error("string.urlNoSql");
   }
-  if (!SAFE_URL_PATTERN.test(trimmed)) {
+  if (!SAFE_URL_PATTERN.test(trimmed.replace(/^www\./i, ''))) {
     return helpers.error("string.urlInvalid");
   }
   return trimmed;
