@@ -14,6 +14,9 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'OFFER_SENT', label: 'Offer sent', category: 'Proposals & Project Management' },
   { type: 'DELIVERABLE_SUBMITTED', label: 'Deliverable submitted', category: 'Proposals & Project Management' },
   { type: 'DELIVERABLE_APPROVED', label: 'Deliverable approved', category: 'Proposals & Project Management' },
+  { type: 'OFFER_ACCEPTED', label: 'An offer is accepted', category: 'Proposals & Project Management' },
+  { type: 'INTERVIEW_OR_OFFER_DECLINED_WITHDRAWN', label: 'An offer is declined or withdrawn', category: 'Proposals & Project Management' },
+  { type: 'INVOICE_RECEIVED', label: 'A milestone invoice is received', category: 'Proposals & Project Management' },
   { type: 'PAYMENT_RELEASED', label: 'Payment released', category: 'Proposals & Project Management' },
   // 1:1 Call Bookings
   { type: 'BOOKING_REQUESTED', label: 'A new booking request is received', category: '1:1 Call Bookings' },
