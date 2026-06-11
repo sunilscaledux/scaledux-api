@@ -26,14 +26,14 @@ router.patch('/languages', authenticateToken, ProfileController.updateLanguages)
 router.post(
   '/profile-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'profile', fieldName: 'profile_image' }).single('image'),
+  FileUpload({ uploadPath: 'profile', fileFilter: 'image', fieldName: 'profile_image' }).single('image'),
   ProfileController.uploadProfileImage,
   handleMulterError
 );
 router.post(
   '/cover-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'cover', fieldName: 'cover_image' }).single('image'),
+  FileUpload({ uploadPath: 'cover', fileFilter: 'image', fieldName: 'cover_image' }).single('image'),
   ProfileController.uploadCoverImage,
   handleMulterError
 );
@@ -51,14 +51,14 @@ router.get('/company/public/:uniqueId', CompanyProfileController.getPublicProfil
 router.post(
   '/company/profile-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'profile/company', fieldName: 'company_profile_image' }).single('image'),
+  FileUpload({ uploadPath: 'profile/company', fileFilter: 'image', fieldName: 'company_profile_image' }).single('image'),
   CompanyProfileController.uploadProfileImage,
   handleMulterError
 );
 router.post(
   '/company/cover-image',
   authenticateToken,
-  FileUpload({ uploadPath: 'cover/company', fieldName: 'company_cover_image' }).single('image'),
+  FileUpload({ uploadPath: 'cover/company', fileFilter: 'image', fieldName: 'company_cover_image' }).single('image'),
   CompanyProfileController.uploadCoverImage,
   handleMulterError
 );
