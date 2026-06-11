@@ -33,6 +33,20 @@ export async function getUserPortfolios(req: Request, res: Response) {
 }
 
 /**
+ * Get published portfolios for a user (public, no auth required).
+ */
+export async function getPublicPortfoliosByUser(req: Request, res: Response) {
+  const { uniqueId } = req.params;
+  if (!uniqueId) return ApiResponse.error(res, 'User ID is required', 400);
+
+  const result = await PortfolioService.getPublicPortfoliosByUser(uniqueId);
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  }
+  return ApiResponse.error(res, result.message);
+}
+
+/**
  * Get portfolio by unique ID. Optional auth: returns portfolio if owner or if published (viewable by anyone).
  */
 export async function getPortfolioById(req: Request, res: Response) {

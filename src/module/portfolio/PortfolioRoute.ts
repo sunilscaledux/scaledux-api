@@ -2,6 +2,7 @@ import { Router } from "express"
 import {
   getUserPortfolios,
   getPortfolioById,
+  getPublicPortfoliosByUser,
   createPortfolio,
   updatePortfolio,
   deletePortfolio,
@@ -15,6 +16,7 @@ import { FileUpload, handleMulterError } from "@middleware/fileupload"
 
 const router = Router()
 
+router.get("/user/:uniqueId", getPublicPortfoliosByUser)
 router.get("/:id", optionalAuth, getPortfolioById)
 
 router.use(authenticateToken)

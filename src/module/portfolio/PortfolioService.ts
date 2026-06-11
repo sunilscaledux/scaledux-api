@@ -82,6 +82,33 @@ export class PortfolioService {
   }
 
   /**
+   * Get published portfolios for a user by their unique_id (public).
+   */
+  static async getPublicPortfoliosByUser(userUniqueId: string): Promise<ServiceResponse> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { unique_id: userUniqueId },
+        select: { id: true },
+      });
+      if (!user) return { success: false, message: 'User not found' };
+
+      const portfolios = await prisma.portfolio.findMany({
+        where: { user_id: user.id, status: 'PUBLISHED', deleted_at: null },
+        include: {
+          industry: { select: { id: true, name: true, description: true } },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+
+      const transformed = await Promise.all(portfolios.map(transformPortfolio));
+      return { success: true, message: 'Portfolios retrieved successfully', data: transformed };
+    } catch (error: any) {
+      Log.error('Error fetching public portfolios', { error });
+      return { success: false, message: 'Failed to get portfolios' };
+    }
+  }
+
+  /**
    * Get a single portfolio by ID (unique_id).
    * If userId is provided: return if owner or if portfolio is PUBLISHED.
    * If userId is not provided (public): return only if portfolio is PUBLISHED.

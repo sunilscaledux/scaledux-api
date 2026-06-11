@@ -39,11 +39,16 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     return ApiResponse.error(res, "Agency name and CIN are required", 400)
   }
 
-  if (!documents || !Array.isArray(documents) || documents.length === 0) {
-    return ApiResponse.error(res, "At least one document is required", 400)
+  // CIN must be exactly 21 uppercase alphanumeric characters
+  const cinTrimmed = cin.trim().toUpperCase()
+  if (!/^[A-Z0-9]{21}$/.test(cinTrimmed)) {
+    return ApiResponse.error(res, "CIN must be exactly 21 alphanumeric characters", 400)
   }
 
-  const normalizedDocumentUrls = urlsOrPathsToAttachmentIds(documents)
+  // Documents are optional — CIN is verified via API
+  const normalizedDocumentUrls = documents && Array.isArray(documents) && documents.length > 0
+    ? urlsOrPathsToAttachmentIds(documents)
+    : []
 
   // ── Real-time CIN verification — only save if verified ──
   if (!isIdtoaiConfigured()) {
