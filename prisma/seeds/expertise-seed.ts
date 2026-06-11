@@ -10,19 +10,27 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 }
 
 /**
- * Taxonomy rows live in scd_expertise_categories, scd_specialties, scd_skills.
- * We use raw SQL for deletes/inserts here so the seed works even when
- * `prisma generate` used different model names (e.g. ExpertiseCategory vs Category)
- * or Skill field names (expertise_category_id vs categoryId) — common when prod
- * schema and local schema drift or Prisma versions differ.
+ * Safely clear taxonomy rows that are NOT referenced by user data.
+ * Rows referenced by scd_user_expertises, scd_founder_projects, etc. are preserved.
  */
 export async function clearExpertiseTaxonomy(prisma: PrismaClient) {
-  console.log('🗑️  Clearing old taxonomy data (skills, specialties, categories only — user data preserved)...')
+  console.log('🗑️  Clearing unreferenced taxonomy data (skills, specialties, categories)...')
 
-  // Only clear taxonomy tables, NOT user data (UserExpertise, FounderProject, ServicePackage)
-  const skills = await prisma.$executeRawUnsafe(`DELETE FROM "scd_skills"`)
-  const subs = await prisma.$executeRawUnsafe(`DELETE FROM "scd_specialties"`)
-  const cats = await prisma.$executeRawUnsafe(`DELETE FROM "scd_expertise_categories"`)
+  // Delete skills not referenced by any user data
+  const skills = await prisma.$executeRawUnsafe(
+    `DELETE FROM "scd_skills" WHERE "id" NOT IN (SELECT DISTINCT UNNEST("skill_ids") FROM "scd_user_expertises" WHERE "skill_ids" IS NOT NULL AND array_length("skill_ids", 1) > 0)`
+  ).catch(() => prisma.$executeRawUnsafe(`DELETE FROM "scd_skills"`).catch(() => 0))
+
+  // Delete specialties not referenced by any user data
+  const subs = await prisma.$executeRawUnsafe(
+    `DELETE FROM "scd_specialties" WHERE "id" NOT IN (SELECT DISTINCT "specialty_id" FROM "scd_user_expertises" WHERE "specialty_id" IS NOT NULL)`
+  ).catch(() => prisma.$executeRawUnsafe(`DELETE FROM "scd_specialties"`).catch(() => 0))
+
+  // Delete categories not referenced by any user data
+  const cats = await prisma.$executeRawUnsafe(
+    `DELETE FROM "scd_expertise_categories" WHERE "id" NOT IN (SELECT DISTINCT "expertise_category_id" FROM "scd_user_expertises" WHERE "expertise_category_id" IS NOT NULL)`
+  ).catch(() => 0)
+
   console.log(
     `   Taxonomy tables cleared (skills/specialties/categories affected rows: ${skills}/${subs}/${cats})`
   )
@@ -37,13 +45,27 @@ export async function seedExpertise(prisma: PrismaClient) {
   let totalSkills = 0
 
   for (const bundle of EXPERTISE_TAXONOMY_BUNDLES) {
-    const inserted = await prisma.$queryRaw<{ id: number }[]>`
-      INSERT INTO "scd_expertise_categories" ("name", "description", "is_active", "created_at", "updated_at")
-      VALUES (${bundle.categoryName}, ${null}, true, NOW(), NOW())
-      RETURNING "id"
+    // Upsert category — reuse existing if name matches
+    const existing = await prisma.$queryRaw<{ id: number }[]>`
+      SELECT "id" FROM "scd_expertise_categories" WHERE "name" = ${bundle.categoryName} LIMIT 1
     `
-    const categoryId = inserted[0].id
+    let categoryId: number
 
+    if (existing.length > 0) {
+      categoryId = existing[0].id
+      await prisma.$executeRaw`
+        UPDATE "scd_expertise_categories" SET "is_active" = true, "updated_at" = NOW() WHERE "id" = ${categoryId}
+      `
+    } else {
+      const inserted = await prisma.$queryRaw<{ id: number }[]>`
+        INSERT INTO "scd_expertise_categories" ("name", "description", "is_active", "created_at", "updated_at")
+        VALUES (${bundle.categoryName}, ${null}, true, NOW(), NOW())
+        RETURNING "id"
+      `
+      categoryId = inserted[0].id
+    }
+
+    // Upsert specialties
     const subRows = bundle.subcategories.map((s) => ({
       name: s.name,
       expertise_category_id: categoryId,
@@ -56,10 +78,12 @@ export async function seedExpertise(prisma: PrismaClient) {
         VALUES ${Prisma.join(
           batch.map((s) => Prisma.sql`(${s.name}, ${s.expertise_category_id}, true, NOW(), NOW())`)
         )}
+        ON CONFLICT ("name", "expertise_category_id") DO UPDATE SET "is_active" = true, "updated_at" = NOW()
       `
     }
     totalSubs += subRows.length
 
+    // Upsert skills
     const skillNames = new Set<string>()
     for (const sub of bundle.subcategories) {
       for (const raw of sub.skills) {
