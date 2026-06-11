@@ -42,6 +42,15 @@ const DURATION_MAP: Record<string, number> = {
 /** Minimum gap before a booking can be scheduled (2 hours 15 minutes). */
 const MIN_ADVANCE_MS = (2 * 60 + 15) * 60 * 1000;
 
+/** Founder must respond to a mentor's reschedule request within 48 hours. */
+const RESCHEDULE_RESPONSE_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/** Founder gets 0% refund if cancelling less than 24 hours before the call. */
+const LATE_CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** "Request Link" button becomes available 2 hours before the call. */
+const MEETING_LINK_REQUEST_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 /**
  * Format a date for notification text (email/DB) in IST.
  * The server typically runs in UTC, but bookings are entered in the user's local time (IST for now)
@@ -263,6 +272,7 @@ export class BookingService {
             rescheduled_by: userId,
             reschedule_count: rescheduleCount,
             reschedule_requested_at: null,
+            reschedule_response_deadline: null,
           },
         });
 
@@ -810,10 +820,12 @@ export class BookingService {
         isReschedule: b.is_reschedule,
         rescheduleCount: b.reschedule_count ?? 0,
         rescheduleRequestedAt: b.reschedule_requested_at ?? null,
+        rescheduleResponseDeadline: b.reschedule_response_deadline ?? null,
         parentId: b.parent_id,
         meetingLink: b.meeting_link ?? null,
         meetingProvider: b.meeting_provider ?? null,
         meetingLinkRequested: !b.meeting_link && await (prisma as any).bookingActivity.count({ where: { booking_id: b.id, action: 'MEETING_LINK_REQUESTED' } }) > 0,
+        canRequestMeetingLink: !b.meeting_link && b.status === 'CONFIRMED' && (new Date(b.scheduled_at).getTime() - Date.now()) <= MEETING_LINK_REQUEST_WINDOW_MS,
         completedAt: b.completed_at ?? null,
         rejectedAt: b.rejected_at ?? null,
         userApprovedAt: b.user_approved_at ?? null,
@@ -911,10 +923,12 @@ export class BookingService {
           isReschedule: booking.is_reschedule,
           rescheduleCount: booking.reschedule_count ?? 0,
           rescheduleRequestedAt: booking.reschedule_requested_at ?? null,
+          rescheduleResponseDeadline: booking.reschedule_response_deadline ?? null,
           parentId: booking.parent_id,
           meetingLink: booking.meeting_link ?? null,
           meetingProvider: booking.meeting_provider ?? null,
           meetingLinkRequested: !booking.meeting_link && (booking.activities ?? []).some((a: any) => a.action === 'MEETING_LINK_REQUESTED'),
+          canRequestMeetingLink: !booking.meeting_link && booking.status === 'CONFIRMED' && (new Date(booking.scheduled_at).getTime() - Date.now()) <= MEETING_LINK_REQUEST_WINDOW_MS,
           completedAt: booking.completed_at ?? null,
           rejectedAt: booking.rejected_at ?? null,
           userApprovedAt: booking.user_approved_at ?? null,
@@ -1032,6 +1046,7 @@ export class BookingService {
           cancelled_by: userId,
           cancelled_at: new Date(),
           reschedule_requested_at: null,
+          reschedule_response_deadline: null,
         },
       });
 
@@ -1044,6 +1059,94 @@ export class BookingService {
           acted_by: userId,
         },
       });
+
+      // ── Refund logic ──────────────────────────────────────────────────────
+      // Mentor cancels → full refund to founder (any time).
+      // Founder cancels ≥24hr before call → full refund.
+      // Founder cancels <24hr before call → 0% refund (Phase 1).
+      const isFounderCancelling = userId === booking.user_id;
+      const msUntilCall = new Date(booking.scheduled_at).getTime() - Date.now();
+      const isLateFounderCancel = isFounderCancelling && msUntilCall < LATE_CANCEL_WINDOW_MS;
+      let refundStatus: 'full' | 'none' | 'skipped' = 'skipped';
+
+      if (booking.status === 'CONFIRMED' && booking.billing_transaction_id) {
+        if (isLateFounderCancel) {
+          // 0% refund — founder forfeits payment
+          refundStatus = 'none';
+          await (prisma as any).bookingActivity.create({
+            data: {
+              booking_id: booking.id,
+              action: 'REFUND_DENIED',
+              reason: 'Cancellation less than 24 hours before session — 0% refund per policy',
+              acted_by: userId,
+            },
+          });
+        } else {
+          // Full refund — reverse Razorpay transfer + refund payment
+          refundStatus = 'full';
+          try {
+            const tx = await (prisma as any).billingTransaction.findUnique({
+              where: { id: booking.billing_transaction_id },
+            });
+
+            if (tx) {
+              // Reverse the Route transfer (still on hold)
+              if (tx.razorpay_transfer_id && razorpay) {
+                try {
+                  await razorpay.transfers.reverse(tx.razorpay_transfer_id);
+                  Log.info('Razorpay transfer reversed for cancelled booking', { transferId: tx.razorpay_transfer_id });
+                } catch (err: any) {
+                  Log.error('Failed to reverse Razorpay transfer', { err: err?.message, transferId: tx.razorpay_transfer_id });
+                }
+              }
+
+              // Refund the payment to founder
+              const paymentId = tx.meta?.razorpay_payment_id;
+              if (paymentId && razorpay) {
+                try {
+                  await razorpay.payments.refund(paymentId, {
+                    notes: { reason: 'Booking cancelled', booking_id: String(booking.id) },
+                  });
+                  Log.info('Razorpay payment refunded for cancelled booking', { paymentId });
+                } catch (err: any) {
+                  Log.error('Failed to refund Razorpay payment', { err: err?.message, paymentId });
+                }
+              }
+
+              // Update billing transaction status
+              await (prisma as any).billingTransaction.update({
+                where: { id: tx.id },
+                data: {
+                  status: BillingTransactionStatus.REFUND,
+                  type: BillingTransactionType.REFUND,
+                },
+              });
+
+              // Decrement mentor's pending wallet amount
+              await (prisma as any).userWallet.update({
+                where: { user_id: booking.mentor_id },
+                data: { pending_amount: { decrement: Number(booking.amount) } },
+              }).catch((err: any) => Log.error('Failed to decrement mentor pending amount on cancel', { err }));
+            }
+
+            await (prisma as any).booking.update({
+              where: { id: booking.id },
+              data: { payment_status: 'REFUNDED' },
+            });
+
+            await (prisma as any).bookingActivity.create({
+              data: {
+                booking_id: booking.id,
+                action: 'REFUNDED',
+                reason: isFounderCancelling ? 'Founder cancelled ≥24hr before session — full refund' : 'Mentor cancelled — full refund to founder',
+                acted_by: userId,
+              },
+            });
+          } catch (err: any) {
+            Log.error('Refund processing failed for cancelled booking', { err, bookingId: booking.id });
+          }
+        }
+      }
 
       // Notify both parties
       const cancellerName = await getUserFullName(userId);
@@ -1075,20 +1178,26 @@ export class BookingService {
       }
 
       // Sync to chat — raw data in metadata, frontend formats
+      const refundNote = refundStatus === 'full'
+        ? ' A full refund has been initiated.'
+        : refundStatus === 'none'
+          ? ' No refund — cancellation was less than 24 hours before the session.'
+          : '';
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
-        `❌ ${cancellerName} cancelled the call.`,
+        `❌ ${cancellerName} cancelled the call.${refundNote}`,
         {
           activityType: 'BOOKING_CANCELLED',
           bookingTitle: '1:1 Video Call',
           bookingDuration: booking.duration,
           bookingScheduledAt: booking.scheduled_at,
           cancelReason: reason?.trim() || null,
+          refundStatus,
         },
         undefined, userId
       );
 
-      return { success: true, message: 'Booking cancelled' };
+      return { success: true, message: 'Booking cancelled', data: { refundStatus } };
     } catch (error: any) {
       Log.error('Cancel booking error', { error });
       return { success: false, message: error.message || 'Failed to cancel booking' };
@@ -1840,9 +1949,18 @@ export class BookingService {
       const rescheduleLink = `${appConfig.frontendUrl}/book-a-call/${booking.mentor.unique_id}?reschedule=${booking.unique_id}`;
 
       // Mark the booking as having a pending reschedule request (drives the founder's "Reschedule meeting" button).
+      // Founder has 48 hours to respond — capped at the call start time if call is sooner.
+      const now = new Date();
+      const callTime = new Date(booking.scheduled_at).getTime();
+      const deadlineMs = Math.min(now.getTime() + RESCHEDULE_RESPONSE_WINDOW_MS, callTime);
+      const responseDeadline = new Date(deadlineMs);
+
       await (prisma as any).booking.update({
         where: { id: booking.id },
-        data: { reschedule_requested_at: new Date() },
+        data: {
+          reschedule_requested_at: now,
+          reschedule_response_deadline: responseDeadline,
+        },
       });
 
       // Activity log
@@ -1857,9 +1975,11 @@ export class BookingService {
       });
 
       // Email body
+      const deadlineStr = formatNotifDate(responseDeadline);
       const emailBody = `<p><strong>${escapeHtml(mentorName)}</strong> has requested to reschedule the 1:1 video call scheduled for <strong>${escapeHtml(dateStr)}</strong>.</p>` +
         (reason ? `<p style="font-size:13px;color:#667085;"><strong>Reason:</strong> ${escapeHtml(reason)}</p>` : '') +
         (remark?.trim() ? `<p style="font-size:13px;color:#667085;"><strong>Note:</strong> ${escapeHtml(remark.trim())}</p>` : '') +
+        `<p style="font-size:13px;color:#b91c1c;"><strong>Please respond by ${escapeHtml(deadlineStr)}.</strong> If no action is taken, the booking will be automatically cancelled.</p>` +
         `<p>You can <a href="${rescheduleLink}">pick a new time</a> for the call, or manage it from your <a href="${appConfig.frontendUrl}/my-bookings">bookings page</a>.</p>`;
 
       const inAppBody = `${mentorName} requested to reschedule the call on ${dateStr}.${reasonText}${remarkText}`;
@@ -1914,6 +2034,12 @@ export class BookingService {
       });
       if (!booking) return { success: false, message: 'Booking not found or you are not the attendee' };
       if (booking.meeting_link) return { success: false, message: 'Meeting link has already been added' };
+
+      // Only allow requesting a link within 2 hours of the call
+      const msUntilCall = new Date(booking.scheduled_at).getTime() - Date.now();
+      if (msUntilCall > MEETING_LINK_REQUEST_WINDOW_MS) {
+        return { success: false, message: 'You can request a meeting link starting 2 hours before the call' };
+      }
 
       // Rate-limit: allow only one request per booking
       const existing = await (prisma as any).bookingActivity.findFirst({
