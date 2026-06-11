@@ -30,6 +30,25 @@ export const dangerousHtmlMessages = {
   "string.dangerousHtml": "{{#label}} contains disallowed HTML content",
 };
 
+/** Strip HTML tags and return plain text. */
+function stripHtml(val: string): string {
+  return val.replace(/<[^>]*>/g, '');
+}
+
+/**
+ * Joi custom validator for rich-text (Tiptap) fields: validates max length
+ * against visible text content, not the raw HTML string.
+ */
+export function richTextMaxLength(max: number) {
+  return (value: string, helpers: Joi.CustomHelpers) => {
+    if (!value) return value;
+    if (stripHtml(value).length > max) {
+      return helpers.error('string.max', { limit: max });
+    }
+    return value;
+  };
+}
+
 const ANY_HTML_TAG = /<[^>]*>/;
 
 /** Joi custom validator that rejects ALL HTML tags in plain text fields. */

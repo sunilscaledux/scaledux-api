@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectDangerousHtml, dangerousHtmlMessages, richTextMaxLength } from '../../utils/validation'
 import { appConfig } from '../../config/app'
 
 export const createFounderProjectSchema = Joi.object({
@@ -10,7 +10,7 @@ export const createFounderProjectSchema = Joi.object({
     'string.max': 'Project title is too long (max 50 characters)',
     'any.required': 'Project title is required'
   }),
-  projectDescription: Joi.string().required().min(1).max(3000).custom(rejectDangerousHtml).messages({
+  projectDescription: Joi.string().required().min(1).custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
     'string.empty': 'Description is required',
     'string.max': 'Description is too long (max 3000 characters)',
@@ -125,7 +125,7 @@ export const saveDraftProjectSchema = Joi.object({
     'string.min': 'Project title is required',
     'any.required': 'Project title is required'
   }),
-  projectDescription: Joi.string().optional().allow('').max(3000).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  projectDescription: Joi.string().optional().allow('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({ 'string.max': 'Description is too long (max 3000 characters)', ...dangerousHtmlMessages }),
   categoryId: Joi.number().integer().positive().optional().allow(null),
   subCategoryId: Joi.number().integer().positive().optional().allow(null),
   projectFiles: Joi.array()
@@ -162,7 +162,7 @@ export const updateFounderProjectSchema = Joi.object({
     'string.min': 'Project title is required',
     'string.max': 'Project title is too long (max 50 characters)'
   }),
-  projectDescription: Joi.string().optional().allow('').max(3000).custom(rejectDangerousHtml).messages({
+  projectDescription: Joi.string().optional().allow('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
     'string.max': 'Description is too long (max 3000 characters)',
     ...dangerousHtmlMessages,

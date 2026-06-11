@@ -1,9 +1,9 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectDangerousHtml, dangerousHtmlMessages, richTextMaxLength } from '../../utils/validation'
 
 export const createMentorPackageSchema = Joi.object({
   packageTitle: Joi.string().required().min(1).max(100),
-  packageDescription: Joi.string().required().min(1).max(3000).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  packageDescription: Joi.string().required().min(1).custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   sessionDetails: Joi.object({
     sessionDuration: Joi.string().required().valid('15m', '30m', '45m'),
     noOfSessions: Joi.string().required().pattern(/^[0-9]+$/),
@@ -38,7 +38,7 @@ export const createMentorPackageSchema = Joi.object({
 
 export const updateMentorPackageSchema = Joi.object({
   packageTitle: Joi.string().min(1).max(100),
-  packageDescription: Joi.string().min(1).max(3000).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  packageDescription: Joi.string().min(1).custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   sessionDetails: Joi.object({
     sessionDuration: Joi.string().valid('15m', '30m', '45m'),
     noOfSessions: Joi.string().pattern(/^[0-9]+$/),
