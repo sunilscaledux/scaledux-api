@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
+import { rejectDangerousHtml, dangerousHtmlMessages, richTextMaxLength, validateSafeUrl, safeUrlMessages } from '../../utils/validation'
 
 export const createPortfolioSchema = Joi.object({
   title: Joi.string().required().min(1).max(125).messages({
@@ -9,7 +9,7 @@ export const createPortfolioSchema = Joi.object({
     'string.max': 'Project title is too long (max 125 characters)',
     'any.required': 'Project title is required'
   }),
-  description: Joi.string().required().min(1).custom(rejectDangerousHtml).messages({
+  description: Joi.string().required().min(1).custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
     'string.empty': 'Description is required',
     'any.required': 'Description is required',
@@ -74,7 +74,7 @@ export const updatePortfolioSchema = Joi.object({
     'string.min': 'Project title is required',
     'string.max': 'Project title is too long (max 125 characters)'
   }),
-  description: Joi.string().optional().min(1).custom(rejectDangerousHtml).messages({
+  description: Joi.string().optional().min(1).custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({
     'string.base': 'Description must be a string',
     'string.min': 'Description is required',
     ...dangerousHtmlMessages,
@@ -132,7 +132,7 @@ export const updatePortfolioSchema = Joi.object({
 // Draft schema - no validation required for drafts
 export const createDraftPortfolioSchema = Joi.object({
   title: Joi.string().optional().allow('').max(125),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyName: Joi.string().optional().allow('').max(50),
   hideCompanyName: Joi.boolean().optional().default(false),
   industryId: Joi.number().integer().positive().optional(),
@@ -153,7 +153,7 @@ export const createDraftPortfolioSchema = Joi.object({
 
 export const updateDraftPortfolioSchema = Joi.object({
   title: Joi.string().optional().allow('').max(125),
-  description: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  description: Joi.string().optional().allow('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   companyName: Joi.string().optional().allow('').max(50),
   hideCompanyName: Joi.boolean().optional(),
   industryId: Joi.number().integer().positive().optional(),

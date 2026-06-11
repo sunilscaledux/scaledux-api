@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { rejectDangerousHtml, dangerousHtmlMessages } from '../../utils/validation'
+import { rejectDangerousHtml, dangerousHtmlMessages, richTextMaxLength } from '../../utils/validation'
 
 export const createServicePackageSchema = Joi.object({
   title: Joi.string().required().min(1).max(200).messages({
@@ -23,7 +23,7 @@ export const createServicePackageSchema = Joi.object({
   basicLabel: Joi.string().optional().allow('').max(50).default('Basic'),
   standardLabel: Joi.string().optional().allow('').max(50).default('Standard'),
   premiumLabel: Joi.string().optional().allow('').max(50).default('Premium'),
-  packageDescription: Joi.string().optional().allow('').default('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  packageDescription: Joi.string().optional().allow('').default('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   deliverables: Joi.array().default([]),
   faqs: Joi.array().default([]),
   links: Joi.array().default([]),
@@ -53,7 +53,7 @@ export const updateServicePackageSchema = Joi.object({
   basicLabel: Joi.string().optional().allow('').max(50),
   standardLabel: Joi.string().optional().allow('').max(50),
   premiumLabel: Joi.string().optional().allow('').max(50),
-  packageDescription: Joi.string().optional().allow('').custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  packageDescription: Joi.string().optional().allow('').custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
   deliverables: Joi.array(),
   faqs: Joi.array(),
   links: Joi.array(),

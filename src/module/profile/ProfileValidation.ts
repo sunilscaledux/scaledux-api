@@ -1,6 +1,6 @@
 import Joi from "joi";
 import { ProfileSummaryInput, PersonalInfoInput, HourlyRateInput, AvailableHoursPerWeekInput } from "./ProfileType";
-import { rejectDangerousHtml, dangerousHtmlMessages, validateSafeUrl, safeUrlMessages } from "../../utils/validation";
+import { rejectDangerousHtml, dangerousHtmlMessages, richTextMaxLength, validateSafeUrl, safeUrlMessages } from "../../utils/validation";
 
 export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
   title: Joi.string().max(120).required().custom((value, helpers) => {
@@ -16,7 +16,7 @@ export const updateSummarySchema = Joi.object<ProfileSummaryInput>({
     'string.htmlNotAllowed': 'Title must not contain HTML tags',
     'string.sqlNotAllowed': 'Title contains invalid characters',
   }),
-  about: Joi.string().required().custom(rejectDangerousHtml).messages(dangerousHtmlMessages),
+  about: Joi.string().required().custom(richTextMaxLength(3000)).custom(rejectDangerousHtml).messages({ 'string.max': 'About is too long (max 3000 characters)', ...dangerousHtmlMessages }),
 });
 
 export const updatePersonalInfoSchema = Joi.object<PersonalInfoInput>({
