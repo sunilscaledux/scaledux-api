@@ -30,9 +30,9 @@ export const dangerousHtmlMessages = {
   "string.dangerousHtml": "{{#label}} contains disallowed HTML content",
 };
 
-/** Strip HTML tags and return plain text. Block-level closing tags become newlines to match Tiptap's CharacterCount. */
+/** Strip HTML tags and return plain text — matches Tiptap CharacterCount behavior. */
 function stripHtml(val: string): string {
-  return val.replace(/<\/(?:p|div|li|br|h[1-6]|blockquote)[^>]*>/gi, '\n').replace(/<[^>]*>/g, '').trim();
+  return val.replace(/<[^>]*>/g, '').trim();
 }
 
 /**
