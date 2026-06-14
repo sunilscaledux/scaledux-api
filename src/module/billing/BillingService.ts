@@ -786,7 +786,7 @@ export class BillingService {
     if (!milestone) return { success: false, message: 'Milestone not found' };
     const proposal = milestone.proposal;
     if (!proposal) return { success: false, message: 'Proposal not found' };
-    if (proposal.user_id !== freelancerId) return { success: false, message: 'You are not the freelancer on this contract' };
+    if (proposal.provider_id !== freelancerId) return { success: false, message: 'You are not the freelancer on this contract' };
 
     // Find the billing transaction for this milestone
     const tx = await (prisma as any).billingTransaction.findFirst({
