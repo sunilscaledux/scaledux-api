@@ -231,11 +231,34 @@ async function buildDeliverablesFromRow(row: any): Promise<any[]> {
 /** Build milestones with submitted_file derived from deliverables (Deliverable table). */
 async function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): Promise<any[]> {
   if (!Array.isArray(rows)) return [];
+
+  // Fetch billing/invoice status for milestones
+  const milestoneIds = rows.map((r: any) => r.id).filter(Boolean);
+  const invoiceStatuses = milestoneIds.length > 0
+    ? await (prisma as any).billingTransaction.findMany({
+        where: { milestone_id: { in: milestoneIds }, type: 'payment' },
+        select: { milestone_id: true, invoice_a_id: true, payer_invoice_id: true, receiver_invoice_id: true, unique_id: true, status: true, invoice_sent_at: true }
+      })
+    : [];
+  const invoiceMap = new Map<number, { invoiceSent: boolean; invoiceSentAt: string | null; transactionUniqueId: string | null; paymentStatus: string; hasInvoiceA: boolean; hasInvoiceB: boolean; hasInvoiceC: boolean }>();
+  for (const tx of invoiceStatuses) {
+    invoiceMap.set(tx.milestone_id, {
+      invoiceSent: tx.invoice_a_id != null,
+      invoiceSentAt: tx.invoice_sent_at ? new Date(tx.invoice_sent_at).toISOString() : null,
+      transactionUniqueId: tx.unique_id,
+      paymentStatus: tx.status,
+      hasInvoiceA: tx.invoice_a_id != null,
+      hasInvoiceB: tx.receiver_invoice_id != null,
+      hasInvoiceC: tx.payer_invoice_id != null,
+    });
+  }
+
   return Promise.all(rows
     .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
     .map(async (row) => {
       const deliverables = await buildDeliverablesFromRow(row);
       const submittedFile = deliverables.flatMap((d: any) => (Array.isArray(d.submitted_file) ? d.submitted_file : []));
+      const txInfo = invoiceMap.get(row.id);
       return {
         id: row.unique_id,
         milestoneId: row.id,
@@ -248,7 +271,14 @@ async function milestonesFromRowsWithDocuments(rows: any[] | null | undefined): 
         milestone_status: row.status ?? MilestoneStatus.PENDING,
         submitted_file: submittedFile,
         is_approved: row.is_approved === true,
-        remark: row.remark ?? undefined
+        remark: row.remark ?? undefined,
+        invoice_sent: txInfo?.invoiceSent ?? false,
+        invoice_sent_at: txInfo?.invoiceSentAt ?? null,
+        transaction_unique_id: txInfo?.transactionUniqueId ?? null,
+        billing_status: txInfo?.paymentStatus ?? null,
+        has_invoice_a: txInfo?.hasInvoiceA ?? false,
+        has_invoice_b: txInfo?.hasInvoiceB ?? false,
+        has_invoice_c: txInfo?.hasInvoiceC ?? false,
       };
     }));
 }
