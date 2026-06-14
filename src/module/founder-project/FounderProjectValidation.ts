@@ -58,12 +58,16 @@ export const createFounderProjectSchema = Joi.object({
       if (isNaN(num) || num < appConfig.minProjectBudget) {
         return helpers.error('any.invalid');
       }
+      if (num > 5000000) {
+        return helpers.error('any.max');
+      }
       return value;
     }).messages({
       'string.base': 'Amount must be a string',
       'string.empty': 'Amount is required',
       'any.required': 'Amount is required',
-      'any.invalid': `Minimum budget should be ₹${appConfig.minProjectBudget}`
+      'any.invalid': `Minimum budget should be ₹${appConfig.minProjectBudget}`,
+      'any.max': 'Maximum budget should be ₹50,00,000'
     })
   }).required().messages({
     'any.required': 'Budget is required'
