@@ -1,10 +1,12 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { BillingService } from "../../module/billing/BillingService";
+import { BookingService } from "../../module/booking/BookingService";
 
 /**
- * Auto-approve milestone invoices not acknowledged by the founder within 48 hours.
- * Triggers Razorpay transfer (same as manual acknowledge).
+ * Auto-approve milestone invoices AND booking confirmations not acknowledged
+ * by the founder within 48 hours. Triggers Razorpay transfer for milestones,
+ * auto-accepts booking confirmation for bookings.
  *
  * Runs every 15 minutes.
  */
@@ -17,8 +19,8 @@ export async function handle(): Promise<void> {
   const cutoff = new Date();
   cutoff.setHours(cutoff.getHours() - AUTO_APPROVE_HOURS);
 
-  // Find funded transactions where invoice was sent but not acknowledged within 24h
-  const expired = await (prisma as any).billingTransaction.findMany({
+  // ── 1. Auto-approve milestone invoices ──
+  const expiredInvoices = await (prisma as any).billingTransaction.findMany({
     where: {
       type: "payment",
       status: "pending",
@@ -29,19 +31,15 @@ export async function handle(): Promise<void> {
     take: 50,
   });
 
-  if (expired.length === 0) return;
-
-  let count = 0;
-
-  for (const tx of expired) {
+  let invoiceCount = 0;
+  for (const tx of expiredInvoices) {
     try {
       const result = await BillingService.acknowledgeMilestonePayment(
         tx.unique_id,
-        tx.from_id // founder (payer) id — same as manual acknowledge
+        tx.from_id
       );
-
       if (result.success) {
-        count += 1;
+        invoiceCount += 1;
       } else {
         Log.error(`[invoice-auto-approve] Failed for tx ${tx.unique_id}: ${result.message}`);
       }
@@ -50,7 +48,36 @@ export async function handle(): Promise<void> {
     }
   }
 
-  if (count > 0) {
-    Log.info(`[invoice-auto-approve] Auto-approved ${count} invoice(s)`);
+  // ── 2. Auto-accept booking confirmations ──
+  const expiredBookings = await (prisma as any).booking.findMany({
+    where: {
+      status: "COMPLETED",
+      completed_at: { not: null, lte: cutoff },
+      user_approved_at: null,
+    },
+    select: { id: true, unique_id: true, user_id: true },
+    take: 50,
+  });
+
+  let bookingCount = 0;
+  for (const booking of expiredBookings) {
+    try {
+      const result = await BookingService.acceptCompletion(
+        booking.user_id,
+        booking.unique_id,
+        { accepted: true }
+      );
+      if (result.success) {
+        bookingCount += 1;
+      } else {
+        Log.error(`[invoice-auto-approve] Booking ${booking.unique_id}: ${result.message}`);
+      }
+    } catch (err) {
+      Log.error(`[invoice-auto-approve] Booking error ${booking.unique_id}`, { err });
+    }
+  }
+
+  if (invoiceCount > 0 || bookingCount > 0) {
+    Log.info(`[invoice-auto-approve] Auto-approved ${invoiceCount} invoice(s), ${bookingCount} booking(s)`);
   }
 }
