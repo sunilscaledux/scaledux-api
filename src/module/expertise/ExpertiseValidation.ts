@@ -24,8 +24,9 @@ export const createUserExpertiseSchema = Joi.object({
     'string.max': 'Description cannot exceed 1000 characters',
     ...noHtmlMessages,
   }),
-  skills: Joi.array().items(Joi.string().trim().min(1).max(100)).max(20).optional().messages({
+  skills: Joi.array().items(Joi.string().trim().min(1).max(100)).min(2).max(20).optional().messages({
     'array.base': 'Skills must be an array',
+    'array.min': 'Minimum 2 skills required',
     'array.max': 'Cannot have more than 20 skills',
     'string.base': 'Each skill must be a string',
     'string.min': 'Skill name cannot be empty',

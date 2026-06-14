@@ -38,9 +38,10 @@ export const createFounderProjectSchema = Joi.object({
     'string.empty': 'Scope of work is required',
     'any.required': 'Scope of work is required'
   }),
-  skillsRequired: Joi.array().items(Joi.string()).min(2).messages({
+  skillsRequired: Joi.array().items(Joi.string()).min(2).max(20).messages({
     'array.base': 'Skills required must be an array',
-    'array.min': 'At least 2 skills are required'
+    'array.min': 'At least 2 skills are required',
+    'array.max': 'Maximum 20 skills allowed'
   }),
   experienceNeeded: Joi.string().required().min(1).messages({
     'string.base': 'Experience needed must be a string',
@@ -137,7 +138,9 @@ export const saveDraftProjectSchema = Joi.object({
     .optional()
     .allow(null),
   scopeOfWork: Joi.string().optional().allow(''),
-  skillsRequired: Joi.array().items(Joi.string()).optional().allow(null),
+  skillsRequired: Joi.array().items(Joi.string()).max(20).optional().allow(null).messages({
+    'array.max': 'Maximum 20 skills allowed'
+  }),
   experienceNeeded: Joi.string().optional().allow(''),
   budget: Joi.object({
     currency: Joi.string().optional().allow(''),
@@ -187,7 +190,9 @@ export const updateFounderProjectSchema = Joi.object({
     .allow(null)
     .messages({ 'array.base': 'Project files must be an array' }),
   scopeOfWork: Joi.string().optional().allow(''),
-  skillsRequired: Joi.array().items(Joi.string()).optional().allow(null),
+  skillsRequired: Joi.array().items(Joi.string()).max(20).optional().allow(null).messages({
+    'array.max': 'Maximum 20 skills allowed'
+  }),
   experienceNeeded: Joi.string().optional().allow(''),
   budget: Joi.object({
     currency: Joi.string().optional().allow(''),

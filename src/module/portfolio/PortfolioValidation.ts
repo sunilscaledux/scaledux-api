@@ -32,9 +32,10 @@ export const createPortfolioSchema = Joi.object({
     'string.base': 'Role must be a string',
     'string.max': 'Role name is too long (max 50 characters)'
   }),
-  projectSkills: Joi.array().items(Joi.string()).min(2).messages({
+  projectSkills: Joi.array().items(Joi.string()).min(2).max(20).messages({
     'array.base': 'Project skills must be an array',
-    'array.min': 'Select minimum 2 skills'
+    'array.min': 'Select minimum 2 skills',
+    'array.max': 'Maximum 20 skills allowed'
   }),
   thumbnail: Joi.string().optional().allow(null, '').messages({
     'string.base': 'Thumbnail must be a string (URL or path)'
@@ -93,9 +94,10 @@ export const updatePortfolioSchema = Joi.object({
     'string.base': 'Role must be a string',
     'string.max': 'Role name is too long (max 50 characters)'
   }),
-  projectSkills: Joi.array().items(Joi.string()).optional().min(2).messages({
+  projectSkills: Joi.array().items(Joi.string()).optional().min(2).max(20).messages({
     'array.base': 'Project skills must be an array',
-    'array.min': 'Select minimum 2 skills'
+    'array.min': 'Select minimum 2 skills',
+    'array.max': 'Maximum 20 skills allowed'
   }),
   thumbnail: Joi.string().optional().allow(null, '').messages({
     'string.base': 'Thumbnail must be a string (URL or path)'

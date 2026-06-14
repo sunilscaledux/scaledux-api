@@ -23,7 +23,10 @@ export const createLicenseSchema = Joi.object({
     'any.required': 'Completed year is required'
   }),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  skills: Joi.array().items(Joi.string()).optional().default([])
+  skills: Joi.array().items(Joi.string()).min(2).max(20).optional().default([]).messages({
+    'array.min': 'Minimum 2 skills required',
+    'array.max': 'Maximum 20 skills allowed'
+  })
 })
 
 export const updateLicenseSchema = Joi.object({
@@ -54,5 +57,8 @@ export const updateLicenseSchema = Joi.object({
     'any.required': 'Completed year is required'
   }),
   description: Joi.string().optional().allow('').custom(rejectAllHtml).messages(noHtmlMessages),
-  skills: Joi.array().items(Joi.string()).optional().default([])
+  skills: Joi.array().items(Joi.string()).min(2).max(20).optional().default([]).messages({
+    'array.min': 'Minimum 2 skills required',
+    'array.max': 'Maximum 20 skills allowed'
+  })
 })

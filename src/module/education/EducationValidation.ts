@@ -36,7 +36,10 @@ export const createEducationSchema = Joi.object<CreateEducationInput>({
     'string.max': 'Description must not exceed 500 characters',
     ...noHtmlMessages,
   }),
-  skills: Joi.array().items(Joi.string()).optional().default([])
+  skills: Joi.array().items(Joi.string()).min(2).max(20).optional().default([]).messages({
+    'array.min': 'Minimum 2 skills required',
+    'array.max': 'Maximum 20 skills allowed'
+  })
 });
 
 export const updateEducationSchema = Joi.object<UpdateEducationInput>({
@@ -78,5 +81,8 @@ export const updateEducationSchema = Joi.object<UpdateEducationInput>({
     'string.max': 'Description must not exceed 500 characters',
     ...noHtmlMessages,
   }),
-  skills: Joi.array().items(Joi.string()).optional().default([])
+  skills: Joi.array().items(Joi.string()).min(2).max(20).optional().default([]).messages({
+    'array.min': 'Minimum 2 skills required',
+    'array.max': 'Maximum 20 skills allowed'
+  })
 });
