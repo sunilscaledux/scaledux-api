@@ -797,6 +797,12 @@ export class BillingService {
 
     await this.createInvoiceA(tx.id);
 
+    // Set invoice_sent_at for 24h auto-approve countdown
+    await (prisma as any).billingTransaction.update({
+      where: { id: tx.id },
+      data: { invoice_sent_at: new Date() }
+    });
+
     // Notify founder
     const { dispatch } = await import('@queues/Queue');
     const { NotificationJob } = await import('../../jobs/NotificationJob');

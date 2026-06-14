@@ -1542,6 +1542,8 @@ model BillingTransaction {
   // Razorpay Route
   razorpay_transfer_id String?  @db.VarChar(50)
   on_hold              Boolean  @default(false)
+  /** When the freelancer sent Invoice A; used for 24h auto-approve countdown. */
+  invoice_sent_at      DateTime?
 
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
