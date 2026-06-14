@@ -1456,10 +1456,10 @@ export class FounderProjectService {
 
       // Sync to chat: get-or-create conversation and add system message (initiator = founder)
       const projectTitle = project.project_title || "Project";
-      const chatSync = await ConversationService.syncSystemMessage(
+      await ConversationService.syncSystemMessage(
         project.user_id,
         providerId,
-        "",
+        message || "",
         {
           activityType: "project_invitation",
           activityId: project.unique_id,
@@ -1470,15 +1470,6 @@ export class FounderProjectService {
         project.id,
         project.user_id
       );
-
-      // Send the invitation message as a regular chat message from the founder
-      if (message && chatSync.success && chatSync.data?.conversationUniqueId) {
-        await ConversationService.sendMessage(
-          chatSync.data.conversationUniqueId,
-          project.user_id,
-          message
-        );
-      }
 
       const founderName = [project.user?.first_name, project.user?.last_name].filter(Boolean).join(' ') || 'Someone';
       const notificationTitle = `${founderName} invited you to "${projectTitle}"`;
