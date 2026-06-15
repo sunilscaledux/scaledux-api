@@ -567,7 +567,12 @@ export class FounderProjectService {
       const transformedProjects = await Promise.all(paginatedProjects.map(async (project: any) => {
         const { invites, savedByUsers, subcategory, _match_score, _matched_skills, ...projectData } = project;
         const currencySymbol = project.user?.currency?.symbol || '₹';
-        if (projectData.user) maskUserName(projectData.user);
+        if (projectData.user) {
+          maskUserName(projectData.user);
+          if (projectData.user.personalInfo?.profileImage) {
+            projectData.user.personalInfo.profileImage = await resolveAttachmentUrl(projectData.user.personalInfo.profileImage, 'profile_image');
+          }
+        }
         return {
           ...projectData,
           subCategory: subcategory,
@@ -746,6 +751,10 @@ export class FounderProjectService {
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, subcategory, category: cat, ...projectData } = project as any;
       if (!isOwner && projectData.user) maskUserName(projectData.user);
+      // Resolve founder profile image
+      if (projectData.user?.personalInfo?.profileImage) {
+        projectData.user.personalInfo.profileImage = await resolveAttachmentUrl(projectData.user.personalInfo.profileImage, 'profile_image');
+      }
       // Use user's currency symbol if available
       const currencySymbol = (project as any).user?.currency?.symbol || '₹';
       const transformedProject = {
