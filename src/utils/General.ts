@@ -17,7 +17,7 @@ export function getDisplayName(
     .join(' ');
   return {
     firstName,
-    lastName: user.last_name ? (maskLastName ? `${user.last_name.charAt(0)}.` : user.last_name) : null,
+    lastName: user.last_name ? (maskLastName ? `${user.last_name.charAt(0).toUpperCase()}.` : user.last_name) : null,
   };
 }
 

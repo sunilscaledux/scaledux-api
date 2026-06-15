@@ -31,7 +31,7 @@ export class MentorService {
       const where: any = {
         role: 'mentor',
         status: 1,
-        profile_completion_percentage: { gte: 75 },
+        profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD },
       };
 
       if (params.search?.trim()) {

@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from "@services/attachmentService";
+import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
 
 export class InvestorService {
 
@@ -25,7 +26,7 @@ export class InvestorService {
         role: 'investor',
         status: 1,
         investmentProfile: { isNot: null },
-        profile_completion_percentage: { gte: 75 },
+        profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD },
       };
 
       if (params.search?.trim()) {

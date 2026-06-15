@@ -4,6 +4,7 @@ import { ApiResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
 import { calculateProfileCompletion } from "../profile/ProfileCompletionService";
 import { getReasonsByKey } from "@constants/proposalReasons";
+import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
 
 /**
  * Get helper for safe string params
@@ -25,7 +26,7 @@ export async function getProposalReasons(req: Request, res: Response) {
 }
 
 const DEFAULT_PROPOSAL_PAGE_LIMIT = Number(process.env.PROPOSAL_PAGE_LIMIT) || 50;
-const MIN_PROFILE_COMPLETION_PERCENT = Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 50;
+const MIN_PROFILE_COMPLETION_PERCENT = PROFILE_COMPLETION_THRESHOLD;
 
 /**
  * Create a new proposal
