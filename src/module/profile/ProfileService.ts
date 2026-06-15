@@ -81,7 +81,7 @@ export class PersonalInfoService {
 
       // Personal profile tab (common for all roles)
       const personalProfile = {
-        id: profile?.id ?? null,
+        id: user.id,
         unique_id: user.unique_id,
         profileImage: profile?.profileImage ? await resolveAttachmentUrl(profile.profileImage, 'profile_image') : null,
         coverImage: profile?.coverImage ? await resolveAttachmentUrl(profile.coverImage, 'cover_image') : null,
