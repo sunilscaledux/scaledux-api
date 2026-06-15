@@ -124,7 +124,7 @@ export function generateBackupCodes(count = 8): string[] {
   )
 }
 
-/** Fetch a user's full display name by ID. Returns "Someone" if not found. */
+/** Fetch a user's masked display name by ID. Returns "Someone" if not found. */
 export async function getUserFullName(userId: number): Promise<string> {
   const { prisma } = await import('../services/prismaService');
   const user = await prisma.user.findUnique({
@@ -132,5 +132,12 @@ export async function getUserFullName(userId: number): Promise<string> {
     select: { first_name: true, last_name: true }
   });
   if (!user) return 'Someone';
-  return [user.first_name, user.last_name].filter(Boolean).join(' ');
+  const { firstName, lastName } = getDisplayName(user, { maskLastName: true });
+  return [firstName, lastName].filter(Boolean).join(' ');
+}
+
+/** Build masked display name string from a user-like object. */
+export function getMaskedName(user: { first_name: string; last_name?: string | null }): string {
+  const { firstName, lastName } = getDisplayName(user, { maskLastName: true });
+  return [firstName, lastName].filter(Boolean).join(' ');
 }

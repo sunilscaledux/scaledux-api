@@ -1,7 +1,7 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { Log } from '@services/loggerService';
-import { getUserFullName } from '@utils/General';
+import { getUserFullName, getMaskedName, getDisplayName } from '@utils/General';
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
@@ -292,7 +292,7 @@ export class BookingService {
 
         // Send notifications to both parties
         const reschedulerName = await getUserFullName(userId);
-        const mentorName = `${mentor.first_name} ${mentor.last_name}`.trim();
+        const mentorName = getMaskedName(mentor);
         const isMentorRescheduling = userId === mentor.id;
         const bookingUserId = oldBooking.user_id;
 
@@ -522,8 +522,8 @@ export class BookingService {
         return;
       }
 
-      const mentorName = `${booking.mentor.first_name ?? ''} ${booking.mentor.last_name ?? ''}`.trim();
-      const founderName = `${booking.user.first_name ?? ''} ${booking.user.last_name ?? ''}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
+      const founderName = getMaskedName(booking.user);
       const summary = `${booking.title} — ${mentorName} & ${founderName}`.trim();
       const description = booking.message ? `Discussion points:\n${booking.message}` : undefined;
       const attendeeEmails = [booking.mentor.email, booking.user.email].filter(Boolean) as string[];
@@ -676,7 +676,7 @@ export class BookingService {
 
       // Notify both mentor and user after successful payment
       const userName = await getUserFullName(userId);
-      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
       const isReschedule = booking.is_reschedule;
 
       // Notify mentor
@@ -834,14 +834,12 @@ export class BookingService {
         createdAt: b.created_at,
         mentor: {
           uniqueId: b.mentor.unique_id,
-          firstName: b.mentor.first_name,
-          lastName: b.mentor.last_name,
+          ...(() => { const dn = getDisplayName(b.mentor, { maskLastName: true }); return { firstName: dn.firstName, lastName: dn.lastName }; })(),
           profileImage: await resolveProfileImage(b.mentor.personalInfo?.profileImage),
         },
         user: {
           uniqueId: b.user.unique_id,
-          firstName: b.user.first_name,
-          lastName: b.user.last_name,
+          ...(() => { const dn = getDisplayName(b.user, { maskLastName: true }); return { firstName: dn.firstName, lastName: dn.lastName }; })(),
           profileImage: await resolveProfileImage(b.user.personalInfo?.profileImage),
         },
       })));
@@ -937,16 +935,14 @@ export class BookingService {
           mentor: {
             id: booking.mentor.id,
             uniqueId: booking.mentor.unique_id,
-            firstName: booking.mentor.first_name,
-            lastName: booking.mentor.last_name,
+            ...(() => { const dn = getDisplayName(booking.mentor, { maskLastName: true }); return { firstName: dn.firstName, lastName: dn.lastName }; })(),
             profileImage: await resolveProfileImage(booking.mentor.personalInfo?.profileImage),
             tagline: booking.mentor.personalInfo?.title || null,
           },
           user: {
             id: booking.user.id,
             uniqueId: booking.user.unique_id,
-            firstName: booking.user.first_name,
-            lastName: booking.user.last_name,
+            ...(() => { const dn = getDisplayName(booking.user, { maskLastName: true }); return { firstName: dn.firstName, lastName: dn.lastName }; })(),
             profileImage: await resolveProfileImage(booking.user.personalInfo?.profileImage),
           },
         },
@@ -1483,7 +1479,7 @@ export class BookingService {
       });
 
       // Notify the user (mentee) about the meeting link
-      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
       const actionWord = isUpdate ? 'updated' : 'added';
       const notifBody = `<p><strong>${escapeHtml(mentorName)}</strong> has ${actionWord} the meeting link for your upcoming 1:1 video call on <strong>${escapeHtml(dateStr)}</strong>.</p>
@@ -1590,7 +1586,7 @@ export class BookingService {
         },
       });
 
-      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
       const scheduledAt = new Date(booking.scheduled_at);
       const dateStr = formatNotifDate(scheduledAt);
 
@@ -1726,7 +1722,7 @@ export class BookingService {
         });
 
         // Notify mentor of the dispute
-        const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+        const founderName = getMaskedName(booking.user);
         const disputeBody = `<p><strong>${escapeHtml(founderName)}</strong> has indicated that the call did not happen as expected.</p>
           ${opts.reason ? `<p><strong>Reason:</strong> ${escapeHtml(opts.reason)}</p>` : ''}
           ${opts.remark ? `<p><strong>Details:</strong> ${escapeHtml(opts.remark)}</p>` : ''}
@@ -1843,8 +1839,8 @@ export class BookingService {
       }
 
       // Now send rate prompts to both parties
-      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
-      const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
+      const founderName = getMaskedName(booking.user);
       const scheduledAt = new Date(booking.scheduled_at);
       const dateStr = formatNotifDate(scheduledAt);
       const reviewLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/submit-review`;
@@ -1947,7 +1943,7 @@ export class BookingService {
         return { success: false, message: 'Invalid reschedule reason' };
       }
 
-      const mentorName = `${booking.mentor.first_name} ${booking.mentor.last_name}`.trim();
+      const mentorName = getMaskedName(booking.mentor);
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
       const reasonText = reason ? ` Reason: ${reason}.` : '';
       const remarkText = remark?.trim() ? ` Note: "${remark.trim()}"` : '';
@@ -2062,7 +2058,7 @@ export class BookingService {
         },
       });
 
-      const founderName = `${booking.user.first_name} ${booking.user.last_name}`.trim();
+      const founderName = getMaskedName(booking.user);
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
       const bookingLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}`;
 
