@@ -1250,11 +1250,12 @@ export class FounderProjectService {
         const isInvited = pendingInvitedProviderIds.includes(freelancer.id);
         const isSaved = savedProviderIds.includes(freelancer.id);
 
+        const { firstName, lastName } = getDisplayName(freelancer, { maskLastName: true });
         return {
           id: freelancer.id,
           unique_id: freelancer.unique_id,
-          first_name: freelancer.first_name,
-          last_name: freelancer.last_name,
+          first_name: firstName,
+          last_name: lastName ?? '',
           email: freelancer.email,
           profile_image: freelancer.personalInfo?.profileImage
             ? await resolveAttachmentUrl(freelancer.personalInfo.profileImage, 'profile_image')
@@ -1473,7 +1474,8 @@ export class FounderProjectService {
         project.user_id
       );
 
-      const founderName = [project.user?.first_name, project.user?.last_name].filter(Boolean).join(' ') || 'Someone';
+      const founderDn = project.user ? getDisplayName(project.user, { maskLastName: true }) : null;
+      const founderName = founderDn ? [founderDn.firstName, founderDn.lastName].filter(Boolean).join(' ') : 'Someone';
       const notificationTitle = `${founderName} invited you to "${projectTitle}"`;
       const bodyParts = [`${founderName} invited you to submit a proposal for "${projectTitle}".`];
       if (message) bodyParts.push(`"${message}"`);
