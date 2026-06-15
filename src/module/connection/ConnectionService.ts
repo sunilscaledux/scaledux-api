@@ -83,7 +83,7 @@ export class ConnectionService {
           });
         }
       } else {
-        const created = await (prisma as any).connection.create({
+        await (prisma as any).connection.create({
           data: {
             sender_id: senderId,
             receiver_id: receiver.id,
@@ -91,25 +91,29 @@ export class ConnectionService {
             note: note || null,
           },
         });
-
-        // Notify receiver only for brand new connection requests
-        const senderName = await getUserFullName(senderId);
-        const notifBody = note
-          ? `<p><strong>${senderName}</strong> sent you a connection request.</p><p style="color:#667085;font-size:13px;margin-top:8px;">"${note}"</p>`
-          : `<p><strong>${senderName}</strong> sent you a connection request.</p>`;
-        const notifData = {
-          userId: receiver.id,
-          type: 'REQUEST_RECEIVED' as const,
-          notificationTitle: 'New connection request',
-          notificationBody: notifBody,
-          notificationLink: `${appConfig.frontendUrl}/my-connects`,
-          actorId: senderId,
-          subjectType: 'Connection' as const,
-          subjectId: created.id,
-        };
-        await dispatch(NotificationJob, notifData);
-        await dispatch(NotificationEmailJob, notifData);
       }
+
+      // Notify receiver for all new/re-requests (skip only if auto-accepted above)
+      const senderName = await getUserFullName(senderId);
+      const notifBody = note
+        ? `<p><strong>${senderName}</strong> sent you a connection request.</p><p style="color:#667085;font-size:13px;margin-top:8px;">"${note}"</p>`
+        : `<p><strong>${senderName}</strong> sent you a connection request.</p>`;
+      const latestConn = await (prisma as any).connection.findFirst({
+        where: { sender_id: senderId, receiver_id: receiver.id },
+        select: { id: true },
+      });
+      const notifData = {
+        userId: receiver.id,
+        type: 'REQUEST_RECEIVED' as const,
+        notificationTitle: 'New connection request',
+        notificationBody: notifBody,
+        notificationLink: `${appConfig.frontendUrl}/my-connects`,
+        actorId: senderId,
+        subjectType: 'Connection' as const,
+        subjectId: latestConn?.id ?? 0,
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
 
       // Create conversation with NOT_ACCEPTED status and send the note as first message
       if (note) {
