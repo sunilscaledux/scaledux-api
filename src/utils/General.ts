@@ -21,6 +21,15 @@ export function getDisplayName(
   };
 }
 
+/** Mutate a user-like object so first_name / last_name use the masked display name.
+ *  Handy for API responses that spread raw DB rows into JSON. */
+export function maskUserName<T extends { first_name: string; last_name?: string | null }>(user: T): T {
+  const { firstName, lastName } = getDisplayName(user, { maskLastName: true });
+  user.first_name = firstName;
+  (user as any).last_name = lastName ?? '';
+  return user;
+}
+
 /** Generate a unique 8-char alphanumeric keycode for identity verification (e.g. "6E4E904W"). */
 export function generateKeycode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

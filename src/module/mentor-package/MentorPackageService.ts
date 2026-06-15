@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
+import { getDisplayName } from '@utils/General';
 
 const categorySelect = {
   category: { select: { id: true, name: true } as const },
@@ -125,8 +126,8 @@ function transformOutput(pkg: any) {
           user: {
             id: user.id,
             uniqueId: user.unique_id,
-            firstName: user.first_name,
-            lastName: user.last_name,
+            firstName: getDisplayName(user, { maskLastName: true }).firstName,
+            lastName: getDisplayName(user, { maskLastName: true }).lastName,
             profileImage: user.personalInfo?.profileImage || null,
           },
         }

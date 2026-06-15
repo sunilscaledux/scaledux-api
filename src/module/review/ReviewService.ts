@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { isValidContractEndReason } from "../../constants/contractEndReasons";
 import { Log } from '@services/loggerService';
+import { maskUserName } from '@utils/General';
 
 const ACTION_TYPE_PROPOSAL_CONTRACT = 'PROPOSAL_CONTRACT';
 const ACTION_TYPE_BOOKING = 'BOOKING';
@@ -268,7 +269,7 @@ export async function getReviewsForProposal(
       ratings_extra: r.ratings_extra,
       created_at: r.created_at,
       updated_at: r.updated_at,
-      review_from: r.review_from,
+      review_from: r.review_from ? maskUserName({ ...r.review_from }) : r.review_from,
       review_to: r.review_to
     }));
 
@@ -333,7 +334,7 @@ export async function getMyReviews(
       ratings_extra: r.ratings_extra,
       created_at: r.created_at,
       updated_at: r.updated_at,
-      review_from: r.review_from,
+      review_from: r.review_from ? maskUserName({ ...r.review_from }) : r.review_from,
       review_to: r.review_to
     }));
 
@@ -467,13 +468,10 @@ export async function getPublicReviewsByProfileUniqueId(
       created_at: r.created_at,
       updated_at: r.updated_at,
       review_from: r.review_from
-        ? {
-            id: r.review_from.id,
-            unique_id: r.review_from.unique_id,
-            first_name: r.review_from.first_name,
-            last_name: r.review_from.last_name,
-            profileImage: r.review_from.personalInfo?.profileImage ?? null
-          }
+        ? (() => {
+            const m = maskUserName({ ...r.review_from });
+            return { id: m.id, unique_id: m.unique_id, first_name: m.first_name, last_name: m.last_name, profileImage: r.review_from.personalInfo?.profileImage ?? null };
+          })()
         : undefined
     }));
 

@@ -9,7 +9,7 @@ import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ProposalStatus, InviteStatus } from '@constants/status';
-import { getUserFullName, getDisplayName } from '@utils/General';
+import { getUserFullName, getDisplayName, maskUserName } from '@utils/General';
 import { MatchingService, buildFreelancerProfile } from '@services/matchingService';
 import { areMandatorySectionsComplete, type ProfileCompletionSectionsMap } from '@constants/profileCompletion';
 import { PROFILE_COMPLETION_THRESHOLD } from '@middleware/requireCompleteProfile';
@@ -567,11 +567,7 @@ export class FounderProjectService {
       const transformedProjects = await Promise.all(paginatedProjects.map(async (project: any) => {
         const { invites, savedByUsers, subcategory, _match_score, _matched_skills, ...projectData } = project;
         const currencySymbol = project.user?.currency?.symbol || '₹';
-        // Mask founder name for service-provider browse view
-        if (projectData.user) {
-          const { firstName, lastName } = getDisplayName(projectData.user, { maskLastName: true });
-          projectData.user = { ...projectData.user, first_name: firstName, last_name: lastName ?? '' };
-        }
+        if (projectData.user) maskUserName(projectData.user);
         return {
           ...projectData,
           subCategory: subcategory,
@@ -749,11 +745,7 @@ export class FounderProjectService {
 
       // Transform file URLs and remove relation data from response
       const { invites, savedByUsers, subcategory, category: cat, ...projectData } = project as any;
-      // Mask founder name for non-owners
-      if (!isOwner && projectData.user) {
-        const { firstName, lastName } = getDisplayName(projectData.user, { maskLastName: true });
-        projectData.user = { ...projectData.user, first_name: firstName, last_name: lastName ?? '' };
-      }
+      if (!isOwner && projectData.user) maskUserName(projectData.user);
       // Use user's currency symbol if available
       const currencySymbol = (project as any).user?.currency?.symbol || '₹';
       const transformedProject = {

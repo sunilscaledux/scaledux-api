@@ -1,5 +1,6 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
+import { maskUserName } from '@utils/General';
 
 export interface NotificationItem {
   id: number;
@@ -47,6 +48,7 @@ export class NotificationService {
     });
     const hasMore = rows.length > limit;
     const list = rows.slice(0, limit);
+    list.forEach((n: any) => { if (n.actor) maskUserName(n.actor); });
     return { success: true, message: 'OK', data: { list, hasMore } };
   }
 

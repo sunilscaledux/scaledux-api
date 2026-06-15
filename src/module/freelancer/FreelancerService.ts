@@ -3,6 +3,7 @@ import { Log } from "@services/loggerService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from "@services/attachmentService";
 import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
+import { getDisplayName } from '@utils/General';
 
 export class FreelancerService {
 
@@ -150,11 +151,12 @@ export class FreelancerService {
             ? await resolveAttachmentUrl(user.personalInfo.profileImage, 'profile_image')
             : null;
 
+          const { firstName, lastName } = getDisplayName(user, { maskLastName: true });
           return {
             id: user.id,
             uniqueId: user.unique_id,
-            firstName: user.first_name,
-            lastName: user.last_name,
+            firstName,
+            lastName,
             profileImage,
             tagline: user.personalInfo?.title || null,
             summary: user.personalInfo?.about ? String(user.personalInfo.about).replace(/<[^>]*>/g, '').slice(0, 150) : null,

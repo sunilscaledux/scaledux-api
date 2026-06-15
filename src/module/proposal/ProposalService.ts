@@ -10,7 +10,7 @@ import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
 import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
-import { getUserFullName } from '@utils/General';
+import { getUserFullName, maskUserName } from '@utils/General';
 import { appConfig } from '@config/app';
 
 /**
@@ -858,8 +858,9 @@ export class ProposalService {
       });
 
       // Transform proposals: milestones from Milestone table; file URLs; flatten nda
-      const transformedProposals = await Promise.all(proposals.map(async (proposal: any) =>
-        await flattenNdaToProposal({
+      const transformedProposals = await Promise.all(proposals.map(async (proposal: any) => {
+        if (proposal.project?.user) maskUserName(proposal.project.user);
+        return await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
           attachments: await resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
@@ -867,8 +868,8 @@ export class ProposalService {
             ...proposal.project,
             budget_currency: proposal.project.user?.currency?.symbol || '₹'
           } : null
-        })
-      ));
+        });
+      }));
 
       return {
         success: true,
@@ -997,6 +998,7 @@ export class ProposalService {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
           ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : null;
+        if (proposal.provider) maskUserName(proposal.provider);
         return await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
@@ -1107,6 +1109,7 @@ export class ProposalService {
         const providerProfileImage = proposal.provider?.personalInfo?.profileImage
           ? await resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : null;
+        if (proposal.provider) maskUserName(proposal.provider);
         return await flattenNdaToProposal({
           ...proposal,
           milestones: await milestonesFromRows(proposal.milestonesRows),
@@ -1266,6 +1269,8 @@ export class ProposalService {
           ? resolveAttachmentUrl(proposal.provider.personalInfo.profileImage, 'profile_image')
           : Promise.resolve(null),
       ]);
+      const maskedProjectUser = projectUser ? maskUserName({ ...projectUser, personalInfo: projectUser.personalInfo ? { ...projectUser.personalInfo, profileImage: projectUserProfileImage } : null }) : null;
+      const maskedProvider = proposal.provider ? maskUserName({ ...proposal.provider, personalInfo: proposal.provider.personalInfo ? { ...proposal.provider.personalInfo, profileImage: providerProfileImage } : null }) : null;
       const transformedProposal: any = {
         ...proposal,
         milestones,
@@ -1274,21 +1279,9 @@ export class ProposalService {
         project: proposal.project ? {
           ...proposal.project,
           budget_currency: proposal.project.user?.currency?.symbol || '₹',
-          user: projectUser ? {
-            ...projectUser,
-            personalInfo: projectUser.personalInfo ? {
-              ...projectUser.personalInfo,
-              profileImage: projectUserProfileImage
-            } : null
-          } : null
+          user: maskedProjectUser
         } : null,
-        provider: proposal.provider ? {
-          ...proposal.provider,
-          personalInfo: proposal.provider.personalInfo ? {
-            ...proposal.provider.personalInfo,
-            profileImage: providerProfileImage
-          } : null
-        } : null
+        provider: maskedProvider
       };
 
       // Founder view: add 24h hire cooldown (can't hire another for 24h after accepting one)

@@ -1,6 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { Log } from '@services/loggerService';
+import { getDisplayName } from '@utils/General';
 import { resolveAttachmentUrl, resolveAttachmentUrls, urlsOrPathsToAttachmentIds, markAttachmentsAttached } from '@services/attachmentService';
 import { createRedirectLink } from '@services/redirectLinkService';
 
@@ -128,8 +129,8 @@ export class ServicePackageService {
           user: {
             id: pkg.user.id,
             uniqueId: pkg.user.unique_id,
-            firstName: pkg.user.first_name,
-            lastName: pkg.user.last_name,
+            firstName: getDisplayName(pkg.user, { maskLastName: true }).firstName,
+            lastName: getDisplayName(pkg.user, { maskLastName: true }).lastName,
             profileImage: pkg.user.personalInfo?.profileImage || null
           }
         };
@@ -246,8 +247,8 @@ export class ServicePackageService {
           ...transformedPackage,
           user: {
             id: user.id,
-            firstName: user.first_name,
-            lastName: user.last_name,
+            firstName: getDisplayName(user, { maskLastName: true }).firstName,
+            lastName: getDisplayName(user, { maskLastName: true }).lastName,
             profileImage: user.personalInfo?.profileImage || null
           }
         }

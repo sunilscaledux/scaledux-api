@@ -3,6 +3,7 @@ import { Log } from "@services/loggerService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from "@services/attachmentService";
 import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
+import { getDisplayName } from '@utils/General';
 
 export class InvestorService {
 
@@ -142,11 +143,12 @@ export class InvestorService {
 
           const investorTypes = investor.investmentProfile?.investor_types;
 
+          const { firstName, lastName } = getDisplayName(investor, { maskLastName: true });
           return {
             id: investor.id,
             uniqueId: investor.unique_id,
-            firstName: investor.first_name,
-            lastName: investor.last_name,
+            firstName,
+            lastName,
             profileImage,
             tagline: investor.personalInfo?.title || null,
             summary: investor.personalInfo?.about
@@ -294,13 +296,10 @@ export class InvestorService {
             isRaising: s.raisingFund?.is_raising || false,
             roundType: s.raisingFund?.round_type || null,
             targetAmount: s.raisingFund?.target_amount != null ? Number(s.raisingFund.target_amount) : null,
-            founder: {
-              id: s.user?.id,
-              uniqueId: s.user?.unique_id,
-              firstName: s.user?.first_name || null,
-              lastName: s.user?.last_name || null,
-              profileImage: founderImage,
-            },
+            founder: (() => {
+              const dn = s.user ? getDisplayName(s.user, { maskLastName: true }) : { firstName: null, lastName: null };
+              return { id: s.user?.id, uniqueId: s.user?.unique_id, firstName: dn.firstName, lastName: dn.lastName, profileImage: founderImage };
+            })(),
           };
         })
       );
@@ -386,11 +385,12 @@ export class InvestorService {
         }))
       );
 
+      const { firstName: maskedFirst, lastName: maskedLast } = getDisplayName(user, { maskLastName: true });
       const data = {
         id: user.id,
         uniqueId: user.unique_id,
-        firstName: user.first_name,
-        lastName: user.last_name,
+        firstName: maskedFirst,
+        lastName: maskedLast,
         profileImage,
         coverImage,
         tagline: user.personalInfo?.title || null,

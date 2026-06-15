@@ -3,6 +3,7 @@ import { Log } from "@services/loggerService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { resolveAttachmentUrl } from "@services/attachmentService";
 import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
+import { getDisplayName } from '@utils/General';
 
 export class MentorService {
 
@@ -148,8 +149,8 @@ export class MentorService {
           return {
             id: mentor.id,
             uniqueId: mentor.unique_id,
-            firstName: mentor.first_name,
-            lastName: mentor.last_name,
+            firstName: getDisplayName(mentor, { maskLastName: true }).firstName,
+            lastName: getDisplayName(mentor, { maskLastName: true }).lastName,
             profileImage,
             tagline: mentor.personalInfo?.title || null,
             summary: mentor.personalInfo?.about ? String(mentor.personalInfo.about).replace(/<[^>]*>/g, '').slice(0, 150) : null,
@@ -278,8 +279,8 @@ export class MentorService {
           return {
             id: m.id,
             uniqueId: m.unique_id,
-            firstName: m.first_name,
-            lastName: m.last_name,
+            firstName: getDisplayName(m, { maskLastName: true }).firstName,
+            lastName: getDisplayName(m, { maskLastName: true }).lastName,
             profileImage,
             tagline: m.personalInfo?.title || null,
             summary: m.personalInfo?.about ? String(m.personalInfo.about).replace(/<[^>]*>/g, '').slice(0, 150) : null,
