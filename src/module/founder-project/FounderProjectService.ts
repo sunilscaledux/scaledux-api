@@ -249,6 +249,7 @@ export class FounderProjectService {
       const whereClause: any = {
         status: 'PUBLISHED',
         deleted_at: null,
+        hired_count: 0,
         user: {
           profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
         }
