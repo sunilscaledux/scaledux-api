@@ -46,6 +46,12 @@ export const CHAT_SYSTEM_MESSAGES = {
   MILESTONE_REQUESTED_SENT: "You requested a new milestone for",
   MILESTONE_REQUESTED_RECEIVED: "Requested a new milestone for",
 
+  MILESTONE_REJECTED_SENT: "You rejected the milestone",
+  MILESTONE_REJECTED_RECEIVED: "Client rejected your milestone",
+
+  MILESTONE_DELETED_SENT: "You deleted the milestone",
+  MILESTONE_DELETED_RECEIVED: "Expert deleted the milestone",
+
   CONTRACT_SENT_SENT: "Contract sent",
   CONTRACT_SENT_RECEIVED: "Contract sent",
   NDA_SIGN_REQUEST: "Please sign the NDA and upload it to proceed.",

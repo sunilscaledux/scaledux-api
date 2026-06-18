@@ -41,6 +41,45 @@ export async function approveMilestone(req: Request, res: Response) {
   return ApiResponse.error(res, result.message, code);
 }
 
+export async function rejectMilestone(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  const milestoneId = getStringParam(req.params.milestoneId);
+  const { reason } = req.body ?? {};
+  if (!milestoneId) {
+    return ApiResponse.error(res, "Milestone ID is required", 400);
+  }
+  const result = await MilestoneService.rejectMilestone(
+    userId,
+    milestoneId,
+    typeof reason === "string" ? reason : undefined
+  );
+  if (result.success) {
+    return ApiResponse.success(res, undefined, result.message);
+  }
+  const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+  return ApiResponse.error(res, result.message, code);
+}
+
+export async function deleteMilestone(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  const milestoneId = getStringParam(req.params.milestoneId);
+  if (!milestoneId) {
+    return ApiResponse.error(res, "Milestone ID is required", 400);
+  }
+  const result = await MilestoneService.deleteMilestone(userId, milestoneId);
+  if (result.success) {
+    return ApiResponse.success(res, undefined, result.message);
+  }
+  const code = result.message?.includes("not found") ? 404 : result.message?.includes("Only the") ? 403 : 400;
+  return ApiResponse.error(res, result.message, code);
+}
+
 function getStringParam(param: unknown): string {
   return typeof param === "string" ? param : "";
 }

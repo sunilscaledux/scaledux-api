@@ -440,10 +440,16 @@ export class ProposalService {
         userId
       );
 
+      // Log proposal creation activity
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        newStatus: 'PENDING',
+        message: `Proposal submitted for "${projectTitle}"`
+      }, userId);
+
       const freelancerNameP = await getUserFullName(userId);
       const notificationTitle = `${freelancerNameP} submitted a proposal`;
       const notificationBody = `${freelancerNameP} submitted a proposal for "${projectTitle}".`;
-      const notificationLink = `${appConfig.frontendUrl}/project/${project.unique_id}`;
+      const notificationLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
 
       const notifData = { userId: project.user_id, type: 'PROPOSAL_RECEIVED' as const, notificationTitle, notificationBody: notificationBody ?? null, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
@@ -780,6 +786,20 @@ export class ProposalService {
         proposal.project_id,
         userId
       );
+
+      const baseUrl = appConfig.frontendUrl;
+      const addNotifData = {
+        userId: proposal.project.user_id,
+        type: 'MILESTONE_REQUESTED' as const,
+        notificationTitle: 'New milestone requested',
+        notificationBody: `The expert requested a new milestone "${title}" for "${projectTitle}". Review and approve or reject it.`,
+        notificationLink: `${baseUrl}/proposals-and-offers/${proposal.unique_id}`,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, addNotifData);
+      await dispatch(NotificationEmailJob, addNotifData);
 
       return { success: true, message: "Milestone added successfully" };
     } catch (error: any) {
@@ -1415,6 +1435,21 @@ export class ProposalService {
           proposal.project.id,
           userId
         );
+
+        // Send notification to founder about proposal update
+        const freelancerNameU = await getUserFullName(userId);
+        const notifData = {
+          userId: proposal.project.user_id,
+          type: 'PROPOSAL_RECEIVED' as const,
+          notificationTitle: `${freelancerNameU} updated their proposal`,
+          notificationBody: `${freelancerNameU} updated their proposal for "${projectTitle}".`,
+          notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+          actorId: userId,
+          subjectType: 'Proposal' as const,
+          subjectId: proposal.id
+        };
+        await dispatch(NotificationJob, notifData);
+        await dispatch(NotificationEmailJob, notifData);
       }
 
       return { success: true, message: "Proposal updated successfully" };

@@ -147,6 +147,167 @@ export async function approveMilestone(
 }
 
 /**
+ * Reject a newly requested milestone (founder/project owner only).
+ * Only un-approved milestones can be rejected. Rejection removes the milestone
+ * (and its deliverables via cascade) and notifies the freelancer.
+ */
+export async function rejectMilestone(
+  userId: number,
+  milestoneUniqueId: string,
+  reason?: string | null
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      project: { select: { user_id: true, project_title: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner (founder) can reject milestones" };
+  }
+  if (milestone.is_approved === true) {
+    return { success: false, message: "An approved milestone cannot be rejected" };
+  }
+
+  const reasonText = reason != null && String(reason).trim() !== "" ? String(reason).trim() : null;
+  const milestoneTitle = milestone.title;
+  const proposalUniqueId = milestone.proposal.unique_id;
+  const providerId = milestone.proposal.provider_id;
+  const projectTitle = milestone.project?.project_title ?? "Project";
+
+  await (prisma as any).milestone.delete({ where: { id: milestone.id } });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    proposalUniqueId,
+    "STATUS_CHANGE",
+    {
+      message: reasonText
+        ? `Milestone "${milestoneTitle}" rejected: ${reasonText}`
+        : `Milestone "${milestoneTitle}" rejected`,
+      milestoneTitle
+    },
+    userId
+  );
+
+  const { ConversationService } = await import("./../chat/ConversationService");
+  const { CHAT_SYSTEM_MESSAGES } = await import("../../constants/chatSystemMessages");
+  await ConversationService.syncSystemMessage(
+    userId,
+    providerId,
+    "",
+    {
+      activityType: "milestone_rejected",
+      activityId: proposalUniqueId,
+      projectTitle,
+      milestoneTitle,
+      messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_REJECTED_SENT}: ${milestoneTitle}`.trim(),
+      messageReceived: `${CHAT_SYSTEM_MESSAGES.MILESTONE_REJECTED_RECEIVED}: ${milestoneTitle}`.trim()
+    },
+    milestone.project_id,
+    userId
+  );
+
+  const baseUrl = appConfig.frontendUrl;
+  const notifData = {
+    userId: providerId,
+    type: 'MILESTONE_REJECTED' as const,
+    notificationTitle: 'Milestone rejected',
+    notificationBody: reasonText
+      ? `Your milestone "${milestoneTitle}" for "${projectTitle}" was rejected: ${reasonText}`
+      : `Your milestone "${milestoneTitle}" for "${projectTitle}" was rejected.`,
+    notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+    actorId: userId,
+    subjectType: 'Proposal' as const,
+    subjectId: milestone.proposal.id
+  };
+  await dispatch(NotificationJob, notifData);
+  await dispatch(NotificationEmailJob, notifData);
+
+  return { success: true, message: "Milestone rejected successfully" };
+}
+
+/**
+ * Delete a milestone (freelancer/proposal provider only).
+ * Only un-approved milestones can be deleted. Removes the milestone
+ * (and its deliverables via cascade) and notifies the founder.
+ */
+export async function deleteMilestone(
+  userId: number,
+  milestoneUniqueId: string
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      project: { select: { user_id: true, project_title: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.proposal.provider_id !== userId) {
+    return { success: false, message: "Only the freelancer (proposal provider) can delete this milestone" };
+  }
+  if (milestone.is_approved === true) {
+    return { success: false, message: "An approved milestone cannot be deleted" };
+  }
+
+  const milestoneTitle = milestone.title;
+  const proposalUniqueId = milestone.proposal.unique_id;
+  const founderId = milestone.project.user_id;
+  const projectTitle = milestone.project?.project_title ?? "Project";
+
+  await (prisma as any).milestone.delete({ where: { id: milestone.id } });
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    proposalUniqueId,
+    "STATUS_CHANGE",
+    { message: `Milestone "${milestoneTitle}" deleted`, milestoneTitle },
+    userId
+  );
+
+  const { ConversationService } = await import("./../chat/ConversationService");
+  const { CHAT_SYSTEM_MESSAGES } = await import("../../constants/chatSystemMessages");
+  await ConversationService.syncSystemMessage(
+    userId,
+    founderId,
+    "",
+    {
+      activityType: "milestone_deleted",
+      activityId: proposalUniqueId,
+      projectTitle,
+      milestoneTitle,
+      messageSent: `${CHAT_SYSTEM_MESSAGES.MILESTONE_DELETED_SENT}: ${milestoneTitle}`.trim(),
+      messageReceived: `${CHAT_SYSTEM_MESSAGES.MILESTONE_DELETED_RECEIVED}: ${milestoneTitle}`.trim()
+    },
+    milestone.project_id,
+    userId
+  );
+
+  const baseUrl = appConfig.frontendUrl;
+  const notifData = {
+    userId: founderId,
+    type: 'MILESTONE_DELETED' as const,
+    notificationTitle: 'Milestone deleted',
+    notificationBody: `The expert deleted the milestone "${milestoneTitle}" for "${projectTitle}".`,
+    notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+    actorId: userId,
+    subjectType: 'Proposal' as const,
+    subjectId: milestone.proposal.id
+  };
+  await dispatch(NotificationJob, notifData);
+  await dispatch(NotificationEmailJob, notifData);
+
+  return { success: true, message: "Milestone deleted successfully" };
+}
+
+/**
  * Release payment for a milestone (founder only). Sets milestone payment_status to RELEASED.
  * All deliverables in the milestone must be APPROVED before release.
  */
