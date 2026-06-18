@@ -449,7 +449,7 @@ export class ProposalService {
       const freelancerNameP = await getUserFullName(userId);
       const notificationTitle = `${freelancerNameP} submitted a proposal`;
       const notificationBody = `${freelancerNameP} submitted a proposal for "${projectTitle}".`;
-      const notificationLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
+      const notificationLink = `${appConfig.frontendUrl}/project/${project.unique_id}?tab=review`;
 
       const notifData = { userId: project.user_id, type: 'PROPOSAL_RECEIVED' as const, notificationTitle, notificationBody: notificationBody ?? null, notificationLink: notificationLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
       await dispatch(NotificationJob, notifData);
@@ -1443,7 +1443,7 @@ export class ProposalService {
           type: 'PROPOSAL_RECEIVED' as const,
           notificationTitle: `${freelancerNameU} updated their proposal`,
           notificationBody: `${freelancerNameU} updated their proposal for "${projectTitle}".`,
-          notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+          notificationLink: `${appConfig.frontendUrl}/project/${proposal.project.unique_id}?tab=review`,
           actorId: userId,
           subjectType: 'Proposal' as const,
           subjectId: proposal.id
