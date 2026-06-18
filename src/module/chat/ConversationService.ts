@@ -355,6 +355,26 @@ export class ConversationService {
   }
 
   /**
+   * Count conversations with unread messages for a user.
+   */
+  static async getUnreadConversationCount(userId: number): Promise<ServiceResponse<number>> {
+    try {
+      const count = await prisma.conversation.count({
+        where: {
+          OR: [
+            { user1_id: userId, user1_has_new_message: true },
+            { user2_id: userId, user2_has_new_message: true }
+          ]
+        }
+      });
+      return { success: true, message: "OK", data: count };
+    } catch (error: any) {
+      Log.error("getUnreadConversationCount error", { error });
+      return { success: false, message: "Failed to get unread count" };
+    }
+  }
+
+  /**
    * List conversations for a user (with last message and other participant). Paginated with cursor.
    */
   static async listConversationsForUser(

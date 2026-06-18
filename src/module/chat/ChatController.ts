@@ -10,6 +10,14 @@ function getStringParam(param: unknown): string {
   return typeof param === "string" ? param : "";
 }
 
+export async function getUnreadMessageCount(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
+  const result = await ConversationService.getUnreadConversationCount(userId);
+  if (result.success) return ApiResponse.success(res, result.data, result.message);
+  return ApiResponse.error(res, result.message, 500);
+}
+
 export async function getConversations(req: Request, res: Response) {
   const userId = req.user?.id;
   if (!userId) return ApiResponse.unauthorized(res, "Authentication required");
