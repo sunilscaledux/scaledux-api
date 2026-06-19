@@ -467,7 +467,30 @@ model BusinessModel {
   @@map("scd_business_models")
 }
 
+/// Generic admin-managed option lists (reasons, stages, models, etc.).
+/// Each row is ONE selectable option. Consuming records store the `value`
+/// text verbatim — never this row's id. `subkey` namespaces a group into
+/// sub-lists (e.g. proposal_reason → "withdrawOffer", meeting_reason → "CANCEL");
+/// it is "" when the group has a single flat list. `code`/`label`/`description`
+/// support object-shaped lists (investor_type, id_type); for plain string lists
+/// `value` is used as both display and stored value.
+model Constant {
+  id          Int      @id @default(autoincrement())
+  group       String   @db.VarChar(64)   // e.g. startup_stage, revenue_model, proposal_reason
+  subkey      String   @default("") @db.VarChar(64) // sub-list key; "" = flat list
+  value       String   @db.VarChar(255)  // the text actually stored on consuming records
+  label       String?  @db.VarChar(255)  // display label (defaults to value when null)
+  description String?  @db.Text
+  code        String?  @db.VarChar(64)   // optional slug/id for object-shaped options
+  sort_order  Int      @default(0)
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 
+  @@unique([group, subkey, value])
+  @@index([group, subkey, is_active])
+  @@map("scd_constants")
+}
 
 model TeamMember {
   id                Int       @id @default(autoincrement())
@@ -1923,4 +1946,82 @@ model Connection {
   @@index([receiver_id, status])
   @@index([sender_id, status])
   @@map("scd_connections")
+}
+
+// ──────────────────────────────────────────────────────────────
+// Admin panel — dedicated admin accounts, sessions & audit trail.
+// Managed by the standalone scaledux-admin-api (shares this DB).
+// ──────────────────────────────────────────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN // full access incl. managing other admins
+  ADMIN       // broad access, cannot manage admins
+  MODERATOR   // content / projects / proposals / reviews / reports
+  FINANCE     // billing, payments, payouts, invoices
+  SUPPORT     // read-mostly + user assistance
+}
+
+model Admin {
+  id             Int       @id @default(autoincrement())
+  unique_id      String    @unique @default(cuid())
+  name           String
+  email          String    @unique
+  password       String
+  role           AdminRole @default(ADMIN)
+  /** Optional fine-grained permission keys, e.g. ["users.suspend","billing.refund"]. Null = role defaults. */
+  permissions    Json?
+  avatar_url     String?
+  phone          String?
+  /** 1 = active, 0 = suspended */
+  status         Int       @default(1)
+  two_fa_enabled Boolean   @default(false)
+  last_login_at  DateTime?
+  created_by     Int?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  sessions   AdminSession[]
+  audit_logs AdminAuditLog[]
+
+  @@index([role])
+  @@index([status])
+  @@map("scd_admins")
+}
+
+model AdminSession {
+  id         Int       @id @default(autoincrement())
+  admin_id   Int
+  /** sha256 hash of the issued refresh token */
+  token_hash String    @unique
+  ip_address String?
+  user_agent String?
+  expires_at DateTime
+  revoked_at DateTime?
+  created_at DateTime  @default(now())
+
+  admin Admin @relation(fields: [admin_id], references: [id], onDelete: Cascade)
+
+  @@index([admin_id])
+  @@map("scd_admin_sessions")
+}
+
+model AdminAuditLog {
+  id          Int      @id @default(autoincrement())
+  admin_id    Int?
+  /** dotted action key, e.g. "user.suspend", "billing.refund" */
+  action      String
+  /** entity affected, e.g. "User", "Proposal", "BillingTransaction" */
+  entity_type String?
+  entity_id   String?
+  description String?  @db.Text
+  metadata    Json?
+  ip_address  String?
+  created_at  DateTime @default(now())
+
+  admin Admin? @relation(fields: [admin_id], references: [id], onDelete: SetNull)
+
+  @@index([admin_id])
+  @@index([entity_type, entity_id])
+  @@index([action])
+  @@map("scd_admin_audit_logs")
 }

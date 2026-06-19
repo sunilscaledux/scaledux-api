@@ -6,6 +6,7 @@ moduleAlias.addAliases({
   '@config': path.join(__dirname, 'config'),
   '@constants': path.join(__dirname, 'constants'),
   '@module': path.join(__dirname, 'module'),
+  '@admin': path.join(__dirname, 'admin'),
   '@types': path.join(__dirname, 'types'),
   '@utils': path.join(__dirname, 'utils'),
   '@middleware': path.join(__dirname, 'middleware'),

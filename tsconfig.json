@@ -13,6 +13,7 @@
       "@config/*": ["src/config/*"],
       "@constants/*": ["src/constants/*"],
       "@module/*": ["src/module/*"],
+      "@admin/*": ["src/admin/*"],
       "@types/*": ["src/types/*"],
       "@utils/*": ["src/utils/*"],
       "@middleware/*": ["src/middleware/*"],

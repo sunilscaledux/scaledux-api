@@ -16,6 +16,11 @@ FROM dev AS dev-socket
 EXPOSE 4001
 CMD ["npm", "run", "dev:socket"]
 
+# -------- Target: dev-admin (admin API, live reload) --------
+FROM dev AS dev-admin
+EXPOSE 4002
+CMD ["npm", "run", "dev:admin"]
+
 # -------- Target: dev-worker --------
 FROM dev AS dev-worker
 CMD ["npm", "run", "dev:worker"]
@@ -64,6 +69,11 @@ CMD ["node", "dist/server.js"]
 FROM prod-base AS prod-socket
 EXPOSE 4001
 CMD ["node", "dist/socket-server.js"]
+
+# -------- Target: prod-admin (admin API) --------
+FROM prod-base AS prod-admin
+EXPOSE 4002
+CMD ["node", "dist/adminServer.js"]
 
 # -------- Target: prod-worker --------
 FROM prod-base AS prod-worker
