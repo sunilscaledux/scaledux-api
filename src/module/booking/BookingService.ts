@@ -10,7 +10,7 @@ import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
 import { GoogleMeetService } from '../video-conferencing/GoogleMeetService';
-import { isValidMeetingReason } from '../../constants/meetingReasons';
+import { isValidConstant } from '@services/constantsService';
 import { resolveAttachmentUrl } from '@services/attachmentService';
 import { calcBookingMentorDeductions, calcBookingMentorPayout, calcBookingFounderTotal } from '@utils/feeCalculations';
 import {
@@ -1037,7 +1037,7 @@ export class BookingService {
       }
 
       // Reason may come from a normal cancellation (CANCEL) or from declining a reschedule request (DECLINE_RESCHEDULE).
-      if (reason && !isValidMeetingReason('CANCEL', reason) && !isValidMeetingReason('DECLINE_RESCHEDULE', reason)) {
+      if (reason && !(await isValidConstant('meeting_reason', reason, 'CANCEL')) && !(await isValidConstant('meeting_reason', reason, 'DECLINE_RESCHEDULE'))) {
         return { success: false, message: 'Invalid cancel reason' };
       }
 
@@ -1558,7 +1558,7 @@ export class BookingService {
 
       if (!data.success) {
         if (!reason) return { success: false, message: 'Reason is required when call did not complete successfully' };
-        if (!isValidMeetingReason('REJECT', reason)) {
+        if (!(await isValidConstant('meeting_reason', reason, 'REJECT'))) {
           return { success: false, message: 'Invalid reason' };
         }
       }
@@ -1939,7 +1939,7 @@ export class BookingService {
         return { success: false, message: 'Cannot request reschedule less than 1 hour before the call' };
       }
 
-      if (reason && !isValidMeetingReason('RESCHEDULE', reason)) {
+      if (reason && !(await isValidConstant('meeting_reason', reason, 'RESCHEDULE'))) {
         return { success: false, message: 'Invalid reschedule reason' };
       }
 

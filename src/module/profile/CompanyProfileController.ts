@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { CompanyProfileService } from './CompanyProfileService';
 import { ApiResponse } from '@utils/ApiResponse';
 import * as CompanyProfileValidation from './CompanyProfileValidation';
+import { isValidConstant } from '@services/constantsService';
 
 
 export class CompanyProfileController {
@@ -125,6 +126,12 @@ export class CompanyProfileController {
       
       if (error) {
         return ApiResponse.joiValidationError(res, error);
+      }
+
+      // Startup stage is admin-managed (Constant group "startup_stage"); validate against active list.
+      if (value.company_stage != null && value.company_stage !== '' &&
+          !(await isValidConstant('startup_stage', value.company_stage))) {
+        return ApiResponse.error(res, 'Invalid startup stage');
       }
 
       const userId = req.user.id;

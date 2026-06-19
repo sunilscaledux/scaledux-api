@@ -3,7 +3,8 @@ import { ProposalService } from "./ProposalService";
 import { ApiResponse } from "@utils/ApiResponse";
 import { Log } from "@services/loggerService";
 import { calculateProfileCompletion } from "../profile/ProfileCompletionService";
-import { getReasonsByKey } from "@constants/proposalReasons";
+import { PROPOSAL_REASON_KEYS } from "@constants/proposalReasons";
+import { getConstantValues } from "@services/constantsService";
 import { PROFILE_COMPLETION_THRESHOLD } from "@middleware/requireCompleteProfile";
 
 /**
@@ -18,10 +19,11 @@ function getStringParam(param: any): string {
  */
 export async function getProposalReasons(req: Request, res: Response) {
   const key = typeof req.query?.key === 'string' ? req.query.key.trim() : undefined;
-  const reasons = getReasonsByKey(key);
-  if (!reasons) {
-    return ApiResponse.error(res, "Valid key is required (proposalDecline, offerDecline, withdrawOffer, withdrawProposal, terminate)", 400);
+  if (!key || !(PROPOSAL_REASON_KEYS as readonly string[]).includes(key)) {
+    return ApiResponse.error(res, `Valid key is required (${PROPOSAL_REASON_KEYS.join(', ')})`, null, 400);
   }
+  // Reasons are admin-managed (Constant group "proposal_reason", subkey = key).
+  const reasons = await getConstantValues('proposal_reason', key);
   return ApiResponse.success(res, reasons);
 }
 

@@ -1,6 +1,6 @@
 import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
-import { isValidContractEndReason } from "../../constants/contractEndReasons";
+import { isValidConstant } from "@services/constantsService";
 import { Log } from '@services/loggerService';
 import { maskUserName } from '@utils/General';
 
@@ -132,7 +132,7 @@ export async function createReview(
       action_type === ACTION_TYPE_PROPOSAL_CONTRACT &&
       end_reason != null && end_reason !== ''
     ) {
-      if (!isValidContractEndReason(end_reason)) {
+      if (!(await isValidConstant('contract_end_reason', end_reason))) {
         return { success: false, message: 'Invalid reason for ending this contract' };
       }
     }

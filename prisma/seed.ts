@@ -6,6 +6,7 @@ import { seedExpertise } from "./seeds/expertise-seed";
 import { seedIndustries } from "./seeds/industries-seed";
 import { seedSubIndustriesAndBusinessModels } from "./seeds/sub-industries-business-models-seed";
 import { seedStartupPhases } from "./seeds/startup-phases-seed";
+import { seedConstants } from "./seeds/constants-seed";
 
 const prisma = new PrismaClient();
 
@@ -37,6 +38,9 @@ async function main() {
 
   // 8. Seed Startup Phases (Phase 0 to Phase 7)
   await seedStartupPhases(prisma);
+
+  // 9. Seed admin-managed Constants (reasons, stages, models, types)
+  await seedConstants(prisma);
 
   console.log("All seeding completed successfully!");
   console.log("Run 'npm run cache' to warm Redis caches.");

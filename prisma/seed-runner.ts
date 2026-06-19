@@ -18,6 +18,7 @@
 import { PrismaClient } from '@prisma/client'
 import fs from 'fs'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 const prisma = new PrismaClient()
 const SEEDS_DIR = path.join(__dirname, 'seeds')
@@ -51,8 +52,8 @@ async function loadAndRunSeed(name: string): Promise<void> {
     process.exit(1)
   }
 
-  // Dynamic import the seed file
-  const mod = await import(filePath)
+  // Dynamic import the seed file (file:// URL required for absolute paths on Windows ESM)
+  const mod = await import(pathToFileURL(filePath).href)
 
   // Try to find the seed function: seed{PascalCase}, or first exported async function with "seed" prefix
   const pascal = toPascalCase(name)

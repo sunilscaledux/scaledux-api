@@ -4,11 +4,7 @@ import { ApiResponse } from "@utils/ApiResponse";
 import { getIntParam, getStringParam } from "@utils/requestHelpers";
 
 import { getPublicUrl } from "@services/bunnyStorageService"
-import { FUNDING_STAGES, INVESTOR_TYPES, INVESTMENT_CRITERIA_OPTIONS } from "../../constants/fundingStages"
-import { STARTUP_STAGES } from "../../constants/startupStages"
-import { CONTRACT_END_REASONS } from "../../constants/contractEndReasons"
-import { MEETING_REASONS, MeetingAction } from "../../constants/meetingReasons"
-import { ID_TYPES } from "../../constants/idTypes"
+import { getConstantValues, getConstantOptions, getConstantGroupedBySubkey } from "@services/constantsService"
 
 // Country related functions
 export async function getCountries(req: Request, res: Response) {
@@ -290,8 +286,8 @@ export async function getBusinessModels(req: Request, res: Response) {
 }
 
 export async function getRevenueModels(req: Request, res: Response) {
-  const { REVENUE_MODELS } = await import("../../constants/revenueModels");
-  return ApiResponse.success(res, REVENUE_MODELS, "Revenue models retrieved successfully")
+  const revenueModels = await getConstantValues('revenue_model')
+  return ApiResponse.success(res, revenueModels, "Revenue models retrieved successfully")
 }
 
 
@@ -300,8 +296,8 @@ export async function getRevenueModels(req: Request, res: Response) {
  * GET /api/v1/funding-stages
  */
 export async function getFundingStages(req: Request, res: Response) {
-  // Return funding stages from constants (no database needed)
-  return ApiResponse.success(res, FUNDING_STAGES, "Funding stages retrieved successfully")
+  const fundingStages = await getConstantValues('funding_stage')
+  return ApiResponse.success(res, fundingStages, "Funding stages retrieved successfully")
 }
 
 /**
@@ -309,7 +305,8 @@ export async function getFundingStages(req: Request, res: Response) {
  * GET /api/v1/startup-stages
  */
 export async function getStartupStages(req: Request, res: Response) {
-  return ApiResponse.success(res, STARTUP_STAGES, "Startup stages retrieved successfully")
+  const startupStages = await getConstantValues('startup_stage')
+  return ApiResponse.success(res, startupStages, "Startup stages retrieved successfully")
 }
 
 /**
@@ -317,7 +314,10 @@ export async function getStartupStages(req: Request, res: Response) {
  * GET /api/v1/investor-types
  */
 export async function getInvestorTypes(req: Request, res: Response) {
-  return ApiResponse.success(res, INVESTOR_TYPES, "Investor types retrieved successfully")
+  const options = await getConstantOptions('investor_type')
+  // Preserve the original { id, value, label, description } shape (code holds the slug id).
+  const investorTypes = options.map((o) => ({ id: o.code, value: o.value, label: o.label, description: o.description }))
+  return ApiResponse.success(res, investorTypes, "Investor types retrieved successfully")
 }
 
 /**
@@ -325,7 +325,8 @@ export async function getInvestorTypes(req: Request, res: Response) {
  * GET /api/v1/investment-profile-options
  */
 export async function getInvestmentProfileOptions(req: Request, res: Response) {
-  const data = { criteria: [...INVESTMENT_CRITERIA_OPTIONS] }
+  const criteria = await getConstantValues('investment_criteria')
+  const data = { criteria }
   return ApiResponse.success(res, data, "Investment profile options retrieved successfully")
 }
 
@@ -334,7 +335,8 @@ export async function getInvestmentProfileOptions(req: Request, res: Response) {
  * GET /api/v1/contract-end-reasons
  */
 export async function getContractEndReasons(req: Request, res: Response) {
-  return ApiResponse.success(res, CONTRACT_END_REASONS, "Contract end reasons retrieved successfully")
+  const contractEndReasons = await getConstantValues('contract_end_reason')
+  return ApiResponse.success(res, contractEndReasons, "Contract end reasons retrieved successfully")
 }
 
 /**
@@ -344,14 +346,15 @@ export async function getContractEndReasons(req: Request, res: Response) {
  */
 export async function getMeetingReasons(req: Request, res: Response) {
   const type = req.query.type as string | undefined;
+  const grouped = await getConstantGroupedBySubkey('meeting_reason');
   if (type) {
-    const upper = type.toUpperCase() as MeetingAction;
-    if (!(upper in MEETING_REASONS)) {
-      return ApiResponse.error(res, "Invalid type. Must be one of: CANCEL, RESCHEDULE, REJECT, DECLINE_RESCHEDULE", 400);
+    const upper = type.toUpperCase();
+    if (!(upper in grouped)) {
+      return ApiResponse.error(res, `Invalid type. Must be one of: ${Object.keys(grouped).join(', ')}`, null, 400);
     }
-    return ApiResponse.success(res, MEETING_REASONS[upper], "Meeting reasons retrieved successfully");
+    return ApiResponse.success(res, grouped[upper], "Meeting reasons retrieved successfully");
   }
-  return ApiResponse.success(res, MEETING_REASONS, "Meeting reasons retrieved successfully");
+  return ApiResponse.success(res, grouped, "Meeting reasons retrieved successfully");
 }
 
 /**
@@ -359,7 +362,10 @@ export async function getMeetingReasons(req: Request, res: Response) {
  * GET /api/v1/id-types
  */
 export async function getIdTypes(req: Request, res: Response) {
-  return ApiResponse.success(res, ID_TYPES, "ID types retrieved successfully")
+  const options = await getConstantOptions('id_type')
+  // Preserve the original { value, label } shape.
+  const idTypes = options.map((o) => ({ value: o.value, label: o.label }))
+  return ApiResponse.success(res, idTypes, "ID types retrieved successfully")
 }
 
 // Skills search function for large datasets
