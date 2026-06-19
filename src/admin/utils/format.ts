@@ -1,4 +1,21 @@
 import { resolveFileUrl } from '@admin/utils/url';
+import { urlOrPathToAttachmentId } from '@services/attachmentService';
+import { appConfig } from '@admin/config';
+
+/**
+ * Resolve an image reference (avatar/cover/logo) to a loadable URL — SYNC.
+ * Stored values are usually Attachment unique_ids (cuid), which can't be served
+ * by prefixing the CDN host. Route those through the admin file endpoint (which
+ * redirects public → CDN / streams private at request time). Absolute URLs pass
+ * through; bare storage keys fall back to the CDN host.
+ */
+export function resolveImageRef(value?: string | null): string | null {
+  if (!value) return null;
+  const attId = urlOrPathToAttachmentId(value);
+  if (attId) return `${appConfig.publicApiUrl}/files/view/${attId}`;
+  if (/^https?:\/\//i.test(value)) return value;
+  return resolveFileUrl(value);
+}
 
 /** Build a display name from a user row. */
 export function userName(u: { first_name?: string | null; middle_name?: string | null; last_name?: string | null } | null | undefined): string {
@@ -17,7 +34,7 @@ export function userCard(u: any) {
     phone: u.phone,
     role: u.role,
     status: u.status,
-    avatar: resolveFileUrl(u.personalInfo?.profileImage ?? null),
+    avatar: resolveImageRef(u.personalInfo?.profileImage ?? null),
   };
 }
 

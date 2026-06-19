@@ -9,6 +9,9 @@ export const appConfig = {
   appEnv: process.env.NODE_ENV || 'local',
   port: parseInt(process.env.ADMIN_PORT || '4002', 10),
   cdnHost,
+  /** Public base URL of the admin API (as reached by the browser) — used to build
+   *  absolute file-streaming URLs for attachments. Override in prod via ADMIN_PUBLIC_URL. */
+  publicApiUrl: (process.env.ADMIN_PUBLIC_URL || 'http://localhost:4002/api/admin/v1').replace(/\/$/, ''),
   cookie: {
     secure: cookieSecure,
     domain: cookieDomain,
