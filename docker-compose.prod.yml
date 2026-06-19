@@ -16,6 +16,23 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod-admin
+    container_name: scaledux-admin
+    restart: unless-stopped
+    command: ["node", "dist/adminServer.js"]
+    ports:
+      - "4002:4002"
+    env_file:
+      - .env
+    depends_on:
+      app: { condition: service_started }
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
   socket:
     build:
       context: .
