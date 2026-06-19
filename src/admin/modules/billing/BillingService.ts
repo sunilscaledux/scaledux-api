@@ -2,8 +2,18 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { paginated } from '@admin/utils/pagination';
-import { userCard, userCardSelect } from '@admin/utils/format';
+import { userCard, userCardSelect, resolveImageRef } from '@admin/utils/format';
 import { resolveAdminUrl } from '@admin/utils/attachments';
+
+/** The 3 invoice docs that can hang off a billing transaction (payer receipt / earnings / service). */
+const INVOICE_SELECT = { select: { file_url: true, invoice_number: true } } as const;
+function txInvoices(t: any) {
+  return [
+    t.payer_invoice?.file_url && { type: 'C', label: 'Payment Receipt', url: resolveImageRef(t.payer_invoice.file_url), number: t.payer_invoice.invoice_number },
+    t.receiver_invoice?.file_url && { type: 'B', label: 'Earnings Invoice', url: resolveImageRef(t.receiver_invoice.file_url), number: t.receiver_invoice.invoice_number },
+    t.invoice_a?.file_url && { type: 'A', label: 'Service Invoice', url: resolveImageRef(t.invoice_a.file_url), number: t.invoice_a.invoice_number },
+  ].filter(Boolean);
+}
 
 /** Resolve {from,to,actor} ids that point at Users into compact cards. */
 async function attachParties(rows: any[]) {
@@ -54,7 +64,13 @@ export class BillingService {
     if (p.created) where.created_at = p.created;
 
     const [rows, total] = await Promise.all([
-      prisma.billingTransaction.findMany({ where, orderBy: { created_at: 'desc' }, skip: p.skip, take: p.limit }),
+      prisma.billingTransaction.findMany({
+        where,
+        include: { payer_invoice: INVOICE_SELECT, receiver_invoice: INVOICE_SELECT, invoice_a: INVOICE_SELECT },
+        orderBy: { created_at: 'desc' },
+        skip: p.skip,
+        take: p.limit,
+      }),
       prisma.billingTransaction.count({ where }),
     ]);
 
@@ -70,6 +86,7 @@ export class BillingService {
       description: t.description,
       subject_type: t.subject_type,
       subject_id: t.subject_id,
+      invoices: txInvoices(t),
       created_at: t.created_at,
       from: t.from_type === 'User' ? parties.get(t.from_id) ?? { id: t.from_id } : { type: t.from_type, id: t.from_id },
       to: t.to_type === 'User' ? parties.get(t.to_id) ?? { id: t.to_id } : { type: t.to_type, id: t.to_id },

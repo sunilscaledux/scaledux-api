@@ -63,6 +63,26 @@ export class ProjectService {
     });
     if (!p) return { success: false, message: 'Project not found', statusCode: 404 };
 
+    // All non-draft proposals on this project (received + accepted/hired).
+    const proposalRows = await prisma.proposal.findMany({
+      where: { project_id: p.id, is_draft: false },
+      select: {
+        unique_id: true,
+        status: true,
+        proposed_amount: true,
+        created_at: true,
+        provider: { select: userCardSelect },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    const proposals = proposalRows.map((pr) => ({
+      unique_id: pr.unique_id,
+      status: pr.status,
+      proposed_amount: pr.proposed_amount != null ? Number(pr.proposed_amount) : null,
+      created_at: pr.created_at,
+      provider: userCard(pr.provider),
+    }));
+
     return {
       success: true,
       message: 'OK',
@@ -73,6 +93,7 @@ export class ProjectService {
         category: p.category?.name ?? null,
         subcategory: p.subcategory?.name ?? null,
         project_files: await resolveAdminFiles((p as any).project_files),
+        proposals,
       },
     };
   }
