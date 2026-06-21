@@ -15,6 +15,8 @@ import {
   rejectInvitation,
   toggleSaveProvider,
   toggleSaveProject,
+  getSavedProviders,
+  unsaveProvider,
   browseProjects
 } from "./FounderProjectController"
 import { uploadFile } from "@module/general/FileController"
@@ -25,6 +27,8 @@ import { FileUpload, handleMulterError } from "@middleware/fileupload"
 const router = Router()
 
 router.get("/browse", optionalAuth, browseProjects)
+// Must be declared before "/:id" so it isn't captured as a project id.
+router.get("/saved-experts", authenticateToken, getSavedProviders)
 router.get("/:id", optionalAuth, getProjectById)
 
 router.use(authenticateToken)
@@ -50,6 +54,7 @@ router.get("/:id/matching-providers", getMatchingServiceProviders)
 router.post("/:id/invite-provider", requireCompleteProfile(), inviteProvider)
 router.post("/:id/revoke-invitation", revokeInvitation)
 router.post("/:id/toggle-save-provider", toggleSaveProvider)
+router.post("/unsave-expert", unsaveProvider)
 
 router.post("/:id/save", toggleSaveProject)
 router.post("/:id/accept-invitation", acceptInvitation)

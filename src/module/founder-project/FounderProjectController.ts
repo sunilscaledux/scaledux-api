@@ -361,6 +361,49 @@ export async function getMatchingServiceProviders(req: Request, res: Response) {
 }
 
 /**
+ * Get all experts the founder has saved across their projects (global list)
+ */
+export async function getSavedProviders(req: Request, res: Response) {
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  const result = await FounderProjectService.getSavedProviders(userId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    return ApiResponse.error(res, result.message, 500);
+  }
+}
+
+/**
+ * Remove an expert from the founder's saved list (across all their projects)
+ */
+export async function unsaveProvider(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const { providerId } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!providerId) {
+    return ApiResponse.error(res, "Provider ID is required", 400);
+  }
+
+  const result = await FounderProjectService.unsaveProvider(userId, parseInt(providerId));
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    return ApiResponse.error(res, result.message, 500);
+  }
+}
+
+/**
  * Invite a service provider to a project
  */
 export async function inviteProvider(req: Request, res: Response) {

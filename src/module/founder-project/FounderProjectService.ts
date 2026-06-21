@@ -1936,6 +1936,108 @@ export class FounderProjectService {
   }
 
   /**
+   * Get ALL experts the founder has saved across any of their projects (global, deduped).
+   */
+  static async getSavedProviders(userId: number): Promise<ServiceResponse> {
+    try {
+      const projects = await prisma.founderProject.findMany({
+        where: { user_id: userId, deleted_at: null },
+        select: { saved_providers: true }
+      });
+
+      const idSet = new Set<number>();
+      for (const p of projects) {
+        for (const id of (((p as any).saved_providers as number[]) || [])) {
+          if (typeof id === 'number') idSet.add(id);
+        }
+      }
+      const ids = [...idSet];
+
+      if (ids.length === 0) {
+        return { success: true, message: "Saved experts retrieved successfully", data: { providers: [] } };
+      }
+
+      const freelancers = await prisma.user.findMany({
+        where: { id: { in: ids }, role: 'freelancer', status: 1 },
+        include: {
+          personalInfo: { include: { country: { select: { id: true, name: true, code: true } } } },
+          expertises: true,
+          servicePackages: { where: { status: 'PUBLISHED' }, select: { id: true } }
+        }
+      });
+
+      const providers = await Promise.all(freelancers.map(async (f: any) => {
+        const skills: string[] = [];
+        f.expertises.forEach((exp: any) => {
+          if (Array.isArray(exp.skills)) skills.push(...(exp.skills as string[]));
+        });
+        const { firstName, lastName } = getDisplayName(f, { maskLastName: true });
+        return {
+          id: f.id,
+          unique_id: f.unique_id,
+          first_name: firstName,
+          last_name: lastName ?? '',
+          profile_image: f.personalInfo?.profileImage
+            ? await resolveAttachmentUrl(f.personalInfo.profileImage, 'profile_image')
+            : null,
+          title: f.personalInfo?.title || null,
+          hourly_rate: f.personalInfo?.hourly_rate || null,
+          country: f.personalInfo?.country || null,
+          all_skills: skills,
+          matched_skills: skills.slice(0, 4),
+          projects_completed: f.servicePackages.length,
+          rating: 0,
+          reviews_count: 0,
+          is_saved: true
+        };
+      }));
+
+      return {
+        success: true,
+        message: "Saved experts retrieved successfully",
+        data: { providers }
+      };
+    } catch (error: any) {
+      Log.error("Get Saved Providers Error", { error });
+      return { success: false, message: "Failed to get saved experts" };
+    }
+  }
+
+  /**
+   * Remove an expert from the founder's saved list everywhere (across all their projects).
+   */
+  static async unsaveProvider(userId: number, providerId: number): Promise<ServiceResponse> {
+    try {
+      const projects = await prisma.founderProject.findMany({
+        where: { user_id: userId, deleted_at: null },
+        select: { id: true, saved_providers: true }
+      });
+
+      const updates = [];
+      for (const p of projects) {
+        const saved = (((p as any).saved_providers as number[]) || []);
+        if (saved.includes(providerId)) {
+          updates.push(
+            (prisma.founderProject.update as any)({
+              where: { id: p.id },
+              data: { saved_providers: saved.filter((id) => id !== providerId) }
+            })
+          );
+        }
+      }
+
+      if (updates.length > 0) {
+        await prisma.$transaction(updates);
+      }
+
+      return { success: true, message: "Expert removed from saved", data: null };
+    } catch (error: any) {
+      Log.error("Unsave Provider Error", { error });
+      return { success: false, message: "Failed to remove saved expert" };
+    }
+  }
+
+  /**
    * Toggle save project for service providers (save for later)
    */
   static async toggleSaveProject(
