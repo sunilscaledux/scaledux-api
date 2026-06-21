@@ -6,6 +6,7 @@ import * as rescheduleAutoCancel from "./rescheduleAutoCancel";
 import * as offerAutoExpiry from "./offerAutoExpiry";
 import * as invoiceAutoApprove from "./invoiceAutoApprove";
 import * as scheduledContractTermination from "./scheduledContractTermination";
+import * as deliverableAutoApprove from "./deliverableAutoApprove";
 
 
 export type ScheduledTaskDef = {
@@ -58,5 +59,10 @@ export const tasks: ScheduledTaskDef[] = [
     name: scheduledContractTermination.name,
     schedule: scheduledContractTermination.schedule,
     handle: scheduledContractTermination.handle,
+  },
+  {
+    name: deliverableAutoApprove.name,
+    schedule: deliverableAutoApprove.schedule,
+    handle: deliverableAutoApprove.handle,
   },
 ];
