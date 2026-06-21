@@ -20,6 +20,7 @@ import { appConfig } from '@config/app';
 export const PROPOSAL_STATUS_LABELS: Record<string, string> = {
   PENDING: 'Pending',
   SHORTLISTED: 'Shortlisted',
+  ARCHIVED: 'Archived',
   OFFER_SENT: 'Offer sent',
   OFFER_ACCEPTED: 'Offer accepted',
   HIRED: 'Hired',
@@ -824,6 +825,11 @@ export class ProposalService {
 
       if (status) {
         const statuses = status.split(',').map((s: string) => s.trim()).filter(Boolean);
+        // Expert never sees the "ignored" state: archived proposals are surfaced as pending.
+        // So when the pending bucket is requested, include ARCHIVED rows too.
+        if (statuses.includes('PENDING') && !statuses.includes('ARCHIVED')) {
+          statuses.push('ARCHIVED');
+        }
         whereClause.status = statuses.length > 1 ? { in: statuses } : statuses[0] || status;
       }
 
@@ -882,6 +888,8 @@ export class ProposalService {
         if (proposal.project?.user) maskUserName(proposal.project.user);
         return await flattenNdaToProposal({
           ...proposal,
+          // Mask founder "ignore" from the expert: archived reads as pending on their side.
+          status: proposal.status === ProposalStatus.ARCHIVED ? ProposalStatus.PENDING : proposal.status,
           milestones: await milestonesFromRows(proposal.milestonesRows),
           attachments: await resolveAttachmentUrls(proposal.attachments || [], 'attachments'),
           project: proposal.project ? {
@@ -1254,12 +1262,20 @@ export class ProposalService {
         };
       }
 
-      // If status is TERMINATING and the date has passed, apply termination now
+      // If status is TERMINATING and the date has passed, apply termination now (also runs via cron).
       const terminateAt = proposal.terminate_at ? new Date(proposal.terminate_at) : null;
-      if (proposal.status === ProposalStatus.TERMINATING && terminateAt && terminateAt <= new Date()) {
-        await (prisma as any).proposal.update({
-          where: { id: proposal.id },
-          data: { status: ProposalStatus.TERMINATED, terminate_at: null, terminate_by: null }
+      if (proposal.status === ProposalStatus.TERMINATING && terminateAt && terminateAt <= new Date()
+        && proposal.project?.id != null && proposal.project?.user_id != null) {
+        await ProposalService.finalizeExpiredTermination({
+          id: proposal.id,
+          unique_id: proposal.unique_id,
+          provider_id: proposal.provider_id,
+          terminate_by: proposal.terminate_by ?? null,
+          project: {
+            id: proposal.project.id,
+            user_id: proposal.project.user_id,
+            project_title: proposal.project.project_title ?? null
+          }
         });
         (proposal as any).status = ProposalStatus.TERMINATED;
         (proposal as any).terminate_at = null;
@@ -1303,6 +1319,11 @@ export class ProposalService {
         } : null,
         provider: maskedProvider
       };
+
+      // Expert never sees the founder's "ignore": archived reads as pending on their side.
+      if (isProposalOwner && !isProjectOwner && transformedProposal.status === ProposalStatus.ARCHIVED) {
+        transformedProposal.status = ProposalStatus.PENDING;
+      }
 
       // Founder view: add 24h hire cooldown (can't hire another for 24h after accepting one)
       if (isProjectOwner) {
@@ -1825,7 +1846,7 @@ export class ProposalService {
       const proposal = await (prisma as any).proposal.findFirst({
         where: { unique_id: proposalId },
         include: {
-          project: { select: { id: true, user_id: true } },
+          project: { select: { id: true, user_id: true, project_title: true } },
           milestonesRows: { orderBy: { order_index: 'asc' } }
         }
       });
@@ -1862,6 +1883,35 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: ProposalStatus.PROJECT_COMPLETED }
       });
+
+      const completedProjectTitle = proposal.project.project_title || "Project";
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        {
+          activityType: "project_completed",
+          activityId: proposal.unique_id,
+          projectTitle: completedProjectTitle,
+          messageSent: `You marked "${completedProjectTitle}" as completed`,
+          messageReceived: `The client marked "${completedProjectTitle}" as completed`
+        },
+        proposal.project.id,
+        userId
+      );
+
+      const completedNotif = {
+        userId: proposal.provider_id,
+        type: 'PROJECT_COMPLETED' as const,
+        notificationTitle: 'Project completed',
+        notificationBody: `The client marked "${completedProjectTitle}" as completed.`,
+        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, completedNotif);
+      await dispatch(NotificationEmailJob, completedNotif);
 
       return { success: true, message: "Project marked as completed" };
     } catch (error: any) {
@@ -2422,6 +2472,20 @@ export class ProposalService {
         userId
       );
 
+      const termRecipientId = isFounder ? proposal.provider_id : proposal.project.user_id;
+      const termNotif = {
+        userId: termRecipientId,
+        type: 'CONTRACT_TERMINATION_SCHEDULED' as const,
+        notificationTitle: 'Contract termination scheduled',
+        notificationBody: `${actorName} scheduled termination of the contract for "${projectTitle}". It will end on ${terminateAt.toDateString()} unless restored.`,
+        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, termNotif);
+      await dispatch(NotificationEmailJob, termNotif);
+
       return { success: true, message: "Contract will terminate in 7 days. You can restore it before then." };
     } catch (error: any) {
       Log.error("Terminate contract Error", { error });
@@ -2489,11 +2553,85 @@ export class ProposalService {
         userId
       );
 
+      const restoreRecipientId = isFounder ? proposal.provider_id : proposal.project.user_id;
+      const restoreNotif = {
+        userId: restoreRecipientId,
+        type: 'CONTRACT_RESTORED' as const,
+        notificationTitle: 'Contract restored',
+        notificationBody: `${restorerName} restored the contract for "${projectTitle}". The termination has been cancelled.`,
+        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, restoreNotif);
+      await dispatch(NotificationEmailJob, restoreNotif);
+
       return { success: true, message: "Contract restored successfully" };
     } catch (error: any) {
       Log.error("Restore contract Error", { error });
       return { success: false, message: error.message || "Failed to restore contract" };
     }
+  }
+
+  /**
+   * Apply a due contract termination (status TERMINATING + terminate_at passed) → TERMINATED.
+   * Guarded with updateMany so it fires activity/chat/notifications EXACTLY ONCE, whether
+   * triggered by a page read (getProposalById) or the scheduled cron. Returns true if this
+   * call performed the termination.
+   */
+  static async finalizeExpiredTermination(p: {
+    id: number;
+    unique_id: string;
+    provider_id: number;
+    terminate_by: number | null;
+    project: { id: number; user_id: number; project_title: string | null };
+  }): Promise<boolean> {
+    const result = await (prisma as any).proposal.updateMany({
+      where: { id: p.id, status: ProposalStatus.TERMINATING },
+      data: { status: ProposalStatus.TERMINATED, terminate_at: null, terminate_by: null }
+    });
+    if (!result || result.count === 0) return false;
+
+    const terminatedBy = p.terminate_by ?? p.project.user_id;
+    const title = p.project.project_title || "Project";
+    const link = `${appConfig.frontendUrl}/proposals-and-offers/${p.unique_id}`;
+
+    await createProposalActivity(p.unique_id, 'STATUS_CHANGE', {
+      oldStatus: ProposalStatus.TERMINATING,
+      newStatus: ProposalStatus.TERMINATED
+    }, terminatedBy);
+
+    await ConversationService.syncSystemMessage(
+      p.project.user_id,
+      p.provider_id,
+      "",
+      {
+        activityType: "contract_terminated",
+        activityId: p.unique_id,
+        projectTitle: title,
+        messageSent: `The contract for "${title}" has been terminated`,
+        messageReceived: `The contract for "${title}" has been terminated`
+      },
+      p.project.id,
+      terminatedBy
+    );
+
+    for (const recipientId of [p.project.user_id, p.provider_id]) {
+      const notif = {
+        userId: recipientId,
+        type: 'CONTRACT_TERMINATED' as const,
+        notificationTitle: 'Contract terminated',
+        notificationBody: `The contract for "${title}" has been terminated.`,
+        notificationLink: link,
+        actorId: terminatedBy,
+        subjectType: 'Proposal' as const,
+        subjectId: p.id
+      };
+      await dispatch(NotificationJob, notif);
+      await dispatch(NotificationEmailJob, notif);
+    }
+    return true;
   }
 
   /**

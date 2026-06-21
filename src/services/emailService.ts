@@ -4,6 +4,14 @@ import mailConfig from "@config/mail";
 import { Log } from "@services/loggerService";
 import { templateService } from "./templateService";
 
+export interface EmailAttachment {
+  filename: string;
+  /** File path or Buffer content */
+  path?: string;
+  content?: Buffer;
+  contentType?: string;
+}
+
 export interface EmailOptions {
   to: string;
   subject: string;
@@ -13,6 +21,7 @@ export interface EmailOptions {
     address: string;
     name?: string;
   };
+  attachments?: EmailAttachment[];
 }
 
 class EmailService {
@@ -60,6 +69,7 @@ class EmailService {
         subject: options.subject,
         html: options.html || undefined,
         text: options.text || undefined,
+        attachments: options.attachments?.length ? options.attachments : undefined,
       });
 
       Log.info("Email sent successfully", { to: options.to, subject: options.subject });

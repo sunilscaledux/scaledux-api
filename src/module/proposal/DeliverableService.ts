@@ -136,6 +136,7 @@ export async function requestChangesDeliverable(
         include: {
           proposal: {
             select: {
+              id: true,
               unique_id: true,
               provider_id: true,
               project: { select: { id: true, unique_id: true, user_id: true, project_title: true } }
@@ -208,6 +209,12 @@ export async function requestChangesDeliverable(
       project.id,
       userId
     );
+    const baseUrl = appConfig.frontendUrl;
+    const proposalUniqueId = deliverable.milestone.proposal.unique_id;
+    const proposalId = deliverable.milestone.proposal.id;
+    const notifData = { userId: providerId, type: 'DELIVERABLE_CHANGES_REQUESTED' as const, notificationTitle: 'Changes requested on deliverable', notificationBody: `The client requested changes on your deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    await dispatch(NotificationJob, notifData);
+    await dispatch(NotificationEmailJob, notifData);
   }
 
   return { success: true, message: "Changes requested successfully" };

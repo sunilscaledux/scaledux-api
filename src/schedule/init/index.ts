@@ -5,6 +5,7 @@ import * as meetingLinkReminder from "./meetingLinkReminder";
 import * as rescheduleAutoCancel from "./rescheduleAutoCancel";
 import * as offerAutoExpiry from "./offerAutoExpiry";
 import * as invoiceAutoApprove from "./invoiceAutoApprove";
+import * as scheduledContractTermination from "./scheduledContractTermination";
 
 
 export type ScheduledTaskDef = {
@@ -52,5 +53,10 @@ export const tasks: ScheduledTaskDef[] = [
     name: invoiceAutoApprove.name,
     schedule: invoiceAutoApprove.schedule,
     handle: invoiceAutoApprove.handle,
+  },
+  {
+    name: scheduledContractTermination.name,
+    schedule: scheduledContractTermination.schedule,
+    handle: scheduledContractTermination.handle,
   },
 ];

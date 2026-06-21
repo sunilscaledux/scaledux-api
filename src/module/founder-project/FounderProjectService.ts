@@ -977,6 +977,38 @@ export class FounderProjectService {
         };
       }
 
+      // A project with live engagement (pending invites or active proposals) can't be deleted —
+      // it would silently drop experts who are mid-flow. Founder must unpublish (close) first,
+      // which revokes invites and archives proposals; the resulting draft can then be deleted.
+      const [pendingInviteCount, activeProposalCount] = await Promise.all([
+        prisma.projectInvite.count({
+          where: { project_id: project.id, status: InviteStatus.PENDING }
+        }),
+        (prisma as any).proposal.count({
+          where: {
+            project_id: project.id,
+            is_draft: false,
+            status: {
+              in: [
+                ProposalStatus.PENDING,
+                ProposalStatus.SHORTLISTED,
+                ProposalStatus.OFFER_SENT,
+                ProposalStatus.OFFER_ACCEPTED,
+                ProposalStatus.HIRED,
+                ProposalStatus.TERMINATING,
+                ProposalStatus.PROJECT_COMPLETED
+              ]
+            }
+          }
+        })
+      ]);
+      if (pendingInviteCount > 0 || activeProposalCount > 0) {
+        return {
+          success: false,
+          message: "PROJECT_HAS_ENGAGEMENT"
+        };
+      }
+
       await prisma.founderProject.update({
         where: { id: project.id },
         data: { deleted_at: new Date() }
@@ -993,6 +1025,74 @@ export class FounderProjectService {
         success: false,
         message: "Failed to delete project"
       };
+    }
+  }
+
+  /**
+   * Unpublish a project (move back to DRAFT).
+   * Revokes all pending invites and silently archives all open proposals (PENDING/SHORTLISTED)
+   * so experts are no longer engaged. Blocked while any offer is out or someone is hired.
+   */
+  static async unpublishProject(userId: number, uniqueId: string): Promise<ServiceResponse> {
+    try {
+      const project = await prisma.founderProject.findFirst({
+        where: { unique_id: uniqueId, user_id: userId, deleted_at: null }
+      });
+
+      if (!project) {
+        return { success: false, message: "Project not found" };
+      }
+
+      // Can't unpublish while a contract is live — that would orphan an active offer/hire.
+      const activeContractCount = await (prisma as any).proposal.count({
+        where: {
+          project_id: project.id,
+          is_draft: false,
+          status: {
+            in: [
+              ProposalStatus.OFFER_SENT,
+              ProposalStatus.OFFER_ACCEPTED,
+              ProposalStatus.HIRED,
+              ProposalStatus.TERMINATING,
+              ProposalStatus.PROJECT_COMPLETED
+            ]
+          }
+        }
+      });
+      if (activeContractCount > 0) {
+        return { success: false, message: "PROJECT_HAS_ACTIVE_CONTRACT" };
+      }
+
+      await prisma.$transaction([
+        // Revoke all pending invites
+        prisma.projectInvite.updateMany({
+          where: { project_id: project.id, status: InviteStatus.PENDING },
+          data: { status: InviteStatus.REJECTED }
+        }),
+        // Silently ignore (archive) all open proposals — no notification to the expert
+        (prisma as any).proposal.updateMany({
+          where: {
+            project_id: project.id,
+            is_draft: false,
+            status: { in: [ProposalStatus.PENDING, ProposalStatus.SHORTLISTED] }
+          },
+          data: { status: ProposalStatus.ARCHIVED }
+        }),
+        // Move the project back to draft and clear active counters
+        prisma.founderProject.update({
+          where: { id: project.id },
+          data: { status: 'DRAFT', invited_count: 0, proposals_count: 0 }
+        })
+      ]);
+
+      return {
+        success: true,
+        message: "Project unpublished and moved to draft",
+        data: null
+      };
+    } catch (error: any) {
+      Log.error("Unpublish Project Error", { error });
+      return { success: false, message: "Failed to unpublish project" };
     }
   }
 
@@ -1507,6 +1607,91 @@ export class FounderProjectService {
         success: false,
         message: "Failed to invite provider"
       };
+    }
+  }
+
+  /**
+   * Revoke an invitation (founder withdraws a pending invite before the provider acts).
+   * Only PENDING invites can be revoked; accepted/rejected ones are left as-is.
+   * Deletes the invite so the provider becomes invitable again and decrements the count.
+   */
+  static async revokeInvitation(
+    userId: number,
+    projectId: string,
+    providerId: number
+  ): Promise<ServiceResponse> {
+    try {
+      const project = await prisma.founderProject.findFirst({
+        where: { unique_id: projectId, user_id: userId, deleted_at: null }
+      });
+
+      if (!project) {
+        return { success: false, message: "Project not found" };
+      }
+
+      const invite = await (prisma as any).projectInvite.findUnique({
+        where: {
+          project_id_provider_id: { project_id: project.id, provider_id: providerId }
+        }
+      });
+
+      if (!invite) {
+        return { success: false, message: "No invitation found for this provider" };
+      }
+
+      if (invite.status !== InviteStatus.PENDING) {
+        return { success: false, message: "INVITE_NOT_PENDING" };
+      }
+
+      await prisma.$transaction([
+        (prisma as any).projectInvite.delete({
+          where: {
+            project_id_provider_id: { project_id: project.id, provider_id: providerId }
+          }
+        }),
+        prisma.founderProject.update({
+          where: { id: project.id },
+          data: { invited_count: { decrement: 1 } }
+        })
+      ]);
+
+      // Tell the provider their pending invite was withdrawn (chat + in-app + email)
+      const projectTitle = project.project_title || "a project";
+      await ConversationService.syncSystemMessage(
+        project.user_id,
+        providerId,
+        "",
+        {
+          activityType: "project_invitation_revoked",
+          activityId: project.unique_id,
+          projectTitle: project.project_title,
+          messageSent: `You withdrew your invitation for "${projectTitle}"`,
+          messageReceived: `The client withdrew the invitation for "${projectTitle}"`
+        },
+        project.id,
+        project.user_id
+      );
+      const revokeNotif = {
+        userId: providerId,
+        type: 'INVITATION_REVOKED' as const,
+        notificationTitle: 'Invitation withdrawn',
+        notificationBody: `The invitation to "${projectTitle}" has been withdrawn by the client.`,
+        notificationLink: `${appConfig.frontendUrl}/project/${project.unique_id}`,
+        actorId: userId,
+        subjectType: 'FounderProject' as const,
+        subjectId: project.id
+      };
+      await dispatch(NotificationJob, revokeNotif);
+      await dispatch(NotificationEmailJob, revokeNotif);
+
+      return {
+        success: true,
+        message: "Invitation revoked successfully",
+        data: null
+      };
+    } catch (error: any) {
+      Log.error("Revoke Invitation Error", { error });
+      return { success: false, message: "Failed to revoke invitation" };
     }
   }
 

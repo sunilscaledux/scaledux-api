@@ -7,6 +7,10 @@ import { createProposalActivity } from "@module/proposal/ProposalActivityService
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
+import { dispatch } from "@queues/Queue";
+import { NotificationJob } from "../../jobs/NotificationJob";
+import { NotificationEmailJob } from "../../jobs/NotificationEmailJob";
+import { appConfig } from "@config/app";
 
 export class BillingController {
   // Get payment breakdown (platform fee only on first milestone, gst, service fee) for display and Razorpay total
@@ -246,6 +250,32 @@ export class BillingController {
       milestoneTitle,
       transactionId: transactionUniqueId
     }, userId);
+
+    // Notify the provider: milestone 0 funding is the hire/first payment; others are escrow funding.
+    const proposalLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
+    const fundNotif = milestoneIndex === 0
+      ? {
+          userId: proposal.provider_id,
+          type: 'HIRED' as const,
+          notificationTitle: 'You have been hired',
+          notificationBody: `You were hired for "${projectTitle}". The first milestone is funded — you can start working.`,
+          notificationLink: proposalLink,
+          actorId: proposal.project.user_id,
+          subjectType: 'Proposal' as const,
+          subjectId: proposal.id
+        }
+      : {
+          userId: proposal.provider_id,
+          type: 'MILESTONE_FUNDED' as const,
+          notificationTitle: 'Milestone funded',
+          notificationBody: `"${milestoneTitle}" on "${projectTitle}" has been funded into escrow.`,
+          notificationLink: proposalLink,
+          actorId: proposal.project.user_id,
+          subjectType: 'Proposal' as const,
+          subjectId: proposal.id
+        };
+    await dispatch(NotificationJob, fundNotif);
+    await dispatch(NotificationEmailJob, fundNotif);
 
     ApiResponse.success(res, { proposalPayment: true, milestoneIndex }, "Milestone payment recorded");
     return true;

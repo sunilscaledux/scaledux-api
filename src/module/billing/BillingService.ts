@@ -825,6 +825,14 @@ export class BillingService {
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
 
+    // Email the actual invoice PDF (Invoice A) to the founder via the queue.
+    const { InvoiceEmailJob } = await import('../../jobs/InvoiceEmailJob');
+    await dispatch(InvoiceEmailJob, {
+      transactionId: tx.id,
+      recipientUserId: proposal.project.user_id,
+      projectTitle: proposal.project.project_title
+    });
+
     return { success: true, message: 'Invoice sent' };
   }
 

@@ -239,8 +239,51 @@ export async function deleteProject(req: Request, res: Response) {
   if (result.success) {
     return ApiResponse.success(res, result.data, result.message);
   } else {
-    const statusCode = result.message === "Project not found" ? 404 : 500;
-    return ApiResponse.error(res, result.message, statusCode);
+    if (result.message === "Project not found") {
+      return ApiResponse.error(res, result.message, 404);
+    }
+    if (result.message === "PROJECT_HAS_ENGAGEMENT") {
+      return ApiResponse.error(
+        res,
+        "This project already has invites or proposals and can't be deleted. Close (unpublish) it instead.",
+        409
+      );
+    }
+    return ApiResponse.error(res, result.message, 500);
+  }
+}
+
+/**
+ * Unpublish project (revoke invites, archive proposals, move to draft)
+ */
+export async function unpublishProject(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const id = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!id) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  const result = await FounderProjectService.unpublishProject(userId, id);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    if (result.message === "Project not found") {
+      return ApiResponse.error(res, result.message, 404);
+    }
+    if (result.message === "PROJECT_HAS_ACTIVE_CONTRACT") {
+      return ApiResponse.error(
+        res,
+        "This project has an active offer or hired expert. Finish or terminate it before unpublishing.",
+        409
+      );
+    }
+    return ApiResponse.error(res, result.message, 500);
   }
 }
 
@@ -349,6 +392,42 @@ export async function inviteProvider(req: Request, res: Response) {
   } else {
     const statusCode = result.message === "Project not found" || result.message === "Provider match not found" ? 404 : 500;
     return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
+ * Revoke an invitation (founder withdraws a pending invite).
+ * Body: { providerId }
+ */
+export async function revokeInvitation(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const projectId = getStringParam(req.params.id);
+  const { providerId } = req.body;
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+
+  if (!projectId) {
+    return ApiResponse.error(res, "Project ID is required", 400);
+  }
+
+  if (!providerId) {
+    return ApiResponse.error(res, "Provider ID is required", 400);
+  }
+
+  const result = await FounderProjectService.revokeInvitation(userId, projectId, parseInt(providerId));
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    if (result.message === "Project not found" || result.message === "No invitation found for this provider") {
+      return ApiResponse.error(res, result.message, 404);
+    }
+    if (result.message === "INVITE_NOT_PENDING") {
+      return ApiResponse.error(res, "This invitation can no longer be revoked.", 409);
+    }
+    return ApiResponse.error(res, result.message, 500);
   }
 }
 

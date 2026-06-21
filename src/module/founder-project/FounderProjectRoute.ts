@@ -6,9 +6,11 @@ import {
   saveDraft,
   updateProject,
   deleteProject,
+  unpublishProject,
   duplicateProject,
   getMatchingServiceProviders,
   inviteProvider,
+  revokeInvitation,
   acceptInvitation,
   rejectInvitation,
   toggleSaveProvider,
@@ -31,6 +33,7 @@ router.get("/", getCompanyProjects)
 router.post("/draft", saveDraft)
 router.post("/", createProject)
 router.put("/:id", updateProject)
+router.post("/:id/unpublish", unpublishProject)
 router.delete("/:id", deleteProject)
 
 router.post(
@@ -45,6 +48,7 @@ router.post("/:id/duplicate", duplicateProject)
 router.get("/:id/matching-providers", getMatchingServiceProviders)
 // Founder inviting a service provider requires a complete founder profile.
 router.post("/:id/invite-provider", requireCompleteProfile(), inviteProvider)
+router.post("/:id/revoke-invitation", revokeInvitation)
 router.post("/:id/toggle-save-provider", toggleSaveProvider)
 
 router.post("/:id/save", toggleSaveProject)
