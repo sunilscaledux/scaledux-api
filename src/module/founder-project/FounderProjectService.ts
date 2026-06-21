@@ -841,6 +841,11 @@ export class FounderProjectService {
         await markAttachmentsAttached(projectFiles, [userId]);
       }
 
+      // Notify the founder when the project goes live on creation
+      if (project.status === 'PUBLISHED') {
+        await FounderProjectService.notifyProjectPublished(userId, project);
+      }
+
       // Transform file URLs for response
       const transformedProject = {
         ...project,
@@ -860,6 +865,33 @@ export class FounderProjectService {
         success: false,
         message: typeof msg === 'string' ? msg : "Failed to create project"
       };
+    }
+  }
+
+  /**
+   * Notify the founder (in-app + email) that their project is now published/live.
+   * Best-effort: never blocks or fails the publish action.
+   */
+  private static async notifyProjectPublished(
+    userId: number,
+    project: { id: number; unique_id: string; project_title: string | null }
+  ): Promise<void> {
+    try {
+      const title = project.project_title || "Your project";
+      const notifData = {
+        userId,
+        type: 'PROJECT_PUBLISHED' as const,
+        notificationTitle: 'Your project is published',
+        notificationBody: `"${title}" is now live. Experts can find it and send proposals.`,
+        notificationLink: `${FRONTEND_URL}/project/${project.unique_id}`,
+        actorId: userId,
+        subjectType: 'FounderProject' as const,
+        subjectId: project.id
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+    } catch (error: any) {
+      Log.error("Notify Project Published Error", { error });
     }
   }
 
@@ -934,6 +966,11 @@ export class FounderProjectService {
       const fileIds = (updatedProject.project_files as string[]) || [];
       if (fileIds.length > 0) {
         await markAttachmentsAttached(fileIds, [userId]);
+      }
+
+      // Notify the founder when the project transitions from draft to published
+      if (updatedProject.status === 'PUBLISHED' && existingProject.status !== 'PUBLISHED') {
+        await FounderProjectService.notifyProjectPublished(userId, updatedProject);
       }
 
       // Transform file URLs
