@@ -155,6 +155,10 @@ export async function requestChangesDeliverable(
   if (deliverable.status !== "SUBMITTED") {
     return { success: false, message: "Deliverable is not submitted for review" };
   }
+  const maxRevisions = appConfig.maxDeliverableRevisions;
+  if ((deliverable.revision_count ?? 0) >= maxRevisions) {
+    return { success: false, message: `Revision limit reached. You can request changes at most ${maxRevisions} times for a deliverable.` };
+  }
 
   const feedbackText = message != null && String(message).trim() !== "" ? String(message).trim() : null;
   await (prisma as any).deliverable.update({
@@ -165,7 +169,8 @@ export async function requestChangesDeliverable(
       submitted_remark: null,
       submitted_file: [],
       approved_at: null,
-      feedback: feedbackText
+      feedback: feedbackText,
+      revision_count: { increment: 1 }
     }
   });
 

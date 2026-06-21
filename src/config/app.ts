@@ -44,6 +44,7 @@ const minProfileCompletionPercent = Math.min(
   Math.max(0, Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 75)
 );
 const minProjectBudget = Math.max(1, parseInt(process.env.MIN_PROJECT_BUDGET || '500', 10));
+const maxDeliverableRevisions = Math.max(1, parseInt(process.env.MAX_DELIVERABLE_REVISIONS || '10', 10));
 
 export const appConfig = {
   appEnv: process.env.NODE_ENV,
@@ -79,4 +80,6 @@ export const appConfig = {
   minProfileCompletionPercent,
   /** Minimum budget (₹) required when posting a project. */
   minProjectBudget,
+  /** Maximum number of revision requests a founder can make per deliverable. */
+  maxDeliverableRevisions,
 };

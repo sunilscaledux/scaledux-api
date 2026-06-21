@@ -1175,6 +1175,7 @@ model Deliverable {
   submitted_file    Json      @default("[]")    // Array of { url, name }
   approved_at       DateTime? @db.Timestamptz   // When founder approved this deliverable
   feedback          String?   @db.Text           // Founder's message when requesting changes; cleared on resubmit
+  revision_count    Int       @default(0)         // How many times the founder requested changes (max 10)
   created_at        DateTime  @default(now())
   updated_at        DateTime  @default(now()) @updatedAt
 

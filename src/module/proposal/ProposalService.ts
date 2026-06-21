@@ -222,7 +222,9 @@ async function buildDeliverablesFromRow(row: any): Promise<any[]> {
                 name: f?.name ?? (typeof f?.url === 'string' ? f.url.split('/').pop() : 'file')
               })))
             : [],
-          feedback: d.feedback ?? null
+          feedback: d.feedback ?? null,
+          revision_count: d.revision_count ?? 0,
+          max_revisions: appConfig.maxDeliverableRevisions
         };
       }));
   }
