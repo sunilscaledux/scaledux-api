@@ -1840,6 +1840,58 @@ export class ProposalService {
   }
 
   /**
+   * Founder nudges the expert to send their invoice (chat + in-app + email).
+   */
+  static async requestInvoice(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: { project: { select: { id: true, user_id: true, project_title: true } } }
+      });
+      if (!proposal) {
+        return { success: false, message: "Proposal not found" };
+      }
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "Only the project owner can request an invoice" };
+      }
+
+      const projectTitle = proposal.project.project_title || "the project";
+      await ConversationService.syncSystemMessage(
+        proposal.project.user_id,
+        proposal.provider_id,
+        "",
+        {
+          activityType: "invoice_requested",
+          activityId: proposal.unique_id,
+          projectTitle: proposal.project.project_title,
+          messageSent: `You asked the expert to send the invoice for "${projectTitle}"`,
+          messageReceived: `The client asked you to send your invoice for "${projectTitle}"`
+        },
+        proposal.project.id,
+        userId
+      );
+
+      const notifData = {
+        userId: proposal.provider_id,
+        type: 'INVOICE_REQUESTED' as const,
+        notificationTitle: 'Invoice requested',
+        notificationBody: `The client has asked you to send your invoice for "${projectTitle}".`,
+        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        actorId: userId,
+        subjectType: 'Proposal' as const,
+        subjectId: proposal.id
+      };
+      await dispatch(NotificationJob, notifData);
+      await dispatch(NotificationEmailJob, notifData);
+
+      return { success: true, message: "Invoice request sent to the expert", data: null };
+    } catch (error: any) {
+      Log.error("Request Invoice Error", { error });
+      return { success: false, message: error.message || "Failed to request invoice" };
+    }
+  }
+
+  /**
    * Mark project completed (founder only). Allowed when status is HIRED and all milestones are PAID (or COMPLETED).
    * Sets proposal status to PROJECT_COMPLETED.
    */

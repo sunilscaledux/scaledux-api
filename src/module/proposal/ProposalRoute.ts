@@ -15,6 +15,7 @@ import {
   terminateContract,
   restoreContract,
   markProjectCompleted,
+  requestInvoice,
   updateProposalNda,
   withdrawProposal,
   checkProposalStatus,
@@ -113,6 +114,7 @@ router.post("/:id/decline-offer", declineOffer);
 router.post("/:id/terminate", terminateContract);
 router.post("/:id/restore", restoreContract);
 router.post("/:id/mark-project-completed", markProjectCompleted);
+router.post("/:id/request-invoice", requestInvoice);
 router.patch("/:id/nda", updateProposalNda);
 router.post("/:id/request-modify", requestModify);
 router.get("/:id/activities", getProposalActivities);

@@ -30,6 +30,7 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'PROJECT_COMPLETED', label: 'A project is marked completed', category: 'Proposals & Project Management' },
   { type: 'INVITATION_REVOKED', label: 'An invitation is revoked', category: 'Proposals & Project Management' },
   { type: 'PROJECT_PUBLISHED', label: 'Your project is published', category: 'Proposals & Project Management' },
+  { type: 'INVOICE_REQUESTED', label: 'The client asks you to send an invoice', category: 'Proposals & Project Management' },
   // 1:1 Call Bookings
   { type: 'BOOKING_REQUESTED', label: 'A new booking request is received', category: '1:1 Call Bookings' },
   { type: 'BOOKING_CONFIRMED', label: 'A booking is confirmed after payment', category: '1:1 Call Bookings' },

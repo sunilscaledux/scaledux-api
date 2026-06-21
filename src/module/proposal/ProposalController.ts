@@ -578,6 +578,30 @@ export async function markProjectCompleted(req: Request, res: Response) {
 }
 
 /**
+ * Founder asks the expert to send their invoice (chat + in-app + email).
+ */
+export async function requestInvoice(req: Request, res: Response) {
+  const userId = req.user?.id;
+  const proposalId = getStringParam(req.params.id);
+
+  if (!userId) {
+    return ApiResponse.error(res, "User not authenticated", 401);
+  }
+  if (!proposalId) {
+    return ApiResponse.error(res, "Proposal ID is required", 400);
+  }
+
+  const result = await ProposalService.requestInvoice(userId, proposalId);
+
+  if (result.success) {
+    return ApiResponse.success(res, result.data, result.message);
+  } else {
+    const statusCode = result.message?.includes("not found") ? 404 : result.message?.includes("Only the project owner") ? 403 : 400;
+    return ApiResponse.error(res, result.message, statusCode);
+  }
+}
+
+/**
  * Withdraw a proposal (service provider)
  */
 export async function withdrawProposal(req: Request, res: Response) {
