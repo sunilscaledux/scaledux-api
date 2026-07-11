@@ -726,7 +726,12 @@ export class ProposalService {
       const amount = Number(data.amount) || 0;
       const dueDate = data.dueDate != null ? new Date(data.dueDate) : null;
       const description = data.description != null ? String(data.description).slice(0, 500) : null;
-      const deliverables = Array.isArray(data.deliverables) ? data.deliverables : [];
+      const deliverables = (Array.isArray(data.deliverables) ? data.deliverables : []).filter(
+        (d) => d && String(d.deliverable ?? "").trim() !== ""
+      );
+      if (deliverables.length === 0) {
+        return { success: false, message: "At least one deliverable is required to add a milestone" };
+      }
       const remark =
         data.remark != null && String(data.remark).trim() !== ""
           ? String(data.remark).trim()
@@ -1282,6 +1287,14 @@ export class ProposalService {
         (proposal as any).status = ProposalStatus.TERMINATED;
         (proposal as any).terminate_at = null;
         (proposal as any).terminate_by = null;
+      }
+
+      // Auto-complete the project 48h after all milestones finished (also runs via cron).
+      if (proposal.status === ProposalStatus.HIRED && proposal.milestones_completed_at) {
+        const autoCompleted = await ProposalService.autoCompleteProjectIfDue(proposal.unique_id);
+        if (autoCompleted) {
+          (proposal as any).status = ProposalStatus.PROJECT_COMPLETED;
+        }
       }
 
       // Check if user is either the proposal owner or the project owner
@@ -1928,50 +1941,108 @@ export class ProposalService {
         return { success: false, message: "Complete and pay all milestones before marking the project as completed" };
       }
 
-      await createProposalActivity(proposal.unique_id, "STATUS_CHANGE", {
-        oldStatus: proposal.status,
-        newStatus: ProposalStatus.PROJECT_COMPLETED
-      }, userId);
-
-      await (prisma as any).proposal.update({
-        where: { id: proposal.id },
-        data: { status: ProposalStatus.PROJECT_COMPLETED }
-      });
-
-      const completedProjectTitle = proposal.project.project_title || "Project";
-      await ConversationService.syncSystemMessage(
-        proposal.project.user_id,
-        proposal.provider_id,
-        "",
-        {
-          activityType: "project_completed",
-          activityId: proposal.unique_id,
-          projectTitle: completedProjectTitle,
-          messageSent: `You marked "${completedProjectTitle}" as completed`,
-          messageReceived: `The client marked "${completedProjectTitle}" as completed`
-        },
-        proposal.project.id,
-        userId
-      );
-
-      const completedNotif = {
-        userId: proposal.provider_id,
-        type: 'PROJECT_COMPLETED' as const,
-        notificationTitle: 'Project completed',
-        notificationBody: `The client marked "${completedProjectTitle}" as completed.`,
-        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
-        actorId: userId,
-        subjectType: 'Proposal' as const,
-        subjectId: proposal.id
-      };
-      await dispatch(NotificationJob, completedNotif);
-      await dispatch(NotificationEmailJob, completedNotif);
-
+      await ProposalService.applyProjectCompletion(proposal, userId);
       return { success: true, message: "Project marked as completed" };
     } catch (error: any) {
       Log.error("Mark project completed Error", { error });
       return { success: false, message: error.message || "Failed to mark project as completed" };
     }
+  }
+
+  /**
+   * Finalize project completion: set status PROJECT_COMPLETED, log activity, sync chat, notify the
+   * freelancer, and prompt BOTH parties to leave a review. Callers own the eligibility checks.
+   * Used by the founder's manual mark-completed and the 48h auto-completion.
+   */
+  private static async applyProjectCompletion(proposal: any, actorUserId: number): Promise<void> {
+    const completedProjectTitle = proposal.project.project_title || "Project";
+
+    await createProposalActivity(proposal.unique_id, "STATUS_CHANGE", {
+      oldStatus: proposal.status,
+      newStatus: ProposalStatus.PROJECT_COMPLETED
+    }, actorUserId);
+
+    await (prisma as any).proposal.update({
+      where: { id: proposal.id },
+      data: { status: ProposalStatus.PROJECT_COMPLETED }
+    });
+
+    await ConversationService.syncSystemMessage(
+      proposal.project.user_id,
+      proposal.provider_id,
+      "",
+      {
+        activityType: "project_completed",
+        activityId: proposal.unique_id,
+        projectTitle: completedProjectTitle,
+        messageSent: `You marked "${completedProjectTitle}" as completed`,
+        messageReceived: `The client marked "${completedProjectTitle}" as completed`
+      },
+      proposal.project.id,
+      actorUserId
+    );
+
+    const completedNotif = {
+      userId: proposal.provider_id,
+      type: 'PROJECT_COMPLETED' as const,
+      notificationTitle: 'Project completed',
+      notificationBody: `The client marked "${completedProjectTitle}" as completed.`,
+      notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+      actorId: actorUserId,
+      subjectType: 'Proposal' as const,
+      subjectId: proposal.id
+    };
+    await dispatch(NotificationJob, completedNotif);
+    await dispatch(NotificationEmailJob, completedNotif);
+
+    // Prompt both the client and the freelancer to review each other.
+    const reviewLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}/submit-review`;
+    const reviewBody = `Your project "${completedProjectTitle}" is complete. Share your experience — leave a review.`;
+    const founderReview = {
+      userId: proposal.project.user_id,
+      type: 'PROJECT_REVIEW_PROMPT' as const,
+      notificationTitle: 'Leave a review',
+      notificationBody: reviewBody,
+      notificationLink: reviewLink,
+      actorId: actorUserId,
+      subjectType: 'Proposal' as const,
+      subjectId: proposal.id
+    };
+    const providerReview = { ...founderReview, userId: proposal.provider_id };
+    await dispatch(NotificationJob, founderReview);
+    await dispatch(NotificationEmailJob, founderReview);
+    await dispatch(NotificationJob, providerReview);
+    await dispatch(NotificationEmailJob, providerReview);
+  }
+
+  /**
+   * Auto-complete a project 48h after all milestones finished, if the founder hasn't marked it.
+   * Invoked on proposal read (getProposalById) and by the invoice-auto-approve cron. Returns true
+   * if it completed the project on this call.
+   */
+  static async autoCompleteProjectIfDue(proposalUniqueId: string): Promise<boolean> {
+    const AUTO_COMPLETE_HOURS = 48;
+    const proposal = await (prisma as any).proposal.findFirst({
+      where: { unique_id: proposalUniqueId },
+      include: {
+        project: { select: { id: true, user_id: true, project_title: true } },
+        milestonesRows: { orderBy: { order_index: 'asc' } }
+      }
+    });
+    if (!proposal) return false;
+    if (proposal.status !== ProposalStatus.HIRED) return false;
+    if (!proposal.milestones_completed_at) return false;
+    const rows = proposal.milestonesRows ?? [];
+    const allDone = rows.length > 0 && rows.every((m: any) => {
+      const s = String(m.status ?? "").toUpperCase();
+      return s === MilestoneStatus.PAID || s === MilestoneStatus.COMPLETED;
+    });
+    if (!allDone) return false;
+    const dueAt = new Date(proposal.milestones_completed_at).getTime() + AUTO_COMPLETE_HOURS * 60 * 60 * 1000;
+    if (Date.now() < dueAt) return false;
+
+    await ProposalService.applyProjectCompletion(proposal, proposal.project.user_id);
+    return true;
   }
 
   /**

@@ -2,6 +2,7 @@ import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { BillingService } from "../../module/billing/BillingService";
 import { BookingService } from "../../module/booking/BookingService";
+import { ProposalService } from "../../module/proposal/ProposalService";
 
 /**
  * Auto-approve milestone invoices AND booking confirmations not acknowledged
@@ -77,7 +78,27 @@ export async function handle(): Promise<void> {
     }
   }
 
-  if (invoiceCount > 0 || bookingCount > 0) {
-    Log.info(`[invoice-auto-approve] Auto-approved ${invoiceCount} invoice(s), ${bookingCount} booking(s)`);
+  // ── 3. Auto-complete projects 48h after all milestones finished ──
+  const dueProjects = await (prisma as any).proposal.findMany({
+    where: {
+      status: "HIRED",
+      milestones_completed_at: { not: null, lte: cutoff },
+    },
+    select: { unique_id: true },
+    take: 50,
+  });
+
+  let projectCount = 0;
+  for (const p of dueProjects) {
+    try {
+      const done = await ProposalService.autoCompleteProjectIfDue(p.unique_id);
+      if (done) projectCount += 1;
+    } catch (err) {
+      Log.error(`[invoice-auto-approve] Project auto-complete error ${p.unique_id}`, { err });
+    }
+  }
+
+  if (invoiceCount > 0 || bookingCount > 0 || projectCount > 0) {
+    Log.info(`[invoice-auto-approve] Auto-approved ${invoiceCount} invoice(s), ${bookingCount} booking(s), completed ${projectCount} project(s)`);
   }
 }
