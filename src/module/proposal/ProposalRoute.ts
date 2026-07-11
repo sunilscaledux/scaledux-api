@@ -23,7 +23,7 @@ import {
   getProposalActivities,
   addMilestone
 } from "./ProposalController";
-import { submitMilestone, requestChangesMilestone, approveMilestone, releaseMilestonePayment, rejectMilestone, deleteMilestone } from "./MilestoneController";
+import { submitMilestone, requestChangesMilestone, approveMilestone, releaseMilestonePayment, rejectMilestone, deleteMilestone, markMilestoneCompleted, editMilestone } from "./MilestoneController";
 import { submitDeliverable, requestChangesDeliverable, approveDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
 import { requireCompleteProfile } from "@middleware/requireCompleteProfile";
@@ -96,6 +96,8 @@ router.post("/milestones/:milestoneId/request-changes", requestChangesMilestone)
 router.post("/milestones/:milestoneId/approve", approveMilestone);
 router.post("/milestones/:milestoneId/reject", rejectMilestone);
 router.post("/milestones/:milestoneId/release-payment", releaseMilestonePayment);
+router.post("/milestones/:milestoneId/mark-completed", markMilestoneCompleted);
+router.put("/milestones/:milestoneId", editMilestone);
 router.delete("/milestones/:milestoneId", deleteMilestone);
 
 router.post("/deliverables/:deliverableId/submit", submitDeliverable);

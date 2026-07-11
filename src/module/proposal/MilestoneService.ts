@@ -37,8 +37,38 @@ export async function submitMilestone(
     where: { id: milestone.id },
     data: { status: MilestoneStatus.COMPLETED }
   });
+  await syncMilestonesCompletedAt(milestone.proposal.id);
 
   return { success: true, message: "Milestone submitted successfully" };
+}
+
+/**
+ * Set proposal.milestones_completed_at when every milestone is COMPLETED/PAID (the 48h
+ * project auto-completion window starts here); clear it if a milestone is no longer done.
+ */
+export async function syncMilestonesCompletedAt(proposalId: number): Promise<void> {
+  const rows = await (prisma as any).milestone.findMany({
+    where: { proposal_id: proposalId },
+    select: { status: true }
+  });
+  const allDone =
+    rows.length > 0 &&
+    rows.every((m: any) => m.status === MilestoneStatus.PAID || m.status === MilestoneStatus.COMPLETED);
+  const proposal = await (prisma as any).proposal.findFirst({
+    where: { id: proposalId },
+    select: { milestones_completed_at: true }
+  });
+  if (allDone && !proposal?.milestones_completed_at) {
+    await (prisma as any).proposal.update({
+      where: { id: proposalId },
+      data: { milestones_completed_at: new Date() }
+    });
+  } else if (!allDone && proposal?.milestones_completed_at) {
+    await (prisma as any).proposal.update({
+      where: { id: proposalId },
+      data: { milestones_completed_at: null }
+    });
+  }
 }
 
 /**
@@ -71,6 +101,7 @@ export async function requestChangesMilestone(
     where: { id: milestone.id },
     data: { status: MilestoneStatus.PENDING }
   });
+  await syncMilestonesCompletedAt(milestone.proposal.id);
 
   const { createProposalActivity } = await import("./ProposalActivityService");
   await createProposalActivity(
@@ -340,6 +371,15 @@ export async function releaseMilestonePayment(
     return { success: false, message: "Approve all deliverables before releasing payment" };
   }
 
+  return performMilestoneRelease(milestone, userId);
+}
+
+/**
+ * Core payment-release: releases the escrowed billing transaction to the freelancer and marks
+ * the milestone RELEASED/PAID. Callers own the authorization + eligibility checks. Used by the
+ * normal release flow (deliverables approved) and the founder "mark completed" override.
+ */
+async function performMilestoneRelease(milestone: any, userId: number): Promise<ServiceResponse> {
   // Find the pending billing transaction for this milestone and release it (by milestone_id or fallback to meta)
   let txn = await (prisma as any).billingTransaction.findFirst({
     where: {
@@ -374,6 +414,7 @@ export async function releaseMilestonePayment(
     where: { id: milestone.id },
     data: { payment_status: MilestonePaymentStatus.RELEASED, status: MilestoneStatus.PAID }
   });
+  await syncMilestonesCompletedAt(milestone.proposal.id);
 
   const { createProposalActivity } = await import("./ProposalActivityService");
   await createProposalActivity(
@@ -395,4 +436,153 @@ export async function releaseMilestonePayment(
 
   // Chat sync is done in BillingService.releasePaymentTransaction so both milestone flow and direct billing release get it
   return { success: true, message: "Payment released successfully" };
+}
+
+/**
+ * Mark a milestone completed (founder/project owner only). Funded milestone → release the
+ * escrowed payment to the freelancer (override: does NOT require deliverables to be approved).
+ * Not-funded milestone → simply set COMPLETED with no payment.
+ */
+export async function markMilestoneCompleted(
+  userId: number,
+  milestoneUniqueId: string
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      project: { select: { user_id: true, project_title: true, unique_id: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.project.user_id !== userId) {
+    return { success: false, message: "Only the project owner can mark this milestone as completed" };
+  }
+  if (milestone.status === MilestoneStatus.PAID || milestone.status === MilestoneStatus.COMPLETED) {
+    return { success: false, message: "Milestone is already completed" };
+  }
+
+  // Funded but not yet released → release payment to the freelancer (founder override).
+  if (
+    milestone.payment_status === MilestonePaymentStatus.FUNDED &&
+    milestone.payment_status !== MilestonePaymentStatus.RELEASED
+  ) {
+    return performMilestoneRelease(milestone, userId);
+  }
+
+  // Not funded → close it out with no payment.
+  await (prisma as any).milestone.update({
+    where: { id: milestone.id },
+    data: { status: MilestoneStatus.COMPLETED }
+  });
+  await syncMilestonesCompletedAt(milestone.proposal.id);
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    milestone.proposal.unique_id,
+    "STATUS_CHANGE",
+    { message: `Milestone "${milestone.title}" marked as completed by the client`, milestoneTitle: milestone.title },
+    userId
+  );
+
+  const projectTitle = milestone.project?.project_title ?? "Project";
+  const baseUrl = appConfig.frontendUrl;
+  const notifData = {
+    userId: milestone.proposal.provider_id,
+    type: 'MILESTONE_COMPLETED' as const,
+    notificationTitle: 'Milestone completed',
+    notificationBody: `The client marked the milestone "${milestone.title}" for "${projectTitle}" as completed.`,
+    notificationLink: `${baseUrl}/project-overview/${milestone.proposal.unique_id}`,
+    actorId: userId,
+    subjectType: 'Proposal' as const,
+    subjectId: milestone.proposal.id
+  };
+  await dispatch(NotificationJob, notifData);
+  await dispatch(NotificationEmailJob, notifData);
+
+  return { success: true, message: "Milestone marked as completed" };
+}
+
+/**
+ * Edit a milestone (freelancer/proposal provider only). Allowed only while the milestone is
+ * still editable: not approved, not funded, and not completed/paid. Requires ≥1 deliverable;
+ * deliverables are replaced wholesale (they are all still PENDING at this stage).
+ */
+export async function editMilestone(
+  userId: number,
+  milestoneUniqueId: string,
+  data: {
+    title?: string;
+    description?: string | null;
+    amount?: number;
+    dueDate?: string | Date | null;
+    deliverables: { deliverable: string }[];
+  }
+): Promise<ServiceResponse> {
+  const milestone = await (prisma as any).milestone.findFirst({
+    where: { unique_id: milestoneUniqueId },
+    include: {
+      proposal: { select: { id: true, unique_id: true, provider_id: true } },
+      deliverablesRow: { select: { status: true } }
+    }
+  });
+  if (!milestone) {
+    return { success: false, message: "Milestone not found" };
+  }
+  if (milestone.proposal.provider_id !== userId) {
+    return { success: false, message: "Only the freelancer (proposal provider) can edit this milestone" };
+  }
+  if (milestone.is_approved === true) {
+    return { success: false, message: "An approved milestone cannot be edited" };
+  }
+  if (milestone.payment_status !== MilestonePaymentStatus.PENDING) {
+    return { success: false, message: "A funded milestone cannot be edited" };
+  }
+  if (milestone.status === MilestoneStatus.COMPLETED || milestone.status === MilestoneStatus.PAID) {
+    return { success: false, message: "A completed milestone cannot be edited" };
+  }
+  const existingDeliverables = milestone.deliverablesRow ?? [];
+  if (existingDeliverables.some((d: any) => d.status && d.status !== "PENDING")) {
+    return { success: false, message: "Cannot edit a milestone that already has submitted work" };
+  }
+
+  const deliverables = Array.isArray(data.deliverables)
+    ? data.deliverables.filter((d) => d && String(d.deliverable ?? "").trim() !== "")
+    : [];
+  if (deliverables.length === 0) {
+    return { success: false, message: "At least one deliverable is required" };
+  }
+
+  const updateData: Record<string, unknown> = {};
+  if (data.title !== undefined) updateData.title = String(data.title || "Milestone").slice(0, 255);
+  if (data.description !== undefined)
+    updateData.description = data.description != null ? String(data.description).slice(0, 500) : null;
+  if (data.amount !== undefined) updateData.amount = Number(data.amount) || 0;
+  if (data.dueDate !== undefined) updateData.due_date = data.dueDate != null ? new Date(data.dueDate) : null;
+
+  await (prisma as any).milestone.update({ where: { id: milestone.id }, data: updateData });
+
+  // Replace deliverables (all PENDING at this stage).
+  await (prisma as any).deliverable.deleteMany({ where: { milestone_id: milestone.id } });
+  for (let j = 0; j < deliverables.length; j++) {
+    await (prisma as any).deliverable.create({
+      data: {
+        milestone_id: milestone.id,
+        order_index: j,
+        description: String(deliverables[j].deliverable).slice(0, 500) || "Deliverable"
+      }
+    });
+  }
+
+  const { createProposalActivity } = await import("./ProposalActivityService");
+  await createProposalActivity(
+    milestone.proposal.unique_id,
+    "STATUS_CHANGE",
+    { message: `Milestone "${updateData.title ?? milestone.title}" updated`, milestoneTitle: String(updateData.title ?? milestone.title) },
+    userId
+  );
+
+  return { success: true, message: "Milestone updated successfully" };
 }

@@ -9,6 +9,7 @@ import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { MilestoneStatus } from "@constants/status";
 import { getUserFullName } from "@utils/General";
+import { syncMilestonesCompletedAt } from "./MilestoneService";
 
 /**
  * Submit one deliverable (freelancer only). Sets status SUBMITTED, stores remark + files; clears feedback.
@@ -178,6 +179,7 @@ export async function requestChangesDeliverable(
     where: { id: deliverable.milestone_id },
     data: { status: MilestoneStatus.PENDING }
   });
+  await syncMilestonesCompletedAt(deliverable.milestone.proposal_id);
 
   const { createProposalActivity } = await import("./ProposalActivityService");
   await createProposalActivity(
@@ -280,6 +282,7 @@ export async function approveDeliverable(
       where: { id: deliverable.milestone_id },
       data: { status: MilestoneStatus.COMPLETED }
     });
+    await syncMilestonesCompletedAt(deliverable.milestone.proposal_id);
   }
 
   const { createProposalActivity } = await import("./ProposalActivityService");

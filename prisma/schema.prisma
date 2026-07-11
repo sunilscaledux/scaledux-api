@@ -1026,6 +1026,8 @@ model Proposal {
   terminate_at          DateTime?
   /** User id who scheduled termination; only this user can restore. */
   terminate_by          Int?
+  /** Set when every milestone became COMPLETED/PAID; starts the 48h project auto-completion window. */
+  milestones_completed_at DateTime?
 
   // Relations
   project               FounderProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
