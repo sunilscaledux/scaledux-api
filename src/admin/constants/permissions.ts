@@ -63,6 +63,9 @@ export const PERMISSIONS = {
 
   // Audit log
   AUDIT_VIEW: 'audit.view',
+
+  // Security / anomaly monitoring (device & session fingerprints)
+  SECURITY_VIEW: 'security.view',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -104,6 +107,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.CONSTANTS_MANAGE,
     PERMISSIONS.NOTIFICATIONS_SEND,
     PERMISSIONS.AUDIT_VIEW,
+    PERMISSIONS.SECURITY_VIEW,
   ],
 
   MODERATOR: [
@@ -124,6 +128,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.CONSTANTS_MANAGE,
     PERMISSIONS.VERIFICATIONS_VIEW,
     PERMISSIONS.VERIFICATIONS_REVIEW,
+    PERMISSIONS.SECURITY_VIEW,
   ],
 
   FINANCE: [

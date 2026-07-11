@@ -30,6 +30,7 @@ import fileRoutes from '@admin/modules/file/FileRoute';
 import notificationRoutes from '@admin/modules/notification/NotificationRoute';
 import adminMgmtRoutes from '@admin/modules/admin/AdminRoute';
 import auditRoutes from '@admin/modules/audit/AuditRoute';
+import securityRoutes from '@admin/modules/security/SecurityRoute';
 
 const app = express();
 
@@ -59,6 +60,7 @@ app.use(`${BASE}/files`, fileRoutes);
 app.use(`${BASE}/notifications`, notificationRoutes);
 app.use(`${BASE}/admins`, adminMgmtRoutes);
 app.use(`${BASE}/audit-logs`, auditRoutes);
+app.use(`${BASE}/security`, securityRoutes);
 
 app.use(globalErrorHandler);
 
