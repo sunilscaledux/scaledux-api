@@ -114,7 +114,7 @@ export async function submitDeliverable(
     );
     const freelancerNameDel = await getUserFullName(userId);
     const baseUrl = appConfig.frontendUrl;
-    const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: `${freelancerNameDel} submitted a deliverable`, notificationBody: `${freelancerNameDel} submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    const notifData = { userId: projectOwnerId, type: 'DELIVERABLE_SUBMITTED' as const, notificationTitle: `${freelancerNameDel} submitted a deliverable`, notificationBody: `${freelancerNameDel} submitted a deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/project-overview/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
   }
@@ -219,7 +219,7 @@ export async function requestChangesDeliverable(
     const baseUrl = appConfig.frontendUrl;
     const proposalUniqueId = deliverable.milestone.proposal.unique_id;
     const proposalId = deliverable.milestone.proposal.id;
-    const notifData = { userId: providerId, type: 'DELIVERABLE_CHANGES_REQUESTED' as const, notificationTitle: 'Changes requested on deliverable', notificationBody: `The client requested changes on your deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    const notifData = { userId: providerId, type: 'DELIVERABLE_CHANGES_REQUESTED' as const, notificationTitle: 'Changes requested on deliverable', notificationBody: `The client requested changes on your deliverable for "${projectTitle}".`, notificationLink: `${baseUrl}/project-overview/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
   }
@@ -321,7 +321,7 @@ export async function approveDeliverable(
       userId
     );
     const baseUrl = appConfig.frontendUrl;
-    const notifData = { userId: providerId, type: 'DELIVERABLE_APPROVED' as const, notificationTitle: 'Deliverable approved', notificationBody: `Your deliverable for "${projectTitle}" was approved.`, notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
+    const notifData = { userId: providerId, type: 'DELIVERABLE_APPROVED' as const, notificationTitle: 'Deliverable approved', notificationBody: `Your deliverable for "${projectTitle}" was approved.`, notificationLink: `${baseUrl}/project-overview/${proposalUniqueId}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposalId };
     await dispatch(NotificationJob, notifData);
     await dispatch(NotificationEmailJob, notifData);
   }

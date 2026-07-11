@@ -251,7 +251,7 @@ export async function rejectMilestone(
     notificationBody: reasonText
       ? `Your milestone "${milestoneTitle}" for "${projectTitle}" was rejected: ${reasonText}`
       : `Your milestone "${milestoneTitle}" for "${projectTitle}" was rejected.`,
-    notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+    notificationLink: `${baseUrl}/project-overview/${proposalUniqueId}`,
     actorId: userId,
     subjectType: 'Proposal' as const,
     subjectId: milestone.proposal.id
@@ -327,7 +327,7 @@ export async function deleteMilestone(
     type: 'MILESTONE_DELETED' as const,
     notificationTitle: 'Milestone deleted',
     notificationBody: `The expert deleted the milestone "${milestoneTitle}" for "${projectTitle}".`,
-    notificationLink: `${baseUrl}/proposals-and-offers/${proposalUniqueId}`,
+    notificationLink: `${baseUrl}/project-overview/${proposalUniqueId}`,
     actorId: userId,
     subjectType: 'Proposal' as const,
     subjectId: milestone.proposal.id
@@ -430,7 +430,7 @@ async function performMilestoneRelease(milestone: any, userId: number): Promise<
 
   const projectTitle = milestone.project?.project_title ?? "Project";
   const baseUrl = appConfig.frontendUrl;
-  const notifData = { userId: milestone.proposal.provider_id, type: 'PAYMENT_RELEASED' as const, notificationTitle: 'Payment released', notificationBody: `Payment for "${projectTitle}" (milestone: ${milestone.title}) was released.`, notificationLink: `${baseUrl}/proposals-and-offers/${milestone.proposal.unique_id}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: milestone.proposal.id };
+  const notifData = { userId: milestone.proposal.provider_id, type: 'PAYMENT_RELEASED' as const, notificationTitle: 'Payment released', notificationBody: `Payment for "${projectTitle}" (milestone: ${milestone.title}) was released.`, notificationLink: `${baseUrl}/project-overview/${milestone.proposal.unique_id}`, actorId: userId, subjectType: 'Proposal' as const, subjectId: milestone.proposal.id };
   await dispatch(NotificationJob, notifData);
   await dispatch(NotificationEmailJob, notifData);
 

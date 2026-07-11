@@ -801,7 +801,7 @@ export class ProposalService {
         type: 'MILESTONE_REQUESTED' as const,
         notificationTitle: 'New milestone requested',
         notificationBody: `The expert requested a new milestone "${title}" for "${projectTitle}". Review and approve or reject it.`,
-        notificationLink: `${baseUrl}/proposals-and-offers/${proposal.unique_id}`,
+        notificationLink: `${baseUrl}/project-overview/${proposal.unique_id}`,
         actorId: userId,
         subjectType: 'Proposal' as const,
         subjectId: proposal.id
@@ -1889,7 +1889,7 @@ export class ProposalService {
         type: 'INVOICE_REQUESTED' as const,
         notificationTitle: 'Invoice requested',
         notificationBody: `The client has asked you to send your invoice for "${projectTitle}".`,
-        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        notificationLink: `${appConfig.frontendUrl}/project-overview/${proposal.unique_id}`,
         actorId: userId,
         subjectType: 'Proposal' as const,
         subjectId: proposal.id
@@ -1987,7 +1987,7 @@ export class ProposalService {
       type: 'PROJECT_COMPLETED' as const,
       notificationTitle: 'Project completed',
       notificationBody: `The client marked "${completedProjectTitle}" as completed.`,
-      notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+      notificationLink: `${appConfig.frontendUrl}/project-overview/${proposal.unique_id}`,
       actorId: actorUserId,
       subjectType: 'Proposal' as const,
       subjectId: proposal.id
@@ -2225,7 +2225,7 @@ export class ProposalService {
         );
         const projectTitle = proposal.project?.project_title || "Project";
         const offerSentLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
-        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer sent', notificationBody: `You received an offer for "${projectTitle}".`, notificationLink: offerSentLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer received', notificationBody: `You received an offer for "${projectTitle}".`, notificationLink: offerSentLink ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
         return { success: true, message: "Offer sent" };
@@ -2380,7 +2380,7 @@ export class ProposalService {
         );
         const projectTitleNda = proposal.project?.project_title || "Project";
         const offerSentLinkNda = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`;
-        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer sent', notificationBody: `You received an offer for "${projectTitleNda}".`, notificationLink: offerSentLinkNda ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
+        const notifData = { userId: proposal.provider_id, type: 'OFFER_SENT' as const, notificationTitle: 'Offer received', notificationBody: `You received an offer for "${projectTitleNda}".`, notificationLink: offerSentLinkNda ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
       }
@@ -2650,7 +2650,7 @@ export class ProposalService {
         type: 'CONTRACT_TERMINATION_SCHEDULED' as const,
         notificationTitle: 'Contract termination scheduled',
         notificationBody: `${actorName} scheduled termination of the contract for "${projectTitle}". It will end on ${terminateAt.toDateString()} unless restored.`,
-        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        notificationLink: `${appConfig.frontendUrl}/project-overview/${proposal.unique_id}`,
         actorId: userId,
         subjectType: 'Proposal' as const,
         subjectId: proposal.id
@@ -2731,7 +2731,7 @@ export class ProposalService {
         type: 'CONTRACT_RESTORED' as const,
         notificationTitle: 'Contract restored',
         notificationBody: `${restorerName} restored the contract for "${projectTitle}". The termination has been cancelled.`,
-        notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
+        notificationLink: `${appConfig.frontendUrl}/project-overview/${proposal.unique_id}`,
         actorId: userId,
         subjectType: 'Proposal' as const,
         subjectId: proposal.id
@@ -2767,7 +2767,7 @@ export class ProposalService {
 
     const terminatedBy = p.terminate_by ?? p.project.user_id;
     const title = p.project.project_title || "Project";
-    const link = `${appConfig.frontendUrl}/proposals-and-offers/${p.unique_id}`;
+    const link = `${appConfig.frontendUrl}/project-overview/${p.unique_id}`;
 
     await createProposalActivity(p.unique_id, 'STATUS_CHANGE', {
       oldStatus: ProposalStatus.TERMINATING,
