@@ -2046,6 +2046,53 @@ export class ProposalService {
   }
 
   /**
+   * Founder marks the WHOLE project completed. Completes every outstanding milestone first —
+   * funded ones release payment to the freelancer, unfunded ones are just marked COMPLETED —
+   * then marks the project PROJECT_COMPLETED (which prompts both parties to review).
+   */
+  static async completeProjectAndMilestones(userId: number, proposalId: string): Promise<ServiceResponse> {
+    try {
+      const proposal = await (prisma as any).proposal.findFirst({
+        where: { unique_id: proposalId },
+        include: {
+          project: { select: { user_id: true } },
+          milestonesRows: { orderBy: { order_index: 'asc' } }
+        }
+      });
+      if (!proposal) return { success: false, message: "Proposal not found" };
+      if (proposal.project.user_id !== userId) {
+        return { success: false, message: "Only the project owner can complete the project" };
+      }
+      if (proposal.status === ProposalStatus.PROJECT_COMPLETED) {
+        return { success: true, message: "Project is already completed" };
+      }
+      if (proposal.status === ProposalStatus.TERMINATING) {
+        return { success: false, message: "Restore the contract before completing the project." };
+      }
+      if (proposal.status !== ProposalStatus.HIRED) {
+        return { success: false, message: "Project can only be completed when the contract is hired" };
+      }
+
+      const { markMilestoneCompleted } = await import('./MilestoneService');
+      const rows = proposal.milestonesRows ?? [];
+      for (const m of rows) {
+        const s = String(m.status ?? '').toUpperCase();
+        if (s !== MilestoneStatus.PAID && s !== MilestoneStatus.COMPLETED) {
+          const res = await markMilestoneCompleted(userId, m.unique_id);
+          if (!res.success) {
+            return { success: false, message: res.message || `Failed to complete milestone "${m.title}"` };
+          }
+        }
+      }
+
+      return await ProposalService.markProjectCompleted(userId, proposalId);
+    } catch (error: any) {
+      Log.error("Complete project Error", { error });
+      return { success: false, message: error.message || "Failed to complete the project" };
+    }
+  }
+
+  /**
    * Check if freelancer has verified bank info and Razorpay linked account.
    * Must be done before accepting a contract so payments can be processed.
    */
