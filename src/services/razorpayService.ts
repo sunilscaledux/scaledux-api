@@ -261,8 +261,11 @@ export async function createRouteLinkedAccount(params: {
   const rawPhone = (params.phone || "").replace(/\D/g, "");
   const phone = rawPhone.length >= 10 ? rawPhone.slice(-10) : "9999999999";
 
-  // postal_code must be a valid 6-digit number
-  const postalCode = parseInt(params.address?.postalCode || "") || 400001;
+  // postal_code must be a valid 6-digit Indian PIN (1-9 followed by 5 digits).
+  // Razorpay rejects anything else with "Invalid country pin passed", so sanitize
+  // the profile zip code and fall back to a known-valid default when it doesn't qualify.
+  const rawPostal = (params.address?.postalCode || "").replace(/\D/g, "");
+  const postalCode = /^[1-9]\d{5}$/.test(rawPostal) ? parseInt(rawPostal, 10) : 400001;
 
   let accountId: string;
 

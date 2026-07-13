@@ -15,6 +15,36 @@ const BANK_NAME_PATTERN = /^[A-Za-z. ]+$/;
 const cleanName = (v?: string | null) =>
   (v ?? '').trim().replace(/\s+/g, ' ');
 
+/**
+ * Translate raw Razorpay Route error descriptions into user-friendly, actionable
+ * messages. Falls back to the raw description (or a generic message) when unknown.
+ */
+const friendlyRazorpayError = (raw?: string | null): string => {
+  const desc = (raw || '').trim();
+  const lower = desc.toLowerCase();
+
+  if (lower.includes('country pin') || lower.includes('postal') || lower.includes('pincode') || lower.includes('pin code')) {
+    return 'The PIN/postal code in your profile address is invalid. Please update it to a valid 6-digit PIN code in your profile and try again.';
+  }
+  if (lower.includes('pan')) {
+    return 'The PAN on file appears to be invalid. Please check your PAN in your tax information and try again.';
+  }
+  if (lower.includes('phone') || lower.includes('contact number')) {
+    return 'The phone number on your profile appears to be invalid. Please update it and try again.';
+  }
+  if (lower.includes('email')) {
+    return 'The email used for your payment account appears to be invalid. Please use a valid email and try again.';
+  }
+  if (lower.includes('ifsc')) {
+    return 'The IFSC code appears to be invalid. Please check your bank IFSC and try again.';
+  }
+  if (lower.includes('account number') || lower.includes('bank account')) {
+    return 'The bank account number appears to be invalid. Please check your account details and try again.';
+  }
+
+  return desc || 'Payment account setup failed. Please try again or contact support.';
+};
+
 export class BankInformationService {
 
   static async getBankInformation(userId: string) {
@@ -648,13 +678,14 @@ export class BankInformationService {
       });
       return { success: true, activationStatus: result.activationStatus, productId: result.productId };
     } catch (err: any) {
-      const razorpayError = err?.response?.data?.error?.description || err?.message || 'Unknown error';
+      const rawError = err?.response?.data?.error?.description || err?.message || 'Unknown error';
       Log.error(`[ensureRazorpayLinkedAccount] Failed for user ${userId} (${entityType})`, {
         message: err?.message,
         status: err?.response?.status,
         data: err?.response?.data,
+        rawError,
       });
-      return { success: false, error: razorpayError };
+      return { success: false, error: friendlyRazorpayError(rawError) };
     }
   }
 }

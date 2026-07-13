@@ -31,6 +31,7 @@ import notificationRoutes from '@admin/modules/notification/NotificationRoute';
 import adminMgmtRoutes from '@admin/modules/admin/AdminRoute';
 import auditRoutes from '@admin/modules/audit/AuditRoute';
 import securityRoutes from '@admin/modules/security/SecurityRoute';
+import bugReportRoutes from '@admin/modules/bug-report/BugReportRoute';
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.use(`${BASE}/notifications`, notificationRoutes);
 app.use(`${BASE}/admins`, adminMgmtRoutes);
 app.use(`${BASE}/audit-logs`, auditRoutes);
 app.use(`${BASE}/security`, securityRoutes);
+app.use(`${BASE}/bug-reports`, bugReportRoutes);
 
 app.use(globalErrorHandler);
 

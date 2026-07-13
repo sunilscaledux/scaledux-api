@@ -38,6 +38,7 @@ const policy: Record<string, FileVisibility> = {
   identity_address_proof: 'private',
   agency_documents: 'private',
   startup_deliverable: 'private',
+  bug_report_recording: 'private',
   attachment: 'private',
 };
 

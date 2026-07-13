@@ -40,6 +40,7 @@ import googleCalendarRoutes from './module/google-calendar/GoogleCalendarRoute';
 import videoConferencingRoutes from './module/video-conferencing/VideoConferencingRoute';
 import { startupPhaseRouter, startupProgressRouter } from './module/startup-phase/StartupPhaseRoute';
 import connectionRoutes from './module/connection/ConnectionRoute';
+import bugReportRoutes from './module/bug-report/BugReportRoute';
 import sitemapRoutes from './module/sitemap/SitemapRoute';
 
 import path from "path";
@@ -104,6 +105,7 @@ app.use("/api/v1/video-conferencing", videoConferencingRoutes);
 app.use("/api/v1/startup-phases", startupPhaseRouter);
 app.use("/api/v1/profile/company/startup-progress", startupProgressRouter);
 app.use("/api/v1/connections", connectionRoutes);
+app.use("/api/v1/bug-reports", bugReportRoutes);
 
 // Public redirect endpoint — /r/:code/redirect → redirects to target URL
 app.get("/r/:code/redirect", async (req, res) => {

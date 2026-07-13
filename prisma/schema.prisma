@@ -122,6 +122,7 @@ model User {
   blockedUsers                  BlockedUser[] @relation("BlockedByUser")
   blockedByUsers                BlockedUser[] @relation("BlockedTargetUser")
   passwordHistory               PasswordHistory[]
+  bugReports                    BugReport[] @relation("BugReportsGiven")
   @@index([email, phone])
   @@index([last_name, first_name, email])
   @@index([googleId])
@@ -1113,6 +1114,39 @@ model ReportSpam {
   @@unique([reporter_id, reported_user_id])
   @@index([reported_user_id])
   @@map("scd_report_spam")
+}
+
+/// User-submitted bug reports: "steps to reproduce" text, auto-captured context
+/// (page URL, browser, screen size) and an optional private screen+mic recording
+/// (stored as an Attachment unique_id). Viewed/downloaded by admins in the panel.
+model BugReport {
+  id                         Int       @id @default(autoincrement())
+  unique_id                  String    @unique @default(cuid())
+  reporter_id                Int
+  /** Free-text steps to reproduce written by the user. */
+  steps                      String    @db.Text
+  /** Page the user was on when reporting. */
+  page_url                   String?   @db.VarChar(1024)
+  /** Browser user-agent string (auto-captured). */
+  user_agent                 String?   @db.Text
+  /** Viewport/screen size, e.g. "1920x1080" (auto-captured). */
+  screen_size               String?   @db.VarChar(32)
+  /** Attachment.unique_id of the private screen+mic recording, if provided. */
+  recording_attachment_id    String?   @db.VarChar(36)
+  /** Recording length in seconds, if a recording was attached. */
+  recording_duration_seconds Int?
+  status                     String    @default("OPEN") @db.VarChar(20) // OPEN, IN_PROGRESS, RESOLVED, CLOSED
+  /** Internal note written by an admin while triaging. */
+  admin_note                 String?   @db.Text
+  created_at                 DateTime  @default(now())
+  updated_at                 DateTime  @updatedAt
+
+  reporter                   User      @relation("BugReportsGiven", fields: [reporter_id], references: [id], onDelete: Cascade)
+
+  @@index([reporter_id])
+  @@index([status])
+  @@index([created_at])
+  @@map("scd_bug_reports")
 }
 
 model BlockedUser {

@@ -66,6 +66,10 @@ export const PERMISSIONS = {
 
   // Security / anomaly monitoring (device & session fingerprints)
   SECURITY_VIEW: 'security.view',
+
+  // Bug reports (user-submitted, with screen recordings)
+  BUG_REPORTS_VIEW: 'bug_reports.view',
+  BUG_REPORTS_MANAGE: 'bug_reports.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -84,6 +88,7 @@ const READ_ONLY = [
   PERMISSIONS.REVIEWS_VIEW,
   PERMISSIONS.CONTENT_VIEW,
   PERMISSIONS.CONSTANTS_VIEW,
+  PERMISSIONS.BUG_REPORTS_VIEW,
 ];
 
 export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
@@ -108,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.NOTIFICATIONS_SEND,
     PERMISSIONS.AUDIT_VIEW,
     PERMISSIONS.SECURITY_VIEW,
+    PERMISSIONS.BUG_REPORTS_MANAGE,
   ],
 
   MODERATOR: [
@@ -129,6 +135,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.VERIFICATIONS_VIEW,
     PERMISSIONS.VERIFICATIONS_REVIEW,
     PERMISSIONS.SECURITY_VIEW,
+    PERMISSIONS.BUG_REPORTS_VIEW,
+    PERMISSIONS.BUG_REPORTS_MANAGE,
   ],
 
   FINANCE: [
