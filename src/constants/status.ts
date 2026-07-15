@@ -69,16 +69,9 @@ export type WithdrawalRequestStatusValue = (typeof WithdrawalRequestStatus)[keyo
 // --- Project status ---
 
 /**
- * FounderProject.status lifecycle.
- *
- * DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED, with IN_PROGRESS → PUBLISHED if the
- * contract is terminated and the project goes back on the market.
- *
- * Only PUBLISHED projects appear in browse and accept proposals — the read and
- * write guards both filter on it, so this field is what takes an awarded project
- * off the market. Keep it in step with the proposal that drives it (an accepted
- * offer ⇒ IN_PROGRESS, a completed contract ⇒ COMPLETED); the two used to drift
- * because the project row was never written at all.
+ * FounderProject.status. DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED; a terminated
+ * contract sends IN_PROGRESS back to PUBLISHED.
+ * Only PUBLISHED is browsable and accepts proposals.
  */
 export const ProjectStatus = {
   DRAFT: 'DRAFT',

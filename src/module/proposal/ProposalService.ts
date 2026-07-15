@@ -82,16 +82,9 @@ function buildRemarkFields(
 }
 
 /**
- * Take a project off the market once its offer is accepted.
- *
- * Browse and createProposal both filter `status: 'PUBLISHED'`, so flipping the
- * project is what actually stops new proposals — the guards were always there,
- * nothing ever moved the project out of PUBLISHED.
- *
- * The losing proposals are rejected rather than left pending: they can no longer
- * be actioned by anyone, so leaving them would hang the freelancers on a silent
- * project and keep dead rows in the founder's list. Drafts are skipped — the
- * freelancer never submitted them and never saw them as live.
+ * Accepted offer → project IN_PROGRESS (drops it from browse and blocks new
+ * proposals), and the remaining PENDING/SHORTLISTED proposals are rejected.
+ * Returns the provider ids that were rejected.
  */
 async function closeProjectOnOfferAccepted(
   projectId: number,
@@ -1059,8 +1052,6 @@ export class ProposalService {
               project_title: true,
               budget_currency: true,
               budget_amount: true,
-              // Lets the card refuse to start a hire on a project that is
-              // already running or finished.
               status: true
             }
           },
@@ -1174,8 +1165,6 @@ export class ProposalService {
               project_title: true,
               budget_currency: true,
               budget_amount: true,
-              // Lets the card refuse to start a hire on a project that is
-              // already running or finished.
               status: true
             }
           },
@@ -2037,8 +2026,6 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: ProposalStatus.PROJECT_COMPLETED }
       }),
-      // Carry the completion up to the project, so it reports as completed and
-      // stays off the market instead of sitting in PUBLISHED forever.
       (prisma as any).founderProject.update({
         where: { id: proposal.project_id },
         data: { status: ProjectStatus.COMPLETED }
@@ -2845,9 +2832,7 @@ export class ProposalService {
     });
     if (!result || result.count === 0) return false;
 
-    // The contract is dead, so put the project back on the market instead of
-    // stranding it IN_PROGRESS where it can never be listed or proposed to
-    // again. Scoped to IN_PROGRESS so a COMPLETED project is never resurrected.
+    // Contract dead → project back on the market. Scoped so COMPLETED stays put.
     await (prisma as any).founderProject.updateMany({
       where: { id: p.project.id, status: ProjectStatus.IN_PROGRESS },
       data: { status: ProjectStatus.PUBLISHED }
