@@ -9,7 +9,7 @@ import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
-import { ProposalStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
+import { ProposalStatus, ProjectStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
 import { getUserFullName, maskUserName } from '@utils/General';
 import { appConfig } from '@config/app';
 
@@ -79,6 +79,70 @@ function buildRemarkFields(
     freelancer_reason: reasonKeyTrimmed,
     founder_remark: receivedDisplay,
   };
+}
+
+/**
+ * Take a project off the market once its offer is accepted.
+ *
+ * Browse and createProposal both filter `status: 'PUBLISHED'`, so flipping the
+ * project is what actually stops new proposals — the guards were always there,
+ * nothing ever moved the project out of PUBLISHED.
+ *
+ * The losing proposals are rejected rather than left pending: they can no longer
+ * be actioned by anyone, so leaving them would hang the freelancers on a silent
+ * project and keep dead rows in the founder's list. Drafts are skipped — the
+ * freelancer never submitted them and never saw them as live.
+ */
+async function closeProjectOnOfferAccepted(
+  projectId: number,
+  acceptedProposalId: number,
+  founderId: number
+): Promise<number[]> {
+  const losing = await (prisma as any).proposal.findMany({
+    where: {
+      project_id: projectId,
+      id: { not: acceptedProposalId },
+      is_draft: false,
+      status: { in: [ProposalStatus.PENDING, ProposalStatus.SHORTLISTED] },
+    },
+    select: { id: true, unique_id: true, provider_id: true },
+  });
+
+  const founderName = await getUserFullName(founderId);
+  const remarkFields = buildRemarkFields(
+    'founder',
+    founderName,
+    'You rejected the proposal',
+    'rejected your proposal',
+    'Found another freelancer',
+    null
+  );
+
+  await prisma.$transaction([
+    (prisma as any).founderProject.update({
+      where: { id: projectId },
+      data: { status: ProjectStatus.IN_PROGRESS },
+    }),
+    ...(losing.length
+      ? [
+          (prisma as any).proposal.updateMany({
+            where: { id: { in: losing.map((p: any) => p.id) } },
+            data: { status: ProposalStatus.REJECTED, ...remarkFields },
+          }),
+        ]
+      : []),
+  ]);
+
+  for (const p of losing) {
+    await createProposalActivity(
+      p.unique_id,
+      'STATUS_CHANGE',
+      { newStatus: ProposalStatus.REJECTED, main_reason: 'Found another freelancer' },
+      founderId
+    ).catch(() => undefined);
+  }
+
+  return losing.map((p: any) => p.provider_id);
 }
 
 /** NDA + offer data (from ProposalNda table or legacy proposal.nda JSON). Dates in API as ISO strings. */
@@ -1962,10 +2026,18 @@ export class ProposalService {
       newStatus: ProposalStatus.PROJECT_COMPLETED
     }, actorUserId);
 
-    await (prisma as any).proposal.update({
-      where: { id: proposal.id },
-      data: { status: ProposalStatus.PROJECT_COMPLETED }
-    });
+    await prisma.$transaction([
+      (prisma as any).proposal.update({
+        where: { id: proposal.id },
+        data: { status: ProposalStatus.PROJECT_COMPLETED }
+      }),
+      // Carry the completion up to the project, so it reports as completed and
+      // stays off the market instead of sitting in PUBLISHED forever.
+      (prisma as any).founderProject.update({
+        where: { id: proposal.project_id },
+        data: { status: ProjectStatus.COMPLETED }
+      }),
+    ]);
 
     await ConversationService.syncSystemMessage(
       proposal.project.user_id,
@@ -2241,6 +2313,7 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
+        await closeProjectOnOfferAccepted(proposal.project_id, proposal.id, proposal.project.user_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
@@ -2395,6 +2468,7 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
+        await closeProjectOnOfferAccepted(proposal.project_id, proposal.id, proposal.project.user_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         const freelancerNameSign = await getUserFullName(userId);
         const projectTitleSign = proposal.project?.project_title || "Project";
@@ -2764,6 +2838,14 @@ export class ProposalService {
       data: { status: ProposalStatus.TERMINATED, terminate_at: null, terminate_by: null }
     });
     if (!result || result.count === 0) return false;
+
+    // The contract is dead, so put the project back on the market instead of
+    // stranding it IN_PROGRESS where it can never be listed or proposed to
+    // again. Scoped to IN_PROGRESS so a COMPLETED project is never resurrected.
+    await (prisma as any).founderProject.updateMany({
+      where: { id: p.project.id, status: ProjectStatus.IN_PROGRESS },
+      data: { status: ProjectStatus.PUBLISHED }
+    });
 
     const terminatedBy = p.terminate_by ?? p.project.user_id;
     const title = p.project.project_title || "Project";

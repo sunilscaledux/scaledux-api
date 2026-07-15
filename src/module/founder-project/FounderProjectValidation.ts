@@ -160,7 +160,10 @@ export const saveDraftProjectSchema = Joi.object({
     estimatedHours: Joi.number().integer().min(0).optional().allow(null),
     serviceProviderType: Joi.string().optional().allow('')
   }).optional(),
-  status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED')
+  // valid(), not allow(): allow() only whitelists extra values on top of "any
+  // string", so this used to accept anything. IN_PROGRESS/COMPLETED are set by
+  // the contract flow and are deliberately not settable here.
+  status: Joi.string().optional().valid('DRAFT', 'PUBLISHED').allow('')
 })
 
 export const updateFounderProjectSchema = Joi.object({
@@ -215,7 +218,7 @@ export const updateFounderProjectSchema = Joi.object({
     estimatedHours: Joi.number().integer().min(0).optional().allow(null),
     serviceProviderType: Joi.string().optional().allow('')
   }).optional(),
-  status: Joi.string().optional().allow('', 'DRAFT', 'PUBLISHED').messages({
+  status: Joi.string().optional().valid('DRAFT', 'PUBLISHED').allow('').messages({
     'any.only': 'Status must be either DRAFT or PUBLISHED'
   })
 })

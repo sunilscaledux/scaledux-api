@@ -8,7 +8,7 @@ import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
-import { ProposalStatus, InviteStatus } from '@constants/status';
+import { ProposalStatus, ProjectStatus, InviteStatus } from '@constants/status';
 import { getUserFullName, getDisplayName, maskUserName } from '@utils/General';
 import { MatchingService, buildFreelancerProfile } from '@services/matchingService';
 import { areMandatorySectionsComplete, type ProfileCompletionSectionsMap } from '@constants/profileCompletion';
@@ -246,10 +246,14 @@ export class FounderProjectService {
       // founders whose profile meets the required completion bar (so service
       // providers don't see projects from founders they can't realistically
       // work with).
+      //
+      // status PUBLISHED is what keeps awarded work out of browse: an accepted
+      // offer moves the project to IN_PROGRESS and completion to COMPLETED.
+      // (This used to also filter hired_count: 0, but nothing ever incremented
+      // that column, so it matched every row and hid nothing.)
       const whereClause: any = {
-        status: 'PUBLISHED',
+        status: ProjectStatus.PUBLISHED,
         deleted_at: null,
-        hired_count: 0,
         user: {
           profile_completion_percentage: { gte: PROFILE_COMPLETION_THRESHOLD }
         }
@@ -468,8 +472,15 @@ export class FounderProjectService {
         if (freelancerData) {
           const profile = buildFreelancerProfile(freelancerData);
 
-          // Build raw WHERE clause matching Prisma's whereClause
-          const conditions: string[] = [`status = 'PUBLISHED'`, `deleted_at IS NULL`];
+          // Build raw WHERE clause matching Prisma's whereClause. Keep these two
+          // in step — the profile-completion bar lives here as an EXISTS because
+          // this path has no join to the founder, and omitting it used to make
+          // sortBy=relevance surface projects the other sorts correctly hid.
+          const conditions: string[] = [
+            `status = '${ProjectStatus.PUBLISHED}'`,
+            `deleted_at IS NULL`,
+            `EXISTS (SELECT 1 FROM scd_users u WHERE u.id = scd_founder_projects.user_id AND u.profile_completion_percentage >= ${Number(PROFILE_COMPLETION_THRESHOLD)})`,
+          ];
           const params: any[] = [];
           let paramIdx = 1;
 
@@ -694,19 +705,24 @@ export class FounderProjectService {
       }
 
       const isOwner = userId && project.user_id === userId;
-      const isPublished = project.status === 'PUBLISHED';
+      const isPublished = project.status === ProjectStatus.PUBLISHED;
 
-      // Non-owners: allow if published OR if user is hired freelancer on this project
+      // Non-owners: allow if published, or if the user has a real proposal on it.
+      // Anyone who submitted needs to keep reading the project after it leaves
+      // PUBLISHED — the awarded freelancer through OFFER_ACCEPTED → HIRED →
+      // PROJECT_COMPLETED, and the rest to see why their proposal ended.
+      // (Matching only HIRED would lock the awarded freelancer out between
+      // accepting the offer and the first payment, and again once completed.)
       if (!isOwner && !isPublished) {
         if (userId) {
-          const hiredProposal = await (prisma as any).proposal.findFirst({
+          const ownProposal = await (prisma as any).proposal.findFirst({
             where: {
               project_id: project.id,
               provider_id: userId,
-              status: ProposalStatus.HIRED
+              is_draft: false
             }
           });
-          if (!hiredProposal) {
+          if (!ownProposal) {
             return {
               success: false,
               message: "Project not found"
@@ -914,6 +930,25 @@ export class FounderProjectService {
         return {
           success: false,
           message: "Project not found"
+        };
+      }
+
+      // IN_PROGRESS / COMPLETED are owned by the contract, not the founder: the
+      // offer-accept and completion flows set them. Without this, a founder could
+      // PATCH status back to PUBLISHED and re-list a project that already has a
+      // live contract, taking fresh proposals nobody can act on.
+      const engagedStatuses: string[] = [ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED];
+      if (
+        data.status !== undefined &&
+        String(data.status) !== '' &&
+        engagedStatuses.includes(existingProject.status)
+      ) {
+        return {
+          success: false,
+          message:
+            existingProject.status === ProjectStatus.COMPLETED
+              ? "This project is completed and can no longer be republished."
+              : "This project has an active contract and can't be republished."
         };
       }
 
