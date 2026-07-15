@@ -242,18 +242,25 @@ export async function revokeAllDevices(
   return { deviceIds };
 }
 
+/**
+ * OR conditions matching an identifier. Only the sides that resolve are included:
+ * a null would become `IS NULL` and match every row missing that column.
+ */
+function identifierConditions(identifier: string): Array<{ email: string } | { phone: string }> {
+  const email = normalizeEmail(identifier);
+  const phone = normalizePhone(identifier);
+  const conditions: Array<{ email: string } | { phone: string }> = [];
+  if (email) conditions.push({ email });
+  if (phone) conditions.push({ phone });
+  return conditions;
+}
+
 export async function checkUserExists(input: string): Promise<boolean> {
+  const conditions = identifierConditions(input);
+  if (conditions.length === 0) return false;
+
   const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [
-        {
-          phone: normalizePhone(input),
-        },
-        {
-          email: normalizeEmail(input),
-        },
-      ],
-    },
+    where: { OR: conditions },
   });
 
   return !!existingUser;
@@ -479,8 +486,11 @@ export async function cleanupExpiredOtps(
   otpType?: OtpType
 ): Promise<void> {
   try {
+    const conditions = identifierConditions(identifier);
+    if (conditions.length === 0) return;
+
     const whereCondition: any = {
-      OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
+      OR: conditions,
       expires_at: {
         lt: new Date(), // Expired
       },
@@ -703,14 +713,17 @@ export async function resendOtpByType(
     }
 
     // Invalidate existing unverified OTPs of the same type
-    await prisma.otp.updateMany({
-      where: {
-        OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
-        verified: false,
-        otp_type: otpType,
-      },
-      data: { verified: true },
-    });
+    const resendConditions = identifierConditions(identifier);
+    if (resendConditions.length > 0) {
+      await prisma.otp.updateMany({
+        where: {
+          OR: resendConditions,
+          verified: false,
+          otp_type: otpType,
+        },
+        data: { verified: true },
+      });
+    }
 
     // Generate and send new OTP
     const result = await generateAndSendOtp({
@@ -737,9 +750,12 @@ export async function resendOtpByType(
  */
 export async function getRegistrationData(identifier: string): Promise<any | null> {
   try {
+    const conditions = identifierConditions(identifier);
+    if (conditions.length === 0) return null;
+
     const otp = await prisma.otp.findFirst({
       where: {
-        OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
+        OR: conditions,
         verified: true,
         otp_type: "REGISTRATION_VERIFICATION",
         expires_at: {
