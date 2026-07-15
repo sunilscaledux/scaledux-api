@@ -324,6 +324,29 @@ export class ProfileController {
     const personalInfo = await PersonalInfoService.getProfileByUniqueId(uniqueId);
 
     if (personalInfo.success) {
+      // Signed out: identity only. The rest (about, experience, education,
+      // rates, links) is for members — don't put it on the wire.
+      if (!viewerId) {
+        const p = ((personalInfo.data as any)?.personal ?? personalInfo.data) as any;
+        return ApiResponse.success(
+          res,
+          {
+            locked: true,
+            tabs: [],
+            connection: null,
+            isBlockedByMe: false,
+            personal: {
+              unique_id: p?.unique_id ?? uniqueId,
+              firstName: p?.firstName ?? null,
+              lastName: p?.lastName ?? null,
+              profileImage: p?.profileImage ?? null,
+              coverImage: p?.coverImage ?? null,
+            },
+          },
+          personalInfo.message
+        );
+      }
+
       // Include connection status and block info if viewer is authenticated
       let connection = null;
       let isBlockedByMe = false;
