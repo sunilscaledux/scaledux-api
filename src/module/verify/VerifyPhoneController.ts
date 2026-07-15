@@ -4,11 +4,12 @@ import { Log } from '@services/loggerService';
 import { ApiResponse } from "@utils/ApiResponse"
 import SmsService from "@services/SmsService"
 import { verifyOtpByType, generateAndSendOtp, OTP_TYPES } from '@module/auth/AuthService'
+import { normalizePhone } from '@utils/General';
 import { updateCompletionSection } from '../profile/ProfileCompletionService';
 
 export async function sendPhoneOTP(req: Request, res: Response) {
   try {
-    const { phone } = req.body
+    const phone = normalizePhone(req.body?.phone)
     const userId = req.user?.id
     if (!phone) {
       return ApiResponse.error(res, "Phone number is required", 400)

@@ -4,7 +4,7 @@ import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { ulid } from "ulid";
 import { emailService } from "@services/emailService";
-import { generateOtpCode, generateKeycode, normalizeContact, normalizeEmail } from "@utils/General";
+import { generateOtpCode, generateKeycode, normalizeContact, normalizeEmail, normalizePhone } from "@utils/General";
 import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
@@ -247,7 +247,7 @@ export async function checkUserExists(input: string): Promise<boolean> {
     where: {
       OR: [
         {
-          phone: input,
+          phone: normalizePhone(input),
         },
         {
           email: normalizeEmail(input),
@@ -480,7 +480,7 @@ export async function cleanupExpiredOtps(
 ): Promise<void> {
   try {
     const whereCondition: any = {
-      OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
+      OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
       expires_at: {
         lt: new Date(), // Expired
       },
@@ -516,11 +516,12 @@ export async function generateAndSendOtp(data: {
   userId?: number;
 }): Promise<ServiceResponse> {
   try {
-    // Store the OTP against the same canonical address verifyOtpByType() will
-    // look it up by, otherwise a case difference between request and verify
-    // reads as an invalid code.
+    // Store the OTP against the same canonical contact verifyOtpByType() will
+    // look it up by, otherwise a difference in case or phone format between
+    // request and verify reads as an invalid code.
     const email = normalizeEmail(data.email);
-    const identifier = email || data.phone;
+    const phone = normalizePhone(data.phone);
+    const identifier = email || phone;
 
     if (!identifier) {
       return {
@@ -538,7 +539,7 @@ export async function generateAndSendOtp(data: {
       data: {
         user_id: data.userId,
         email,
-        phone: data.phone,
+        phone,
         otp_code: otpCode,
         otp_type: data.otpType,
         expires_at: expiresAt,
@@ -558,8 +559,8 @@ export async function generateAndSendOtp(data: {
       message = sent
         ? "OTP sent successfully to your email"
         : "Failed to send OTP email. Please try again.";
-    } else if (data.phone) {
-      sent = await sendSmsOtp(data.phone, otpCode);
+    } else if (phone) {
+      sent = await sendSmsOtp(phone, otpCode);
       message = sent
         ? "OTP sent successfully to your phone"
         : "Failed to send OTP. Please try again.";
@@ -619,8 +620,7 @@ export async function verifyOtpByType(
     if (contactInfo.email) {
       whereConditions.email = contactInfo.email;
     } else if (contactInfo.phone) {
-      // Match phone with or without '+' prefix since DB may store either format
-      whereConditions.phone = { in: [contactInfo.phone, `+${contactInfo.phone}`] };
+      whereConditions.phone = contactInfo.phone;
     } else {
       return {
         success: false,
@@ -654,7 +654,7 @@ export async function verifyOtpByType(
       where: {
         OR: [
           contactInfo.email ? { email: contactInfo.email } : undefined,
-          contactInfo.phone ? { phone: { in: [contactInfo.phone, `+${contactInfo.phone}`] } } : undefined,
+          contactInfo.phone ? { phone: contactInfo.phone } : undefined,
         ].filter(Boolean) as any[],
         verified: false,
         otp_type: otpType,
@@ -705,7 +705,7 @@ export async function resendOtpByType(
     // Invalidate existing unverified OTPs of the same type
     await prisma.otp.updateMany({
       where: {
-        OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
+        OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
         verified: false,
         otp_type: otpType,
       },
@@ -739,7 +739,7 @@ export async function getRegistrationData(identifier: string): Promise<any | nul
   try {
     const otp = await prisma.otp.findFirst({
       where: {
-        OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
+        OR: [{ email: normalizeEmail(identifier) }, { phone: normalizePhone(identifier) }],
         verified: true,
         otp_type: "REGISTRATION_VERIFICATION",
         expires_at: {

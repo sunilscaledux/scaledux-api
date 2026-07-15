@@ -79,6 +79,38 @@ export const normalizeEmail = <T extends string | null | undefined>(
 ): T extends string ? string : null =>
   (email ? email.trim().toLowerCase() : null) as T extends string ? string : null;
 
+/** Country code assumed for bare local numbers. The UI only offers India today. */
+export const DEFAULT_PHONE_COUNTRY_CODE = "+91";
+
+/**
+ * Canonical (E.164) form of a phone number: +<country code><subscriber number>.
+ *
+ * `phone` is a single unique column holding the full international number, so a
+ * bare "9606626500" and "+919606626500" must not both be storable — they are the
+ * same person and the unique index cannot tell. Everything is folded to the +91…
+ * form on every read and write.
+ *
+ * A 10-digit local number is assumed to be Indian, matching the only country code
+ * the UI offers. Revisit this when a second country ships.
+ */
+export const normalizePhone = (phone?: string | null): string | null => {
+  if (!phone) return null;
+
+  const trimmed = phone.trim();
+  const isInternational = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D/g, "");
+
+  if (!digits) return null;
+  if (isInternational) return `+${digits}`;
+  if (digits.startsWith("00")) return `+${digits.slice(2)}`;
+  if (digits.length === 10) return `${DEFAULT_PHONE_COUNTRY_CODE}${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return `${DEFAULT_PHONE_COUNTRY_CODE}${digits.slice(1)}`;
+  }
+  // 11+ digits without a '+' already carry a country code (e.g. 919606626500).
+  return `+${digits}`;
+};
+
 /**
  * Normalize contact input to determine if it's email or phone
  */
@@ -96,7 +128,7 @@ export const normalizeContact = (email: string) => {
   if (isEmail) {
     return { email: normalizeEmail(incoming), phone: null };
   } else if (isPhone) {
-    return { email: null, phone: incoming.trim() };
+    return { email: null, phone: normalizePhone(incoming) };
   } else {
     // Keep as-is and let Joi raise validation error
     return { email: normalizeEmail(incoming), phone: null };
