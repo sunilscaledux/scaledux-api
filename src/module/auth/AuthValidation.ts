@@ -41,9 +41,10 @@ export const registerUserSchema = Joi.object({
 });
 
 export const loginUserSchema = Joi.object<LoginInput>({
-  email: Joi.string().email().optional().allow(null, "").custom(rejectDisposableEmail).messages({
+  // Holds an email OR a phone — userLogin() splits it via normalizeContact.
+  // .email() here rejected every phone before the password was ever checked.
+  email: Joi.string().optional().allow(null, "").custom(rejectDisposableEmail).messages({
     "any.required": "Email is required",
-    "string.email": "Please enter valid email address",
     ...disposableEmailMessage,
   }),
   password: Joi.string().required().messages({
