@@ -89,8 +89,10 @@ export async function initiateRegistration(req: Request, res: Response) {
 }
 
 export async function register(req: Request, res: Response) {
-  const rawBody = req.body || {};
-  const contactInfo = normalizeContact(rawBody.email);
+  // `email` is the pre-rename name for this field; older clients still send it.
+  const { email: legacyEmail, ...rest } = req.body || {};
+  const rawBody = { ...rest, identifier: rest.identifier ?? legacyEmail };
+  const contactInfo = normalizeContact(rawBody.identifier);
 
   const { error, value } = registerUserSchema.validate(rawBody, {
     abortEarly: false,
@@ -169,7 +171,9 @@ export async function register(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-  const rawBody = req.body || {};
+  // `email` is the pre-rename name for this field; older clients still send it.
+  const { email: legacyEmail, ...rest } = req.body || {};
+  const rawBody = { ...rest, identifier: rest.identifier ?? legacyEmail };
 
   const { error, value } = loginUserSchema.validate(rawBody, {
     abortEarly: false,

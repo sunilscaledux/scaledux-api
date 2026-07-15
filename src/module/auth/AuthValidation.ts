@@ -28,8 +28,9 @@ export const registerUserSchema = Joi.object({
     "string.min": "Last name must be at least 2 characters long",
     "string.max": "Last name must not exceed 50 characters",
   }),
-  email: Joi.string().required().custom(rejectDisposableEmail).messages({
+  identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
+    "string.empty": "Email or phone number is required",
     ...disposableEmailMessage,
   }),
   password: Joi.string().min(8).required().messages({
@@ -41,10 +42,9 @@ export const registerUserSchema = Joi.object({
 });
 
 export const loginUserSchema = Joi.object<LoginInput>({
-  // Holds an email OR a phone — userLogin() splits it via normalizeContact.
-  // .email() here rejected every phone before the password was ever checked.
-  email: Joi.string().optional().allow(null, "").custom(rejectDisposableEmail).messages({
-    "any.required": "Email is required",
+  identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
+    "any.required": "Email or phone number is required",
+    "string.empty": "Email or phone number is required",
     ...disposableEmailMessage,
   }),
   password: Joi.string().required().messages({

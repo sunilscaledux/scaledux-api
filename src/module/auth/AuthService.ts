@@ -270,8 +270,10 @@ export async function createUserAfterOtpVerification(
   data: RegisterInput
 ): Promise<ServiceResponse> {
   try {
+    const identifier = data.identifier ?? data.email ?? "";
+
     // Double-check user doesn't exist
-    const userExists = await checkUserExists(data.email);
+    const userExists = await checkUserExists(identifier);
     if (userExists) {
       return {
         success: false,
@@ -280,13 +282,15 @@ export async function createUserAfterOtpVerification(
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const contactInfo = normalizeContact(data.email);
+    const contactInfo = normalizeContact(identifier);
 
     const userData: any = {
       first_name: data.first_name,
       unique_id: ulid(),
       last_name: data.last_name,
-      email: contactInfo.email || normalizeEmail(data.email),
+      // Whichever side the identifier resolved to; a phone signup must not land
+      // its number in the email column.
+      email: contactInfo.email,
       phone: contactInfo.phone,
       password: hashedPassword,
       notification: data.notification || false,
@@ -299,7 +303,7 @@ export async function createUserAfterOtpVerification(
     }
 
     // Set verification timestamp for the method that was used
-    if (contactInfo.email || data.email) {
+    if (contactInfo.email) {
       userData.email_verified_at = new Date();
     }
     if (contactInfo.phone) {
@@ -342,7 +346,7 @@ export async function createUserAfterOtpVerification(
 
 export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
   try {
-    const contactInfo = normalizeContact(data.email || "");
+    const contactInfo = normalizeContact(data.identifier ?? data.email ?? "");
 
     const conditions = [];
     if (contactInfo.email) {

@@ -1,13 +1,19 @@
 export interface RegisterInput {
   first_name: string;
   last_name?: string;
-  email: string;
+  /** Email or phone. */
+  identifier: string;
+  /** @deprecated Legacy alias for identifier; older clients still send this. */
+  email?: string;
   password: string;
   terms: boolean;
   notification?: boolean;
 }
 
 export interface LoginInput {
+  /** Email or phone. */
+  identifier?: string;
+  /** @deprecated Legacy alias for identifier; older clients still send this. */
   email?: string;
   password: string;
   rememberMe?: boolean;
