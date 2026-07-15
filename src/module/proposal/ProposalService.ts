@@ -1058,7 +1058,10 @@ export class ProposalService {
               unique_id: true,
               project_title: true,
               budget_currency: true,
-              budget_amount: true
+              budget_amount: true,
+              // Lets the card refuse to start a hire on a project that is
+              // already running or finished.
+              status: true
             }
           },
           milestonesRows: {
@@ -1170,7 +1173,10 @@ export class ProposalService {
               unique_id: true,
               project_title: true,
               budget_currency: true,
-              budget_amount: true
+              budget_amount: true,
+              // Lets the card refuse to start a hire on a project that is
+              // already running or finished.
+              status: true
             }
           },
           milestonesRows: {
