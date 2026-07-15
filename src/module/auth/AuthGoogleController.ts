@@ -3,7 +3,7 @@ import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from '../../utils/jwtUtils';
 import { prisma } from '../../services/prismaService';
 import { createLoginDevice } from './AuthService';
-import { generateKeycode } from '@utils/General';
+import { generateKeycode, normalizeEmail } from '@utils/General';
 import { reactivateOnLogin } from '../profile/DeactivationService';
 import axios from 'axios';
 import { ulid } from 'ulid';
@@ -58,10 +58,11 @@ const googleCallback = async (req: Request, res: Response) => {
     );
 
     const googleUser = userResponse.data;
+    const googleEmail = normalizeEmail(googleUser.email);
 
     // Step 3: Check if user exists by email or googleId
     let user = await prisma.user.findUnique({
-      where: { email: googleUser.email }
+      where: { email: googleEmail }
     });
 
     if (!user && googleUser.id) {
@@ -77,8 +78,8 @@ const googleCallback = async (req: Request, res: Response) => {
         updates.googleId = googleUser.id;
         updates.provider = "google";
       }
-      if (user.email !== googleUser.email) {
-        updates.email = googleUser.email;
+      if (user.email !== googleEmail) {
+        updates.email = googleEmail;
       }
       if (!user.unique_id || user.unique_id.trim() === '') {
         updates.unique_id = ulid();
@@ -98,7 +99,7 @@ const googleCallback = async (req: Request, res: Response) => {
         data: {
           first_name: firstName,
           last_name: lastName,
-          email: googleUser.email,
+          email: googleEmail,
           googleId: googleUser.id,
           provider: "google",
           unique_id: ulid(),

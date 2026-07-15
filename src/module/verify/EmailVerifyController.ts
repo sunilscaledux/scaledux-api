@@ -2,12 +2,13 @@ import { Request, Response } from 'express'
 import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import * as AuthService from '../auth/AuthService'
+import { normalizeEmail } from '@utils/General';
 import { Log } from '@services/loggerService';
 import { updateCompletionSection } from '../profile/ProfileCompletionService';
 
 export async function sendEmailOTP(req: Request, res: Response) {
   try {
-    const { email } = req.body
+    const email = normalizeEmail(req.body?.email)
     const userId = req.user?.id
 
     if (!email) {
@@ -59,7 +60,8 @@ export async function sendEmailOTP(req: Request, res: Response) {
  */
 export async function verifyEmailOTP(req: Request, res: Response) {
   try {
-    const { email, otp } = req.body
+    const { otp } = req.body
+    const email = normalizeEmail(req.body?.email)
     const userId = req.user?.id
 
     if (!email || !otp) {

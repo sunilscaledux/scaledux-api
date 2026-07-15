@@ -4,7 +4,7 @@ import { LoginInput, RegisterInput, UserDetail } from "./AuthTypes";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { ulid } from "ulid";
 import { emailService } from "@services/emailService";
-import { generateOtpCode, generateKeycode, normalizeContact } from "@utils/General";
+import { generateOtpCode, generateKeycode, normalizeContact, normalizeEmail } from "@utils/General";
 import mailConfig from "@config/mail";
 import { generateRefreshToken } from "@utils/jwtUtils";
 import { Log } from '@services/loggerService';
@@ -250,7 +250,7 @@ export async function checkUserExists(input: string): Promise<boolean> {
           phone: input,
         },
         {
-          email: input,
+          email: normalizeEmail(input),
         },
       ],
     },
@@ -279,7 +279,7 @@ export async function createUserAfterOtpVerification(
       first_name: data.first_name,
       unique_id: ulid(),
       last_name: data.last_name,
-      email: contactInfo.email || data.email,
+      email: contactInfo.email || normalizeEmail(data.email),
       phone: contactInfo.phone,
       password: hashedPassword,
       notification: data.notification || false,
@@ -480,7 +480,7 @@ export async function cleanupExpiredOtps(
 ): Promise<void> {
   try {
     const whereCondition: any = {
-      OR: [{ email: identifier }, { phone: identifier }],
+      OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
       expires_at: {
         lt: new Date(), // Expired
       },
@@ -516,7 +516,11 @@ export async function generateAndSendOtp(data: {
   userId?: number;
 }): Promise<ServiceResponse> {
   try {
-    const identifier = data.email || data.phone;
+    // Store the OTP against the same canonical address verifyOtpByType() will
+    // look it up by, otherwise a case difference between request and verify
+    // reads as an invalid code.
+    const email = normalizeEmail(data.email);
+    const identifier = email || data.phone;
 
     if (!identifier) {
       return {
@@ -533,7 +537,7 @@ export async function generateAndSendOtp(data: {
     const otp = await prisma.otp.create({
       data: {
         user_id: data.userId,
-        email: data.email,
+        email,
         phone: data.phone,
         otp_code: otpCode,
         otp_type: data.otpType,
@@ -549,8 +553,8 @@ export async function generateAndSendOtp(data: {
       ? 'Reset Your Password'
       : undefined;
 
-    if (data.email) {
-      sent = await emailService.sendOtpEmail(data.email, otpCode, undefined, emailSubject);
+    if (email) {
+      sent = await emailService.sendOtpEmail(email, otpCode, undefined, emailSubject);
       message = sent
         ? "OTP sent successfully to your email"
         : "Failed to send OTP email. Please try again.";
@@ -701,7 +705,7 @@ export async function resendOtpByType(
     // Invalidate existing unverified OTPs of the same type
     await prisma.otp.updateMany({
       where: {
-        OR: [{ email: identifier }, { phone: identifier }],
+        OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
         verified: false,
         otp_type: otpType,
       },
@@ -735,7 +739,7 @@ export async function getRegistrationData(identifier: string): Promise<any | nul
   try {
     const otp = await prisma.otp.findFirst({
       where: {
-        OR: [{ email: identifier }, { phone: identifier }],
+        OR: [{ email: normalizeEmail(identifier) }, { phone: identifier }],
         verified: true,
         otp_type: "REGISTRATION_VERIFICATION",
         expires_at: {

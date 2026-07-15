@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { generateTokenAndSetCookie, generateRefreshToken, getRefreshCookieOptions } from '../../utils/jwtUtils';
-import { generateKeycode } from '@utils/General';
+import { generateKeycode, normalizeEmail } from '@utils/General';
 import { prisma } from '../../services/prismaService';
 import { createLoginDevice } from './AuthService';
 import { reactivateOnLogin } from '../profile/DeactivationService';
@@ -201,6 +201,8 @@ const linkedinCallback = async (req: Request, res: Response) => {
       firstName,
       lastName,
     });
+
+    userEmail = normalizeEmail(userEmail) || "";
 
     if (!userEmail) {
       Log.error("❌ No email found in LinkedIn response");

@@ -67,6 +67,19 @@ export const generateOtpCode = (length: number = 6): string => {
 };
 
 /**
+ * Canonical form of an email address: trimmed and lowercased.
+ *
+ * Addresses are stored and looked up in this form only. The `email` column is a
+ * plain unique text column, so its index is case-sensitive and cannot collapse
+ * `A@x.com` and `a@x.com` on its own — normalizing on every read and write is
+ * what keeps them a single identity.
+ */
+export const normalizeEmail = <T extends string | null | undefined>(
+  email: T
+): T extends string ? string : null =>
+  (email ? email.trim().toLowerCase() : null) as T extends string ? string : null;
+
+/**
  * Normalize contact input to determine if it's email or phone
  */
 export const normalizeContact = (email: string) => {
@@ -81,12 +94,12 @@ export const normalizeContact = (email: string) => {
   const isPhone = !isEmail && /^\+?\d{10,15}$/.test(incoming.trim());
 
   if (isEmail) {
-    return { email: incoming, phone: null };
+    return { email: normalizeEmail(incoming), phone: null };
   } else if (isPhone) {
     return { email: null, phone: incoming.trim() };
   } else {
     // Keep as-is and let Joi raise validation error
-    return { email: incoming, phone: null };
+    return { email: normalizeEmail(incoming), phone: null };
   }
 };
 
