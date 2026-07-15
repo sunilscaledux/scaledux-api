@@ -40,4 +40,9 @@ router.get('/business-models', view, C.listBusinessModels);
 router.post('/business-models', manage, C.createBusinessModel);
 router.patch('/business-models/:id', manage, C.updateBusinessModel);
 
+// Countries
+router.get('/countries', view, C.listCountries);
+router.post('/countries', manage, C.createCountry);
+router.patch('/countries/:id', manage, C.updateCountry);
+
 export default router;

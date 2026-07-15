@@ -554,6 +554,8 @@ model Country {
   code               String              @unique
   phone_code         String?             // Phone country code like +91, +1, +44
   flag               String?
+  /** Admin-managed: inactive countries stay referencable by existing rows but are hidden from public pickers. */
+  is_active          Boolean             @default(true)
   currency_id        Int?
   created_at         DateTime            @default(now())
   updated_at         DateTime            @updatedAt

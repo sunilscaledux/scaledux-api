@@ -9,6 +9,7 @@ import { getConstantValues, getConstantOptions, getConstantGroupedBySubkey } fro
 // Country related functions
 export async function getCountries(req: Request, res: Response) {
   const countriesData = await prisma.country.findMany({
+    where: { is_active: true },
     select: {
       id: true,
       name: true,
@@ -55,6 +56,7 @@ export async function getStatesByCountry(req: Request, res: Response) {
 
 export async function getAllCountriesWithStates(req: Request, res: Response) {
   const countriesData = await prisma.country.findMany({
+    where: { is_active: true },
     include: {
       states: {
         select: {
@@ -141,6 +143,7 @@ export async function getCurrencies(req: Request, res: Response) {
 
 export async function getCountriesWithCurrencies(req: Request, res: Response) {
   const countries = await prisma.country.findMany({
+    where: { is_active: true },
     select: {
       id: true,
       name: true,

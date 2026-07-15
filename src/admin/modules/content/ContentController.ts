@@ -136,3 +136,25 @@ export async function updateBusinessModel(req: Request, res: Response) {
   await auditFromReq(req, 'content.business_model.update', { entityType: 'BusinessModel', entityId: id });
   return ApiResponse.success(res, result.data, result.message);
 }
+
+/* ───────────── Countries ───────────── */
+export async function listCountries(_req: Request, res: Response) {
+  const result = await ContentService.listCountries();
+  return ApiResponse.success(res, result.data);
+}
+
+export async function createCountry(req: Request, res: Response) {
+  const result = await ContentService.createCountry(req.body || {});
+  if (!result.success) return ApiResponse.error(res, result.message, null, result.statusCode ?? 400);
+  await auditFromReq(req, 'content.country.create', { entityType: 'Country', entityId: result.data.id });
+  return ApiResponse.created(res, result.data, result.message);
+}
+
+export async function updateCountry(req: Request, res: Response) {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return ApiResponse.error(res, 'Invalid id', null, 400);
+  const result = await ContentService.updateCountry(id, req.body || {});
+  if (!result.success) return ApiResponse.error(res, result.message, null, result.statusCode ?? 400);
+  await auditFromReq(req, 'content.country.update', { entityType: 'Country', entityId: id });
+  return ApiResponse.success(res, result.data, result.message);
+}
