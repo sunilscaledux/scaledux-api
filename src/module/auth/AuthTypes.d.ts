@@ -3,8 +3,6 @@ export interface RegisterInput {
   last_name?: string;
   /** Email or phone. */
   identifier: string;
-  /** @deprecated Legacy alias for identifier; older clients still send this. */
-  email?: string;
   password: string;
   terms: boolean;
   notification?: boolean;
@@ -12,9 +10,7 @@ export interface RegisterInput {
 
 export interface LoginInput {
   /** Email or phone. */
-  identifier?: string;
-  /** @deprecated Legacy alias for identifier; older clients still send this. */
-  email?: string;
+  identifier: string;
   password: string;
   rememberMe?: boolean;
 }

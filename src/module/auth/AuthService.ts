@@ -270,7 +270,7 @@ export async function createUserAfterOtpVerification(
   data: RegisterInput
 ): Promise<ServiceResponse> {
   try {
-    const identifier = data.identifier ?? data.email ?? "";
+    const identifier = data.identifier;
 
     // Double-check user doesn't exist
     const userExists = await checkUserExists(identifier);
@@ -346,7 +346,7 @@ export async function createUserAfterOtpVerification(
 
 export async function userLogin(data: LoginInput): Promise<ServiceResponse> {
   try {
-    const contactInfo = normalizeContact(data.identifier ?? data.email ?? "");
+    const contactInfo = normalizeContact(data.identifier);
 
     const conditions = [];
     if (contactInfo.email) {
