@@ -40,6 +40,7 @@ import * as AuthService from "@module/auth/AuthService";
 import { assertNotReused, recordPasswordChange } from "@module/auth/PasswordHistoryService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
 import { normalizeContact, generateKeycode } from '@utils/General';
+import { notifySensitiveUpdate } from '@utils/sensitiveUpdateNotifier';
 import { Log } from '@services/loggerService';
 import { NotificationService } from '@module/notification/NotificationService';
 import { emailService } from '@services/emailService';
@@ -552,14 +553,24 @@ export async function resetPassword(req: Request, res: Response) {
 
   const contactInfo = normalizeContact(identifier);
 
+  // Only match on the half of the contact we actually have. A `{ phone: null }`
+  // entry would mean "phone IS NULL" to Prisma and match unrelated accounts.
+  const contactConditions = [];
+  if (contactInfo.email) {
+    contactConditions.push({ email: contactInfo.email });
+  }
+  if (contactInfo.phone) {
+    contactConditions.push({ phone: contactInfo.phone });
+  }
+
+  if (contactConditions.length === 0) {
+    return ApiResponse.error(res, "Email or phone number is required.");
+  }
+
   // Look up the user so we can compare the new password against both their
   // current hash and their full history before writing anything.
   const existingUser = await prisma.user.findFirst({
-    where: {
-      OR: [{ email: contactInfo.email }, { phone: contactInfo.phone }].filter(
-        Boolean
-      ),
-    },
+    where: { OR: contactConditions },
     select: { id: true, password: true },
   });
 
@@ -610,13 +621,17 @@ export async function resetPassword(req: Request, res: Response) {
   // Invalidate all existing OTPs for this user
   await prisma.otp.updateMany({
     where: {
-      OR: [{ email: contactInfo.email }, { phone: contactInfo.phone }].filter(
-        Boolean
-      ),
+      OR: contactConditions,
       verified: false,
     },
     data: { verified: true },
   });
+
+  void notifySensitiveUpdate(
+    existingUser.id,
+    'Your password was reset',
+    'The password on your ScaleDux account was just reset. You can now sign in with your new password.',
+  );
 
   return ApiResponse.success(
     res,

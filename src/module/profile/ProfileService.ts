@@ -4,6 +4,7 @@ import { prisma } from '@services/prismaService';
 import { Log } from '@services/loggerService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { assertNotReused, recordPasswordChange } from '@module/auth/PasswordHistoryService';
+import { notifySensitiveUpdate } from '@utils/sensitiveUpdateNotifier';
 import { getDisplayName } from '@utils/General';
 import { resolveAttachmentUrl, resolveAttachmentUrls, createAttachment } from '@services/attachmentService';
 import type { AttachmentMetaItem } from '@middleware/fileupload';
@@ -853,6 +854,11 @@ export class PersonalInfoService {
         data: { password: hashedPassword },
       });
       await recordPasswordChange({ userId, hashedPassword, source: 'set', req });
+      void notifySensitiveUpdate(
+        userId,
+        'A password was added to your account',
+        'A password was just set on your ScaleDux account. You can now sign in with your email and password as well as with Google or LinkedIn.',
+      );
       return {
         success: true,
         message: 'Password set successfully',
@@ -922,6 +928,11 @@ export class PersonalInfoService {
         data: { password: hashedPassword },
       });
       await recordPasswordChange({ userId, hashedPassword, source: 'update', req });
+      void notifySensitiveUpdate(
+        userId,
+        'Your password was changed',
+        'The password on your ScaleDux account was just changed.',
+      );
       return {
         success: true,
         message: 'Password updated successfully',
