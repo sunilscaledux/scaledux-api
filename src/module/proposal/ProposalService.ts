@@ -1666,16 +1666,19 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can withdraw the offer" };
       }
-      if (proposal.status !== ProposalStatus.OFFER_SENT) {
-        return { success: false, message: "Only an offer that has been sent (and not yet accepted via NDA) can be withdrawn" };
+      if (
+        proposal.status !== ProposalStatus.OFFER_SENT &&
+        proposal.status !== ProposalStatus.OFFER_ACCEPTED
+      ) {
+        return { success: false, message: "Only an offer that has been sent or accepted (and not yet paid for) can be withdrawn" };
       }
       const nda = getNda(proposal);
-      if (nda?.is_nda_signed === true) {
-        return { success: false, message: "Cannot withdraw offer after the freelancer has signed the NDA" };
-      }
 
       const reason = body.reason?.trim();
       const reasonMsg = body.reason_message?.trim() || null;
+      if (!reason && !reasonMsg) {
+        return { success: false, message: "Reason or reason message is required" };
+      }
 
       const founderNameCH = await getUserFullName(userId);
       const remarkFields = buildRemarkFields(
@@ -1687,6 +1690,12 @@ export class ProposalService {
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: { status: ProposalStatus.WITHDRAWN, ...remarkFields }
+      });
+      // Accepting the offer moved the project to IN_PROGRESS; withdrawing puts it
+      // back on the market. Scoped so COMPLETED stays put.
+      await (prisma as any).founderProject.updateMany({
+        where: { id: proposal.project.id, status: ProjectStatus.IN_PROGRESS },
+        data: { status: ProjectStatus.PUBLISHED }
       });
       const toDateOrNull = (v: string | null | undefined): Date | null =>
         v == null || v === '' ? null : new Date(v);
@@ -1755,7 +1764,8 @@ export class ProposalService {
   }
 
   /**
-   * Decline offer (freelancer only). Allowed only when status is OFFER_SENT. Sets status to REJECTED, stores reason_key + remark, syncs to chat.
+   * Decline offer (freelancer only). Allowed while the offer is sent or accepted
+   * but not yet paid for. Sets status to REJECTED, stores reason_key + remark, syncs to chat.
    */
   static async declineOffer(
     userId: number,
@@ -1777,13 +1787,20 @@ export class ProposalService {
       if (proposal.provider_id !== userId) {
         return { success: false, message: "Only the freelancer can decline this offer" };
       }
-      if (proposal.status !== ProposalStatus.OFFER_SENT) {
-        return { success: false, message: "Only an offer that has been sent can be declined" };
+      if (
+        proposal.status !== ProposalStatus.OFFER_SENT &&
+        proposal.status !== ProposalStatus.OFFER_ACCEPTED
+      ) {
+        return { success: false, message: "Only an offer that has been sent or accepted (and not yet paid for) can be declined" };
       }
 
       const reason = body.reason?.trim();
       const reasonMsg = body.reason_message?.trim() || null;
+      if (!reason && !reasonMsg) {
+        return { success: false, message: "Reason or reason message is required" };
+      }
 
+      const previousStatus = proposal.status;
       const freelancerNameDO = await getUserFullName(userId);
       const remarkFields = buildRemarkFields(
         'freelancer', freelancerNameDO,
@@ -1795,9 +1812,15 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: ProposalStatus.REJECTED, ...remarkFields }
       });
+      // Accepting the offer moved the project to IN_PROGRESS; declining puts it
+      // back on the market. Scoped so COMPLETED stays put.
+      await (prisma as any).founderProject.updateMany({
+        where: { id: proposal.project.id, status: ProjectStatus.IN_PROGRESS },
+        data: { status: ProjectStatus.PUBLISHED }
+      });
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
-        oldStatus: ProposalStatus.OFFER_SENT,
+        oldStatus: previousStatus,
         newStatus: ProposalStatus.REJECTED,
         message: remarkFields.freelancer_remark ?? undefined,
         ...(remarkFields.freelancer_reason ? { main_reason: remarkFields.freelancer_reason } : {})
