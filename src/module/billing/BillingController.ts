@@ -5,7 +5,7 @@ import { getStringParam } from "@utils/requestHelpers";
 import { ConversationService } from "@module/chat/ConversationService";
 import { createProposalActivity } from "@module/proposal/ProposalActivityService";
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
-import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus } from "@constants/status";
+import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus, ProjectStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
 import { dispatch } from "@queues/Queue";
 import { NotificationJob } from "../../jobs/NotificationJob";
@@ -214,11 +214,24 @@ export class BillingController {
 
     if (milestoneIndex === 0) {
       const hireDate = new Date();
+      const statusBeforeHire = proposal.status;
 
       await (prisma as any).proposal.update({
         where: { id: proposal.id },
         data: { status: ProposalStatus.HIRED, milestones_approved: true }
       });
+      // Paying is what starts the work, so this is where the project leaves the
+      // market. Scoped so a DRAFT or COMPLETED project stays put.
+      await (prisma as any).founderProject.updateMany({
+        where: { id: proposal.project.id, status: ProjectStatus.PUBLISHED },
+        data: { status: ProjectStatus.IN_PROGRESS }
+      });
+      if (statusBeforeHire !== ProposalStatus.HIRED) {
+        await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+          oldStatus: statusBeforeHire,
+          newStatus: ProposalStatus.HIRED
+        }, userId);
+      }
       await (prisma as any).milestone.updateMany({
         where: { proposal_id: proposal.id },
         data: { is_approved: true }

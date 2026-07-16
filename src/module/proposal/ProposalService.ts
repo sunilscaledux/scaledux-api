@@ -81,18 +81,6 @@ function buildRemarkFields(
   };
 }
 
-/**
- * Accepted offer → project IN_PROGRESS: drops it from browse and blocks new
- * proposals. The other proposals keep their status so the founder still has the
- * shortlist if this contract later falls through.
- */
-async function closeProjectOnOfferAccepted(projectId: number): Promise<void> {
-  await (prisma as any).founderProject.update({
-    where: { id: projectId },
-    data: { status: ProjectStatus.IN_PROGRESS },
-  });
-}
-
 /** NDA + offer data (from ProposalNda table or legacy proposal.nda JSON). Dates in API as ISO strings. */
 export interface ProposalNdaData {
   offer_expires_at?: string | null;
@@ -1691,12 +1679,8 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: ProposalStatus.WITHDRAWN, ...remarkFields }
       });
-      // Accepting the offer moved the project to IN_PROGRESS; withdrawing puts it
-      // back on the market. Scoped so COMPLETED stays put.
-      await (prisma as any).founderProject.updateMany({
-        where: { id: proposal.project.id, status: ProjectStatus.IN_PROGRESS },
-        data: { status: ProjectStatus.PUBLISHED }
-      });
+      // Project status is untouched: it only leaves the market once paid for, and
+      // an offer can only be withdrawn before that.
       const toDateOrNull = (v: string | null | undefined): Date | null =>
         v == null || v === '' ? null : new Date(v);
       const nextNda = { ...(nda || {}), offer_expires_at: null };
@@ -1812,12 +1796,8 @@ export class ProposalService {
         where: { id: proposal.id },
         data: { status: ProposalStatus.REJECTED, ...remarkFields }
       });
-      // Accepting the offer moved the project to IN_PROGRESS; declining puts it
-      // back on the market. Scoped so COMPLETED stays put.
-      await (prisma as any).founderProject.updateMany({
-        where: { id: proposal.project.id, status: ProjectStatus.IN_PROGRESS },
-        data: { status: ProjectStatus.PUBLISHED }
-      });
+      // Project status is untouched: it only leaves the market once paid for, and
+      // an offer can only be declined before that.
 
       await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
         oldStatus: previousStatus,
@@ -2291,7 +2271,6 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await closeProjectOnOfferAccepted(proposal.project_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
@@ -2449,7 +2428,6 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await closeProjectOnOfferAccepted(proposal.project_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         const freelancerNameSign = await getUserFullName(userId);
         const projectTitleSign = proposal.project?.project_title || "Project";
