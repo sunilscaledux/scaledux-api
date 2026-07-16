@@ -2305,6 +2305,9 @@ export class ProposalService {
       }
 
       const current = getNda(proposal) || {};
+      // Capture before the merge below overwrites it — this is the only copy of
+      // the outgoing document, since proposalNda holds one row per proposal.
+      const previousNdaFileLink = current.nda_file_link ?? null;
       const toDateIso = (v: string | Date | null | undefined): string | null =>
         v == null ? null : typeof v === 'string' ? v : new Date(v).toISOString();
 
@@ -2431,6 +2434,18 @@ export class ProposalService {
         const notifData = { userId: proposal.project.user_id, type: 'OFFER_ACCEPTED' as const, notificationTitle: `${freelancerNameSign} accepted your offer`, notificationBody: `${freelancerNameSign} accepted your offer for "${projectTitleSign}".`, notificationLink: offerAcceptedLinkSign ?? null, actorId: userId, subjectType: 'Proposal' as const, subjectId: proposal.id };
         await dispatch(NotificationJob, notifData);
         await dispatch(NotificationEmailJob, notifData);
+      }
+
+      // Replacing the NDA leaves no trace in scd_proposal_ndas — the upsert above
+      // overwrites the row — so record both documents on the activity feed.
+      const ndaFileReplaced =
+        data.nda_file_link !== undefined &&
+        (current.nda_file_link ?? null) !== previousNdaFileLink;
+      if (isFounder && ndaFileReplaced && !didJustSendOffer) {
+        await createProposalActivity(proposal.unique_id, 'NDA_UPDATE', {
+          oldNdaFileLink: previousNdaFileLink,
+          newNdaFileLink: current.nda_file_link ?? null
+        }, userId);
       }
 
       // Contract-sent notification: only when founder updates NDA but we did not just send the offer (avoid duplicate with OFFER_SENT above)
