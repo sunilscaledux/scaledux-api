@@ -9,7 +9,7 @@ import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ConversationService } from '@module/chat/ConversationService';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
-import { ProposalStatus, ProjectStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus } from '@constants/status';
+import { ProposalStatus, ProjectStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus, BillingTransactionType, BillingTransactionStatus } from '@constants/status';
 import { getUserFullName, maskUserName } from '@utils/General';
 import { appConfig } from '@config/app';
 
@@ -1884,6 +1884,12 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can request an invoice" };
       }
+      // Nothing to chase unless a funded, approved milestone is still uninvoiced —
+      // otherwise this just nudges the expert about work they cannot bill for.
+      const awaitingInvoice = await ProposalService.countMilestonesAwaitingInvoice(proposal.id);
+      if (awaitingInvoice === 0) {
+        return { success: false, message: "No milestone is waiting on an invoice right now." };
+      }
 
       const projectTitle = proposal.project.project_title || "the project";
       await ConversationService.syncSystemMessage(
@@ -1922,6 +1928,27 @@ export class ProposalService {
   }
 
   /**
+   * Funded milestones with no invoice against them. Payment sits held on these, and the
+   * 48h auto-release only runs once an invoice exists — so the money never moves on its
+   * own until the expert sends one.
+   *
+   * Deliverable state is deliberately not part of this: sendFreelancerInvoice only asks
+   * for a funded, uninvoiced transaction, so anything counted here is invoiceable today.
+   */
+  private static async countMilestonesAwaitingInvoice(proposalId: number): Promise<number> {
+    return await (prisma as any).billingTransaction.count({
+      where: {
+        subject_type: 'Proposal',
+        subject_id: proposalId,
+        type: BillingTransactionType.PAYMENT,
+        status: BillingTransactionStatus.PENDING,
+        milestone_id: { not: null },
+        invoice_a_id: null,
+      }
+    });
+  }
+
+  /**
    * Mark project completed (founder only). Allowed when status is HIRED and all milestones are PAID (or COMPLETED).
    * Sets proposal status to PROJECT_COMPLETED.
    */
@@ -1956,6 +1983,15 @@ export class ProposalService {
       });
       if (!allDone) {
         return { success: false, message: "Complete and pay all milestones before marking the project as completed" };
+      }
+      const uninvoiced = await ProposalService.countMilestonesAwaitingInvoice(proposal.id);
+      if (uninvoiced > 0) {
+        return {
+          success: false,
+          message: uninvoiced === 1
+            ? "The expert still has to send an invoice for 1 funded milestone. Request the invoice, then complete the project."
+            : `The expert still has to send invoices for ${uninvoiced} funded milestones. Request the invoices, then complete the project.`
+        };
       }
 
       await ProposalService.applyProjectCompletion(proposal, userId);
@@ -2094,6 +2130,17 @@ export class ProposalService {
       }
       if (proposal.status !== ProposalStatus.HIRED) {
         return { success: false, message: "Project can only be completed when the contract is hired" };
+      }
+      // Before the loop below releases anything: the sweep pays out funded milestones, so a
+      // check further down would fire after the money had already moved.
+      const uninvoiced = await ProposalService.countMilestonesAwaitingInvoice(proposal.id);
+      if (uninvoiced > 0) {
+        return {
+          success: false,
+          message: uninvoiced === 1
+            ? "The expert still has to send an invoice for 1 funded milestone. Request the invoice, then complete the project."
+            : `The expert still has to send invoices for ${uninvoiced} funded milestones. Request the invoices, then complete the project.`
+        };
       }
 
       const { markMilestoneCompleted } = await import('./MilestoneService');
