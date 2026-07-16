@@ -1,5 +1,6 @@
 import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
+import { ProjectStatus } from '@constants/status';
 
 export class DashboardService {
   static async getStats(): Promise<ServiceResponse> {
@@ -24,7 +25,9 @@ export class DashboardService {
       prisma.user.count({ where: { created_at: { gte: since30 } } }),
       prisma.user.count({ where: { is_deactivated: true } }),
       prisma.founderProject.count({ where: { deleted_at: null } }),
-      prisma.founderProject.count({ where: { deleted_at: null, status: { in: ['PUBLISHED', 'ACTIVE', 'OPEN'] } } }),
+      prisma.founderProject.count({
+        where: { deleted_at: null, status: { in: [ProjectStatus.PUBLISHED, ProjectStatus.IN_PROGRESS] } },
+      }),
       prisma.proposal.count({ where: { is_draft: false } }),
       prisma.proposal.count({ where: { status: 'HIRED' } }),
       prisma.booking.count(),
