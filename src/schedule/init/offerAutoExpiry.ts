@@ -9,8 +9,8 @@ import { ProposalStatus } from "@constants/status";
 import { CHAT_SYSTEM_MESSAGES } from "@constants/chatSystemMessages";
 
 /**
- * Auto-expire offers where the freelancer has not signed the NDA
- * within the expiry window (OFFER_EXPIRY_HOURS, default 24h).
+ * Auto-expire offers the freelancer hasn't taken up within OFFER_EXPIRY_HOURS
+ * (default 24h) — signing the NDA where required, accepting otherwise.
  *
  * Runs every 15 minutes.
  */
@@ -33,7 +33,7 @@ export async function handle(): Promise<void> {
       proposalNda: true,
       provider: { select: { id: true, first_name: true, last_name: true } },
       founder: { select: { id: true, first_name: true, last_name: true } },
-      project: { select: { id: true, unique_id: true, project_title: true } },
+      project: { select: { id: true, unique_id: true, project_title: true, is_nda_required: true } },
     },
     take: 50,
   });
@@ -54,12 +54,17 @@ export async function handle(): Promise<void> {
       const founderName = `${proposal.founder?.first_name || ""} ${proposal.founder?.last_name || ""}`.trim();
       const providerName = `${proposal.provider?.first_name || ""} ${proposal.provider?.last_name || ""}`.trim();
 
+      // Only NDA projects lapse for an unsigned NDA; others simply went unanswered.
+      const lapseCause = proposal.project?.is_nda_required === true
+        ? "the NDA was not signed within the deadline"
+        : "it was not accepted within the deadline";
+
       // Notify the freelancer
       const providerNotif = {
         userId: proposal.provider_id,
         type: "OFFER_EXPIRED" as const,
         notificationTitle: `Offer expired for "${projectTitle}"`,
-        notificationBody: `The offer from ${founderName} for "${projectTitle}" has expired because the NDA was not signed within the deadline.`,
+        notificationBody: `The offer from ${founderName} for "${projectTitle}" has expired because ${lapseCause}.`,
         notificationLink: `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}`,
         actorId: null,
         subjectType: "Proposal" as const,
@@ -73,7 +78,7 @@ export async function handle(): Promise<void> {
         userId: proposal.founder_id,
         type: "OFFER_EXPIRED" as const,
         notificationTitle: `Offer expired for "${projectTitle}"`,
-        notificationBody: `Your offer to ${providerName} for "${projectTitle}" has expired because the NDA was not signed within the deadline.`,
+        notificationBody: `Your offer to ${providerName} for "${projectTitle}" has expired because ${lapseCause}.`,
         notificationLink: `${appConfig.frontendUrl}/project/${proposal.project?.unique_id}`,
         actorId: null,
         subjectType: "Proposal" as const,
@@ -91,8 +96,8 @@ export async function handle(): Promise<void> {
           activityType: "offer_expired",
           activityId: proposal.project?.unique_id,
           projectTitle,
-          messageSent: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle} — NDA not signed within deadline`,
-          messageReceived: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle} — NDA not signed within deadline`,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle} — ${lapseCause}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle} — ${lapseCause}`,
         },
         proposal.project?.id,
       );
