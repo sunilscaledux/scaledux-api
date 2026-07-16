@@ -82,60 +82,15 @@ function buildRemarkFields(
 }
 
 /**
- * Accepted offer → project IN_PROGRESS (drops it from browse and blocks new
- * proposals), and the remaining PENDING/SHORTLISTED proposals are rejected.
- * Returns the provider ids that were rejected.
+ * Accepted offer → project IN_PROGRESS: drops it from browse and blocks new
+ * proposals. The other proposals keep their status so the founder still has the
+ * shortlist if this contract later falls through.
  */
-async function closeProjectOnOfferAccepted(
-  projectId: number,
-  acceptedProposalId: number,
-  founderId: number
-): Promise<number[]> {
-  const losing = await (prisma as any).proposal.findMany({
-    where: {
-      project_id: projectId,
-      id: { not: acceptedProposalId },
-      is_draft: false,
-      status: { in: [ProposalStatus.PENDING, ProposalStatus.SHORTLISTED] },
-    },
-    select: { id: true, unique_id: true, provider_id: true },
+async function closeProjectOnOfferAccepted(projectId: number): Promise<void> {
+  await (prisma as any).founderProject.update({
+    where: { id: projectId },
+    data: { status: ProjectStatus.IN_PROGRESS },
   });
-
-  const founderName = await getUserFullName(founderId);
-  const remarkFields = buildRemarkFields(
-    'founder',
-    founderName,
-    'You rejected the proposal',
-    'rejected your proposal',
-    'Found another freelancer',
-    null
-  );
-
-  await prisma.$transaction([
-    (prisma as any).founderProject.update({
-      where: { id: projectId },
-      data: { status: ProjectStatus.IN_PROGRESS },
-    }),
-    ...(losing.length
-      ? [
-          (prisma as any).proposal.updateMany({
-            where: { id: { in: losing.map((p: any) => p.id) } },
-            data: { status: ProposalStatus.REJECTED, ...remarkFields },
-          }),
-        ]
-      : []),
-  ]);
-
-  for (const p of losing) {
-    await createProposalActivity(
-      p.unique_id,
-      'STATUS_CHANGE',
-      { newStatus: ProposalStatus.REJECTED, main_reason: 'Found another freelancer' },
-      founderId
-    ).catch(() => undefined);
-  }
-
-  return losing.map((p: any) => p.provider_id);
 }
 
 /** NDA + offer data (from ProposalNda table or legacy proposal.nda JSON). Dates in API as ISO strings. */
@@ -2210,7 +2165,7 @@ export class ProposalService {
         include: {
           proposalNda: true,
           project: {
-            select: { id: true, user_id: true, project_title: true, unique_id: true, is_nda_required: true }
+            select: { id: true, user_id: true, project_title: true, unique_id: true, is_nda_required: true, status: true }
           }
         }
       });
@@ -2224,6 +2179,13 @@ export class ProposalService {
       }
 
       const isNdaRequired = proposal.project.is_nda_required === true;
+
+      // Proposals outlive the hire, so a finished project can still be sitting on a
+      // live shortlist. Sending an offer from it would reopen the project.
+      const isSendingOffer = data.send_offer === true || data.nda_file_link !== undefined;
+      if (isFounder && isSendingOffer && proposal.project.status === ProjectStatus.COMPLETED) {
+        return { success: false, message: "This project is completed. You can no longer send offers on it." };
+      }
 
       // Founder: send offer when NDA not required (SHORTLISTED/PENDING -> OFFER_SENT)
       if (isFounder && !isNdaRequired && data.send_offer === true && (proposal.status === ProposalStatus.SHORTLISTED || proposal.status === ProposalStatus.PENDING)) {
@@ -2306,7 +2268,7 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await closeProjectOnOfferAccepted(proposal.project_id, proposal.id, proposal.project.user_id);
+        await closeProjectOnOfferAccepted(proposal.project_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         await ConversationService.syncSystemMessage(
           proposal.project.user_id,
@@ -2461,7 +2423,7 @@ export class ProposalService {
           where: { id: proposal.id },
           data: { status: ProposalStatus.OFFER_ACCEPTED }
         });
-        await closeProjectOnOfferAccepted(proposal.project_id, proposal.id, proposal.project.user_id);
+        await closeProjectOnOfferAccepted(proposal.project_id);
         await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', { oldStatus: ProposalStatus.OFFER_SENT, newStatus: ProposalStatus.OFFER_ACCEPTED }, userId);
         const freelancerNameSign = await getUserFullName(userId);
         const projectTitleSign = proposal.project?.project_title || "Project";
