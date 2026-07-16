@@ -27,6 +27,7 @@ import {
 import { submitMilestone, requestChangesMilestone, approveMilestone, releaseMilestonePayment, rejectMilestone, deleteMilestone, markMilestoneCompleted, editMilestone } from "./MilestoneController";
 import { submitDeliverable, requestChangesDeliverable, approveDeliverable } from "./DeliverableController";
 import { authenticateToken } from "@middleware/auth";
+import { createRateLimiter } from "@middleware/rateLimiter";
 import { requireCompleteProfile } from "@middleware/requireCompleteProfile";
 import { uploadFile } from "@module/general/FileController";
 import { FileUpload, handleMulterError } from "@middleware/fileupload";
@@ -118,7 +119,7 @@ router.post("/:id/terminate", terminateContract);
 router.post("/:id/restore", restoreContract);
 router.post("/:id/mark-project-completed", markProjectCompleted);
 router.post("/:id/complete-project", completeProject);
-router.post("/:id/request-invoice", requestInvoice);
+router.post("/:id/request-invoice", createRateLimiter(5 * 60, 3), requestInvoice);
 router.patch("/:id/nda", updateProposalNda);
 router.post("/:id/request-modify", requestModify);
 router.get("/:id/activities", getProposalActivities);
