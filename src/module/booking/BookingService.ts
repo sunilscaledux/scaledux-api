@@ -10,6 +10,7 @@ import { BillingService } from '../billing/BillingService';
 import { ConversationService } from '../chat/ConversationService';
 import { MeetingService } from '../video-conferencing/MeetingService';
 import { GoogleMeetService } from '../video-conferencing/GoogleMeetService';
+import { GoogleCalendarService } from '../google-calendar/GoogleCalendarService';
 import { isValidConstant } from '@services/constantsService';
 import { resolveAttachmentUrl } from '@services/attachmentService';
 import { calcBookingMentorDeductions, calcBookingMentorPayout, calcBookingFounderTotal } from '@utils/feeCalculations';
@@ -496,29 +497,37 @@ export class BookingService {
    * Verify Razorpay payment and confirm booking.
    */
   /**
-   * Auto-sync a confirmed booking to Google Calendar via the mentor's connected
-   * calendar: creates (or, on reschedule, patches) an event with a Google Meet
-   * link and the founder as an attendee, so it lands on both participants'
-   * calendars. Best-effort, never throws, so it can't break the booking flow.
+   * Auto-sync a confirmed booking to Google Calendar: creates (or, on
+   * reschedule, patches) an event with a Google Meet link, hosted on the
+   * calendar of whichever participant has connected one. The other party is
+   * invited as an attendee, so Google delivers it to their calendar too.
+   * Best-effort, never throws, so it can't break the booking flow.
    */
   private static async syncBookingToCalendar(bookingId: number): Promise<void> {
     try {
+      const participantSelect = {
+        id: true,
+        first_name: true,
+        last_name: true,
+        email: true,
+        google_calendar_refresh_token: true,
+        google_calendar_email: true,
+      };
       const booking = await (prisma as any).booking.findUnique({
         where: { id: bookingId },
-        include: {
-          mentor: {
-            select: { id: true, first_name: true, last_name: true, email: true, google_calendar_refresh_token: true },
-          },
-          user: { select: { first_name: true, last_name: true, email: true } },
-        },
+        include: { mentor: { select: participantSelect }, user: { select: participantSelect } },
       });
       if (!booking) return;
 
-      // Sync happens through the mentor's calendar. It's the one that generates
-      // the Meet link. If the mentor hasn't connected, leave it to the manual
-      // "add meeting link" flow.
-      if (!booking.mentor?.google_calendar_refresh_token) {
-        Log.info(`Booking ${bookingId}: mentor has no Google Calendar connected, skipping auto-sync`);
+      // The host's calendar is what generates the Meet link. Prefer the mentor,
+      // fall back to the founder, so one unconnected side doesn't sink the sync.
+      const host = booking.mentor?.google_calendar_refresh_token
+        ? booking.mentor
+        : booking.user?.google_calendar_refresh_token
+          ? booking.user
+          : null;
+      if (!host) {
+        Log.info(`Booking ${bookingId}: neither participant has Google Calendar connected, skipping auto-sync`);
         return;
       }
 
@@ -526,19 +535,36 @@ export class BookingService {
       const founderName = getMaskedName(booking.user);
       const summary = `${booking.title}: ${mentorName} & ${founderName}`.trim();
       const description = booking.message ? `Discussion points:\n${booking.message}` : undefined;
-      const attendeeEmails = [booking.mentor.email, booking.user.email].filter(Boolean) as string[];
+      // Invite the address the calendar is actually on, which is not always the
+      // ScaleDux login. Only ask Google when a connected user has no email on
+      // record. Unconnected users can only be reached at their login.
+      const resolveAttendee = async (p: any): Promise<string | null> => {
+        if (!p) return null;
+        if (p.google_calendar_email) return p.google_calendar_email;
+        if (p.google_calendar_refresh_token) {
+          return (await GoogleCalendarService.resolveConnectedEmail(p.id)) || p.email || null;
+        }
+        return p.email || null;
+      };
+      const attendeeEmails = (
+        await Promise.all([booking.mentor, booking.user].map(resolveAttendee))
+      ).filter(Boolean) as string[];
       const startTime = new Date(booking.scheduled_at);
-      const existingEventId = (booking.meta as any)?.google_calendar_event_id as string | undefined;
+      const meta = (booking.meta as any) || {};
+      const existingEventId = meta.google_calendar_event_id as string | undefined;
+      // Patch on the calendar that holds the event, not whoever hosts today.
+      // Pre-dates this field means the mentor hosted it.
+      const existingHostUserId = (meta.google_calendar_host_user_id as number | undefined) ?? booking.mentor?.id;
 
       const result = existingEventId
         ? await GoogleMeetService.updateBookingEvent({
-            hostUserId: booking.mentor.id,
+            hostUserId: existingHostUserId,
             eventId: existingEventId,
             startTime,
             durationMinutes: booking.duration,
           })
         : await GoogleMeetService.createBookingEvent({
-            hostUserId: booking.mentor.id,
+            hostUserId: host.id,
             summary,
             description,
             startTime,
@@ -551,7 +577,11 @@ export class BookingService {
         data: {
           meeting_link: result.meetLink ?? booking.meeting_link,
           meeting_provider: 'google_meet',
-          meta: { ...((booking.meta as any) || {}), google_calendar_event_id: result.eventId },
+          meta: {
+            ...meta,
+            google_calendar_event_id: result.eventId,
+            google_calendar_host_user_id: existingEventId ? existingHostUserId : host.id,
+          },
         },
       });
 

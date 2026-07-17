@@ -79,6 +79,41 @@ export class GoogleCalendarService {
   }
 
   /**
+   * The address a user's calendar actually lives on, which is not always their
+   * ScaleDux login. Backfills from Google when the connect flow couldn't read
+   * it, so invites still reach the right calendar. Null if not connected.
+   */
+  static async resolveConnectedEmail(userId: number): Promise<string | null> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { google_calendar_email: true, google_calendar_refresh_token: true },
+    });
+    if (!user?.google_calendar_refresh_token) return null;
+    if (user.google_calendar_email) return user.google_calendar_email;
+
+    try {
+      const tokenRes = await axios.post(GOOGLE_TOKEN_URL, {
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        grant_type: 'refresh_token',
+        refresh_token: user.google_calendar_refresh_token,
+      });
+      const userInfoRes = await axios.get(GOOGLE_USERINFO_URL, {
+        headers: { Authorization: `Bearer ${tokenRes.data.access_token}` },
+      });
+      const email = (userInfoRes.data.email as string) ?? null;
+      if (email) {
+        await prisma.user.update({ where: { id: userId }, data: { google_calendar_email: email } });
+        Log.info(`Backfilled Google Calendar email for user ${userId}`);
+      }
+      return email;
+    } catch (err: any) {
+      Log.warn(`Could not resolve Google Calendar email for user ${userId} (${err?.response?.status ?? err?.message})`);
+      return null;
+    }
+  }
+
+  /**
    * Disconnect: revoke the token at Google and clear local data.
    */
   static async disconnect(userId: number) {
