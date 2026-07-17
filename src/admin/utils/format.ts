@@ -3,7 +3,7 @@ import { urlOrPathToAttachmentId } from '@services/attachmentService';
 import { appConfig } from '@admin/config';
 
 /**
- * Resolve an image reference (avatar/cover/logo) to a loadable URL — SYNC.
+ * Resolve an image reference (avatar/cover/logo) to a loadable URL, SYNC.
  * Stored values are usually Attachment unique_ids (cuid), which can't be served
  * by prefixing the CDN host. Route those through the admin file endpoint (which
  * redirects public → CDN / streams private at request time). Absolute URLs pass

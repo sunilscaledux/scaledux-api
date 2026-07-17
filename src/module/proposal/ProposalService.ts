@@ -479,7 +479,7 @@ export class ProposalService {
    * Save (or update) a proposal draft. Drafts are hidden from the founder
    * (filtered out of founder-facing queries) and do not trigger the chat
    * sync, invite flip, proposals_count increment, or notifications. A
-   * provider can save multiple times — the draft is upserted by
+   * provider can save multiple times. The draft is upserted by
    * (project_id, provider_id). Once they click "Submit", createProposal
    * converts the draft by flipping is_draft=false and running the usual
    * side effects.
@@ -1884,8 +1884,8 @@ export class ProposalService {
       if (proposal.project.user_id !== userId) {
         return { success: false, message: "Only the project owner can request an invoice" };
       }
-      // Nothing to chase unless a funded, approved milestone is still uninvoiced —
-      // otherwise this just nudges the expert about work they cannot bill for.
+      // Nothing to chase unless a funded, approved milestone is still uninvoiced.
+      // Otherwise this just nudges the expert about work they cannot bill for.
       const awaitingInvoice = await ProposalService.countMilestonesAwaitingInvoice(proposal.id);
       if (awaitingInvoice === 0) {
         return { success: false, message: "No milestone is waiting on an invoice right now." };
@@ -1929,7 +1929,7 @@ export class ProposalService {
 
   /**
    * Funded milestones with no invoice against them. Payment sits held on these, and the
-   * 48h auto-release only runs once an invoice exists — so the money never moves on its
+   * 48h auto-release only runs once an invoice exists, so the money never moves on its
    * own until the expert sends one.
    *
    * Deliverable state is deliberately not part of this: sendFreelancerInvoice only asks
@@ -2056,7 +2056,7 @@ export class ProposalService {
 
     // Prompt both the client and the freelancer to review each other.
     const reviewLink = `${appConfig.frontendUrl}/proposals-and-offers/${proposal.unique_id}/submit-review`;
-    const reviewBody = `Your project "${completedProjectTitle}" is complete. Share your experience — leave a review.`;
+    const reviewBody = `Your project "${completedProjectTitle}" is complete. Share your experience. Leave a review.`;
     const founderReview = {
       userId: proposal.project.user_id,
       type: 'PROJECT_REVIEW_PROMPT' as const,
@@ -2105,8 +2105,8 @@ export class ProposalService {
   }
 
   /**
-   * Founder marks the WHOLE project completed. Completes every outstanding milestone first —
-   * funded ones release payment to the freelancer, unfunded ones are just marked COMPLETED —
+   * Founder marks the WHOLE project completed. Completes every outstanding milestone first
+   * (funded ones release payment to the freelancer, unfunded ones are just marked COMPLETED),
    * then marks the project PROJECT_COMPLETED (which prompts both parties to review).
    */
   static async completeProjectAndMilestones(userId: number, proposalId: string): Promise<ServiceResponse> {
@@ -2354,7 +2354,7 @@ export class ProposalService {
       }
 
       const current = getNda(proposal) || {};
-      // Capture before the merge below overwrites it — this is the only copy of
+      // Capture before the merge below overwrites it. This is the only copy of
       // the outgoing document, since proposalNda holds one row per proposal.
       const previousNdaFileLink = current.nda_file_link ?? null;
       const toDateIso = (v: string | Date | null | undefined): string | null =>
@@ -2484,8 +2484,8 @@ export class ProposalService {
         await dispatch(NotificationEmailJob, notifData);
       }
 
-      // Replacing the NDA leaves no trace in scd_proposal_ndas — the upsert above
-      // overwrites the row — so record both documents on the activity feed.
+      // Replacing the NDA leaves no trace in scd_proposal_ndas (the upsert above
+      // overwrites the row), so record both documents on the activity feed.
       const ndaFileReplaced =
         data.nda_file_link !== undefined &&
         (current.nda_file_link ?? null) !== previousNdaFileLink;
@@ -2603,7 +2603,7 @@ export class ProposalService {
         ...(remarkFields.freelancer_reason ? { main_reason: remarkFields.freelancer_reason } : {})
       }, userId);
 
-      // Decrement proposals_count on the project — but only if this proposal
+      // Decrement proposals_count on the project, but only if this proposal
       // was actually counted. Drafts were never incremented in the first
       // place, so withdrawing them must not decrement below reality.
       if (!proposal.is_draft) {

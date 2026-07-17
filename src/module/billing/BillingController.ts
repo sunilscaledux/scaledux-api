@@ -271,7 +271,7 @@ export class BillingController {
           userId: proposal.provider_id,
           type: 'HIRED' as const,
           notificationTitle: 'You have been hired',
-          notificationBody: `You were hired for "${projectTitle}". The first milestone is funded — you can start working.`,
+          notificationBody: `You were hired for "${projectTitle}". The first milestone is funded. You can start working.`,
           notificationLink: proposalLink,
           actorId: proposal.project.user_id,
           subjectType: 'Proposal' as const,
@@ -502,7 +502,7 @@ export class BillingController {
     return ApiResponse.success(res, null, result.message);
   }
 
-  /** Founder acknowledges milestone — triggers Razorpay transfer, generates Invoice B. */
+  /** Founder acknowledges milestone: triggers Razorpay transfer, generates Invoice B. */
   static async acknowledgeMilestone(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
@@ -513,7 +513,7 @@ export class BillingController {
     return ApiResponse.success(res, null, "Payment acknowledged");
   }
 
-  /** Razorpay webhook handler — verifies signature, processes transfer.settled events. */
+  /** Razorpay webhook handler: verifies signature, processes transfer.settled events. */
   static async razorpayWebhook(req: Request, res: Response) {
     const { appConfig } = await import('@config/app');
     const crypto = await import('crypto');

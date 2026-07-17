@@ -8,7 +8,7 @@ import { resolveFileUrl } from './url';
  * Admin-side file resolution. A stored value can be an Attachment unique_id, a
  * bare storage key, or an already-absolute URL. Public attachments resolve to a
  * CDN URL; private ones resolve to the admin streaming endpoint `files/view/:id`
- * (relative to the admin API base — the UI prefixes it). Admins can view ALL
+ * (relative to the admin API base; the UI prefixes it). Admins can view ALL
  * private files, so no per-user access check is applied here or at the endpoint.
  */
 export interface AdminFile {

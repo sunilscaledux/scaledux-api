@@ -8,7 +8,7 @@ import { getDisplayName } from '@utils/General';
 export class FreelancerService {
 
   /**
-   * Browse freelancers — public listing with filters.
+   * Browse freelancers, public listing with filters.
    */
   static async browseFreelancers(params: {
     search?: string;

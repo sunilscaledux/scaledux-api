@@ -176,7 +176,7 @@ function computeScore(
       rawScore += W_LOCATION;
     }
   } else {
-    // No location restriction — full points
+    // No location restriction, full points
     maxPossible += W_LOCATION;
     rawScore += W_LOCATION;
   }
@@ -251,7 +251,7 @@ export class MatchingService {
 
   /**
    * Get scored + paginated project IDs using raw SQL.
-   * Scoring happens entirely in PostgreSQL — only the page of IDs is returned.
+   * Scoring happens entirely in PostgreSQL. Only the page of IDs is returned.
    * Caller then fetches full project data for those IDs only.
    */
   static async getScoredProjectIds(
@@ -267,7 +267,7 @@ export class MatchingService {
     const scoreParts: string[] = [];
     let maxParts: string[] = [];
 
-    // 1. Skills match (40 pts) — count overlapping skills in JSON array
+    // 1. Skills match (40 pts): count overlapping skills in JSON array
     if (freelancerProfile.skills.length > 0) {
       const skillsJson = JSON.stringify(freelancerProfile.skills);
       scoreParts.push(`(
@@ -293,12 +293,12 @@ export class MatchingService {
       maxParts.push(`CASE WHEN specialty_id IS NOT NULL THEN ${W_SPECIALTY} ELSE 0 END`);
     }
 
-    // 4. Location + type + earned get base points (simplified in SQL — full scoring in JS for the page)
+    // 4. Location + type + earned get base points (simplified in SQL, full scoring in JS for the page)
     // Give base points for dimensions we can't fully evaluate in SQL
     scoreParts.push(`${W_LOCATION + W_TYPE + W_EARNED}`);
     maxParts.push(`${W_LOCATION + W_TYPE + W_EARNED}`);
 
-    // 5. Rate compatibility (10 pts) — compare freelancer hourly rate to project budget
+    // 5. Rate compatibility (10 pts): compare freelancer hourly rate to project budget
     if (freelancerProfile.hourlyRate != null) {
       const rate = freelancerProfile.hourlyRate;
       scoreParts.push(`(

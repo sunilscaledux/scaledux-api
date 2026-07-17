@@ -10,7 +10,7 @@ import { userCard, userCardSelect } from '@admin/utils/format';
  * Signal source is the `scd_login_devices` table (one row per refresh-token
  * session). A "device fingerprint" is the (device_type | browser | os) combo;
  * distinct IPs are tracked separately. An account is flagged when >= minDevices
- * distinct fingerprints appear within any rolling `windowHours` span — i.e.
+ * distinct fingerprints appear within any rolling `windowHours` span, i.e.
  * multiple devices linked to one account in a short time.
  */
 
@@ -139,7 +139,7 @@ export class SecurityService {
       (a, b) => b.devicesInWindow - a.devicesInWindow || b.lastActivity.getTime() - a.lastActivity.getTime()
     );
 
-    // Optional name/email search — resolve matching accounts before paginating
+    // Optional name/email search: resolve matching accounts before paginating
     // so the total count stays consistent with the returned page.
     let flaggedForPage = flagged;
     if (p.search) {

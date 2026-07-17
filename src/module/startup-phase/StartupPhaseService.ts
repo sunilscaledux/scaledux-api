@@ -72,7 +72,7 @@ export async function listStartupPhases(industryId: number | null): Promise<Serv
 
 /**
  * Get a founder's startup progress by unique_id (public, read-only).
- * Does NOT auto-create — returns null data if no progress exists.
+ * Does NOT auto-create, returns null data if no progress exists.
  */
 export async function getPublicStartupProgress(founderUniqueId: string): Promise<ServiceResponse> {
   try {

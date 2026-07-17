@@ -1,7 +1,7 @@
 import cors from 'cors';
 
 export const corsMiddleware = () => {
-  // Admin UI origin(s) — distinct from the main app's CORS_ORIGIN.
+  // Admin UI origin(s), distinct from the main app's CORS_ORIGIN.
   const corsOriginsEnv = process.env.ADMIN_CORS_ORIGIN || 'http://localhost:3001,http://127.0.0.1:3001';
   const allowed = corsOriginsEnv.split(',').map((o) => o.trim()).filter((o) => o.length > 0);
 

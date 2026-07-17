@@ -61,7 +61,7 @@ export class GoogleCalendarService {
       });
       email = userInfoRes.data.email ?? null;
     } catch (err: any) {
-      Log.warn(`Could not fetch Google account email — connecting without it (${err?.response?.status ?? err?.message})`);
+      Log.warn(`Could not fetch Google account email, connecting without it (${err?.response?.status ?? err?.message})`);
     }
 
     // Store refresh token and mark as connected
@@ -94,7 +94,7 @@ export class GoogleCalendarService {
           params: { token: user.google_calendar_refresh_token },
         });
       } catch (err) {
-        Log.warn(`Google token revoke failed for user ${userId} — clearing locally anyway`);
+        Log.warn(`Google token revoke failed for user ${userId}, clearing locally anyway`);
       }
     }
 

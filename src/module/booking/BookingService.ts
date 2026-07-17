@@ -53,8 +53,8 @@ const MEETING_LINK_REQUEST_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
  * Format a date for notification text (email/DB) in IST.
- * The server typically runs in UTC, but bookings are entered in the user's local time (IST for now)
- * — so we format with an explicit timeZone to match what the browser shows on the booking card.
+ * The server typically runs in UTC, but bookings are entered in the user's local time (IST for now),
+ * so we format with an explicit timeZone to match what the browser shows on the booking card.
  */
 const NOTIF_TZ = 'Asia/Kolkata';
 function formatNotifDate(date: Date): string {
@@ -216,7 +216,7 @@ export class BookingService {
         return { success: false, message: 'This time slot is not available' };
       }
 
-      // Compute amount — pro-rate hourly rate by duration
+      // Compute amount, pro-rate hourly rate by duration
       let hourlyRate = settings.price_amount != null ? Number(settings.price_amount) : 0;
       if (
         settings.discount_enabled &&
@@ -391,7 +391,7 @@ export class BookingService {
         },
       });
 
-      // No notifications/email/chat here — triggered only after payment in verifyPayment
+      // No notifications/email/chat here, triggered only after payment in verifyPayment
 
       return {
         success: true,
@@ -499,7 +499,7 @@ export class BookingService {
    * Auto-sync a confirmed booking to Google Calendar via the mentor's connected
    * calendar: creates (or, on reschedule, patches) an event with a Google Meet
    * link and the founder as an attendee, so it lands on both participants'
-   * calendars. Best-effort — never throws, so it can't break the booking flow.
+   * calendars. Best-effort, never throws, so it can't break the booking flow.
    */
   private static async syncBookingToCalendar(bookingId: number): Promise<void> {
     try {
@@ -514,17 +514,17 @@ export class BookingService {
       });
       if (!booking) return;
 
-      // Sync happens through the mentor's calendar — it's the one that generates
+      // Sync happens through the mentor's calendar. It's the one that generates
       // the Meet link. If the mentor hasn't connected, leave it to the manual
       // "add meeting link" flow.
       if (!booking.mentor?.google_calendar_refresh_token) {
-        Log.info(`Booking ${bookingId}: mentor has no Google Calendar connected — skipping auto-sync`);
+        Log.info(`Booking ${bookingId}: mentor has no Google Calendar connected, skipping auto-sync`);
         return;
       }
 
       const mentorName = getMaskedName(booking.mentor);
       const founderName = getMaskedName(booking.user);
-      const summary = `${booking.title} — ${mentorName} & ${founderName}`.trim();
+      const summary = `${booking.title}: ${mentorName} & ${founderName}`.trim();
       const description = booking.message ? `Discussion points:\n${booking.message}` : undefined;
       const attendeeEmails = [booking.mentor.email, booking.user.email].filter(Boolean) as string[];
       const startTime = new Date(booking.scheduled_at);
@@ -605,7 +605,7 @@ export class BookingService {
           status: BillingTransactionStatus.PENDING,
           sender_status: BillingTransactionSenderStatus.FUNDED,
           receiver_status: BillingTransactionReceiverStatus.PENDING,
-          description: `1:1 Video Call booking — ${booking.duration} min session`,
+          description: `1:1 Video Call booking, ${booking.duration} min session`,
           meta: {
             razorpay_order_id: data.razorpayOrderId,
             razorpay_payment_id: data.razorpayPaymentId,
@@ -728,7 +728,7 @@ export class BookingService {
       await dispatch(NotificationJob, userNotifData);
       await dispatch(NotificationEmailJob, userNotifData);
 
-      // Sync to chat — pass raw data in metadata, frontend formats with user's local tz
+      // Sync to chat, pass raw data in metadata, frontend formats with user's local tz
       const chatPrefix = isReschedule ? '📅 Booking rescheduled & confirmed!' : '✅ New booking confirmed!';
       await ConversationService.syncSystemMessage(
         userId, booking.mentor_id,
@@ -1030,7 +1030,7 @@ export class BookingService {
       if (booking.status === 'CANCELLED') return { success: false, message: 'Booking is already cancelled' };
       if (booking.status === 'COMPLETED') return { success: false, message: 'Cannot cancel a completed booking' };
 
-      // Mentor cannot cancel while their own reschedule request is pending — they must wait for the founder to respond.
+      // Mentor cannot cancel while their own reschedule request is pending. They must wait for the founder to respond.
       const isMentorCancelling = userId === booking.mentor_id;
       if (isMentorCancelling && booking.reschedule_requested_at) {
         return { success: false, message: 'You cannot cancel while your reschedule request is pending. Please wait for the founder to respond.' };
@@ -1073,18 +1073,18 @@ export class BookingService {
 
       if (booking.status === 'CONFIRMED' && booking.billing_transaction_id) {
         if (isLateFounderCancel) {
-          // 0% refund — founder forfeits payment
+          // 0% refund, founder forfeits payment
           refundStatus = 'none';
           await (prisma as any).bookingActivity.create({
             data: {
               booking_id: booking.id,
               action: 'REFUND_DENIED',
-              reason: 'Cancellation less than 24 hours before session — 0% refund per policy',
+              reason: 'Cancellation less than 24 hours before session, 0% refund per policy',
               acted_by: userId,
             },
           });
         } else {
-          // Full refund — reverse Razorpay transfer + refund payment
+          // Full refund, reverse Razorpay transfer + refund payment
           refundStatus = 'full';
           try {
             const tx = await (prisma as any).billingTransaction.findUnique({
@@ -1140,7 +1140,7 @@ export class BookingService {
               data: {
                 booking_id: booking.id,
                 action: 'REFUNDED',
-                reason: isFounderCancelling ? 'Founder cancelled ≥24hr before session — full refund' : 'Mentor cancelled — full refund to founder',
+                reason: isFounderCancelling ? 'Founder cancelled ≥24hr before session, full refund' : 'Mentor cancelled, full refund to founder',
                 acted_by: userId,
               },
             });
@@ -1179,11 +1179,11 @@ export class BookingService {
         await dispatch(NotificationEmailJob, notifData);
       }
 
-      // Sync to chat — raw data in metadata, frontend formats
+      // Sync to chat, raw data in metadata, frontend formats
       const refundNote = refundStatus === 'full'
         ? ' A full refund has been initiated.'
         : refundStatus === 'none'
-          ? ' No refund — cancellation was less than 24 hours before the session.'
+          ? ' No refund. Cancellation was less than 24 hours before the session.'
           : '';
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
@@ -1290,7 +1290,7 @@ export class BookingService {
       const callRevenueTrend = calcTrend(callRevenue, prevCallRevenue);
       const packageRevenueTrend = calcTrend(packageRevenue, prevPackageRevenue);
 
-      // Chart data — group by day (this-month) or by week (quarterly/ytd)
+      // Chart data, group by day (this-month) or by week (quarterly/ytd)
       const chartPoints: Record<string, { bookings: number; callRevenue: number; packageRevenue: number }> = {};
 
       for (const b of currentBookings) {
@@ -1299,7 +1299,7 @@ export class BookingService {
         if (period === 'this-month') {
           key = `${d.getMonth() + 1}/${d.getDate()}`;
         } else {
-          // Weekly grouping — use ISO week start (Monday)
+          // Weekly grouping, use ISO week start (Monday)
           const day = d.getDay();
           const monday = new Date(d);
           monday.setDate(d.getDate() - ((day + 6) % 7));
@@ -1803,12 +1803,12 @@ export class BookingService {
               });
             }
           } else {
-            Log.warn('Cannot release transfer hold — missing transfer ID or Razorpay client', {
+            Log.warn('Cannot release transfer hold, missing transfer ID or Razorpay client', {
               transferId, hasRazorpay: !!razorpay,
             });
           }
 
-          // Update BillingTransaction status — mark as payment_processed; COMPLETED/RELEASED set via webhook
+          // Update BillingTransaction status, mark as payment_processed; COMPLETED/RELEASED set via webhook
           await (prisma as any).billingTransaction.update({
             where: { id: tx.id },
             data: {
@@ -1846,7 +1846,7 @@ export class BookingService {
       const reviewLink = `${appConfig.frontendUrl}/my-bookings/${booking.unique_id}/submit-review`;
 
       const rateBody = (otherName: string) => `<p>Your 1:1 video call with <strong>${escapeHtml(otherName)}</strong> on <strong>${escapeHtml(dateStr)}</strong> has been completed.</p>
-        <p>Please take a moment to leave a review — your public rating helps other founders and mentors on ScaleDux, and private feedback is shared only with ${escapeHtml(otherName)}.</p>`;
+        <p>Please take a moment to leave a review. Your public rating helps other founders and mentors on ScaleDux, and private feedback is shared only with ${escapeHtml(otherName)}.</p>`;
 
       // Founder rates mentor
       const founderRateData = {
@@ -1902,7 +1902,7 @@ export class BookingService {
   }
 
   /**
-   * Mentor requests a reschedule — does NOT reschedule directly.
+   * Mentor requests a reschedule, does NOT reschedule directly.
    * Sends notification, email, and chat message to the founder.
    */
   static async requestReschedule(
@@ -1951,7 +1951,7 @@ export class BookingService {
       const rescheduleLink = `${appConfig.frontendUrl}/book-a-call/${booking.mentor.unique_id}?reschedule=${booking.unique_id}`;
 
       // Mark the booking as having a pending reschedule request (drives the founder's "Reschedule meeting" button).
-      // Founder has 48 hours to respond — capped at the call start time if call is sooner.
+      // Founder has 48 hours to respond, capped at the call start time if call is sooner.
       const now = new Date();
       const callTime = new Date(booking.scheduled_at).getTime();
       const deadlineMs = Math.min(now.getTime() + RESCHEDULE_RESPONSE_WINDOW_MS, callTime);
@@ -2001,7 +2001,7 @@ export class BookingService {
       await dispatch(NotificationJob, notifData);
       await dispatch(NotificationEmailJob, notifData);
 
-      // Chat message — rescheduleLink + rescheduleUserId let the UI show a
+      // Chat message, rescheduleLink + rescheduleUserId let the UI show a
       // "Reschedule call" button to the founder only (mentor can only request).
       const chatMsg = `📅 ${mentorName} has requested to reschedule the call.${reasonText}${remarkText}`;
       await ConversationService.syncSystemMessage(

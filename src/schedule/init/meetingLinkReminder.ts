@@ -92,10 +92,10 @@ export async function handle(): Promise<void> {
       const callMs = new Date(b.scheduled_at).getTime();
       const msUntilCall = callMs - nowMs;
 
-      // 1. Immediate — first cron tick after confirmation
+      // 1. Immediate, first cron tick after confirmation
       if (await tryReminder(b, 'LINK_REMINDER_AFTER_BOOKING', "Don't forget to add a meeting link for your upcoming call")) sent++;
 
-      // 2. Daily — one per calendar day while call is >1 hour away
+      // 2. Daily, one per calendar day while call is >1 hour away
       if (msUntilCall > 60 * 60 * 1000) {
         const dailyKey = `LINK_REMINDER_DAILY_${todayDateKey()}`;
         if (await tryReminder(b, dailyKey, 'Reminder: please add a meeting link for your upcoming call')) sent++;
@@ -103,12 +103,12 @@ export async function handle(): Promise<void> {
 
       // 3. 1 hour before
       if (msUntilCall <= 60 * 60 * 1000) {
-        if (await tryReminder(b, 'LINK_REMINDER_1HR_BEFORE', 'Your call starts in about 1 hour — please add a meeting link')) sent++;
+        if (await tryReminder(b, 'LINK_REMINDER_1HR_BEFORE', 'Your call starts in about 1 hour. Please add a meeting link')) sent++;
       }
 
       // 4. 10 minutes before
       if (msUntilCall <= 10 * 60 * 1000) {
-        if (await tryReminder(b, 'LINK_REMINDER_10MIN_BEFORE', 'Your call starts in ~10 minutes — add a meeting link now!')) sent++;
+        if (await tryReminder(b, 'LINK_REMINDER_10MIN_BEFORE', 'Your call starts in ~10 minutes. Add a meeting link now!')) sent++;
       }
     } catch (err) {
       Log.error(`[meeting-link-reminder] Failed for booking ${b.id}`, { err });

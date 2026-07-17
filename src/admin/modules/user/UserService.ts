@@ -166,7 +166,7 @@ export class UserService {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return { success: false, message: 'User not found', statusCode: 404 };
 
-    // Same app as the main API — reuse its JWT secret directly.
+    // Same app as the main API. Reuse its JWT secret directly.
     const secret = process.env.JWT_SECRET;
     if (!secret) {
       return {

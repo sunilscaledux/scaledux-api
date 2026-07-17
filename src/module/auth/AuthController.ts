@@ -200,7 +200,7 @@ export async function login(req: Request, res: Response) {
   });
 
   if (userFor2FA?.two_fa_enabled) {
-    // Check if this device is trusted — skip 2FA if so
+    // Check if this device is trusted, skip 2FA if so
     // Trust survives logout (deleted_at), so we only check browser + os + ip
     const { browser, os } = parseUserAgent(req.headers['user-agent'] as string);
     const trustedDevice = await prisma.loginDevice.findFirst({
@@ -215,13 +215,13 @@ export async function login(req: Request, res: Response) {
     });
 
     if (trustedDevice) {
-      // Trusted device — skip 2FA, update last_used and proceed with normal login
+      // Trusted device: skip 2FA, update last_used and proceed with normal login
       await prisma.loginDevice.update({
         where: { id: trustedDevice.id },
         data: { last_used_at: new Date() },
       });
     } else {
-      // Untrusted device — require 2FA
+      // Untrusted device: require 2FA
       const twoFAToken = jwt.sign(
         { userId: loginResult.data.id, purpose: '2fa', rememberMe },
         process.env.JWT_SECRET || 'fallback-secret',

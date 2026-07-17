@@ -86,7 +86,7 @@ export class ConversationService {
    */
   /**
    * Get or create a single conversation between two users.
-   * Conversation is not scoped to a project — one thread per user pair for all context (chat, invites, proposals, etc.).
+   * Conversation is not scoped to a project. One thread per user pair for all context (chat, invites, proposals, etc.).
    */
   static async getOrCreateConversation(
     userId1: number,
@@ -517,7 +517,7 @@ export class ConversationService {
 
   /**
    * Mark conversation as read for the current user (sets new_message = false for this participant).
-   * Uses raw update so updated_at is NOT changed — list order stays by last message/activity only.
+   * Uses raw update so updated_at is NOT changed. List order stays by last message/activity only.
    */
   static async markConversationAsRead(conversationUniqueId: string, userId: number): Promise<ServiceResponse<void>> {
     try {

@@ -10,7 +10,7 @@ import { CHAT_SYSTEM_MESSAGES } from "@constants/chatSystemMessages";
 
 /**
  * Auto-expire offers the freelancer hasn't taken up within OFFER_EXPIRY_HOURS
- * (default 24h) — signing the NDA where required, accepting otherwise.
+ * (default 24h), signing the NDA where required, accepting otherwise.
  *
  * Runs every 15 minutes.
  */
@@ -96,8 +96,8 @@ export async function handle(): Promise<void> {
           activityType: "offer_expired",
           activityId: proposal.project?.unique_id,
           projectTitle,
-          messageSent: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle} — ${lapseCause}`,
-          messageReceived: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle} — ${lapseCause}`,
+          messageSent: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_SENT} ${projectTitle}: ${lapseCause}`,
+          messageReceived: `${CHAT_SYSTEM_MESSAGES.OFFER_CANCELLED_RECEIVED} ${projectTitle}: ${lapseCause}`,
         },
         proposal.project?.id,
       );

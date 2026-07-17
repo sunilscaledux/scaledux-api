@@ -203,7 +203,7 @@ io.on('connection', (socket) => {
 async function startSocketServer(): Promise<void> {
   if (process.env.SOCKET_IO_DISABLE_REDIS_ADAPTER === 'true') {
     Log.warn(
-      '[socket] SOCKET_IO_DISABLE_REDIS_ADAPTER=true — single replica only, or use sticky sessions at the proxy'
+      '[socket] SOCKET_IO_DISABLE_REDIS_ADAPTER=true: single replica only, or use sticky sessions at the proxy'
     );
   } else {
     try {
@@ -214,10 +214,10 @@ async function startSocketServer(): Promise<void> {
       subClient.on('error', (err) => Log.error('[socket-io-redis] sub client', { err: String(err) }));
       await Promise.all([pubClient.connect(), subClient.connect()]);
       io.adapter(createAdapter(pubClient, subClient));
-      Log.info('[socket] Redis adapter on — Engine.IO sessions work across multiple instances / load balancers');
+      Log.info('[socket] Redis adapter on. Engine.IO sessions work across multiple instances / load balancers');
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      bootLog(`ERROR: Redis adapter failed (${msg}) — continuing without adapter (single replica OK). Use REDIS_URL=rediss://... for TLS or SOCKET_IO_DISABLE_REDIS_ADAPTER=true`);
+      bootLog(`ERROR: Redis adapter failed (${msg}), continuing without adapter (single replica OK). Use REDIS_URL=rediss://... for TLS or SOCKET_IO_DISABLE_REDIS_ADAPTER=true`);
       Log.error('[socket] Failed to attach Redis adapter', { err: msg });
       Log.warn('[socket] Continuing without Redis adapter');
     }

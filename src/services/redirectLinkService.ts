@@ -29,7 +29,7 @@ export async function createRedirectLink(
   try {
     if (!targetUrl) return '';
 
-    // Normalize URL — ensure it has a protocol
+    // Normalize URL. Ensure it has a protocol
     const normalizedUrl = targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`;
 
     // Check if redirect already exists for this entity + URL

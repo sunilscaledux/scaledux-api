@@ -72,7 +72,7 @@ export class ZoomService {
           { headers: { Authorization: `Basic ${basicAuth}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
         );
       } catch (err) {
-        Log.warn(`Zoom token revoke failed for user ${userId} — clearing locally anyway`);
+        Log.warn(`Zoom token revoke failed for user ${userId}, clearing locally anyway`);
       }
     }
 

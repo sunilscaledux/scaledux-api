@@ -304,7 +304,7 @@ export class ProfileController {
       return ApiResponse.error(res, 'Unique ID is required', 400);
     }
 
-    // Check if target user has blocked the viewer — skip for own profile
+    // Check if target user has blocked the viewer, skip for own profile
     const viewerId = req.user?.id;
     if (viewerId) {
       const targetUser = await prisma.user.findUnique({ where: { unique_id: uniqueId }, select: { id: true } });
@@ -325,7 +325,7 @@ export class ProfileController {
 
     if (personalInfo.success) {
       // Signed out: identity only. The rest (about, experience, education,
-      // rates, links) is for members — don't put it on the wire.
+      // rates, links) is for members. Don't put it on the wire.
       if (!viewerId) {
         const p = ((personalInfo.data as any)?.personal ?? personalInfo.data) as any;
         return ApiResponse.success(

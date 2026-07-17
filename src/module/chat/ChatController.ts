@@ -55,7 +55,7 @@ export async function startConversation(req: Request, res: Response) {
     return ApiResponse.error(res, "Valid other user ID is required", 400);
   }
 
-  // Check connection status — only allow starting conversation if connected
+  // Check connection status, only allow starting conversation if connected
   const connection = await (prisma as any).connection.findFirst({
     where: {
       OR: [

@@ -30,7 +30,7 @@ export function verifyRefreshToken(token: string): { id: number; unique_id: stri
   return jwt.verify(token, REFRESH_SECRET) as { id: number; unique_id: string };
 }
 
-/** sha256 hash of a token — what we persist in scd_admin_sessions.token_hash. */
+/** sha256 hash of a token, what we persist in scd_admin_sessions.token_hash. */
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
 }

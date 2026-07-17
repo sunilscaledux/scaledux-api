@@ -336,7 +336,7 @@ export async function verify2FABackup(req: Request, res: Response) {
   return ApiResponse.success(res, sessionData, 'Login successful');
 }
 
-// ─── POST /auth/2fa/resend-otp (login flow — resend OTP using 2fa token) ────
+// ─── POST /auth/2fa/resend-otp (login flow, resend OTP using 2fa token) ────
 
 export async function resend2FALoginOtp(req: Request, res: Response) {
   const { twoFAToken } = req.body;
@@ -380,7 +380,7 @@ export async function resend2FALoginOtp(req: Request, res: Response) {
   return ApiResponse.success(res, { method: user.two_fa_method }, 'A new verification code has been sent');
 }
 
-// ─── POST /auth/2fa/send-otp (for disable flow — send OTP before disabling) ─
+// ─── POST /auth/2fa/send-otp (for disable flow, send OTP before disabling) ─
 
 export async function send2FAOtp(req: Request, res: Response) {
   const userId = req.user?.id;

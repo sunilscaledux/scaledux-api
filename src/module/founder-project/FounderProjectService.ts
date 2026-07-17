@@ -415,7 +415,7 @@ export class FounderProjectService {
             const matchedCount = await prisma.founderProject.count({ where: personalizedWhere });
 
             if (matchedCount > 0) {
-              // Found matching projects — use personalized query
+              // Found matching projects, use personalized query
               const [projects] = await Promise.all([
                 prisma.founderProject.findMany({
                   where: personalizedWhere,
@@ -428,7 +428,7 @@ export class FounderProjectService {
               totalCount = matchedCount;
               paginatedProjects = projects;
             } else {
-              // No matching projects — fall through to show all
+              // No matching projects, fall through to show all
               const [count, projects] = await Promise.all([
                 prisma.founderProject.count({ where: whereClause }),
                 prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
@@ -437,7 +437,7 @@ export class FounderProjectService {
               paginatedProjects = projects;
             }
           } else {
-            // User has no skills — show all
+            // User has no skills, show all
             const [count, projects] = await Promise.all([
               prisma.founderProject.count({ where: whereClause }),
               prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
@@ -446,7 +446,7 @@ export class FounderProjectService {
             paginatedProjects = projects;
           }
         } else {
-          // No expertises — show all
+          // No expertises, show all
           const [count, projects] = await Promise.all([
             prisma.founderProject.count({ where: whereClause }),
             prisma.founderProject.findMany({ where: whereClause, include: include as any, orderBy, skip: (page - 1) * limit, take: limit })
@@ -729,7 +729,7 @@ export class FounderProjectService {
       const inviteStatus = inviteData?.status || null;
       // is_invited = had a PENDING invite (for showing Accept/Reject). We also return invite_status so UI can show "Invitation rejected"
       const isInvitedUser = !isOwner && inviteStatus === ProposalStatus.PENDING;
-      // Freelancer side: only show invitation message when PENDING (when REJECTED, message holds rejection reason — do not show to freelancer)
+      // Freelancer side: only show invitation message when PENDING (when REJECTED, message holds rejection reason, do not show to freelancer)
       const invitationMessageForViewer = !isOwner && inviteStatus === ProposalStatus.REJECTED ? null : (inviteData?.message || null);
 
       // Fetch client stats for the project owner
@@ -1033,8 +1033,8 @@ export class FounderProjectService {
         };
       }
 
-      // A project with live engagement (pending invites or active proposals) can't be deleted —
-      // it would silently drop experts who are mid-flow. Founder must unpublish (close) first,
+      // A project with live engagement (pending invites or active proposals) can't be deleted.
+      // It would silently drop experts who are mid-flow. Founder must unpublish (close) first,
       // which revokes invites and archives proposals; the resulting draft can then be deleted.
       const [pendingInviteCount, activeProposalCount] = await Promise.all([
         prisma.projectInvite.count({
@@ -1099,7 +1099,7 @@ export class FounderProjectService {
         return { success: false, message: "Project not found" };
       }
 
-      // Can't unpublish while a contract is live — that would orphan an active offer/hire.
+      // Can't unpublish while a contract is live. That would orphan an active offer/hire.
       const activeContractCount = await (prisma as any).proposal.count({
         where: {
           project_id: project.id,
@@ -1125,7 +1125,7 @@ export class FounderProjectService {
           where: { project_id: project.id, status: InviteStatus.PENDING },
           data: { status: InviteStatus.REJECTED }
         }),
-        // Silently ignore (archive) all open proposals — no notification to the expert
+        // Silently ignore (archive) all open proposals, no notification to the expert
         (prisma as any).proposal.updateMany({
           where: {
             project_id: project.id,
@@ -1279,7 +1279,7 @@ export class FounderProjectService {
       const pendingInvitedProviderIds = pendingInvites.map((i: any) => i.provider_id);
 
       // Build where clause based on filter. Only expose service providers
-      // whose own profile meets the required completion bar — keeps the
+      // whose own profile meets the required completion bar, keeps the
       // "Receive invite → NO" rule for incomplete providers consistent with
       // the browse-projects filter applied elsewhere.
       let whereClause: any = {
@@ -1460,7 +1460,7 @@ export class FounderProjectService {
         ? providers.filter(p => p.match_score > 0 || p.matched_skills.length > 0)
         : providers;
 
-      // Apply advanced filters that need JS (rating, earned — need aggregated data)
+      // Apply advanced filters that need JS (rating, earned, which need aggregated data)
       if (advancedFilters) {
         if (advancedFilters.ratingMin !== undefined) {
           filteredProviders = filteredProviders.filter(p => p.rating >= advancedFilters.ratingMin!);

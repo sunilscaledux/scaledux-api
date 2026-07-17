@@ -5,7 +5,7 @@ import { getResubmitWindow } from '@utils/General'
 import { appConfig } from '@config/app'
 
 /**
- * Get identity verification details — returns basic details + cooldown info
+ * Get identity verification details. Returns basic details + cooldown info
  */
 export async function getIdentityVerificationDetails(req: Request, res: Response) {
   const userId = req.user?.id

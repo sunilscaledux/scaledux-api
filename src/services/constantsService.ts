@@ -3,7 +3,7 @@ import { prisma } from './prismaService'
 /**
  * Read helpers for admin-managed option lists stored in the `Constant` table.
  * Only active rows are returned, ordered by sort_order then value. Callers map
- * the rows into whatever shape their public endpoint already exposes — the
+ * the rows into whatever shape their public endpoint already exposes. The
  * stored `value` is the canonical text saved on consuming records.
  */
 

@@ -160,10 +160,10 @@ export async function createContactAndFundAccount(params: {
           );
         }
       } catch (err: any) {
-        // If validation endpoint is not available, log and continue — fund account is still created
+        // If validation endpoint is not available, log and continue. Fund account is still created
         const msg = err?.response?.data?.error?.description || err?.message || "";
         if (msg.includes("Access to requested resource") || msg.includes("not available")) {
-          // Validation API not enabled on this Razorpay account — skip
+          // Validation API not enabled on this Razorpay account, skip
         } else {
           throw err;
         }
@@ -181,7 +181,7 @@ export async function createContactAndFundAccount(params: {
  */
 /**
  * Check if an email already has a Razorpay linked account and whether it's suspended.
- * Searches Razorpay directly by email — no DB lookups.
+ * Searches Razorpay directly by email, no DB lookups.
  */
 export async function checkRazorpayEmailStatus(email: string): Promise<
   { status: 'none' } | { status: 'suspended' } | { status: 'active'; accountId: string }
@@ -226,7 +226,7 @@ export async function checkRazorpayEmailStatus(email: string): Promise<
     }
   }
 
-  // No search endpoint returned results — email not found on Razorpay
+  // No search endpoint returned results. Email not found on Razorpay
   return { status: 'none' };
 }
 
@@ -325,7 +325,7 @@ export async function createRouteLinkedAccount(params: {
     }
   }
 
-  // Step 2: Add or update stakeholder (KYC holder) — required for activation
+  // Step 2: Add or update stakeholder (KYC holder), required for activation
   if (params.stakeholder) {
     const stakeholderBody = {
       name: params.stakeholder.name.slice(0, 200),
@@ -340,7 +340,7 @@ export async function createRouteLinkedAccount(params: {
       const desc = err?.response?.data?.error?.description || "";
       if (/(already|duplicate)/i.test(desc)) {
         Log.info(`[createRouteLinkedAccount] Stakeholder already exists for ${accountId}, fetching to update`);
-        // Stakeholder exists — fetch and update with latest KYC/details
+        // Stakeholder exists. Fetch and update with latest KYC/details
         try {
           const listRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders`, { headers });
           Log.info(`[createRouteLinkedAccount] Stakeholders fetch response`, { data: JSON.stringify(listRes.data) });
@@ -520,7 +520,7 @@ export async function createRouteLinkedAccount(params: {
 
       return { accountId, productId, activationStatus };
     } else {
-      Log.error(`[createRouteLinkedAccount] Could not determine product ID for ${accountId} — bank settlement config NOT updated`);
+      Log.error(`[createRouteLinkedAccount] Could not determine product ID for ${accountId}. Bank settlement config NOT updated`);
     }
   }
 

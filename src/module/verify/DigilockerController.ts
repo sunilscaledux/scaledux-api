@@ -18,7 +18,7 @@ const FRONTEND_URL = appConfig.frontendUrl;
 
 /**
  * POST /verify/digilocker/initiate
- * Starts the DigiLocker OAuth flow — returns auth_url to redirect user.
+ * Starts the DigiLocker OAuth flow, returns auth_url to redirect user.
  */
 export async function initiateDigilocker(req: Request, res: Response) {
   const userId = req.user?.id;
@@ -92,7 +92,7 @@ export async function completeDigilocker(req: Request, res: Response) {
   if (state) {
     const [, stateToken] = String(state).split(":");
     if (stateToken && user?.digilocker_state && stateToken !== user.digilocker_state) {
-      return ApiResponse.error(res, "Invalid state — please restart verification", 400);
+      return ApiResponse.error(res, "Invalid state, please restart verification", 400);
     }
   }
 
@@ -152,7 +152,7 @@ export async function completeDigilocker(req: Request, res: Response) {
       await prisma.identityVerification.create({ data: verificationData });
     }
 
-    Log.info(`[digilocker][${uid}] DL verified & saved — dlNumber: ${dlResult.dlNumber}`);
+    Log.info(`[digilocker][${uid}] DL verified & saved, dlNumber: ${dlResult.dlNumber}`);
 
     void notifySensitiveUpdate(
       userId,
@@ -224,7 +224,7 @@ export async function completeDigilocker(req: Request, res: Response) {
   });
   await updateCompletionSection(userId, "identityVerification", true);
 
-  Log.info(`[digilocker][${uid}] Aadhaar verified & saved — name: ${aadhaar.name}`);
+  Log.info(`[digilocker][${uid}] Aadhaar verified & saved, name: ${aadhaar.name}`);
 
   void notifySensitiveUpdate(
     userId,

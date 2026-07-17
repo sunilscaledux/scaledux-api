@@ -3,7 +3,7 @@ import { ApiResponse } from '@utils/ApiResponse';
 import { ConnectionService } from './ConnectionService';
 
 export class ConnectionController {
-  /** POST /connections/request — send a connection request */
+  /** POST /connections/request: send a connection request */
   static async sendRequest(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -19,7 +19,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** PATCH /connections/:id/accept — accept a connection request */
+  /** PATCH /connections/:id/accept: accept a connection request */
   static async acceptRequest(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -32,7 +32,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** PATCH /connections/:id/reject — reject a connection request */
+  /** PATCH /connections/:id/reject: reject a connection request */
   static async rejectRequest(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -45,7 +45,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** PATCH /connections/:id/withdraw — withdraw a sent request */
+  /** PATCH /connections/:id/withdraw: withdraw a sent request */
   static async withdrawRequest(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -58,7 +58,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** PATCH /connections/:id/disconnect — remove an accepted connection */
+  /** PATCH /connections/:id/disconnect: remove an accepted connection */
   static async disconnectConnection(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -71,7 +71,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** GET /connections/status/:uniqueId — get connection status with another user */
+  /** GET /connections/status/:uniqueId: get connection status with another user */
   static async getStatus(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -84,7 +84,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** GET /connections/requests — list received pending requests */
+  /** GET /connections/requests: list received pending requests */
   static async getReceivedRequests(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -99,7 +99,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** GET /connections — list all accepted connections */
+  /** GET /connections: list all accepted connections */
   static async getConnections(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
@@ -114,7 +114,7 @@ export class ConnectionController {
     return ApiResponse.error(res, result.message, 400);
   }
 
-  /** GET /connections/sent — list sent pending requests */
+  /** GET /connections/sent: list sent pending requests */
   static async getSentRequests(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);

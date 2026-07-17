@@ -12,7 +12,7 @@ interface AuditInput {
   ip?: string;
 }
 
-/** Best-effort audit write — never throws into the request flow. */
+/** Best-effort audit write, never throws into the request flow. */
 export async function recordAudit(input: AuditInput): Promise<void> {
   try {
     await prisma.adminAuditLog.create({

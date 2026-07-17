@@ -6,7 +6,7 @@ import { Log } from '@services/loggerService';
  * Fire-and-forget email notification that a sensitive field on a user's
  * account was updated (bank details, tax info, CIN, identity, etc.).
  *
- * Caller supplies the subject and the user-facing message — there is no
+ * Caller supplies the subject and the user-facing message. There is no
  * per-field template. We look up the user's email internally so service
  * callers only need to pass userId + copy.
  *

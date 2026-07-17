@@ -57,7 +57,7 @@ export class GoogleMeetService {
 
     const meetLink = res.data.hangoutLink;
     if (!meetLink) {
-      throw new Error('Google Meet link was not generated — the calendar may not support Meet.');
+      throw new Error('Google Meet link was not generated. The calendar may not support Meet.');
     }
 
     return meetLink;
@@ -102,7 +102,7 @@ export class GoogleMeetService {
     const meetLink = res.data.hangoutLink;
     const eventId = res.data.id;
     if (!meetLink) {
-      throw new Error('Google Meet link was not generated — the calendar may not support Meet.');
+      throw new Error('Google Meet link was not generated. The calendar may not support Meet.');
     }
 
     return { meetLink, eventId };

@@ -4,7 +4,7 @@ import { ServiceResponse } from '@utils/ApiResponse';
 /**
  * Admin management of generic option lists (Constant table).
  * Groups + their sub-lists are admin-managed: add / edit / deactivate / reorder.
- * Consuming records store the option's `value` text — never the row id.
+ * Consuming records store the option's `value` text, never the row id.
  */
 
 /** Human-friendly labels + which groups use a subkey (sub-list). Drives the admin UI. */

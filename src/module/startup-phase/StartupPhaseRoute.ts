@@ -17,7 +17,7 @@ const progressRouter = Router();
 // Public phase listing (anyone can browse phases, even unauthenticated)
 phaseRouter.get('/', optionalAuth, listPhases);
 
-// Public progress by founder uniqueId — only founder themselves or investors
+// Public progress by founder uniqueId, only founder themselves or investors
 phaseRouter.get('/progress/:uniqueId', authenticateToken, getPublicProgress);
 
 // All progress routes require auth

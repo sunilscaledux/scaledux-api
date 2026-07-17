@@ -65,7 +65,7 @@ export const appConfig = {
   platformFeeAmount: Math.max(0, Number(platformFeeAmountRaw) || 0),
   /** Processing fee deducted from freelancer payout (%). Default 1.5. */
   processingFeePercent: Math.min(100, Math.max(0, Number(processingFeePercentRaw) || 1.5)),
-  /** TCS rate (%) — only applied if provider is GST registered. Default 0.5. */
+  /** TCS rate (%), only applied if provider is GST registered. Default 0.5. */
   tcsPercent: Math.min(100, Math.max(0, Number(tcsPercentRaw) || 0.5)),
   razorpayPlatformAccountId: razorpayPlatformAccountRaw || null as string | null,
   razorpayWebhookSecret: razorpayWebhookSecretRaw || null as string | null,

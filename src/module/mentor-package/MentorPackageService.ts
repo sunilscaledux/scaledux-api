@@ -18,14 +18,14 @@ function formatDuration(minutes: number): string {
   return `${minutes}m`;
 }
 
-/** Safe parseInt — returns undefined if not a valid number */
+/** Safe parseInt, returns undefined if not a valid number */
 function safeInt(val: any): number | undefined {
   if (val === undefined || val === null || val === '') return undefined;
   const n = parseInt(String(val), 10);
   return isNaN(n) ? undefined : n;
 }
 
-/** Safe parseFloat — returns undefined if not a valid number */
+/** Safe parseFloat, returns undefined if not a valid number */
 function safeFloat(val: any): number | undefined {
   if (val === undefined || val === null || val === '') return undefined;
   const n = parseFloat(String(val));

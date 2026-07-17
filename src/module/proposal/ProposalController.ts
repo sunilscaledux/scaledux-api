@@ -101,7 +101,7 @@ export async function createProposal(req: Request, res: Response) {
 
 /**
  * Save a proposal draft. Unlike createProposal:
- *   - No profile completion check — drafts can be saved at any completion %.
+ *   - No profile completion check. Drafts can be saved at any completion %.
  *   - No required fields beyond projectId; the form is allowed to be partial.
  *   - The service skips chat sync, invite flip, proposals_count increment and
  *     notifications, and hides the row from founder-facing queries.

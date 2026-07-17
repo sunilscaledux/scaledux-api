@@ -615,7 +615,7 @@ export class BillingService {
 
   /**
    * Founder acknowledges milestone completion. Triggers Razorpay transfer and sets status to PAYMENT_PROCESSED.
-   * Freelancer wallet is NOT credited here — that happens via the transfer.settled webhook.
+   * Freelancer wallet is NOT credited here, that happens via the transfer.settled webhook.
    */
   static async acknowledgeMilestonePayment(transactionUniqueId: string, userId: number): Promise<{ success: boolean; message?: string }> {
     const tx = await (prisma as any).billingTransaction.findUnique({
@@ -1071,7 +1071,7 @@ export class BillingService {
     };
   }
 
-  // Tax information — delegated to TaxInformationService
+  // Tax information, delegated to TaxInformationService
   static async saveTaxInformation(userId: string, data: any) {
     const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
     return TaxInformationService.saveTaxInformation(userId, data);
@@ -1080,7 +1080,7 @@ export class BillingService {
     const { TaxInformationService } = require("@module/tax-information/TaxInformationService");
     return TaxInformationService.getTaxInformation(userId);
   }
-  // Bank information — delegated to BankInformationService
+  // Bank information, delegated to BankInformationService
   static async getBankInformation(userId: string) {
     const { BankInformationService } = require("@module/bank-information/BankInformationService");
     return BankInformationService.getBankInformation(userId);

@@ -45,12 +45,12 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     return ApiResponse.error(res, "CIN must be exactly 21 alphanumeric characters", 400)
   }
 
-  // Documents are optional — CIN is verified via API
+  // Documents are optional. CIN is verified via API
   const normalizedDocumentUrls = documents && Array.isArray(documents) && documents.length > 0
     ? urlsOrPathsToAttachmentIds(documents)
     : []
 
-  // ── Real-time CIN verification — only save if verified ──
+  // ── Real-time CIN verification, only save if verified ──
   if (!isIdtoaiConfigured()) {
     return ApiResponse.error(res, "CIN verification service is temporarily unavailable. Please try again later.", 503)
   }
@@ -78,7 +78,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
 
   Log.info(`[agency-verify] CIN ${cin} verified for user ${userId}`)
 
-  // Verified — save
+  // Verified, save
   const existingVerification = await prisma.agencyVerification.findFirst({
     where: { user_id: userId },
     orderBy: { created_at: 'desc' }

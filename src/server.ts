@@ -68,7 +68,7 @@ app.use(corsMiddleware());
 app.use(express.json());
 app.use(cookieParser());
 app.use(sitemapRoutes);
-/** Private file download — /files/view/:uniqueId?f=originalName */
+/** Private file download: /files/view/:uniqueId?f=originalName */
 app.get("/files/view/:uniqueId", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 app.use("/api/v1", userRoutes);
@@ -107,7 +107,7 @@ app.use("/api/v1/profile/company/startup-progress", startupProgressRouter);
 app.use("/api/v1/connections", connectionRoutes);
 app.use("/api/v1/bug-reports", bugReportRoutes);
 
-// Public redirect endpoint — /r/:code/redirect → redirects to target URL
+// Public redirect endpoint: /r/:code/redirect → redirects to target URL
 app.get("/r/:code/redirect", async (req, res) => {
   const targetUrl = await resolveRedirectLink(req.params.code);
   if (!targetUrl) return res.status(404).send('Link not found');
@@ -126,7 +126,7 @@ if (process.env.NODE_ENV !== 'production') {
   Log.info('Bull Board available at: http://localhost:4000/admin/queues');
 }
 
-// Global error handler — catches all unhandled errors from controllers
+// Global error handler: catches all unhandled errors from controllers
 app.use(globalErrorHandler);
 
 const PORT = process.env.PORT || 4000;

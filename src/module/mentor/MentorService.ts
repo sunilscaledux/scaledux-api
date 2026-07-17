@@ -8,7 +8,7 @@ import { getDisplayName } from '@utils/General';
 export class MentorService {
 
   /**
-   * Browse mentors — public listing with filters.
+   * Browse mentors, public listing with filters.
    */
   static async browseMentors(params: {
     search?: string;
@@ -27,7 +27,7 @@ export class MentorService {
       const limit = Math.min(50, Math.max(1, params.limit || 16));
       const cursorDate = params.cursor ? new Date(params.cursor) : null;
 
-      // bar — makes "Receive requests → NO" for incomplete mentors work
+      // bar, makes "Receive requests → NO" for incomplete mentors work
       // automatically.
       const where: any = {
         role: 'mentor',

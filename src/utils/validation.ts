@@ -30,7 +30,7 @@ export const dangerousHtmlMessages = {
   "string.dangerousHtml": "{{#label}} contains disallowed HTML content",
 };
 
-/** Strip HTML tags and return plain text — matches Tiptap CharacterCount behavior. */
+/** Strip HTML tags and return plain text, matches Tiptap CharacterCount behavior. */
 function stripHtml(val: string): string {
   return val.replace(/<[^>]*>/g, '').trim();
 }

@@ -1,5 +1,5 @@
 /**
- * IDtoAI Verification Service — PAN & GSTIN
+ * IDtoAI Verification Service: PAN & GSTIN
  * PAN docs:  https://idtoai.readme.io/reference/post_pan-verification
  * GST docs:  https://idtoai.readme.io/reference/post_gst-verification-basic
  */
@@ -47,7 +47,7 @@ export interface PANVerificationResponse {
 export async function verifyPAN(panNumber: string, uniqueId?: string): Promise<PANVerificationResponse> {
   const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
   if (!isConfigured()) {
-    Log.warn(`${tag} Missing idtoaiConfig.apiKey or idtoaiConfig.clientId env vars — skipping PAN verification`);
+    Log.warn(`${tag} Missing idtoaiConfig.apiKey or idtoaiConfig.clientId env vars, skipping PAN verification`);
     return { success: false, error: "PAN verification is temporarily unavailable. Please try again later." };
   }
 
@@ -196,7 +196,7 @@ export async function verifyBankAccount(
 ): Promise<BankVerificationResponse> {
   const tag = uniqueId ? `[idtoai][${uniqueId}]` : "[idtoai]";
   if (!isConfigured()) {
-    Log.warn(`${tag} IDtoAI not configured — skipping bank verification`);
+    Log.warn(`${tag} IDtoAI not configured, skipping bank verification`);
     return { success: false, error: "Bank verification is temporarily unavailable. Please try again later." };
   }
 
@@ -261,7 +261,7 @@ export async function verifyBankAccount(
   }
 }
 
-// ─── DigiLocker — Aadhaar Verification ──────────────────────────────────────
+// ─── DigiLocker: Aadhaar Verification ───────────────────────────────────────
 
 export interface DigilockerAadhaarResponse {
   success: boolean;
@@ -290,7 +290,7 @@ export interface DigilockerAadhaarResponse {
 }
 
 /**
- * Initiate DigiLocker session — returns auth_url to redirect user to.
+ * Initiate DigiLocker session, returns auth_url to redirect user to.
  */
 export async function digilockerInitiateSession(
   redirectUrl: string,
@@ -299,7 +299,7 @@ export async function digilockerInitiateSession(
 ): Promise<{ success: boolean; authUrl?: string; error?: string; raw?: any }> {
   const tag = userId ? `[digilocker][${userId}]` : "[digilocker]";
   if (!isConfigured()) {
-    Log.warn(`${tag} IDtoAI not configured — skipping DigiLocker`);
+    Log.warn(`${tag} IDtoAI not configured, skipping DigiLocker`);
     return { success: false, error: "DigiLocker verification is temporarily unavailable." };
   }
 
@@ -320,7 +320,7 @@ export async function digilockerInitiateSession(
       return { success: true, authUrl, raw: data };
     }
 
-    Log.error(`${tag} DigiLocker initiate — no auth_url`, { data });
+    Log.error(`${tag} DigiLocker initiate, no auth_url`, { data });
     return { success: false, error: data.message || "Failed to initiate DigiLocker session", raw: data };
   } catch (error: any) {
     const status = error.response?.status;
@@ -357,7 +357,7 @@ export async function digilockerGetReference(
       return { success: true, referenceKey: result.reference_key, raw: data };
     }
 
-    Log.error(`${tag} DigiLocker get_reference — no reference_key`, { data });
+    Log.error(`${tag} DigiLocker get_reference, no reference_key`, { data });
     return { success: false, error: result.message || "Failed to get reference key", raw: data };
   } catch (error: any) {
     const status = error.response?.status;
@@ -390,7 +390,7 @@ export async function digilockerFetchAadhaar(
 
     // IDtoAI may return XML as a string directly or wrapped in JSON
     if (typeof rawData === 'object' && !Array.isArray(rawData)) {
-      // Find the XML string in the response — could be the whole thing or a nested field
+      // Find the XML string in the response, could be the whole thing or a nested field
       const possibleXml = rawData.xml || rawData.data || rawData.result || rawData;
       if (typeof possibleXml === 'string' && possibleXml.includes('<')) {
         xmlStr = possibleXml;
@@ -454,7 +454,7 @@ export async function digilockerFetchAadhaar(
   }
 }
 
-// ─── DigiLocker — Driving Licence ───────────────────────────────────────────
+// ─── DigiLocker: Driving Licence ────────────────────────────────────────────
 
 export interface DigilockerDrivingLicenceResponse {
   success: boolean;

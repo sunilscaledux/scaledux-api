@@ -77,14 +77,14 @@ export async function handle(): Promise<void> {
       const emailBody = `<p>The 1:1 video call scheduled for <strong>${escapeHtml(dateStr)}</strong> has been automatically cancelled because the reschedule request was not responded to within the deadline.</p>
         <p>You can book a new session from your <a href="${appConfig.frontendUrl}/my-bookings" style="color:#7C3AED;">bookings page</a>.</p>`;
 
-      const inAppBody = `The call on ${dateStr} was auto-cancelled — reschedule request expired.`;
+      const inAppBody = `The call on ${dateStr} was auto-cancelled. Reschedule request expired.`;
 
       // Notify both parties
       for (const recipientId of [booking.mentor_id, booking.user_id]) {
         const notifData = {
           userId: recipientId,
           type: 'BOOKING_CANCELLED' as const,
-          notificationTitle: 'Booking auto-cancelled — reschedule deadline expired',
+          notificationTitle: 'Booking auto-cancelled: reschedule deadline expired',
           notificationBody: emailBody,
           inAppBody,
           notificationLink: `${appConfig.frontendUrl}/my-bookings`,
@@ -99,7 +99,7 @@ export async function handle(): Promise<void> {
       // Sync to chat
       await ConversationService.syncSystemMessage(
         booking.user_id, booking.mentor_id,
-        `❌ The call was automatically cancelled — the reschedule request was not responded to in time.`,
+        `❌ The call was automatically cancelled. The reschedule request was not responded to in time.`,
         {
           activityType: 'BOOKING_CANCELLED',
           bookingTitle: '1:1 Video Call',

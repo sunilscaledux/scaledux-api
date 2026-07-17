@@ -66,7 +66,7 @@ export class BankInformationService {
         where: { id: userIdNum },
         select: { razorpay_account_id: true, razorpay_agency_account_id: true },
       });
-      const reviewMs = 60 * 1000; // 1 minute — Route activation usually completes within a minute
+      const reviewMs = 60 * 1000; // 1 minute. Route activation usually completes within a minute
       const refreshTasks: Promise<void>[] = [];
       for (const [rec, accId] of [
         [individual, userRecord?.razorpay_account_id],
@@ -82,7 +82,7 @@ export class BankInformationService {
             refreshTasks.push(
               getRouteAccountActivationStatus(accId, rec.razorpay_product_id).then(async (rpStatus) => {
                 // activated -> activated; suspended/rejected -> failed; anything else
-                // (needs_clarification, under_review, null/API error) stays pending — never false-fail.
+                // (needs_clarification, under_review, null/API error) stays pending, never false-fail.
                 let newStatus = 'in_review';
                 if (rpStatus === 'activated') newStatus = 'activated';
                 else if (rpStatus === 'suspended' || rpStatus === 'rejected') newStatus = 'failed';
@@ -503,7 +503,7 @@ export class BankInformationService {
     }
     const bankName = incomingBankName ?? record.bank_name;
 
-    // Check if account number or IFSC changed — only re-verify if they did
+    // Check if account number or IFSC changed. Only re-verify if they did
     const accountChanged = newAccountNumber && newAccountNumber !== record.account_number;
     const ifscChanged = ifsc !== record.ifsc;
     const needsReverification = accountChanged || ifscChanged;
@@ -562,7 +562,7 @@ export class BankInformationService {
         WHERE id = ${recordIdNum} AND user_id = ${userIdNum}
       `;
     } else {
-      // Only label/name/bank name/email changed — no re-verification needed
+      // Only label/name/bank name/email changed, no re-verification needed
       const updateData: any = {
         display_label: displayLabel,
         bank_name: bankName,
@@ -605,7 +605,7 @@ export class BankInformationService {
     razorpayEmail?: string | null,
   ): Promise<{ success: boolean; error?: string; activationStatus?: string; productId?: string }> {
     if (!isRazorpayConfigured()) {
-      Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured — skipping for user ${userId}`);
+      Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured, skipping for user ${userId}`);
       return { success: false, error: 'Payment service is not configured. Please contact support.' };
     }
 
@@ -624,13 +624,13 @@ export class BankInformationService {
         }
       });
       if (!user) {
-        Log.warn(`[ensureRazorpayLinkedAccount] User ${userId} not found — skipping`);
+        Log.warn(`[ensureRazorpayLinkedAccount] User ${userId} not found, skipping`);
         return { success: false, error: 'User not found.' };
       }
       // Use razorpay_email (from bank record) if provided, otherwise fall back to user's ScaleDux email
       const emailForRazorpay = razorpayEmail || user.email;
       if (!emailForRazorpay) {
-        Log.warn(`[ensureRazorpayLinkedAccount] No email for user ${userId} — skipping`);
+        Log.warn(`[ensureRazorpayLinkedAccount] No email for user ${userId}, skipping`);
         return { success: false, error: 'Email not found. Please provide an email for Razorpay.' };
       }
       const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;

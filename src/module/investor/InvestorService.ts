@@ -8,7 +8,7 @@ import { getDisplayName } from '@utils/General';
 export class InvestorService {
 
   /**
-   * Browse investors — public listing with filters.
+   * Browse investors, public listing with filters.
    */
   static async browseInvestors(params: {
     search?: string;
@@ -193,7 +193,7 @@ export class InvestorService {
   }
 
   /**
-   * Browse startups — public listing for investors with filters.
+   * Browse startups, public listing for investors with filters.
    */
   static async browseStartups(params: {
     search?: string;

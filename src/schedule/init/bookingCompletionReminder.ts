@@ -6,7 +6,7 @@ import { appConfig } from "@config/app";
 
 /**
  * Email the mentor a one-time "please mark this call complete" nudge right after the call ends.
- * Only picks bookings where scheduled_end passed within the last 2 minutes — so the reminder
+ * Only picks bookings where scheduled_end passed within the last 2 minutes, so the reminder
  * arrives promptly and is never re-sent (completion_reminder_sent_at stamp prevents duplicates).
  *
  * Runs every 2 minutes to catch calls as they end.
@@ -51,7 +51,7 @@ export async function handle(): Promise<void> {
       const dateStr = formatNotifDate(new Date(booking.scheduled_at));
       const title = 'Please mark your call complete';
       const body = `<p>Your 1:1 video call with <strong>${escapeHtml(founderName)}</strong> on <strong>${escapeHtml(dateStr)}</strong> has ended.</p>
-        <p>Take a moment to mark it complete — this lets ${escapeHtml(founderName)} leave a review and helps us release your payout.</p>`;
+        <p>Take a moment to mark it complete. This lets ${escapeHtml(founderName)} leave a review and helps us release your payout.</p>`;
       const link = `${appConfig.frontendUrl}/my-bookings`;
 
       await dispatch(NotificationEmailJob, {

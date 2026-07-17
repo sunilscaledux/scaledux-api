@@ -4,7 +4,7 @@ import { authenticateToken } from "@middleware/auth";
 
 const router = Router();
 
-// Razorpay webhook — no auth, signature verified in handler
+// Razorpay webhook: no auth, signature verified in handler
 router.post("/webhook/razorpay", BillingController.razorpayWebhook);
 
 router.use(authenticateToken)

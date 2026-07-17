@@ -92,7 +92,7 @@ const READ_ONLY = [
 ];
 
 export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
-  // SUPER_ADMIN handled specially as "*" — listed here for completeness.
+  // SUPER_ADMIN handled specially as "*", listed here for completeness.
   SUPER_ADMIN: ALL,
 
   ADMIN: [

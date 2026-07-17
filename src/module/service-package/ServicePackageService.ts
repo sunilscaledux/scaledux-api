@@ -263,7 +263,7 @@ export class ServicePackageService {
   }
 
   /**
-   * Process links — create redirect URLs for each link
+   * Process links, create redirect URLs for each link
    */
   private static async processLinks(
     links: any[],

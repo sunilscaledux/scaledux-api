@@ -71,7 +71,7 @@ export const generateOtpCode = (length: number = 6): string => {
  *
  * Addresses are stored and looked up in this form only. The `email` column is a
  * plain unique text column, so its index is case-sensitive and cannot collapse
- * `A@x.com` and `a@x.com` on its own — normalizing on every read and write is
+ * `A@x.com` and `a@x.com` on its own. Normalizing on every read and write is
  * what keeps them a single identity.
  */
 export const normalizeEmail = <T extends string | null | undefined>(
@@ -86,7 +86,7 @@ export const DEFAULT_PHONE_COUNTRY_CODE = "+91";
  * Canonical (E.164) form of a phone number: +<country code><subscriber number>.
  *
  * `phone` is a single unique column holding the full international number, so a
- * bare "9606626500" and "+919606626500" must not both be storable — they are the
+ * bare "9606626500" and "+919606626500" must not both be storable. They are the
  * same person and the unique index cannot tell. Everything is folded to the +91…
  * form on every read and write.
  *

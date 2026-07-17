@@ -58,7 +58,7 @@ router.delete("/auth/devices", authenticateToken, logoutAllOtherDevices);
 
 router.patch("/auth/role", authenticateToken, updateUserRole);
 
-// 2FA routes (public — token in body)
+// 2FA routes (public, token in body)
 router.post("/auth/2fa/verify", createRateLimiter(5 * 60, 10), verify2FA);
 router.post("/auth/2fa/verify-backup", createRateLimiter(5 * 60, 5), verify2FABackup);
 router.post("/auth/2fa/resend-otp", createRateLimiter(5 * 60, 5), resend2FALoginOtp);

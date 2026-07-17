@@ -5,7 +5,7 @@ import { ApiResponse } from '@utils/ApiResponse';
 
 /**
  * Stream a stored file to an authenticated admin. Admins can access ALL private
- * files — there is no per-user access check (intentional). Public files redirect
+ * files. There is no per-user access check (intentional). Public files redirect
  * to their CDN URL; private files are streamed from the Bunny private zone.
  */
 export async function viewFile(req: Request, res: Response) {

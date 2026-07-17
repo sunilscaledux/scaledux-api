@@ -154,7 +154,7 @@ export async function markAttachmentsAttached(
 ): Promise<void> {
   if (!attachmentIds.length) return;
   for (const uid of attachmentIds) {
-    // Find even soft-deleted files — if we're attaching them, they should be restored
+    // Find even soft-deleted files. If we're attaching them, they should be restored
     const att = await prisma.attachment.findUnique({ where: { unique_id: uid } });
     if (!att) continue;
     const existing = Array.isArray(att.accessible_user_ids) ? (att.accessible_user_ids as number[]) : [];

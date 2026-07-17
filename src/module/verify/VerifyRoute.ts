@@ -30,7 +30,7 @@ const router = Router()
 const verifyLimit = createRateLimiter(24 * 60 * 60, 10)
 
 // OTP send: 5 requests per 10 minutes (per IP). Tightened from the previous
-// 15/15min so users can't spam the channel — they get the initial code, plus
+// 15/15min so users can't spam the channel. They get the initial code, plus
 // up to 4 resends (2-min countdown × 4 ≈ 8 min) within the OTP validity.
 router.post("/phone/send-otp", createRateLimiter(10 * 60, 5), authenticateToken, sendPhoneOTP)
 router.post("/phone/verify-otp", createRateLimiter(15 * 60, 15), authenticateToken, verifyPhoneOTP)

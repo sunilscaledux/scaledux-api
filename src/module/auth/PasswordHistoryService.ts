@@ -17,7 +17,7 @@ export async function assertNotReused(
   currentHash: string | null | undefined,
   newPlainPassword: string
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  // Reuse of the current password is the most common case — fast path.
+  // Reuse of the current password is the most common case, fast path.
   if (currentHash) {
     const matchesCurrent = await bcrypt.compare(newPlainPassword, currentHash);
     if (matchesCurrent) {
@@ -50,7 +50,7 @@ export async function assertNotReused(
 }
 
 /**
- * Append a password change to the audit log. Best-effort — failure here must
+ * Append a password change to the audit log. Best-effort, failure here must
  * not roll back the password update itself (the user's auth state is already
  * changed), so we log and swallow.
  */

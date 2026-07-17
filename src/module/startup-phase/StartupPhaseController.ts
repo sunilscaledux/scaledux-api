@@ -23,7 +23,7 @@ export async function listPhases(req: Request, res: Response) {
 
 /**
  * GET /startup-phases/progress/:uniqueId
- * Public endpoint — only founder themselves or investors can view.
+ * Public endpoint, only founder themselves or investors can view.
  */
 export async function getPublicProgress(req: Request, res: Response) {
   try {

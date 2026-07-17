@@ -28,7 +28,7 @@ async function transformPortfolio(portfolio: any): Promise<any> {
   };
 }
 
-/** Normalize references — store actual URLs directly, no redirect wrapping */
+/** Normalize references, store actual URLs directly, no redirect wrapping */
 function normalizeReferences(references?: any[]): any[] {
   if (!Array.isArray(references) || references.length === 0) return [];
   return references.map((ref: any) => {
@@ -209,7 +209,7 @@ export class PortfolioService {
 
       try {
         await updateCompletionSection(userId, 'portfolio', true);
-        Log.info(`[portfolio] Profile completion updated for user ${userId} — portfolio: true`);
+        Log.info(`[portfolio] Profile completion updated for user ${userId}, portfolio: true`);
       } catch (err) {
         Log.error(`[portfolio] Failed to update profile completion for user ${userId}`, { error: err });
       }
@@ -333,7 +333,7 @@ export class PortfolioService {
       const remaining = await prisma.portfolio.count({ where: { user_id: userId, deleted_at: null } });
       try {
         await updateCompletionSection(userId, 'portfolio', remaining > 0);
-        Log.info(`[portfolio] Profile completion updated for user ${userId} — portfolio: ${remaining > 0}, remaining: ${remaining}`);
+        Log.info(`[portfolio] Profile completion updated for user ${userId}, portfolio: ${remaining > 0}, remaining: ${remaining}`);
       } catch (err) {
         Log.error(`[portfolio] Failed to update profile completion for user ${userId}`, { error: err });
       }
