@@ -70,6 +70,17 @@ export class PersonalInfoService {
       // Enrich expertises with subcategory details
       const enrichedExpertises = await this.enrichExpertisesWithSpecialties(user.expertises || []);
 
+      // The agency name is public only once the expert has opted in and the
+      // agency is verified. The verification status itself stays private.
+      let agencyName: string | null = null;
+      if (user.show_as_agency && user.agency_verification_status === 'APPROVED') {
+        const approvedAgency = await prisma.agencyVerification.findFirst({
+          where: { user_id: user.id, status: 'APPROVED' },
+          orderBy: { verified_at: 'desc' },
+        });
+        agencyName = approvedAgency?.agency_name ?? null;
+      }
+
       // Resolve success story media URLs
       const successStoriesWithUrls = await Promise.all(
         (user.successStories || []).map(async (story) => ({
@@ -103,6 +114,7 @@ export class PersonalInfoService {
         hideEmail: profile?.hideEmail ?? false,
         hidePhone: profile?.hidePhone ?? false,
         show_as_agency: user.show_as_agency,
+        agencyName,
         identity_verification_status: (user as any).identity_verification_status,
         profile_type: (user as any).profile_type || user.role,
         // Professional sections
