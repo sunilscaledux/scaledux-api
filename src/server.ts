@@ -72,6 +72,9 @@ app.use(sitemapRoutes);
 /** Private file download: /files/view/:uniqueId?f=originalName */
 app.get("/files/view/:uniqueId", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
+// Public contact form — must be mounted before the bare "/api/v1" routers
+// (e.g. chat) whose router-level auth guard would otherwise 401 it.
+app.use("/api/v1/contact", contactRoutes);
 app.use("/api/v1", userRoutes);
 app.use("/api/v1/profile", profileRoutes);
 app.use("/api/v1", generalRoutes);
@@ -107,7 +110,6 @@ app.use("/api/v1/startup-phases", startupPhaseRouter);
 app.use("/api/v1/profile/company/startup-progress", startupProgressRouter);
 app.use("/api/v1/connections", connectionRoutes);
 app.use("/api/v1/bug-reports", bugReportRoutes);
-app.use("/api/v1/contact", contactRoutes);
 
 // Public redirect endpoint: /r/:code/redirect → redirects to target URL
 app.get("/r/:code/redirect", async (req, res) => {
