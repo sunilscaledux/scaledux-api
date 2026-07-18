@@ -1151,6 +1151,30 @@ model BugReport {
   @@map("scd_bug_reports")
 }
 
+model ContactSubmission {
+  id          Int      @id @default(autoincrement())
+  unique_id   String   @unique @default(cuid())
+  first_name  String   @db.VarChar(20)
+  last_name   String   @db.VarChar(20)
+  email       String   @db.VarChar(255)
+  phone       String   @db.VarChar(20)
+  /** Reason bucket chosen in the form: question, sales, support, other. */
+  reason      String   @db.VarChar(20)
+  subject     String   @db.VarChar(100)
+  message     String   @db.Text
+  status      String   @default("NEW") @db.VarChar(20) // NEW, IN_PROGRESS, RESOLVED, ARCHIVED
+  /** Internal note written by an admin while triaging. */
+  admin_note  String?  @db.Text
+  /** Origin IP, captured for abuse tracing. */
+  ip_address  String?  @db.VarChar(45)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  @@index([status])
+  @@index([created_at])
+  @@map("scd_contact_submissions")
+}
+
 model BlockedUser {
   id              Int       @id @default(autoincrement())
   blocker_id      Int

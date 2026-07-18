@@ -70,6 +70,10 @@ export const PERMISSIONS = {
   // Bug reports (user-submitted, with screen recordings)
   BUG_REPORTS_VIEW: 'bug_reports.view',
   BUG_REPORTS_MANAGE: 'bug_reports.manage',
+
+  // Contact submissions (public contact form)
+  CONTACTS_VIEW: 'contacts.view',
+  CONTACTS_MANAGE: 'contacts.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -89,6 +93,7 @@ const READ_ONLY = [
   PERMISSIONS.CONTENT_VIEW,
   PERMISSIONS.CONSTANTS_VIEW,
   PERMISSIONS.BUG_REPORTS_VIEW,
+  PERMISSIONS.CONTACTS_VIEW,
 ];
 
 export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
@@ -114,6 +119,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.AUDIT_VIEW,
     PERMISSIONS.SECURITY_VIEW,
     PERMISSIONS.BUG_REPORTS_MANAGE,
+    PERMISSIONS.CONTACTS_MANAGE,
   ],
 
   MODERATOR: [
@@ -137,6 +143,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.SECURITY_VIEW,
     PERMISSIONS.BUG_REPORTS_VIEW,
     PERMISSIONS.BUG_REPORTS_MANAGE,
+    PERMISSIONS.CONTACTS_VIEW,
+    PERMISSIONS.CONTACTS_MANAGE,
   ],
 
   FINANCE: [
