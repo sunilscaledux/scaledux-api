@@ -41,7 +41,7 @@ const appUrl = (process.env.APP_URL || 'http://localhost:4000').replace(/\/$/, '
 
 const minProfileCompletionPercent = Math.min(
   100,
-  Math.max(0, Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 75)
+  Math.max(0, Number(process.env.MIN_PROFILE_COMPLETION_PERCENT) || 90)
 );
 const minProjectBudget = Math.max(1, parseInt(process.env.MIN_PROJECT_BUDGET || '500', 10));
 const maxDeliverableRevisions = Math.max(1, parseInt(process.env.MAX_DELIVERABLE_REVISIONS || '10', 10));

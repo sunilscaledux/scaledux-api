@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken } from '@middleware/auth';
+import { requireCompleteProfile } from '@middleware/requireCompleteProfile';
 import { ConnectionController } from './ConnectionController';
 
 const router = Router();
@@ -9,7 +10,7 @@ router.get('/', ConnectionController.getConnections);
 router.get('/requests', ConnectionController.getReceivedRequests);
 router.get('/sent', ConnectionController.getSentRequests);
 router.get('/status/:uniqueId', ConnectionController.getStatus);
-router.post('/request', ConnectionController.sendRequest);
+router.post('/request', requireCompleteProfile(), ConnectionController.sendRequest);
 router.patch('/:id/accept', ConnectionController.acceptRequest);
 router.patch('/:id/reject', ConnectionController.rejectRequest);
 router.patch('/:id/withdraw', ConnectionController.withdrawRequest);
