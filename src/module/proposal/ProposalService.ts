@@ -1916,6 +1916,12 @@ export class ProposalService {
         return { success: false, message: "No milestone is waiting on an invoice right now." };
       }
 
+      await createProposalActivity(proposal.unique_id, 'INVOICE_REQUESTED', {
+        message: awaitingInvoice === 1
+          ? 'Client requested the invoice for a funded milestone'
+          : `Client requested invoices for ${awaitingInvoice} funded milestones`
+      }, userId);
+
       const projectTitle = proposal.project.project_title || "the project";
       await ConversationService.syncSystemMessage(
         proposal.project.user_id,
@@ -2825,6 +2831,12 @@ export class ProposalService {
           freelancer_reason: null,
         }
       });
+
+      await createProposalActivity(proposal.unique_id, 'STATUS_CHANGE', {
+        oldStatus: ProposalStatus.TERMINATING,
+        newStatus: ProposalStatus.HIRED,
+        message: `${restorerName} restored the contract; the scheduled termination was cancelled`
+      }, userId);
 
       const projectTitle = proposal.project?.project_title ?? "Project";
       await ConversationService.syncSystemMessage(

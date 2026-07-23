@@ -1,5 +1,5 @@
 /** Types for proposal activity (storage is in Postgres Activity table). */
-export type ProposalActivityType = 'STATUS_CHANGE' | 'REQUEST_MODIFY' | 'CONTENT_UPDATE' | 'MILESTONE_PAYMENT' | 'HIRE_PAYMENT' | 'MILESTONE_SUBMITTED' | 'NDA_UPDATE';
+export type ProposalActivityType = 'STATUS_CHANGE' | 'REQUEST_MODIFY' | 'CONTENT_UPDATE' | 'MILESTONE_PAYMENT' | 'HIRE_PAYMENT' | 'MILESTONE_SUBMITTED' | 'NDA_UPDATE' | 'INVOICE_REQUESTED' | 'INVOICE_SENT' | 'PAYMENT_RELEASED';
 
 export interface IProposalActivityPayload {
   oldStatus?: string;

@@ -682,6 +682,12 @@ export class BillingService {
         const projectTitle = proposal.project?.project_title ?? '';
         const { ConversationService } = await import('../chat/ConversationService');
         const { CHAT_SYSTEM_MESSAGES } = await import('../../constants/chatSystemMessages');
+        const { createProposalActivity } = await import('@module/proposal/ProposalActivityService');
+        await createProposalActivity(proposal.unique_id, 'PAYMENT_RELEASED', {
+          milestoneTitle: milestoneTitle || undefined,
+          amount: Number(tx.amount),
+          transactionId: tx.unique_id
+        }, userId);
         await ConversationService.syncSystemMessage(
           tx.from_id,
           tx.to_id,
@@ -802,6 +808,13 @@ export class BillingService {
       where: { id: tx.id },
       data: { invoice_sent_at: new Date() }
     });
+
+    const { createProposalActivity } = await import('@module/proposal/ProposalActivityService');
+    await createProposalActivity(proposal.unique_id, 'INVOICE_SENT', {
+      milestoneTitle: milestone.title || 'Milestone',
+      amount: Number(tx.amount),
+      transactionId: tx.unique_id
+    }, freelancerId);
 
     // Notify founder
     const { dispatch } = await import('@queues/Queue');
