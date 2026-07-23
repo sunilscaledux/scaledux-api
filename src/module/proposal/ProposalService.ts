@@ -683,6 +683,19 @@ export class ProposalService {
         Log.error(`Milestone sync failed for proposal_id=${proposalId} order_index=${i}`, { err });
       }
     }
+    // Remove unapproved milestones beyond the new list (user removed them in the form).
+    // Deliverables cascade on delete.
+    try {
+      await prismaAny.milestone.deleteMany({
+        where: {
+          proposal_id: proposalId,
+          order_index: { gte: milestones.length },
+          is_approved: false
+        }
+      });
+    } catch (err) {
+      Log.error('Milestone deleteMany error', { err });
+    }
   }
 
   /**
@@ -1405,13 +1418,25 @@ export class ProposalService {
       if ((proposal as any).milestones_approved === true) {
         return { success: false, message: "Milestones are locked after hire and cannot be edited" };
       }
+      const oldMilestoneRows = await (prisma as any).milestone.findMany({
+        where: { proposal_id: proposal.id },
+        orderBy: { order_index: 'asc' },
+        include: { deliverablesRow: { orderBy: { order_index: 'asc' }, select: { description: true } } }
+      });
       const oldSnapshot = {
         status: proposal.status,
         cover_letter: proposal.cover_letter,
         proposed_amount: proposal.proposed_amount?.toString?.(),
         payment_schedule: proposal.payment_schedule,
         screening_answers: proposal.screening_answers,
-        attachments: proposal.attachments
+        attachments: proposal.attachments,
+        milestones: oldMilestoneRows.map((m: any) => ({
+          title: m.title ?? '',
+          amount: Number(m.amount ?? 0),
+          dueDate: m.due_date ? new Date(m.due_date).toISOString().slice(0, 10) : null,
+          description: m.description ?? null,
+          deliverables: (m.deliverablesRow ?? []).map((d: any) => d.description ?? '')
+        }))
       };
       await createProposalActivity(proposal.unique_id, 'CONTENT_UPDATE', { oldSnapshot }, userId);
       const hoursRequired =
