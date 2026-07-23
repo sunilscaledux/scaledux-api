@@ -87,11 +87,18 @@ export class BankInformationService {
                 if (rpStatus === 'activated') newStatus = 'activated';
                 else if (rpStatus === 'suspended' || rpStatus === 'rejected') newStatus = 'failed';
                 if (newStatus !== status) {
+                  const failureReason = newStatus === 'failed'
+                    ? `Your payment account was ${rpStatus} by the payment provider, so payouts to this bank account cannot be set up. Please update your bank details and try again, or contact support.`
+                    : null;
                   await (prisma as any).bankInformation.update({
                     where: { id: rec.id },
-                    data: { razorpay_activation_status: newStatus },
+                    data: {
+                      razorpay_activation_status: newStatus,
+                      ...(failureReason ? { verification_failure_reason: failureReason } : {}),
+                    },
                   });
                   rec.razorpay_activation_status = newStatus;
+                  if (failureReason) rec.verification_failure_reason = failureReason;
                 }
               }).catch(() => {})
             );
@@ -331,11 +338,11 @@ export class BankInformationService {
       void notifySensitiveUpdate(
         userIdNum,
         'Bank verification failed',
-        `Your ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+        `Verification of your ${entityType.toLowerCase()} bank account ending in ${accountNumberLast4} failed: ${razorpayResult.error} Please try again or contact support.`,
       );
       return {
         success: false,
-        message: `Bank verified but payment account setup failed: ${razorpayResult.error}`
+        message: `Bank verification failed: ${razorpayResult.error}`
       };
     }
 
@@ -414,9 +421,9 @@ export class BankInformationService {
       void notifySensitiveUpdate(
         userIdNum,
         'Bank verification failed',
-        `Your bank account was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+        `Verification of your bank account failed: ${razorpayResult.error} Please try again or contact support.`,
       );
-      return { success: false, message: `Bank verified but payment account setup failed: ${razorpayResult.error}` };
+      return { success: false, message: `Bank verification failed: ${razorpayResult.error}` };
     }
 
     await (prisma as any).bankInformation.update({
@@ -543,9 +550,9 @@ export class BankInformationService {
         void notifySensitiveUpdate(
           userIdNum,
           'Bank update failed',
-          `Your bank account was verified, but payment account setup failed: ${razorpayResult.error}. Please try again or contact support.`,
+          `Verification of your updated bank account failed: ${razorpayResult.error} Please try again or contact support.`,
         );
-        return { success: false, message: `Bank verified but payment account setup failed: ${razorpayResult.error}` };
+        return { success: false, message: `Bank verification failed: ${razorpayResult.error}` };
       }
 
       const updatedEmail = emailChanging ? newEmail : record.razorpay_email;
