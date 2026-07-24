@@ -2,10 +2,23 @@ import { prisma } from "@services/prismaService";
 import { ServiceResponse } from "@utils/ApiResponse";
 import { isValidConstant } from "@services/constantsService";
 import { Log } from '@services/loggerService';
-import { maskUserName } from '@utils/General';
+import { maskUserName, getMaskedName } from '@utils/General';
+import { dispatch } from '@queues/Queue';
+import { NotificationJob } from '../../jobs/NotificationJob';
+import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
+import { appConfig } from '@config/app';
 
 const ACTION_TYPE_PROPOSAL_CONTRACT = 'PROPOSAL_CONTRACT';
 const ACTION_TYPE_BOOKING = 'BOOKING';
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 /**
  * Recalculate and persist the cached avg_rating on the User row.
@@ -173,6 +186,30 @@ export async function createReview(
     if (review_type === 'PUBLIC') {
       await refreshAvgRating(review_to_id);
     }
+
+    // Notify the recipient (in-app + email, both gated by their REVIEW_RECEIVED preferences)
+    const reviewerName = getMaskedName(review.review_from);
+    const context = action_type === ACTION_TYPE_BOOKING ? 'your 1:1 call' : 'your contract';
+    const notificationTitle = review_type === 'PUBLIC'
+      ? `${reviewerName} left you a ${ratingNum}-star review`
+      : `${reviewerName} shared private feedback with you`;
+    const notificationBody = review_type === 'PUBLIC'
+      ? `<p><strong>${escapeHtml(reviewerName)}</strong> rated ${context} <strong>${ratingNum} out of 5</strong>.</p>
+        ${feedback ? `<p>&ldquo;${escapeHtml(feedback)}&rdquo;</p>` : ''}
+        <p>Public reviews appear on your profile.</p>`
+      : `<p><strong>${escapeHtml(reviewerName)}</strong> shared private feedback on ${context}. It is visible only to you.</p>`;
+    const reviewNotificationData = {
+      userId: review_to_id,
+      type: 'REVIEW_RECEIVED' as const,
+      notificationTitle,
+      notificationBody,
+      notificationLink: `${appConfig.frontendUrl}/review?tab=taken`,
+      actorId: reviewFromId,
+      subjectType: 'Review' as const,
+      subjectId: review.id,
+    };
+    await dispatch(NotificationJob, reviewNotificationData);
+    await dispatch(NotificationEmailJob, reviewNotificationData);
 
     return {
       success: true,
