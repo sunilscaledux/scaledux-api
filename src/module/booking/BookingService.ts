@@ -918,6 +918,13 @@ export class BookingService {
             orderBy: { created_at: 'desc' },
             select: { action: true, reason: true, remark: true, acted_by: true, created_at: true },
           },
+          moms: {
+            orderBy: { created_at: 'asc' },
+            select: {
+              content: true, created_at: true, updated_at: true,
+              author: { select: { id: true, first_name: true, last_name: true } },
+            },
+          },
         },
       });
       if (!booking) return { success: false, message: 'Booking not found' };
@@ -961,6 +968,15 @@ export class BookingService {
           rejectedAt: booking.rejected_at ?? null,
           userApprovedAt: booking.user_approved_at ?? null,
           activities: booking.activities,
+          moms: (booking.moms ?? []).map((m: any) => ({
+            content: m.content,
+            createdAt: m.created_at,
+            updatedAt: m.updated_at,
+            addedBy: {
+              id: m.author.id,
+              ...(() => { const dn = getDisplayName(m.author, { maskLastName: true }); return { firstName: dn.firstName, lastName: dn.lastName }; })(),
+            },
+          })),
           createdAt: booking.created_at,
           mentor: {
             id: booking.mentor.id,
@@ -980,6 +996,42 @@ export class BookingService {
     } catch (error: any) {
       Log.error('Get booking error', { error });
       return { success: false, message: error.message || 'Failed to fetch booking' };
+    }
+  }
+
+  /**
+   * Add or update the caller's Minutes of Meeting on a completed booking.
+   * Each party (mentor and founder) keeps their own version.
+   */
+  static async saveMom(userId: number, uniqueId: string, content: string): Promise<ServiceResponse> {
+    try {
+      const text = (content ?? '').trim();
+      if (!text) return { success: false, message: 'Minutes of meeting cannot be empty' };
+      if (text.length > 5000) return { success: false, message: 'Minutes of meeting must be under 5000 characters' };
+
+      const booking = await (prisma as any).booking.findFirst({
+        where: { unique_id: uniqueId, OR: [{ mentor_id: userId }, { user_id: userId }] },
+        select: { id: true, status: true },
+      });
+      if (!booking) return { success: false, message: 'Booking not found' };
+      if (booking.status !== 'COMPLETED') {
+        return { success: false, message: 'Minutes of meeting can be added once the meeting is completed' };
+      }
+
+      const mom = await (prisma as any).bookingMom.upsert({
+        where: { booking_id_user_id: { booking_id: booking.id, user_id: userId } },
+        create: { booking_id: booking.id, user_id: userId, content: text },
+        update: { content: text },
+      });
+
+      return {
+        success: true,
+        message: 'Minutes of meeting saved',
+        data: { mom: { content: mom.content, createdAt: mom.created_at, updatedAt: mom.updated_at } },
+      };
+    } catch (error: any) {
+      Log.error('Save MoM error', { error });
+      return { success: false, message: error.message || 'Failed to save minutes of meeting' };
     }
   }
 

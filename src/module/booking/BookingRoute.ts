@@ -18,5 +18,6 @@ router.post('/:uniqueId/meeting-link', authenticateToken, BookingController.addM
 router.post('/:uniqueId/request-meeting-link', authenticateToken, BookingController.requestMeetingLink);
 router.post('/:uniqueId/complete', authenticateToken, BookingController.completeBooking);
 router.post('/:uniqueId/accept-completion', authenticateToken, BookingController.acceptCompletion);
+router.put('/:uniqueId/mom', authenticateToken, BookingController.saveMom);
 
 export default router;

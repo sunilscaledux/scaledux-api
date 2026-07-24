@@ -97,6 +97,7 @@ model User {
   bookingsAsMentor             Booking[] @relation("BookingMentor")
   bookingsAsUser               Booking[] @relation("BookingUser")
   bookingActivities            BookingActivity[] @relation("BookingActivityActor")
+  bookingMoms                  BookingMom[] @relation("BookingMomAuthor")
   attachmentsOwned              Attachment[] @relation("AttachmentOwner")
   attachmentsUploaded          Attachment[] @relation("AttachmentUploadedBy")
   /** Temporary state token for DigiLocker OAuth callback validation */
@@ -1948,6 +1949,7 @@ model Booking {
   parent                 Booking?          @relation("BookingReschedule", fields: [parent_id], references: [id])
   rescheduled            Booking[]         @relation("BookingReschedule")
   activities             BookingActivity[] @relation("BookingActivities")
+  moms                   BookingMom[]      @relation("BookingMoms")
   billing_transaction    BillingTransaction? @relation("BookingBillingTransaction", fields: [billing_transaction_id], references: [id])
 
   @@index([mentor_id, scheduled_at])
@@ -1955,6 +1957,22 @@ model Booking {
   @@index([status])
   @@index([parent_id])
   @@map("scd_bookings")
+}
+
+/** Minutes of Meeting: each party on a completed booking keeps their own version. */
+model BookingMom {
+  id         Int      @id @default(autoincrement())
+  booking_id Int
+  user_id    Int      // author
+  content    String   @db.Text
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  booking Booking @relation("BookingMoms", fields: [booking_id], references: [id], onDelete: Cascade)
+  author  User    @relation("BookingMomAuthor", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([booking_id, user_id])
+  @@map("scd_booking_moms")
 }
 
 model BookingActivity {

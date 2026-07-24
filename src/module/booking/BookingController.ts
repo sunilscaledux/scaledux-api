@@ -181,6 +181,18 @@ export class BookingController {
     return ApiResponse.error(res, result.message, 400);
   }
 
+  static async saveMom(req: Request, res: Response) {
+    const userId = req.user?.id;
+    if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
+
+    const { content } = req.body;
+    if (typeof content !== 'string') return ApiResponse.error(res, 'content is required', 400);
+
+    const result = await BookingService.saveMom(userId, req.params.uniqueId, content);
+    if (result.success) return ApiResponse.success(res, result.data, result.message);
+    return ApiResponse.error(res, result.message, 400);
+  }
+
   static async requestMeetingLink(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, 'User not authenticated', 401);
