@@ -5,12 +5,12 @@ import { paginated } from '@admin/utils/pagination';
 import { userCard, userCardSelect, resolveImageRef } from '@admin/utils/format';
 import { resolveAdminUrl } from '@admin/utils/attachments';
 
-/** The 3 invoice docs that can hang off a billing transaction (payer receipt / earnings / service). */
+/** The 3 invoice docs that can hang off a billing transaction (platform fee / service fee / service). */
 const INVOICE_SELECT = { select: { file_url: true, invoice_number: true } } as const;
 function txInvoices(t: any) {
   return [
-    t.payer_invoice?.file_url && { type: 'C', label: 'Payment Receipt', url: resolveImageRef(t.payer_invoice.file_url), number: t.payer_invoice.invoice_number },
-    t.receiver_invoice?.file_url && { type: 'B', label: 'Earnings Invoice', url: resolveImageRef(t.receiver_invoice.file_url), number: t.receiver_invoice.invoice_number },
+    t.payer_invoice?.file_url && { type: 'C', label: 'Platform Fee Invoice', url: resolveImageRef(t.payer_invoice.file_url), number: t.payer_invoice.invoice_number },
+    t.receiver_invoice?.file_url && { type: 'B', label: 'Service Fee Invoice', url: resolveImageRef(t.receiver_invoice.file_url), number: t.receiver_invoice.invoice_number },
     t.invoice_a?.file_url && { type: 'A', label: 'Service Invoice', url: resolveImageRef(t.invoice_a.file_url), number: t.invoice_a.invoice_number },
   ].filter(Boolean);
 }
