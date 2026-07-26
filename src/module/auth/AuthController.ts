@@ -39,7 +39,7 @@ import { isDisposableEmail } from "@utils/disposableEmailValidator";
 import * as AuthService from "@module/auth/AuthService";
 import { assertNotReused, recordPasswordChange } from "@module/auth/PasswordHistoryService";
 import { reactivateOnLogin } from "@module/profile/DeactivationService";
-import { normalizeContact, generateKeycode } from '@utils/General';
+import { normalizeContact, generateKeycode, splitFullName, normalizeFullName } from '@utils/General';
 import { notifySensitiveUpdate } from '@utils/sensitiveUpdateNotifier';
 import { Log } from '@services/loggerService';
 import { NotificationService } from '@module/notification/NotificationService';
@@ -126,7 +126,12 @@ export async function register(req: Request, res: Response) {
     );
   }
 
-  const userResult = await createUserAfterOtpVerification(rawBody);
+  // Single full-name field: first word → first_name, rest → last_name
+  const nameParts = value.full_name
+    ? splitFullName(value.full_name)
+    : { first_name: normalizeFullName(value.first_name), last_name: value.last_name ? normalizeFullName(value.last_name) : null };
+
+  const userResult = await createUserAfterOtpVerification({ ...rawBody, ...nameParts });
   if (!userResult.success) {
     return ApiResponse.error(res, userResult.message);
   }

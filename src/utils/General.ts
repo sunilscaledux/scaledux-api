@@ -2,8 +2,29 @@
 import crypto from 'crypto'
 import { appConfig } from '@config/app'
 
+/** Letters and single spaces only — blocks numbers, tags and special characters. */
+export const FULL_NAME_REGEX = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+
+/** Normalize a full name: trim, collapse spaces, capitalize each word's first letter. */
+export function normalizeFullName(fullName: string): string {
+  return fullName
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/** Split a full name: first word → first_name, remaining words → last_name. */
+export function splitFullName(fullName: string): { first_name: string; last_name: string | null } {
+  const words = normalizeFullName(fullName).split(' ').filter(Boolean);
+  const first_name = words.shift() ?? '';
+  return { first_name, last_name: words.length ? words.join(' ') : null };
+}
+
 /** Display name for API: "Scaledux user" when deactivated, else first + middle + last name.
- *  When maskLastName is true, last name is masked (e.g. "S.") and middle name is hidden. */
+ *  When maskLastName is true, last name is masked to the initial of its last word
+ *  (e.g. "Ashok Kumar Mehta" → "Ashok M.") and middle name is hidden. */
 export function getDisplayName(
   user: { first_name: string; middle_name?: string | null; last_name?: string | null; is_deactivated?: boolean },
   options?: { maskLastName?: boolean }
@@ -15,9 +36,10 @@ export function getDisplayName(
   const firstName = [user.first_name, maskLastName ? null : user.middle_name]
     .filter(Boolean)
     .join(' ');
+  const lastWord = user.last_name?.trim().split(/\s+/).pop() ?? '';
   return {
     firstName,
-    lastName: user.last_name ? (maskLastName ? `${user.last_name.charAt(0).toUpperCase()}.` : user.last_name) : null,
+    lastName: user.last_name ? (maskLastName ? `${lastWord.charAt(0).toUpperCase()}.` : user.last_name) : null,
   };
 }
 

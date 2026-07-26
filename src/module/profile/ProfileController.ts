@@ -5,7 +5,7 @@ import { updateSummarySchema, updatePersonalInfoSchema, updateHourlyRateSchema, 
 import { getPublicReviewsByProfileUniqueId } from '../review/ReviewService';
 import { ConnectionService } from '../connection/ConnectionService';
 import { prisma } from '@services/prismaService';
-import { getResubmitWindow } from '@utils/General';
+import { getResubmitWindow, splitFullName } from '@utils/General';
 import { appConfig } from '@config/app';
 
 export class ProfileController {
@@ -404,11 +404,12 @@ export class ProfileController {
       );
     }
 
+    const nameParts = splitFullName(value.full_name);
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
-        first_name: value.first_name,
-        last_name: value.last_name || null,
+        first_name: nameParts.first_name,
+        last_name: nameParts.last_name,
         name_updated_at: new Date(),
       },
       select: { first_name: true, last_name: true, name_updated_at: true },
@@ -433,6 +434,7 @@ export class ProfileController {
     return ApiResponse.success(res, {
       firstName: user?.first_name,
       lastName: user?.last_name,
+      fullName: [user?.first_name, user?.last_name].filter(Boolean).join(' '),
       canEdit: cooldown.canSubmit,
       nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
       cooldownDays: appConfig.verification.nameCooldownDays,

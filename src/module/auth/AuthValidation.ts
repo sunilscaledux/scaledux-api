@@ -18,15 +18,23 @@ const disposableEmailMessage = {
   'string.disposableEmail': 'Disposable or temporary email addresses are not allowed. Please use a permanent email address.',
 };
 
+const FULL_NAME_PATTERN = /^[A-Za-z]+(?:\s+[A-Za-z]+)*$/;
+
 export const registerUserSchema = Joi.object({
-  first_name: Joi.string().min(2).max(50).required().messages({
+  full_name: Joi.string().trim().min(2).max(100).pattern(FULL_NAME_PATTERN).messages({
+    "string.min": "Full name must be at least 2 characters long",
+    "string.max": "Full name must not exceed 100 characters",
+    "string.pattern.base": "Full name can contain only letters and spaces",
+  }),
+  first_name: Joi.string().min(2).max(50).pattern(FULL_NAME_PATTERN).messages({
     "string.min": "First name must be at least 2 characters long",
     "string.max": "First name must not exceed 50 characters",
-    "any.required": "First name is required",
+    "string.pattern.base": "Name can contain only letters and spaces",
   }),
-  last_name: Joi.string().min(2).max(50).optional().allow("").messages({
+  last_name: Joi.string().min(2).max(50).pattern(FULL_NAME_PATTERN).optional().allow("").messages({
     "string.min": "Last name must be at least 2 characters long",
     "string.max": "Last name must not exceed 50 characters",
+    "string.pattern.base": "Name can contain only letters and spaces",
   }),
   identifier: Joi.string().required().custom(rejectDisposableEmail).messages({
     "any.required": "Email or phone number is required",
@@ -39,6 +47,8 @@ export const registerUserSchema = Joi.object({
   }),
   terms: Joi.boolean().optional(),
   notification: Joi.boolean().optional(),
+}).or('full_name', 'first_name').messages({
+  'object.missing': 'Full name is required',
 });
 
 export const loginUserSchema = Joi.object<LoginInput>({

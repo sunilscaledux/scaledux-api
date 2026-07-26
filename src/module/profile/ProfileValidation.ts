@@ -95,13 +95,12 @@ export const setPasswordSchema = Joi.object({
 }).options({ stripUnknown: true });
 
 export const updateNameSchema = Joi.object({
-  first_name: Joi.string().trim().min(1).max(50).required().messages({
-    'string.empty': 'First name is required',
-    'string.max': 'First name must be at most 50 characters',
-  }),
-  last_name: Joi.string().trim().min(1).max(50).required().messages({
-    'string.empty': 'Last name is required',
-    'string.max': 'Last name must be at most 50 characters',
+  full_name: Joi.string().trim().min(2).max(100).pattern(/^[A-Za-z]+(?:\s+[A-Za-z]+)*$/).required().messages({
+    'string.empty': 'Full name is required',
+    'string.min': 'Full name must be at least 2 characters',
+    'string.max': 'Full name must be at most 100 characters',
+    'string.pattern.base': 'Full name can contain only letters and spaces',
+    'any.required': 'Full name is required',
   }),
 });
 
