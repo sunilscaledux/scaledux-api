@@ -3,6 +3,7 @@ import { prisma } from "../../services/prismaService";
 import { ApiResponse } from '@utils/ApiResponse'
 import { getResubmitWindow } from '@utils/General'
 import { appConfig } from '@config/app'
+import { checkNameAgainstVerifiedRecords, NameCheckContext } from './NameCheckService'
 
 /**
  * Get identity verification details. Returns basic details + cooldown info
@@ -48,4 +49,21 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
     nextEditAllowedAt: cooldown.nextSubmitAllowedAt,
     cooldownDays: appConfig.verification.identityCooldownDays,
   }, "Identity verification details retrieved successfully")
+}
+
+/**
+ * Check a typed name against the user's already-verified names (identity document or
+ * agency verification, plus tax information for bank details). Called while typing.
+ */
+export async function checkName(req: Request, res: Response) {
+  const userId = req.user?.id
+  if (!userId) return ApiResponse.error(res, "User not authenticated", 401)
+
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : ''
+  const entityType = req.body?.entityType === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL'
+  const context: NameCheckContext = req.body?.context === 'bank' ? 'bank' : 'tax'
+
+  // Run even with an empty name so the UI learns up front that verification is missing
+  const result = await checkNameAgainstVerifiedRecords(userId, entityType, name, context)
+  return ApiResponse.success(res, result, result.valid ? "Name matches your verified records" : result.message!)
 }

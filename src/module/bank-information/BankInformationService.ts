@@ -7,6 +7,8 @@ import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
+import { isNameMatch } from "@utils/nameMatch";
+import { getNameSources, matchAgainstReferences, anchorMissingMessage } from "@module/verify/NameCheckService";
 
 /** Bank name and account holder name: letters, dots, and spaces only. */
 const BANK_NAME_PATTERN = /^[A-Za-z. ]+$/;
@@ -43,6 +45,30 @@ const friendlyRazorpayError = (raw?: string | null): string => {
   }
 
   return desc || 'Payment account setup failed. Please try again or contact support.';
+};
+
+type TaxGate =
+  | { ok: true; name: string | null; entityLabel: string }
+  | { ok: false; message: string };
+
+/**
+ * Bank details depend on tax information: the PAN is sent to Razorpay Route and the
+ * account holder name is matched against the PAN-verified name.
+ */
+const requireVerifiedTaxInformation = async (userId: number, entityType: string): Promise<TaxGate> => {
+  const entityLabel = entityType === 'AGENCY' ? 'company / agency' : 'individual';
+  const taxInfo = await (prisma as any).taxInformation.findFirst({
+    where: { user_id: userId, entity_type: entityType },
+    select: { name: true, pan_number: true, gstin_status: true },
+  });
+
+  if (!taxInfo?.pan_number || taxInfo.gstin_status !== 'VERIFIED') {
+    return {
+      ok: false,
+      message: `Please add and verify your ${entityLabel} tax information (PAN) before adding or updating bank details.`,
+    };
+  }
+  return { ok: true, name: taxInfo.name || null, entityLabel };
 };
 
 export class BankInformationService {
@@ -237,6 +263,10 @@ export class BankInformationService {
 
     const entityType = data.entityType || 'INDIVIDUAL';
 
+    // ── Tax information gate ──
+    const taxGate = await requireVerifiedTaxInformation(userIdNum, entityType);
+    if (!taxGate.ok) return { success: false, message: taxGate.message };
+
     // ── Email OTP verification ──
     if (!data.otpCode?.trim()) {
       return { success: false, message: 'Email OTP is required. Please verify your email first.' };
@@ -291,7 +321,7 @@ export class BankInformationService {
     }
     const accountNumberLast4 = accountNumber.slice(-4);
 
-    let accountHolderName = cleanedHolderName || null;
+    let accountHolderName = cleanedHolderName || taxGate.name || null;
     if (!accountHolderName) {
       const user = await prisma.user.findUnique({
         where: { id: userIdNum },
@@ -299,6 +329,12 @@ export class BankInformationService {
       });
       accountHolderName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim() || data.displayLabel;
     }
+
+    // Reject a mismatched name before spending a paid verification call
+    const { anchor, refs: references } = await getNameSources(userIdNum, entityType, 'bank');
+    if (!anchor) return { success: false, message: anchorMissingMessage(entityType) };
+    const preCheck = matchAgainstReferences(accountHolderName, references);
+    if (!preCheck.valid) return { success: false, message: preCheck.message! };
 
     // Verify via IDtoAI pennyless bank verification
     if (!isIdtoaiConfigured()) {
@@ -312,19 +348,21 @@ export class BankInformationService {
     }
 
     // Validate account holder name matches bank records
-    if (accountHolderName && verification.accountHolderName) {
-      const submittedName = accountHolderName.trim().replace(/\s+/g, ' ').toLowerCase();
-      const bankName = verification.accountHolderName.trim().replace(/\s+/g, ' ').toLowerCase();
-      if (submittedName && bankName && !bankName.includes(submittedName) && !submittedName.includes(bankName)) {
-        return {
-          success: false,
-          message: 'Account holder name does not match bank records. Please enter the name exactly as registered with your bank.'
-        };
-      }
+    if (!isNameMatch(accountHolderName, verification.accountHolderName)) {
+      return {
+        success: false,
+        message: 'Account holder name does not match bank records. Please enter the name exactly as registered with your bank.'
+      };
     }
 
     // Use verified account holder name from bank if available
     const verifiedName = verification.accountHolderName || accountHolderName;
+
+    // The name the bank holds must also match PAN and identity records
+    const verifiedCheck = matchAgainstReferences(
+      verifiedName, references, `This bank account, registered to "${verifiedName}",`,
+    );
+    if (!verifiedCheck.valid) return { success: false, message: verifiedCheck.message! };
     const verifiedBankName = verification.bankName || cleanedBankName || null;
 
     // Create Razorpay Route linked account BEFORE saving bank info
@@ -390,6 +428,9 @@ export class BankInformationService {
       return { success: false, message: 'Only failed verification can be resubmitted.' };
     }
 
+    const taxGate = await requireVerifiedTaxInformation(userIdNum, record.entity_type);
+    if (!taxGate.ok) return { success: false, message: taxGate.message };
+
     if (!isIdtoaiConfigured()) {
       return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
     }
@@ -409,6 +450,14 @@ export class BankInformationService {
       }).catch(() => {});
       return { success: false, message: reason };
     }
+
+    const resubmitName = verification.accountHolderName || record.account_holder_name;
+    const { anchor: resubmitAnchor, refs: resubmitRefs } = await getNameSources(userIdNum, record.entity_type, 'bank');
+    if (!resubmitAnchor) return { success: false, message: anchorMissingMessage(record.entity_type) };
+    const resubmitCheck = matchAgainstReferences(
+      resubmitName, resubmitRefs, `This bank account, registered to "${resubmitName}",`,
+    );
+    if (!resubmitCheck.valid) return { success: false, message: resubmitCheck.message! };
 
     // Re-create Razorpay Route linked account before saving
     const razorpayResult = await BankInformationService.ensureRazorpayLinkedAccount(userIdNum, record.entity_type, {
@@ -460,6 +509,10 @@ export class BankInformationService {
       return { success: false, message: 'Bank information not found.' };
     }
 
+    // ── Tax information gate ──
+    const taxGate = await requireVerifiedTaxInformation(userIdNum, record.entity_type);
+    if (!taxGate.ok) return { success: false, message: taxGate.message };
+
     // ── 15-day cooldown check ──
     if (record.verification_status === 'verified' && record.verified_at) {
       const cooldown = getResubmitWindow(record.verified_at, appConfig.verification.bankCooldownDays);
@@ -503,6 +556,10 @@ export class BankInformationService {
       return { success: false, message: 'Account holder name can only contain letters and spaces' };
     }
     const accountHolderName = incomingHolderName ?? record.account_holder_name;
+    const { anchor, refs: references } = await getNameSources(userIdNum, record.entity_type, 'bank');
+    if (!anchor) return { success: false, message: anchorMissingMessage(record.entity_type) };
+    const holderCheck = matchAgainstReferences(accountHolderName, references);
+    if (!holderCheck.valid) return { success: false, message: holderCheck.message! };
 
     const incomingBankName = data.bankName != null ? cleanName(data.bankName) : null;
     if (incomingBankName && !BANK_NAME_PATTERN.test(incomingBankName)) {
@@ -535,7 +592,19 @@ export class BankInformationService {
         return { success: false, message: reason };
       }
 
+      if (!isNameMatch(accountHolderName, verification.accountHolderName)) {
+        return {
+          success: false,
+          message: 'Account holder name does not match bank records. Please enter the name exactly as registered with your bank.'
+        };
+      }
+
       const verifiedName = verification.accountHolderName || accountHolderName;
+      const verifiedCheck = matchAgainstReferences(
+        verifiedName, references, `This bank account, registered to "${verifiedName}",`,
+      );
+      if (!verifiedCheck.valid) return { success: false, message: verifiedCheck.message! };
+
       const verifiedBankName = verification.bankName || bankName;
       const accountNumberLast4 = accountNumber.slice(-4);
 
@@ -600,6 +669,31 @@ export class BankInformationService {
     };
   }
 
+  /** Flatten TaxInformation.tax_residence into a Razorpay address, resolving the stored state id to its name. */
+  private static async resolveTaxAddress(taxResidence: any): Promise<{
+    street1?: string; street2?: string; city?: string; state?: string; postalCode?: string;
+  }> {
+    if (!taxResidence || typeof taxResidence !== 'object') return {};
+
+    const trimmed = (v: any) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+    let state = trimmed(taxResidence.state);
+    if (state && /^\d+$/.test(state)) {
+      const row = await prisma.state.findUnique({
+        where: { id: parseInt(state, 10) },
+        select: { name: true },
+      }).catch(() => null);
+      state = row?.name || undefined;
+    }
+
+    return {
+      street1: trimmed(taxResidence.addressLine1),
+      street2: trimmed(taxResidence.addressLine2),
+      city: trimmed(taxResidence.city),
+      state,
+      postalCode: trimmed(taxResidence.zipCode),
+    };
+  }
+
   /**
    * Create Razorpay Route linked account after bank verification
    * and store the account ID on the user so Route transfers work for bookings/proposals.
@@ -642,34 +736,43 @@ export class BankInformationService {
       }
       const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;
 
-      // Fetch PAN from tax information
+      // PAN, legal name and tax residence address all come from the PAN-verified tax record
       const taxInfo = await (prisma as any).taxInformation.findFirst({
         where: { user_id: userId, entity_type: entityType },
-        select: { pan_number: true }
+        select: { pan_number: true, name: true, tax_residence: true }
       });
 
-      const fullName = bank.name || [user.first_name, user.last_name].filter(Boolean).join(' ') || 'User';
+      const taxAddress = await BankInformationService.resolveTaxAddress(taxInfo?.tax_residence);
       const info = user.personalInfo;
       const pan = taxInfo?.pan_number || undefined;
+      const legalName = taxInfo?.name
+        || bank.name
+        || [user.first_name, user.last_name].filter(Boolean).join(' ')
+        || 'User';
 
-      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType}), name: ${fullName}`);
+      // Tax residence is authoritative; profile address only fills gaps left by optional tax fields
+      const address = {
+        street1: taxAddress.street1 || info?.address || undefined,
+        street2: taxAddress.street2 || info?.address_line_2 || undefined,
+        city: taxAddress.city || info?.city || undefined,
+        state: taxAddress.state || info?.state?.name || undefined,
+        postalCode: taxAddress.postalCode || info?.zipCode || undefined,
+      };
+
+      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType}), name: ${legalName}`, {
+        addressSource: taxAddress.postalCode ? 'tax_information' : 'personal_info',
+      });
 
       const result = await createRouteLinkedAccount({
         email: emailForRazorpay,
         phone: user?.phone || undefined,
-        legalBusinessName: fullName,
+        legalBusinessName: legalName,
         businessType: isAgency ? 'not_yet_registered' : 'individual',
         pan,
         existingAccountId: existingId || undefined,
-        address: info ? {
-          street1: info.address || undefined,
-          street2: info.address_line_2 || undefined,
-          city: info.city || undefined,
-          state: info.state?.name || undefined,
-          postalCode: info.zipCode || undefined,
-        } : undefined,
-        stakeholder: { name: fullName, email: emailForRazorpay, phone: user?.phone || undefined, pan },
-        bankAccount: { name: fullName, ifsc: bank.ifsc, accountNumber: bank.accountNumber },
+        address,
+        stakeholder: { name: legalName, email: emailForRazorpay, phone: user?.phone || undefined, pan },
+        bankAccount: { name: bank.name || legalName, ifsc: bank.ifsc, accountNumber: bank.accountNumber },
       });
 
       if (!existingId) {

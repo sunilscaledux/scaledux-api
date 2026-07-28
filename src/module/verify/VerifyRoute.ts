@@ -9,6 +9,7 @@ import {
 } from "./EmailVerifyController"
 import {
   getIdentityVerificationDetails,
+  checkName,
 } from "./IdentityVerifyController"
 import {
   submitAgencyVerification,
@@ -39,6 +40,9 @@ router.post("/email/send-otp", createRateLimiter(10 * 60, 5), authenticateToken,
 router.post("/email/verify-otp", createRateLimiter(15 * 60, 15), authenticateToken, verifyEmailOTP)
 
 router.get("/identity/details", authenticateToken, getIdentityVerificationDetails)
+
+// Debounced while-typing name check against verified records. Read-only, so a loose limit.
+router.post("/name/check", createRateLimiter(60, 60), authenticateToken, checkName)
 
 // DigiLocker (Aadhaar via IDtoAI)
 router.post("/digilocker/initiate", authenticateToken, verifyLimit, initiateDigilocker)

@@ -5,6 +5,8 @@ import { verifyPAN, validatePanWithGSTIN, isConfigured as isIdtoaiConfigured } f
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
+import { isNameMatch } from "@utils/nameMatch";
+import { checkNameAgainstVerifiedRecords } from "@module/verify/NameCheckService";
 
 export class TaxInformationService {
 
@@ -46,6 +48,12 @@ export class TaxInformationService {
       return { success: false, message: "PAN number is required." };
     }
 
+    // Name must match the identity / agency document before spending a PAN verification call
+    const identityCheck = await checkNameAgainstVerifiedRecords(userIdNum, entityType, name || '', 'tax');
+    if (!identityCheck.valid) {
+      return { success: false, message: identityCheck.message! };
+    }
+
     // ── PAN verification ──
     if (!isIdtoaiConfigured()) {
       return { success: false, message: "PAN verification service is temporarily unavailable. Please try again later." };
@@ -57,12 +65,8 @@ export class TaxInformationService {
     }
 
     // Match name with PAN
-    if (panResult.full_name && name) {
-      const panName = panResult.full_name.trim().toLowerCase();
-      const userName = name.trim().toLowerCase();
-      if (panName && userName && !panName.includes(userName) && !userName.includes(panName)) {
-        return { success: false, message: `Name does not match PAN. PAN is registered to "${panResult.full_name}". Please ensure your ${entityLabel} name matches your PAN.` };
-      }
+    if (!isNameMatch(name, panResult.full_name)) {
+      return { success: false, message: `Name does not match PAN. PAN is registered to "${panResult.full_name}". Please ensure your ${entityLabel} name matches your PAN.` };
     }
 
     // ── GSTIN validation (local only, no API verification) ──
