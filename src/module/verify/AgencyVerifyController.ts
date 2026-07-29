@@ -10,6 +10,7 @@ import { Log } from '@services/loggerService';
 import { appConfig } from '@config/app';
 import { getResubmitWindow } from '@utils/General';
 import { verifyCIN, isConfigured as isIdtoaiConfigured } from '@services/idtoaiService';
+import { maskTail } from '@utils/redact';
 
 
 
@@ -76,7 +77,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
     }
   }
 
-  Log.info(`[agency-verify] CIN ${cin} verified for user ${userId}`)
+  Log.info(`[agency-verify] CIN ${maskTail(cin)} verified for user ${userId}`)
 
   // Verified, save
   const existingVerification = await prisma.agencyVerification.findFirst({

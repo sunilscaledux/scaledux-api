@@ -12,6 +12,7 @@ import { updateCompletionSection } from "../profile/ProfileCompletionService";
 import crypto from "crypto";
 import { getResubmitWindow } from "@utils/General";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
+import { encryptPii, identityImageContext } from "@utils/crypto";
 
 import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
@@ -125,7 +126,7 @@ export async function completeDigilocker(req: Request, res: Response) {
       expiryDate: dlResult.expiryDate,
       vehicleClasses: dlResult.vehicleClasses,
       address: dlResult.address,
-      image: dlResult.image,
+      image: dlResult.image ? encryptPii(dlResult.image, identityImageContext(userId)) : "",
       verifiedVia: "digilocker",
       verifiedAt: new Date().toISOString(),
     };
@@ -152,7 +153,7 @@ export async function completeDigilocker(req: Request, res: Response) {
       await prisma.identityVerification.create({ data: verificationData });
     }
 
-    Log.info(`[digilocker][${uid}] DL verified & saved, dlNumber: ${dlResult.dlNumber}`);
+    Log.info(`[digilocker][${uid}] DL verified & saved`);
 
     void notifySensitiveUpdate(
       userId,
@@ -187,7 +188,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     gender: aadhaar.gender,
     aadhaarUid: aadhaar.aadhaarUid,
     address: aadhaar.address,
-    image: aadhaar.image,
+    image: aadhaar.image ? encryptPii(aadhaar.image, identityImageContext(userId)) : "",
     verifiedVia: "digilocker",
     verifiedAt: new Date().toISOString(),
   };
@@ -224,7 +225,7 @@ export async function completeDigilocker(req: Request, res: Response) {
   });
   await updateCompletionSection(userId, "identityVerification", true);
 
-  Log.info(`[digilocker][${uid}] Aadhaar verified & saved, name: ${aadhaar.name}`);
+  Log.info(`[digilocker][${uid}] Aadhaar verified & saved`);
 
   void notifySensitiveUpdate(
     userId,

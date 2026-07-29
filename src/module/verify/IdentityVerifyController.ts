@@ -4,6 +4,8 @@ import { ApiResponse } from '@utils/ApiResponse'
 import { getResubmitWindow } from '@utils/General'
 import { appConfig } from '@config/app'
 import { checkNameAgainstVerifiedRecords, NameCheckContext } from './NameCheckService'
+import { decryptPii, identityImageContext } from '@utils/crypto'
+import { Log } from '@services/loggerService'
 
 /**
  * Get identity verification details. Returns basic details + cooldown info
@@ -31,6 +33,14 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
   const cooldown = getResubmitWindow(verification.verified_at, appConfig.verification.identityCooldownDays)
   const meta = verification.meta_data as any
 
+  // Photo is stored encrypted; a decrypt failure must not take the whole page down
+  let image: string | null = null
+  try {
+    image = meta?.image ? decryptPii(meta.image, identityImageContext(verification.user_id)) : null
+  } catch (err: any) {
+    Log.error(`[identity] Could not decrypt document photo for user ${verification.user_id}`, { message: err?.message })
+  }
+
   return ApiResponse.success(res, {
     id: verification.id,
     verificationType: verification.verification_type,
@@ -41,7 +51,7 @@ export async function getIdentityVerificationDetails(req: Request, res: Response
     name: meta?.name || null,
     dob: meta?.dob || null,
     gender: meta?.gender || null,
-    image: meta?.image || null,
+    image,
     submittedAt: verification.submitted_at,
     verifiedAt: verification.verified_at,
     rejectionReason: verification.rejection_reason,

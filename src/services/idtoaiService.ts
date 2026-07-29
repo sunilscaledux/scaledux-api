@@ -7,6 +7,7 @@ import axios from "axios";
 import { XMLParser } from "fast-xml-parser";
 import { Log } from "@services/loggerService";
 import idtoaiConfig from "@config/idtoai";
+import { maskTail, maskIfsc, safeErrorData } from "@utils/redact";
 
 /** Extract a human-readable error string from IDtoAI error responses.
  *  `detail` can be a string, an object with `msg`, or an array of `{msg}` objects. */
@@ -76,7 +77,7 @@ export async function verifyPAN(panNumber: string, uniqueId?: string): Promise<P
     const status = error.response?.status;
     const data = error.response?.data;
     if (status) {
-      Log.error(`${tag} PAN API error`, { status, data });
+      Log.error(`${tag} PAN API error`, { status, data: safeErrorData(data) });
       return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} PAN request failed`, { error: error.message });
@@ -163,7 +164,7 @@ export async function verifyCIN(cinNumber: string, uniqueId?: string): Promise<C
     const status = error.response?.status;
     const errData = error.response?.data;
     if (status) {
-      Log.error(`${tag} CIN API error`, { status, data: errData });
+      Log.error(`${tag} CIN API error`, { status, data: safeErrorData(errData) });
       return { success: false, error: parseApiError(errData, `API returned ${status}`), raw: errData };
     }
     Log.error(`${tag} CIN request failed`, { error: error.message });
@@ -205,9 +206,12 @@ export async function verifyBankAccount(
       account_number: accountNumber,
       ifsc_code: ifsc.toUpperCase(),
     };
-    Log.info(`${tag} Bank verification request`, { url: idtoaiConfig.bankVerificationUrl, payload });
+    Log.info(`${tag} Bank verification request`, {
+      url: idtoaiConfig.bankVerificationUrl,
+      account: maskTail(accountNumber),
+      ifsc: maskIfsc(payload.ifsc_code),
+    });
     const response = await axios.post(idtoaiConfig.bankVerificationUrl, payload, { headers: idtoaiConfig.headers });
-    Log.info(`${tag} Bank verification response`, { data: JSON.stringify(response.data) });
 
     const data = response.data;
     const resp = data.response || data;
@@ -237,7 +241,7 @@ export async function verifyBankAccount(
       };
     }
 
-    Log.info(`${tag} Bank verified: holder=${result.account_holder_name || result.full_name || result.user}, status=${status}`);
+    Log.info(`${tag} Bank verified`, { status, holder_returned: !!(result.account_holder_name || result.full_name || result.user) });
 
     return {
       success: true,
@@ -253,7 +257,7 @@ export async function verifyBankAccount(
     const errStatus = error.response?.status;
     const errData = error.response?.data;
     if (errStatus) {
-      Log.error(`${tag} Bank verification error`, { status: errStatus, data: JSON.stringify(errData) });
+      Log.error(`${tag} Bank verification error`, { status: errStatus, data: safeErrorData(errData) });
       return { success: false, error: parseApiError(errData, `API returned ${errStatus}`), raw: errData };
     }
     Log.error(`${tag} Bank verification failed`, { error: error.message });
@@ -320,13 +324,13 @@ export async function digilockerInitiateSession(
       return { success: true, authUrl, raw: data };
     }
 
-    Log.error(`${tag} DigiLocker initiate, no auth_url`, { data });
+    Log.error(`${tag} DigiLocker initiate, no auth_url`, { data: safeErrorData(data) });
     return { success: false, error: data.message || "Failed to initiate DigiLocker session", raw: data };
   } catch (error: any) {
     const status = error.response?.status;
     const data = error.response?.data;
     if (status) {
-      Log.error(`${tag} DigiLocker initiate error`, { status, data });
+      Log.error(`${tag} DigiLocker initiate error`, { status, data: safeErrorData(data) });
       return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker initiate failed`, { error: error.message });
@@ -357,13 +361,13 @@ export async function digilockerGetReference(
       return { success: true, referenceKey: result.reference_key, raw: data };
     }
 
-    Log.error(`${tag} DigiLocker get_reference, no reference_key`, { data });
+    Log.error(`${tag} DigiLocker get_reference, no reference_key`, { data: safeErrorData(data) });
     return { success: false, error: result.message || "Failed to get reference key", raw: data };
   } catch (error: any) {
     const status = error.response?.status;
     const data = error.response?.data;
     if (status) {
-      Log.error(`${tag} DigiLocker get_reference error`, { status, data });
+      Log.error(`${tag} DigiLocker get_reference error`, { status, data: safeErrorData(data) });
       return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker get_reference failed`, { error: error.message });
@@ -430,7 +434,10 @@ export async function digilockerFetchAadhaar(
       postOffice: poa.po || '',
     };
 
-    Log.info(`${tag} Parsed: name=${name}, dob=${dob}, gender=${gender}, uid=${aadhaarUid}, state=${address.state}, district=${address.district}`);
+    Log.info(`${tag} Aadhaar parsed`, {
+      hasName: !!name, hasDob: !!dob, hasAddress: !!address.state, hasPhoto: !!pht,
+      uid: maskTail(String(aadhaarUid)),
+    });
 
     return {
       success: true,
@@ -446,7 +453,7 @@ export async function digilockerFetchAadhaar(
     const status = error.response?.status;
     const data = error.response?.data;
     if (status) {
-      Log.error(`${tag} DigiLocker fetch_aadhaar error`, { status, data });
+      Log.error(`${tag} DigiLocker fetch_aadhaar error`, { status, data: safeErrorData(data) });
       return { success: false, error: parseApiError(data, `API returned ${status}`), raw: data };
     }
     Log.error(`${tag} DigiLocker fetch_aadhaar failed`, { error: error.message });
@@ -497,7 +504,7 @@ export async function digilockerFetchDrivingLicence(
     const image = result.image || result.photo || '';
     const address = result.address || {};
 
-    Log.info(`${tag} DL fetched: name=${name}, dlNumber=${dlNumber}, expiry=${expiryDate}`);
+    Log.info(`${tag} DL fetched`, { hasName: !!name, dlNumber: maskTail(dlNumber), expiry: expiryDate });
 
     return {
       success: true,
@@ -515,7 +522,7 @@ export async function digilockerFetchDrivingLicence(
     const status = error.response?.status;
     const errData = error.response?.data;
     if (status) {
-      Log.error(`${tag} DigiLocker fetch_driving_licence error`, { status, data: errData });
+      Log.error(`${tag} DigiLocker fetch_driving_licence error`, { status, data: safeErrorData(errData) });
       return { success: false, error: parseApiError(errData, `API returned ${status}`), raw: errData };
     }
     Log.error(`${tag} DigiLocker fetch_driving_licence failed`, { error: error.message });

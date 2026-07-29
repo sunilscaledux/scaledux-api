@@ -379,7 +379,7 @@ export class BankInformationService {
 
     const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
     if (!verification.success) {
-      Log.error(`Bank verification failed for user ${userIdNum}`, { error: verification.error, raw: JSON.stringify(verification.raw) });
+      Log.error(`Bank verification failed for user ${userIdNum}`, { error: verification.error });
       return { success: false, message: verification.error || 'Bank account verification failed. Please check your details.' };
     }
 
@@ -793,7 +793,7 @@ export class BankInformationService {
         postalCode: taxAddress.postalCode || info?.zipCode || undefined,
       };
 
-      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType}), name: ${legalName}`, {
+      Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType})`, {
         addressSource: taxAddress.postalCode ? 'tax_information' : 'personal_info',
       });
 

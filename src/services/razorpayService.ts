@@ -343,9 +343,11 @@ export async function createRouteLinkedAccount(params: {
         // Stakeholder exists. Fetch and update with latest KYC/details
         try {
           const listRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders`, { headers });
-          Log.info(`[createRouteLinkedAccount] Stakeholders fetch response`, { data: JSON.stringify(listRes.data) });
           // Handle both { items: [...] } and direct array response formats
           const items = listRes.data?.items || listRes.data;
+          Log.info(`[createRouteLinkedAccount] Stakeholders fetched for ${accountId}`, {
+            count: Array.isArray(items) ? items.length : 0,
+          });
           const existing = Array.isArray(items) ? items[0] : null;
           if (existing?.id) {
             await axios.patch(`https://api.razorpay.com/v2/accounts/${accountId}/stakeholders/${existing.id}`, stakeholderBody, { headers });
@@ -392,7 +394,7 @@ export async function createRouteLinkedAccount(params: {
             const accRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}`, { headers });
             Log.info(`[createRouteLinkedAccount] Account fetch response for product lookup`, {
               activatedProducts: JSON.stringify(accRes.data?.activated_products),
-              products: JSON.stringify(accRes.data?.products),
+              productNames: Object.keys(accRes.data?.products || {}).join(','),
             });
             // Try various response formats Razorpay might use
             const products = accRes.data?.products;
@@ -413,8 +415,10 @@ export async function createRouteLinkedAccount(params: {
         if (!productId) {
           try {
             const prodListRes = await axios.get(`https://api.razorpay.com/v2/accounts/${accountId}/products`, { headers });
-            Log.info(`[createRouteLinkedAccount] Products list response`, { data: JSON.stringify(prodListRes.data) });
             const items = prodListRes.data?.items || prodListRes.data;
+            Log.info(`[createRouteLinkedAccount] Products listed for ${accountId}`, {
+              productNames: Array.isArray(items) ? items.map((p: any) => p.product_name).join(',') : '',
+            });
             const routeProduct = Array.isArray(items)
               ? items.find((p: any) => p.product_name === "route")
               : null;
@@ -444,7 +448,7 @@ export async function createRouteLinkedAccount(params: {
         tnc_accepted: true,
       }, { headers });
       Log.info(`[createRouteLinkedAccount] Product ${productId} updated with bank details for ${accountId}`, {
-        activeConfig: JSON.stringify(patchRes.data?.active_configuration),
+        settlementsConfigured: !!patchRes.data?.active_configuration?.settlements,
         requirements: JSON.stringify(patchRes.data?.requirements),
         activationStatus: patchRes.data?.activation_status,
       });
