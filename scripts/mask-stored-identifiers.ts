@@ -8,7 +8,7 @@
  *   npx tsx scripts/mask-stored-identifiers.ts --apply  # write
  */
 import { PrismaClient, Prisma } from "@prisma/client";
-import { maskTail, maskPan, maskGstin, isMasked } from "../src/utils/redact";
+import { maskTail, maskIfsc, maskPan, maskGstin, isMasked } from "../src/utils/redact";
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes("--apply");
@@ -97,11 +97,36 @@ async function maskTaxInformation() {
   console.log(`tax_information: masked ${pending.length}`);
 }
 
+/** Account number and IFSC keep only their masked forms; last4 already lives in its own column. */
+async function maskBankInformation() {
+  const rows = await prisma.bankInformation.findMany({
+    select: { id: true, account_number: true, ifsc: true },
+  });
+
+  const pending = rows.filter(
+    (r) => (r.account_number && !isMasked(r.account_number)) || (r.ifsc && !isMasked(r.ifsc))
+  );
+  console.log(`bank_information: ${pending.length} of ${rows.length} still hold a full account number or IFSC`);
+
+  if (!APPLY) return;
+  for (const row of pending) {
+    await prisma.bankInformation.update({
+      where: { id: row.id },
+      data: {
+        account_number: row.account_number ? maskTail(row.account_number) : row.account_number,
+        ifsc: row.ifsc ? maskIfsc(row.ifsc) : row.ifsc,
+      },
+    });
+  }
+  console.log(`bank_information: masked ${pending.length}`);
+}
+
 async function main() {
   console.log(APPLY ? "Applying changes.\n" : "Dry run. Re-run with --apply to write.\n");
   await maskAgencyCins();
   await maskIdentityMetaData();
   await maskTaxInformation();
+  await maskBankInformation();
 }
 
 main()

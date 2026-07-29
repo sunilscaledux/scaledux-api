@@ -8,7 +8,7 @@ import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
 import { isNameMatch } from "@utils/nameMatch";
-import { maskPan } from "@utils/redact";
+import { maskPan, maskTail, maskIfsc } from "@utils/redact";
 import { getNameSources, matchAgainstReferences, anchorMissingMessage } from "@module/verify/NameCheckService";
 
 /** Bank name and account holder name: letters, dots, and spaces only. */
@@ -462,10 +462,10 @@ export class BankInformationService {
         entity_type: entityType,
         display_label: data.displayLabel,
         bank_name: verifiedBankName,
-        account_number: accountNumber,
+        account_number: maskTail(accountNumber),
         account_number_last4: accountNumberLast4,
         account_holder_name: verifiedName,
-        ifsc,
+        ifsc: maskIfsc(ifsc),
         razorpay_email: razorpayEmail,
         razorpay_product_id: razorpayResult.productId || null,
         razorpay_activation_status: razorpayResult.activationStatus === 'activated' ? 'activated' : 'in_review',
@@ -487,7 +487,12 @@ export class BankInformationService {
     };
   }
 
-  static async resubmitForVerification(userId: string, entityType?: string, panNumber?: string): Promise<{ success: boolean; message: string; data?: any }> {
+  static async resubmitForVerification(
+    userId: string,
+    entityType?: string,
+    panNumber?: string,
+    bank?: { accountNumber?: string; ifsc?: string },
+  ): Promise<{ success: boolean; message: string; data?: any }> {
     const userIdNum = parseInt(userId);
     const where: any = { user_id: userIdNum };
     if (entityType) where.entity_type = entityType;
@@ -509,10 +514,14 @@ export class BankInformationService {
       return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
     }
 
-    const accountNumber = (record.account_number || '').trim();
-    const ifsc = (record.ifsc || '').trim().toUpperCase();
+    // Stored masked, so the account has to be re-entered to be re-verified
+    const accountNumber = (bank?.accountNumber || '').replace(/\D/g, '').trim();
+    const ifsc = (bank?.ifsc || '').trim().toUpperCase();
     if (!accountNumber || accountNumber.length < 9 || !ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-      return { success: false, message: 'Missing or invalid account number or IFSC. Please edit your bank details and try again.' };
+      return { success: false, message: 'Please enter your account number and IFSC again to resubmit. We only keep them masked.' };
+    }
+    if (record.account_number_last4 && accountNumber.slice(-4) !== record.account_number_last4) {
+      return { success: false, message: 'This account number does not match the one on file. Edit your bank details instead to change the account.' };
     }
 
     const verification = await verifyBankAccount(accountNumber, ifsc, String(userIdNum));
@@ -615,12 +624,10 @@ export class BankInformationService {
       }
     }
 
-    const ifsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : record.ifsc;
-    if (ifsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-      return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
-    }
-
-    const newAccountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : null;
+    // Account number and IFSC are stored masked, so re-verification cannot fall back
+    // to the record: supplying either means both have to be entered again in full.
+    const submittedIfsc = data.ifsc != null ? String(data.ifsc).trim().toUpperCase() : '';
+    const submittedAccountNumber = data.accountNumber != null ? data.accountNumber.replace(/\D/g, '').trim() : '';
     const displayLabel = data.displayLabel?.trim() ?? record.display_label;
 
     const incomingHolderName = data.accountHolderName != null ? cleanName(data.accountHolderName) : null;
@@ -639,15 +646,22 @@ export class BankInformationService {
     }
     const bankName = incomingBankName ?? record.bank_name;
 
-    // Check if account number or IFSC changed. Only re-verify if they did
-    const accountChanged = newAccountNumber && newAccountNumber !== record.account_number;
-    const ifscChanged = ifsc !== record.ifsc;
-    const needsReverification = accountChanged || ifscChanged;
+    const needsReverification = !!submittedAccountNumber || !!submittedIfsc;
 
     if (needsReverification) {
-      const accountNumber = newAccountNumber || record.account_number;
-      if (!accountNumber || accountNumber.length < 9) {
+      if (!submittedAccountNumber || !submittedIfsc) {
+        return {
+          success: false,
+          message: 'Both account number and IFSC are needed to re-verify. We only keep them masked, so please enter both again.',
+        };
+      }
+      const accountNumber = submittedAccountNumber;
+      const ifsc = submittedIfsc;
+      if (accountNumber.length < 9) {
         return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
+      }
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+        return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
       }
 
       // Only re-verification reaches Razorpay, so the PAN is only needed on this branch
@@ -704,8 +718,8 @@ export class BankInformationService {
       const newActivationStatus = razorpayResult.activationStatus === 'activated' ? 'activated' : 'in_review';
       await prisma.$executeRaw`
         UPDATE scd_bank_information
-        SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${accountNumber},
-            account_number_last4 = ${accountNumberLast4}, ifsc = ${ifsc},
+        SET display_label = ${displayLabel}, bank_name = ${verifiedBankName}, account_number = ${maskTail(accountNumber)},
+            account_number_last4 = ${accountNumberLast4}, ifsc = ${maskIfsc(ifsc)},
             account_holder_name = ${verifiedName}, razorpay_email = ${updatedEmail},
             razorpay_product_id = ${razorpayResult.productId || null},
             razorpay_activation_status = ${newActivationStatus},
