@@ -47,6 +47,55 @@ const friendlyRazorpayError = (raw?: string | null): string => {
   return desc || 'Payment account setup failed. Please try again or contact support.';
 };
 
+const entityLabel = (entityType: string) =>
+  entityType === 'AGENCY' ? 'company / agency' : 'individual';
+
+/**
+ * Razorpay Route refuses a second linked account on an email that already has one,
+ * so individual and agency bank details must each use a different email.
+ * Returns a user-facing message when the email can't be used, otherwise null.
+ */
+const emailUnavailableReason = async (
+  userId: number,
+  email: string,
+  entityType: string,
+): Promise<string | null> => {
+  const otherUser = await (prisma as any).bankInformation.findFirst({
+    where: { razorpay_email: email, user_id: { not: userId } },
+    select: { id: true },
+  });
+  if (otherUser) {
+    return 'This email is already linked to another account. Please use a different email.';
+  }
+
+  const ownOtherEntity = await (prisma as any).bankInformation.findFirst({
+    where: { user_id: userId, razorpay_email: email, entity_type: { not: entityType } },
+    select: { entity_type: true },
+  });
+  if (ownOtherEntity) {
+    return `This email is already used for your ${entityLabel(ownOtherEntity.entity_type)} bank account. The payment provider does not allow two payment accounts on the same email, so please use a different email for your ${entityLabel(entityType)} bank account.`;
+  }
+
+  if (!isRazorpayConfigured()) return null;
+
+  const razorpayStatus = await checkRazorpayEmailStatus(email);
+  if (razorpayStatus.status === 'suspended') {
+    return 'This email has a suspended payment account on ScaleDux. Please use a different email to add your bank account.';
+  }
+  if (razorpayStatus.status === 'active') {
+    const user = await (prisma as any).user.findUnique({
+      where: { id: userId },
+      select: { razorpay_account_id: true, razorpay_agency_account_id: true },
+    });
+    const ownAccountId = entityType === 'AGENCY' ? user?.razorpay_agency_account_id : user?.razorpay_account_id;
+    if (ownAccountId !== razorpayStatus.accountId) {
+      return `This email already has a payment account with our payment provider. Please use a different email for your ${entityLabel(entityType)} bank account.`;
+    }
+  }
+
+  return null;
+};
+
 type TaxGate =
   | { ok: true; name: string | null; entityLabel: string }
   | { ok: false; message: string };
@@ -56,7 +105,7 @@ type TaxGate =
  * account holder name is matched against the PAN-verified name.
  */
 const requireVerifiedTaxInformation = async (userId: number, entityType: string): Promise<TaxGate> => {
-  const entityLabel = entityType === 'AGENCY' ? 'company / agency' : 'individual';
+  const label = entityLabel(entityType);
   const taxInfo = await (prisma as any).taxInformation.findFirst({
     where: { user_id: userId, entity_type: entityType },
     select: { name: true, pan_number: true, gstin_status: true },
@@ -65,10 +114,10 @@ const requireVerifiedTaxInformation = async (userId: number, entityType: string)
   if (!taxInfo?.pan_number || taxInfo.gstin_status !== 'VERIFIED') {
     return {
       ok: false,
-      message: `Please add and verify your ${entityLabel} tax information (PAN) before adding or updating bank details.`,
+      message: `Please add and verify your ${label} tax information (PAN) before adding or updating bank details.`,
     };
   }
-  return { ok: true, name: taxInfo.name || null, entityLabel };
+  return { ok: true, name: taxInfo.name || null, entityLabel: label };
 };
 
 export class BankInformationService {
@@ -199,7 +248,7 @@ export class BankInformationService {
    * Send OTP to an email for bank information verification.
    * Email can differ from user's ScaleDux email but must be unique across all bank records.
    */
-  static async sendEmailOtp(userId: number, email?: string): Promise<{ success: boolean; message: string }> {
+  static async sendEmailOtp(userId: number, email?: string, entityType?: string): Promise<{ success: boolean; message: string }> {
     if (!email?.trim()) {
       // Default to user's registered email
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
@@ -210,21 +259,11 @@ export class BankInformationService {
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const entity = entityType === 'AGENCY' ? 'AGENCY' : 'INDIVIDUAL';
 
-    // Check uniqueness: email must not be used by another user's bank record
-    const existing = await (prisma as any).bankInformation.findFirst({
-      where: { razorpay_email: normalizedEmail, user_id: { not: userId } }
-    });
-    if (existing) {
-      return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
-    }
-
-    // Check Razorpay: if this email already has a suspended account, block early
-    if (isRazorpayConfigured()) {
-      const razorpayStatus = await checkRazorpayEmailStatus(normalizedEmail);
-      if (razorpayStatus.status === 'suspended') {
-        return { success: false, message: 'This email has a suspended payment account on ScaleDux. Please use a different email to add your bank account.' };
-      }
+    const unavailable = await emailUnavailableReason(userId, normalizedEmail, entity);
+    if (unavailable) {
+      return { success: false, message: unavailable };
     }
 
     const result = await generateAndSendOtp({
@@ -288,12 +327,9 @@ export class BankInformationService {
       return { success: false, message: otpResult.message || 'Invalid or expired OTP.' };
     }
 
-    // Check email uniqueness across other users
-    const emailTaken = await (prisma as any).bankInformation.findFirst({
-      where: { razorpay_email: razorpayEmail, user_id: { not: userIdNum } }
-    });
-    if (emailTaken) {
-      return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
+    const emailUnavailable = await emailUnavailableReason(userIdNum, razorpayEmail, entityType);
+    if (emailUnavailable) {
+      return { success: false, message: emailUnavailable };
     }
 
     if (entityType === 'AGENCY') {
@@ -360,7 +396,7 @@ export class BankInformationService {
 
     // The name the bank holds must also match PAN and identity records
     const verifiedCheck = matchAgainstReferences(
-      verifiedName, references, `This bank account, registered to "${verifiedName}",`,
+      verifiedName, references, 'The name registered on this bank account',
     );
     if (!verifiedCheck.valid) return { success: false, message: verifiedCheck.message! };
     const verifiedBankName = verification.bankName || cleanedBankName || null;
@@ -455,7 +491,7 @@ export class BankInformationService {
     const { anchor: resubmitAnchor, refs: resubmitRefs } = await getNameSources(userIdNum, record.entity_type, 'bank');
     if (!resubmitAnchor) return { success: false, message: anchorMissingMessage(record.entity_type) };
     const resubmitCheck = matchAgainstReferences(
-      resubmitName, resubmitRefs, `This bank account, registered to "${resubmitName}",`,
+      resubmitName, resubmitRefs, 'The name registered on this bank account',
     );
     if (!resubmitCheck.valid) return { success: false, message: resubmitCheck.message! };
 
@@ -535,11 +571,9 @@ export class BankInformationService {
       if (!otpResult.success) {
         return { success: false, message: otpResult.message || 'Invalid or expired OTP.' };
       }
-      const emailTaken = await (prisma as any).bankInformation.findFirst({
-        where: { razorpay_email: newEmail, user_id: { not: userIdNum } }
-      });
-      if (emailTaken) {
-        return { success: false, message: 'This email is already linked to another account. Please use a different email.' };
+      const emailUnavailable = await emailUnavailableReason(userIdNum, newEmail, record.entity_type);
+      if (emailUnavailable) {
+        return { success: false, message: emailUnavailable };
       }
     }
 
@@ -601,7 +635,7 @@ export class BankInformationService {
 
       const verifiedName = verification.accountHolderName || accountHolderName;
       const verifiedCheck = matchAgainstReferences(
-        verifiedName, references, `This bank account, registered to "${verifiedName}",`,
+        verifiedName, references, 'The name registered on this bank account',
       );
       if (!verifiedCheck.valid) return { success: false, message: verifiedCheck.message! };
 

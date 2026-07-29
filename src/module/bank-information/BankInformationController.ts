@@ -15,8 +15,8 @@ export class BankInformationController {
   static async sendEmailOtp(req: Request, res: Response) {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
-    const { email } = req.body;
-    const result = await BankInformationService.sendEmailOtp(userId, email);
+    const { email, entityType } = req.body;
+    const result = await BankInformationService.sendEmailOtp(userId, email, entityType);
     if (!result.success) return ApiResponse.error(res, result.message, 400);
     return ApiResponse.success(res, null, result.message);
   }

@@ -20,10 +20,14 @@ export interface NameCheckResult {
   message: string | null;
   /** True when the user has no verified document to check against yet. */
   requiresVerification?: boolean;
-  /** Verified name the input was rejected against, echoed back so the user can correct it. */
-  referenceName?: string;
   source?: ReferenceName['source'];
 }
+
+/** Document the identity name came from. Never echo the verified name itself back to the user. */
+const IDENTITY_LABELS: Record<string, string> = {
+  aadhaar: 'verified Aadhaar',
+  'driving-license': 'verified driving licence',
+};
 
 /** Prompt shown when there is no verified document to anchor names to. */
 export const anchorMissingMessage = (entityType: string): string =>
@@ -52,11 +56,12 @@ export async function getNameSources(
     const identity = await prisma.identityVerification.findFirst({
       where: { user_id: userId, status: 'APPROVED' },
       orderBy: { created_at: 'desc' },
-      select: { meta_data: true },
+      select: { meta_data: true, verification_type: true },
     });
     const identityName = (identity?.meta_data as any)?.name;
     if (typeof identityName === 'string' && identityName.trim()) {
-      anchor = { source: 'identity', label: 'verified identity document', name: identityName.trim() };
+      const label = IDENTITY_LABELS[identity?.verification_type || ''] || 'verified identity document';
+      anchor = { source: 'identity', label, name: identityName.trim() };
     }
   }
 
@@ -69,14 +74,17 @@ export async function getNameSources(
       select: { name: true },
     });
     if (taxInfo?.name) {
-      refs.push({ source: 'tax', label: 'tax information (PAN)', name: taxInfo.name });
+      refs.push({ source: 'tax', label: 'verified PAN name', name: taxInfo.name });
     }
   }
 
   return { anchor, refs };
 }
 
-/** Compare a name against every verified name on record. */
+/**
+ * Compare a name against every verified name on record.
+ * Messages name the document, never the verified name held on it.
+ */
 export function matchAgainstReferences(
   name: string | null | undefined,
   refs: ReferenceName[],
@@ -86,8 +94,7 @@ export function matchAgainstReferences(
     if (!isNameMatch(name, ref.name)) {
       return {
         valid: false,
-        message: `${subject || `"${name}"`} does not match your ${ref.label} ("${ref.name}"). Names must belong to the same person or entity.`,
-        referenceName: ref.name,
+        message: `${subject || 'The name you entered'} does not match your ${ref.label}. Please enter it exactly as it appears there.`,
         source: ref.source,
       };
     }

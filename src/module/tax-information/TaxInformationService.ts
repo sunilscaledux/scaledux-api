@@ -66,7 +66,7 @@ export class TaxInformationService {
 
     // Match name with PAN
     if (!isNameMatch(name, panResult.full_name)) {
-      return { success: false, message: `Name does not match PAN. PAN is registered to "${panResult.full_name}". Please ensure your ${entityLabel} name matches your PAN.` };
+      return { success: false, message: `The ${entityLabel} name you entered does not match this PAN. Please enter it exactly as it appears on your PAN.` };
     }
 
     // ── GSTIN validation (local only, no API verification) ──
