@@ -8,7 +8,7 @@
  *   npx tsx scripts/mask-stored-identifiers.ts --apply  # write
  */
 import { PrismaClient, Prisma } from "@prisma/client";
-import { maskTail, maskIfsc, maskPan, maskGstin, isMasked } from "../src/utils/redact";
+import { maskTail, maskIfsc, maskPan, isMasked } from "../src/utils/redact";
 
 const prisma = new PrismaClient();
 const APPLY = process.argv.includes("--apply");
@@ -67,29 +67,26 @@ async function maskIdentityMetaData() {
 }
 
 /**
- * PAN and GSTIN keep only their masked form. gstin_api_response is the raw PAN
- * provider payload (full name, PAN, dob) and is cleared outright - nothing reads it.
+ * PAN keeps only its masked form. GSTIN is left in full: invoices carry it verbatim.
+ * gstin_api_response is the raw PAN provider payload (full name, PAN, dob) and is
+ * cleared outright - nothing reads it.
  */
 async function maskTaxInformation() {
   const rows = await prisma.taxInformation.findMany({
-    select: { id: true, pan_number: true, gstin: true, gstin_api_response: true },
+    select: { id: true, pan_number: true, gstin_api_response: true },
   });
 
   const pending = rows.filter(
-    (r) =>
-      (r.pan_number && !isMasked(r.pan_number)) ||
-      (r.gstin && !isMasked(r.gstin)) ||
-      r.gstin_api_response !== null
+    (r) => (r.pan_number && !isMasked(r.pan_number)) || r.gstin_api_response !== null
   );
-  console.log(`tax_information: ${pending.length} of ${rows.length} still hold a full PAN, GSTIN or raw provider payload`);
+  console.log(`tax_information: ${pending.length} of ${rows.length} still hold a full PAN or raw provider payload`);
 
   if (!APPLY) return;
-  for (const row of rows) {
+  for (const row of pending) {
     await prisma.taxInformation.update({
       where: { id: row.id },
       data: {
         pan_number: row.pan_number ? maskPan(row.pan_number) : row.pan_number,
-        gstin: row.gstin ? maskGstin(row.gstin) : row.gstin,
         gstin_api_response: Prisma.DbNull,
       },
     });

@@ -78,10 +78,9 @@ export class TaxInformationService {
       }
     }
 
-    // Verified against the provider above; only the masked forms are ever stored.
-    // maskPAN / maskGSTIN are idempotent, so re-masking a stored value is a no-op.
+    // PAN is stored masked; GSTIN stays in full because invoices carry it verbatim.
+    // maskPAN is idempotent, so re-masking a stored value is a no-op.
     const maskedPan = TaxInformationService.maskPAN(panNumber);
-    const maskedGstin = gstin ? TaxInformationService.maskGSTIN(gstin) : null;
 
     const taxInfo = await (prisma as any).taxInformation.upsert({
       where: {
@@ -92,7 +91,7 @@ export class TaxInformationService {
         name,
         pan_number: maskedPan,
         has_gstin: hasGSTIN,
-        gstin: maskedGstin,
+        gstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
         gstin_failure_reason: null,
@@ -106,7 +105,7 @@ export class TaxInformationService {
         name,
         pan_number: maskedPan,
         has_gstin: hasGSTIN,
-        gstin: maskedGstin,
+        gstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
       }
