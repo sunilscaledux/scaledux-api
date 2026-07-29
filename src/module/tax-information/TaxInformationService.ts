@@ -7,6 +7,7 @@ import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { isNameMatch } from "@utils/nameMatch";
 import { checkNameAgainstVerifiedRecords } from "@module/verify/NameCheckService";
+import { maskPan, maskGstin } from "@utils/redact";
 
 export class TaxInformationService {
 
@@ -77,6 +78,11 @@ export class TaxInformationService {
       }
     }
 
+    // Verified against the provider above; only the masked forms are ever stored.
+    // maskPAN / maskGSTIN are idempotent, so re-masking a stored value is a no-op.
+    const maskedPan = TaxInformationService.maskPAN(panNumber);
+    const maskedGstin = gstin ? TaxInformationService.maskGSTIN(gstin) : null;
+
     const taxInfo = await (prisma as any).taxInformation.upsert({
       where: {
         user_id_entity_type: { user_id: userIdNum, entity_type: entityType }
@@ -84,13 +90,13 @@ export class TaxInformationService {
       update: {
         tax_residence: data.taxResidence,
         name,
-        pan_number: panNumber,
+        pan_number: maskedPan,
         has_gstin: hasGSTIN,
-        gstin,
+        gstin: maskedGstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
         gstin_failure_reason: null,
-        gstin_api_response: panResult.raw || null,
+        gstin_api_response: undefined,
         updated_at: new Date()
       },
       create: {
@@ -98,12 +104,11 @@ export class TaxInformationService {
         entity_type: entityType,
         tax_residence: data.taxResidence,
         name,
-        pan_number: panNumber,
+        pan_number: maskedPan,
         has_gstin: hasGSTIN,
-        gstin,
+        gstin: maskedGstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
-        gstin_api_response: panResult.raw || null,
       }
     });
 
@@ -141,8 +146,7 @@ export class TaxInformationService {
 
   /** Mask PAN: show first 4 + last char, e.g. ABCDE1234F → ABCD*****F */
   private static maskPAN(pan: string): string {
-    if (!pan || pan.length < 6) return pan ? '*'.repeat(pan.length) : '';
-    return pan.slice(0, 4) + '*'.repeat(pan.length - 5) + pan.slice(-1);
+    return maskPan(pan);
   }
 
   /** Mask name: show first char of each word, e.g. John Doe → J*** D** */
@@ -153,10 +157,9 @@ export class TaxInformationService {
     ).join(' ');
   }
 
-  /** Mask GSTIN: show first 2 (state code) + last 3, e.g. 27ABCDE1234F1Z5 → 27**********Z5 */
+  /** Mask GSTIN: show first 2 (state code) + last 2, e.g. 27ABCDE1234F1Z5 → 27***********Z5 */
   private static maskGSTIN(gstin: string): string {
-    if (!gstin || gstin.length < 6) return gstin ? '*'.repeat(gstin.length) : '';
-    return gstin.slice(0, 2) + '*'.repeat(gstin.length - 4) + gstin.slice(-2);
+    return maskGstin(gstin);
   }
 
   private static mapRecord(record: any, mask = false) {

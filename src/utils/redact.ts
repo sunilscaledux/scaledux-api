@@ -1,7 +1,7 @@
 /**
- * Keep KYC and payment identifiers out of the logs.
- * Verification responses carry account numbers, PAN, Aadhaar UIDs and photos;
- * none of it belongs in Docker logs, where it survives outside the database.
+ * Masking for KYC and payment identifiers, in logs and at rest.
+ * Every mask here is idempotent: masking an already-masked value returns it
+ * unchanged, so backfills and re-saves can run more than once safely.
  */
 
 /** Last 4 characters only, e.g. 502312345678 -> ****5678. */
@@ -18,6 +18,29 @@ export const maskIfsc = (value?: string | null): string => {
   if (v.length < 5) return v ? '****' : '';
   return `${v.slice(0, 4)}${'*'.repeat(v.length - 4)}`;
 };
+
+/** PAN: keep the first 4 and the trailing check letter, e.g. ABCDE1234F -> ABCD*****F. */
+export const maskPan = (value?: string | null): string => {
+  const v = (value ?? '').trim().toUpperCase();
+  if (!v) return '';
+  if (v.length < 6) return '*'.repeat(v.length);
+  return v.slice(0, 4) + '*'.repeat(v.length - 5) + v.slice(-1);
+};
+
+/**
+ * GSTIN: keep the 2-digit state code and the last 2.
+ * Characters 3-12 are the holder's PAN, so those are what must go.
+ */
+export const maskGstin = (value?: string | null): string => {
+  const v = (value ?? '').trim().toUpperCase();
+  if (!v) return '';
+  if (v.length < 6) return '*'.repeat(v.length);
+  return v.slice(0, 2) + '*'.repeat(v.length - 4) + v.slice(-2);
+};
+
+/** True when a value is already reduced to its masked form. */
+export const isMasked = (value?: string | null): boolean =>
+  typeof value === 'string' && value.includes('*');
 
 /** Diagnostic keys worth logging from a vendor error body. Everything else is dropped. */
 const ERROR_KEYS = ['status', 'code', 'error', 'error_code', 'message', 'detail', 'reason', 'failure_reason'];

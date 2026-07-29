@@ -8,6 +8,7 @@ import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
 import { isNameMatch } from "@utils/nameMatch";
+import { maskPan } from "@utils/redact";
 import { getNameSources, matchAgainstReferences, anchorMissingMessage } from "@module/verify/NameCheckService";
 
 /** Bank name and account holder name: letters, dots, and spaces only. */
@@ -97,8 +98,39 @@ const emailUnavailableReason = async (
 };
 
 type TaxGate =
-  | { ok: true; name: string | null; entityLabel: string }
+  | { ok: true; name: string | null; entityLabel: string; maskedPan: string }
   | { ok: false; message: string };
+
+const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+
+/**
+ * Only the masked PAN is stored, so Razorpay Route needs the full one re-entered.
+ * Masking the input and comparing to the stored mask proves it is the same PAN
+ * that was verified, without ever holding the full value.
+ */
+const resolveSubmittedPan = (
+  submitted: string | null | undefined,
+  maskedPan: string,
+  entityType: string,
+): { ok: true; pan: string } | { ok: false; message: string } => {
+  const pan = (submitted || '').trim().toUpperCase();
+  if (!pan) {
+    return {
+      ok: false,
+      message: `Please enter your ${entityLabel(entityType)} PAN. We only keep it masked, so it has to be entered again to set up your payment account.`,
+    };
+  }
+  if (!PAN_PATTERN.test(pan)) {
+    return { ok: false, message: 'Enter a valid PAN (e.g. ABCDE1234F).' };
+  }
+  if (maskPan(pan) !== maskedPan) {
+    return {
+      ok: false,
+      message: `This PAN does not match the one on your verified ${entityLabel(entityType)} tax information.`,
+    };
+  }
+  return { ok: true, pan };
+};
 
 /**
  * Bank details depend on tax information: the PAN is sent to Razorpay Route and the
@@ -117,7 +149,7 @@ const requireVerifiedTaxInformation = async (userId: number, entityType: string)
       message: `Please add and verify your ${label} tax information (PAN) before adding or updating bank details.`,
     };
   }
-  return { ok: true, name: taxInfo.name || null, entityLabel: label };
+  return { ok: true, name: taxInfo.name || null, entityLabel: label, maskedPan: taxInfo.pan_number };
 };
 
 export class BankInformationService {
@@ -306,6 +338,9 @@ export class BankInformationService {
     const taxGate = await requireVerifiedTaxInformation(userIdNum, entityType);
     if (!taxGate.ok) return { success: false, message: taxGate.message };
 
+    const panCheck = resolveSubmittedPan(data.panNumber, taxGate.maskedPan, entityType);
+    if (!panCheck.ok) return { success: false, message: panCheck.message };
+
     // ── Email OTP verification ──
     if (!data.otpCode?.trim()) {
       return { success: false, message: 'Email OTP is required. Please verify your email first.' };
@@ -406,7 +441,7 @@ export class BankInformationService {
       name: verifiedName || data.displayLabel || 'User',
       ifsc,
       accountNumber,
-    }, razorpayEmail);
+    }, razorpayEmail, panCheck.pan);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -452,7 +487,7 @@ export class BankInformationService {
     };
   }
 
-  static async resubmitForVerification(userId: string, entityType?: string): Promise<{ success: boolean; message: string; data?: any }> {
+  static async resubmitForVerification(userId: string, entityType?: string, panNumber?: string): Promise<{ success: boolean; message: string; data?: any }> {
     const userIdNum = parseInt(userId);
     const where: any = { user_id: userIdNum };
     if (entityType) where.entity_type = entityType;
@@ -466,6 +501,9 @@ export class BankInformationService {
 
     const taxGate = await requireVerifiedTaxInformation(userIdNum, record.entity_type);
     if (!taxGate.ok) return { success: false, message: taxGate.message };
+
+    const panCheck = resolveSubmittedPan(panNumber, taxGate.maskedPan, record.entity_type);
+    if (!panCheck.ok) return { success: false, message: panCheck.message };
 
     if (!isIdtoaiConfigured()) {
       return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
@@ -500,7 +538,7 @@ export class BankInformationService {
       name: verification.accountHolderName || record.account_holder_name || 'User',
       ifsc,
       accountNumber,
-    }, record.razorpay_email);
+    }, record.razorpay_email, panCheck.pan);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -612,6 +650,10 @@ export class BankInformationService {
         return { success: false, message: 'Valid account number (at least 9 digits) is required.' };
       }
 
+      // Only re-verification reaches Razorpay, so the PAN is only needed on this branch
+      const panCheck = resolveSubmittedPan(data.panNumber, taxGate.maskedPan, record.entity_type);
+      if (!panCheck.ok) return { success: false, message: panCheck.message };
+
       if (!isIdtoaiConfigured()) {
         return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
       }
@@ -647,7 +689,7 @@ export class BankInformationService {
         name: verifiedName || 'User',
         ifsc,
         accountNumber,
-      }, emailChanging ? newEmail : record.razorpay_email);
+      }, emailChanging ? newEmail : record.razorpay_email, panCheck.pan);
 
       if (!razorpayResult.success) {
         void notifySensitiveUpdate(
@@ -737,7 +779,9 @@ export class BankInformationService {
     userId: number,
     entityType: string,
     bank: { name: string; ifsc: string; accountNumber: string },
-    razorpayEmail?: string | null,
+    razorpayEmail: string | null | undefined,
+    /** Re-entered by the user; only the masked form is stored. */
+    pan: string,
   ): Promise<{ success: boolean; error?: string; activationStatus?: string; productId?: string }> {
     if (!isRazorpayConfigured()) {
       Log.warn(`[ensureRazorpayLinkedAccount] Razorpay not configured, skipping for user ${userId}`);
@@ -770,15 +814,15 @@ export class BankInformationService {
       }
       const existingId = isAgency ? user.razorpay_agency_account_id : user.razorpay_account_id;
 
-      // PAN, legal name and tax residence address all come from the PAN-verified tax record
+      // Legal name and tax residence address come from the PAN-verified tax record;
+      // the PAN itself is passed in, since only its masked form is stored.
       const taxInfo = await (prisma as any).taxInformation.findFirst({
         where: { user_id: userId, entity_type: entityType },
-        select: { pan_number: true, name: true, tax_residence: true }
+        select: { name: true, tax_residence: true }
       });
 
       const taxAddress = await BankInformationService.resolveTaxAddress(taxInfo?.tax_residence);
       const info = user.personalInfo;
-      const pan = taxInfo?.pan_number || undefined;
       const legalName = taxInfo?.name
         || bank.name
         || [user.first_name, user.last_name].filter(Boolean).join(' ')

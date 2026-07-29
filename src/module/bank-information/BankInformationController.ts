@@ -33,7 +33,7 @@ export class BankInformationController {
     const userId = req.user?.id;
     if (!userId) return ApiResponse.error(res, "User not authenticated", 401);
     const entityType = req.body?.entityType;
-    const result = await BankInformationService.resubmitForVerification(userId.toString(), entityType);
+    const result = await BankInformationService.resubmitForVerification(userId.toString(), entityType, req.body?.panNumber);
     if (!result.success) return ApiResponse.error(res, result.message, 400);
     return ApiResponse.success(res, result.data, result.message);
   }
