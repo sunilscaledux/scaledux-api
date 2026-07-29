@@ -93,7 +93,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
       where: { id: existingVerification.id },
       data: {
         agency_name: agencyName,
-        cin: cin,
+        cin: maskTail(cinTrimmed),
         document_urls: normalizedDocumentUrls,
         status: 'APPROVED',
         submitted_at: verifiedAt,
@@ -106,7 +106,7 @@ export async function submitAgencyVerification(req: Request, res: Response) {
       data: {
         user_id: userId,
         agency_name: agencyName,
-        cin: cin,
+        cin: maskTail(cinTrimmed),
         document_urls: normalizedDocumentUrls,
         status: 'APPROVED',
         submitted_at: verifiedAt,

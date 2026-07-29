@@ -13,6 +13,7 @@ import crypto from "crypto";
 import { getResubmitWindow } from "@utils/General";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { encryptPii, identityImageContext } from "@utils/crypto";
+import { maskTail } from "@utils/redact";
 
 import { appConfig } from '@config/app';
 const FRONTEND_URL = appConfig.frontendUrl;
@@ -121,7 +122,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     const metaData = {
       name: dlResult.name,
       dob: dlResult.dob,
-      dlNumber: dlResult.dlNumber,
+      dlNumber: maskTail(dlResult.dlNumber),
       issueDate: dlResult.issueDate,
       expiryDate: dlResult.expiryDate,
       vehicleClasses: dlResult.vehicleClasses,
@@ -165,7 +166,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     return ApiResponse.success(res, {
       name: dlResult.name,
       dob: dlResult.dob,
-      dlNumber: dlResult.dlNumber,
+      dlNumber: maskTail(dlResult.dlNumber),
       issueDate: dlResult.issueDate,
       expiryDate: dlResult.expiryDate,
       vehicleClasses: dlResult.vehicleClasses,
@@ -186,7 +187,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     name: aadhaar.name,
     dob: aadhaar.dob,
     gender: aadhaar.gender,
-    aadhaarUid: aadhaar.aadhaarUid,
+    aadhaarUid: maskTail(String(aadhaar.aadhaarUid ?? "")),
     address: aadhaar.address,
     image: aadhaar.image ? encryptPii(aadhaar.image, identityImageContext(userId)) : "",
     verifiedVia: "digilocker",
@@ -238,7 +239,7 @@ export async function completeDigilocker(req: Request, res: Response) {
     name: aadhaar.name,
     dob: aadhaar.dob,
     gender: aadhaar.gender,
-    aadhaarUid: aadhaar.aadhaarUid,
+    aadhaarUid: maskTail(String(aadhaar.aadhaarUid ?? "")),
     address: aadhaar.address,
     image: aadhaar.image,
     status: "APPROVED",
