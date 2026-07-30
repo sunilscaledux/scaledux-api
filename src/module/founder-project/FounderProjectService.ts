@@ -643,7 +643,6 @@ export class FounderProjectService {
             unique_id: true,
             first_name: true,
             last_name: true,
-            email: true,
             role: true,
             currency: {
               select: {
