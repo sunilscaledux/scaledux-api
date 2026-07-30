@@ -114,3 +114,41 @@ export const decryptPii = (value: string | null | undefined, context: string): s
 /** Context string for the identity document photo held in IdentityVerification.meta_data. */
 export const identityImageContext = (userId: number): string =>
   `identity_verification:meta_data.image:${userId}`;
+
+/** Context for TaxInformation.pan_number, keyed by the row's unique pair. */
+export const taxPanContext = (userId: number, entityType: string): string =>
+  `tax_information:pan_number:${userId}:${entityType}`;
+
+/** Context for TaxInformation.gstin, keyed by the row's unique pair. */
+export const taxGstinContext = (userId: number, entityType: string): string =>
+  `tax_information:gstin:${userId}:${entityType}`;
+
+/**
+ * Context for the GSTINs copied onto an invoice. The id is not known before the
+ * insert, so the row is identified by the triple that is unique without it.
+ */
+export const invoiceGstContext = (
+  transactionId: number,
+  party: string,
+  invoiceType: string | null | undefined,
+  field: 'sender' | 'receiver' | 'gst_number',
+): string =>
+  `invoice:${field}:${transactionId}:${party}:${invoiceType || 'legacy'}`;
+
+/**
+ * Decrypt for display. A wrong key or a value moved between rows must not take
+ * down an invoice or a profile, so it is reported and reads as absent.
+ */
+export const tryDecryptPii = (
+  value: string | null | undefined,
+  context: string,
+  onError?: (err: unknown) => void,
+): string | null => {
+  if (!value) return null;
+  try {
+    return decryptPii(value, context) || null;
+  } catch (err) {
+    onError?.(err);
+    return null;
+  }
+};

@@ -36,7 +36,6 @@ export class BankInformationController {
     const result = await BankInformationService.resubmitForVerification(
       userId.toString(),
       entityType,
-      req.body?.panNumber,
       { accountNumber: req.body?.accountNumber, ifsc: req.body?.ifsc },
     );
     if (!result.success) return ApiResponse.error(res, result.message, 400);

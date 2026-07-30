@@ -11,8 +11,6 @@ export interface CreateBankInformationInput {
   email?: string;
   /** OTP code sent to the email for verification. */
   otpCode?: string;
-  /** Full PAN, re-entered by the user; only the masked form is stored. */
-  panNumber?: string;
 }
 
 export interface UpdateBankInformationInput {
@@ -25,6 +23,4 @@ export interface UpdateBankInformationInput {
   email?: string;
   /** OTP code sent to the email for verification. */
   otpCode?: string;
-  /** Full PAN, re-entered by the user; only the masked form is stored. */
-  panNumber?: string;
 }

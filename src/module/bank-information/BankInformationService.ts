@@ -8,7 +8,8 @@ import { appConfig } from "@config/app";
 import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { generateAndSendOtp, verifyOtpByType, OTP_TYPES } from "@module/auth/AuthService";
 import { isNameMatch } from "@utils/nameMatch";
-import { maskPan, maskTail, maskIfsc } from "@utils/redact";
+import { maskTail, maskIfsc, isMasked } from "@utils/redact";
+import { decryptPii, taxPanContext } from "@utils/crypto";
 import { getNameSources, matchAgainstReferences, anchorMissingMessage } from "@module/verify/NameCheckService";
 
 /** Bank name and account holder name: letters, dots, and spaces only. */
@@ -98,49 +99,20 @@ const emailUnavailableReason = async (
 };
 
 type TaxGate =
-  | { ok: true; name: string | null; entityLabel: string; maskedPan: string }
+  | { ok: true; name: string | null; entityLabel: string; pan: string }
   | { ok: false; message: string };
 
 const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
 
 /**
- * Only the masked PAN is stored, so Razorpay Route needs the full one re-entered.
- * Masking the input and comparing to the stored mask proves it is the same PAN
- * that was verified, without ever holding the full value.
- */
-const resolveSubmittedPan = (
-  submitted: string | null | undefined,
-  maskedPan: string,
-  entityType: string,
-): { ok: true; pan: string } | { ok: false; message: string } => {
-  const pan = (submitted || '').trim().toUpperCase();
-  if (!pan) {
-    return {
-      ok: false,
-      message: `Please enter your ${entityLabel(entityType)} PAN. We only keep it masked, so it has to be entered again to set up your payment account.`,
-    };
-  }
-  if (!PAN_PATTERN.test(pan)) {
-    return { ok: false, message: 'Enter a valid PAN (e.g. ABCDE1234F).' };
-  }
-  if (maskPan(pan) !== maskedPan) {
-    return {
-      ok: false,
-      message: `This PAN does not match the one on your verified ${entityLabel(entityType)} tax information.`,
-    };
-  }
-  return { ok: true, pan };
-};
-
-/**
- * Bank details depend on tax information: the PAN is sent to Razorpay Route and the
- * account holder name is matched against the PAN-verified name.
+ * Bank details depend on tax information: the PAN is decrypted here and sent to
+ * Razorpay Route, and the account holder name is matched against the PAN-verified name.
  */
 const requireVerifiedTaxInformation = async (userId: number, entityType: string): Promise<TaxGate> => {
   const label = entityLabel(entityType);
   const taxInfo = await (prisma as any).taxInformation.findFirst({
     where: { user_id: userId, entity_type: entityType },
-    select: { name: true, pan_number: true, gstin_status: true },
+    select: { id: true, name: true, pan_number: true, gstin_status: true },
   });
 
   if (!taxInfo?.pan_number || taxInfo.gstin_status !== 'VERIFIED') {
@@ -149,7 +121,29 @@ const requireVerifiedTaxInformation = async (userId: number, entityType: string)
       message: `Please add and verify your ${label} tax information (PAN) before adding or updating bank details.`,
     };
   }
-  return { ok: true, name: taxInfo.name || null, entityLabel: label, maskedPan: taxInfo.pan_number };
+
+  // Rows written while only the mask was kept cannot be recovered
+  const reenterMessage =
+    `Please save your ${label} tax information again. Your PAN was stored before we could keep it recoverable, so it has to be entered once more before payments can be set up.`;
+  if (isMasked(taxInfo.pan_number)) {
+    return { ok: false, message: reenterMessage };
+  }
+
+  let pan: string;
+  try {
+    pan = decryptPii(taxInfo.pan_number, taxPanContext(userId, entityType)).toUpperCase();
+  } catch (err: any) {
+    Log.error(`[requireVerifiedTaxInformation] PAN decrypt failed for user ${userId} (${entityType})`, {
+      taxInformationId: taxInfo.id,
+      message: err?.message,
+    });
+    return { ok: false, message: reenterMessage };
+  }
+  if (!PAN_PATTERN.test(pan)) {
+    return { ok: false, message: reenterMessage };
+  }
+
+  return { ok: true, name: taxInfo.name || null, entityLabel: label, pan };
 };
 
 export class BankInformationService {
@@ -338,9 +332,6 @@ export class BankInformationService {
     const taxGate = await requireVerifiedTaxInformation(userIdNum, entityType);
     if (!taxGate.ok) return { success: false, message: taxGate.message };
 
-    const panCheck = resolveSubmittedPan(data.panNumber, taxGate.maskedPan, entityType);
-    if (!panCheck.ok) return { success: false, message: panCheck.message };
-
     // ── Email OTP verification ──
     if (!data.otpCode?.trim()) {
       return { success: false, message: 'Email OTP is required. Please verify your email first.' };
@@ -441,7 +432,7 @@ export class BankInformationService {
       name: verifiedName || data.displayLabel || 'User',
       ifsc,
       accountNumber,
-    }, razorpayEmail, panCheck.pan);
+    }, razorpayEmail, taxGate.pan);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -490,7 +481,6 @@ export class BankInformationService {
   static async resubmitForVerification(
     userId: string,
     entityType?: string,
-    panNumber?: string,
     bank?: { accountNumber?: string; ifsc?: string },
   ): Promise<{ success: boolean; message: string; data?: any }> {
     const userIdNum = parseInt(userId);
@@ -506,9 +496,6 @@ export class BankInformationService {
 
     const taxGate = await requireVerifiedTaxInformation(userIdNum, record.entity_type);
     if (!taxGate.ok) return { success: false, message: taxGate.message };
-
-    const panCheck = resolveSubmittedPan(panNumber, taxGate.maskedPan, record.entity_type);
-    if (!panCheck.ok) return { success: false, message: panCheck.message };
 
     if (!isIdtoaiConfigured()) {
       return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
@@ -547,7 +534,7 @@ export class BankInformationService {
       name: verification.accountHolderName || record.account_holder_name || 'User',
       ifsc,
       accountNumber,
-    }, record.razorpay_email, panCheck.pan);
+    }, record.razorpay_email, taxGate.pan);
 
     if (!razorpayResult.success) {
       void notifySensitiveUpdate(
@@ -664,10 +651,6 @@ export class BankInformationService {
         return { success: false, message: 'Valid IFSC is required (e.g. HDFC0001234)' };
       }
 
-      // Only re-verification reaches Razorpay, so the PAN is only needed on this branch
-      const panCheck = resolveSubmittedPan(data.panNumber, taxGate.maskedPan, record.entity_type);
-      if (!panCheck.ok) return { success: false, message: panCheck.message };
-
       if (!isIdtoaiConfigured()) {
         return { success: false, message: 'Bank verification service is temporarily unavailable. Please try again later.' };
       }
@@ -703,7 +686,7 @@ export class BankInformationService {
         name: verifiedName || 'User',
         ifsc,
         accountNumber,
-      }, emailChanging ? newEmail : record.razorpay_email, panCheck.pan);
+      }, emailChanging ? newEmail : record.razorpay_email, taxGate.pan);
 
       if (!razorpayResult.success) {
         void notifySensitiveUpdate(

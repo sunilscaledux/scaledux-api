@@ -1514,9 +1514,11 @@ model TaxInformation {
   entity_type    String   @default("INDIVIDUAL") @db.VarChar(20) // INDIVIDUAL | AGENCY
   tax_residence  Json
   name           String?  @db.VarChar(200)
-  pan_number     String?  @db.VarChar(10)
+  /** AES-256-GCM ciphertext, not a PAN. Decrypt with taxPanContext. */
+  pan_number     String?  @db.Text
   has_gstin      Boolean  @default(false)
-  gstin          String?  @db.VarChar(15)
+  /** AES-256-GCM ciphertext, not a GSTIN. Decrypt with taxGstinContext. */
+  gstin          String?  @db.Text
   gstin_status   String?  @default("PENDING") @db.VarChar(20) // PENDING | VERIFIED | FAILED
   gstin_verified_at    DateTime?
   gstin_failure_reason String?  @db.VarChar(500)
@@ -1675,14 +1677,14 @@ model Invoice {
   currency_code         String   @db.VarChar(10)
   description           String   @db.Text
   invoice_number        String   @unique @db.VarChar(50)
-  /** Platform GSTIN (issuer) */
-  gst_number            String?  @db.VarChar(50)
+  /** Issuer GSTIN. Platform GST in the clear; a user's GSTIN is encrypted (invoiceGstContext). */
+  gst_number            String?  @db.Text
   /** Platform GST number (same as gst_number; explicit column for clarity) */
   platform_gst          String?  @db.VarChar(50)
-  /** Sender (from_id) GST if they have one */
-  sender_gst            String?  @db.VarChar(50)
-  /** Receiver (to_id) GST if they have one */
-  receiver_gst          String?  @db.VarChar(50)
+  /** Sender (from_id) GST if they have one. AES-256-GCM ciphertext. */
+  sender_gst            String?  @db.Text
+  /** Receiver (to_id) GST if they have one. AES-256-GCM ciphertext. */
+  receiver_gst          String?  @db.Text
   /** Platform/service fee amount (legacy) */
   fee                    Decimal? @db.Decimal(10, 2)
   /** GST/tax amount if applicable */

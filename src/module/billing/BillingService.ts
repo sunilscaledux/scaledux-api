@@ -10,6 +10,7 @@ import { getPlatformFee, calcFounderTotal, calcFreelancerDeductions, calcFreelan
 import { getNextInvoiceNumber } from "@utils/invoiceNumbering";
 import { convertToUserCurrency } from "@utils/currencyConverter";
 import { createContactAndFundAccount, isRazorpayConfigured } from "@services/razorpayService";
+import { encryptPii, tryDecryptPii, taxGstinContext, invoiceGstContext } from "@utils/crypto";
 import {
   BillingTransactionType,
   BillingTransactionStatus,
@@ -27,6 +28,36 @@ if (razorpayConfig.key_id && razorpayConfig.key_secret) {
         key_secret: razorpayConfig.key_secret
     });
 }
+
+/** TaxInformation.gstin is encrypted at rest; read it back for the row it belongs to. */
+const readTaxGstin = (row: any): string | null =>
+  tryDecryptPii(row?.gstin, taxGstinContext(row?.user_id, row?.entity_type), (err: any) =>
+    Log.error(`[Billing] GSTIN decrypt failed for user ${row?.user_id} (${row?.entity_type})`, {
+      message: err?.message,
+    }));
+
+/** A party's GSTIN is copied onto the invoice encrypted, bound to that invoice. */
+const sealInvoiceGst = (
+  gstin: string | null,
+  transactionId: number,
+  party: string,
+  invoiceType: string | null,
+  field: 'sender' | 'receiver' | 'gst_number',
+): string | null =>
+  gstin ? encryptPii(gstin, invoiceGstContext(transactionId, party, invoiceType, field)) : null;
+
+/** Platform GST is stored in the clear, so decryption is a no-op for it. */
+const openInvoiceGst = (
+  value: string | null | undefined,
+  transactionId: number,
+  party: string,
+  invoiceType: string | null,
+  field: 'sender' | 'receiver' | 'gst_number',
+): string | null =>
+  tryDecryptPii(value, invoiceGstContext(transactionId, party, invoiceType, field), (err: any) =>
+    Log.error(`[Billing] Invoice ${field} decrypt failed for transaction ${transactionId}`, {
+      message: err?.message,
+    }));
 
 export class BillingService {
   /** Payer amount (base + platform fee + GST) and receiver amount (base - all freelancer deductions). */
@@ -1391,7 +1422,7 @@ export class BillingService {
     });
     const findGst = (uid: number) => {
       const rows = taxInfos.filter((t: any) => t.user_id === uid && t.has_gstin && t.gstin);
-      return (rows.find((t: any) => t.entity_type === 'AGENCY') || rows[0])?.gstin ?? null;
+      return readTaxGstin(rows.find((t: any) => t.entity_type === 'AGENCY') || rows[0]);
     };
     const senderGst = findGst(transaction.from_id);
     const receiverGst = findGst(transaction.to_id);
@@ -1414,8 +1445,8 @@ export class BillingService {
           description: transaction.description,
           invoice_number: `INV-${transactionId}-P-${Date.now()}`,
           gst_number: platformGst,
-          sender_gst: senderGst,
-          receiver_gst: receiverGst,
+          sender_gst: sealInvoiceGst(senderGst, transactionId, 'payer', null, 'sender'),
+          receiver_gst: sealInvoiceGst(receiverGst, transactionId, 'payer', null, 'receiver'),
           fee: appFeeFounder,
           gst_amount: gstOnAppFee,
           meta
@@ -1440,8 +1471,8 @@ export class BillingService {
           description: transaction.description,
           invoice_number: `INV-${transactionId}-R-${Date.now()}`,
           gst_number: platformGst,
-          sender_gst: senderGst,
-          receiver_gst: receiverGst,
+          sender_gst: sealInvoiceGst(senderGst, transactionId, 'receiver', null, 'sender'),
+          receiver_gst: sealInvoiceGst(receiverGst, transactionId, 'receiver', null, 'receiver'),
           fee: serviceCharge,
           gst_amount: gstOnServiceCharge,
           meta
@@ -1522,7 +1553,10 @@ export class BillingService {
     }
     if (!invoice) return { success: false as const, message: 'Invoice not available yet' };
     const inv = invoice as any;
-    const platformGstForResponse = inv.gst_number ?? inv.platform_gst ?? (appConfig.platformGstNumber ?? undefined);
+    const openGst = (value: any, field: 'sender' | 'receiver' | 'gst_number') =>
+      openInvoiceGst(value, transaction.id, inv.party, inv.invoice_type ?? null, field);
+    const invoiceGstNumber = openGst(inv.gst_number, 'gst_number');
+    const platformGstForResponse = invoiceGstNumber ?? inv.platform_gst ?? (appConfig.platformGstNumber ?? undefined);
     return {
       success: true as const,
       data: {
@@ -1532,8 +1566,8 @@ export class BillingService {
         subjectType: transaction.subject_type,
         gstNumber: platformGstForResponse,
         platformGst: inv.platform_gst ?? undefined,
-        senderGst: inv.sender_gst ?? undefined,
-        receiverGst: inv.receiver_gst ?? undefined,
+        senderGst: openGst(inv.sender_gst, 'sender') ?? undefined,
+        receiverGst: openGst(inv.receiver_gst, 'receiver') ?? undefined,
         fee: inv.fee != null ? parseFloat(inv.fee.toString()) : undefined,
         gstAmount: inv.gst_amount != null ? parseFloat(inv.gst_amount.toString()) : undefined,
         invoiceType: inv.invoice_type ?? null,
@@ -1773,15 +1807,15 @@ export class BillingService {
     // Check if freelancer is GST registered
     const taxInfo = await (prisma as any).taxInformation.findFirst({
       where: { user_id: tx.to_id, has_gstin: true, gstin: { not: null } },
-      select: { gstin: true }
+      select: { user_id: true, entity_type: true, gstin: true }
     });
-    const freelancerGst = taxInfo?.gstin ?? null;
+    const freelancerGst = readTaxGstin(taxInfo);
     const isBillOfSupply = !freelancerGst;
 
     // Client GST
     const clientTax = await (prisma as any).taxInformation.findFirst({
       where: { user_id: tx.from_id, has_gstin: true, gstin: { not: null } },
-      select: { gstin: true }
+      select: { user_id: true, entity_type: true, gstin: true }
     });
 
     const { invoiceNumber, financialYear, sequenceNumber } = await getNextInvoiceNumber('A');
@@ -1797,9 +1831,9 @@ export class BillingService {
         currency_code: tx.currency?.code ?? 'INR',
         description: tx.description,
         invoice_number: invoiceNumber,
-        gst_number: freelancerGst,
-        sender_gst: freelancerGst,
-        receiver_gst: clientTax?.gstin ?? null,
+        gst_number: sealInvoiceGst(freelancerGst, transactionId, 'receiver', 'A', 'gst_number'),
+        sender_gst: sealInvoiceGst(freelancerGst, transactionId, 'receiver', 'A', 'sender'),
+        receiver_gst: sealInvoiceGst(readTaxGstin(clientTax), transactionId, 'receiver', 'A', 'receiver'),
         is_bill_of_supply: isBillOfSupply,
         financial_year: financialYear,
         sequence_number: sequenceNumber,
@@ -1832,7 +1866,7 @@ export class BillingService {
 
     const freelancerTax = await (prisma as any).taxInformation.findFirst({
       where: { user_id: tx.to_id, has_gstin: true, gstin: { not: null } },
-      select: { gstin: true }
+      select: { user_id: true, entity_type: true, gstin: true }
     });
 
     const { invoiceNumber, financialYear, sequenceNumber } = await getNextInvoiceNumber('B');
@@ -1856,7 +1890,7 @@ export class BillingService {
         invoice_number: invoiceNumber,
         gst_number: appConfig.platformGstNumber,
         platform_gst: appConfig.platformGstNumber,
-        receiver_gst: freelancerTax?.gstin ?? null,
+        receiver_gst: sealInvoiceGst(readTaxGstin(freelancerTax), transactionId, 'receiver', 'B', 'receiver'),
         commission_amount: commission,
         processing_fee_amount: processingFee,
         tcs_amount: tcs,

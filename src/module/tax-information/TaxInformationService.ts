@@ -8,6 +8,7 @@ import { notifySensitiveUpdate } from "@utils/sensitiveUpdateNotifier";
 import { isNameMatch } from "@utils/nameMatch";
 import { checkNameAgainstVerifiedRecords } from "@module/verify/NameCheckService";
 import { maskPan, maskGstin } from "@utils/redact";
+import { encryptPii, tryDecryptPii, taxPanContext, taxGstinContext } from "@utils/crypto";
 
 export class TaxInformationService {
 
@@ -78,9 +79,10 @@ export class TaxInformationService {
       }
     }
 
-    // PAN is stored masked; GSTIN stays in full because invoices carry it verbatim.
-    // maskPAN is idempotent, so re-masking a stored value is a no-op.
-    const maskedPan = TaxInformationService.maskPAN(panNumber);
+    // Both are encrypted at rest: the PAN has to be recoverable for payment setup
+    // and the GSTIN has to be printed verbatim on invoices.
+    const storedPan = encryptPii(panNumber, taxPanContext(userIdNum, entityType));
+    const storedGstin = gstin ? encryptPii(gstin, taxGstinContext(userIdNum, entityType)) : null;
 
     const taxInfo = await (prisma as any).taxInformation.upsert({
       where: {
@@ -89,9 +91,9 @@ export class TaxInformationService {
       update: {
         tax_residence: data.taxResidence,
         name,
-        pan_number: maskedPan,
+        pan_number: storedPan,
         has_gstin: hasGSTIN,
-        gstin,
+        gstin: storedGstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
         gstin_failure_reason: null,
@@ -103,9 +105,9 @@ export class TaxInformationService {
         entity_type: entityType,
         tax_residence: data.taxResidence,
         name,
-        pan_number: maskedPan,
+        pan_number: storedPan,
         has_gstin: hasGSTIN,
-        gstin,
+        gstin: storedGstin,
         gstin_status: 'VERIFIED',
         gstin_verified_at: new Date(),
       }
@@ -163,17 +165,25 @@ export class TaxInformationService {
 
   private static mapRecord(record: any, mask = false) {
     const name = record.name || '';
-    const panNumber = record.pan_number || '';
-    const gstin = record.gstin || '';
+    const onError = (err: unknown) =>
+      Log.error(`[TaxInformation] Could not decrypt record ${record.id}`, { message: (err as any)?.message });
+
+    // Never leaves the API in full: masked here, decrypted only where it is spent
+    const panNumber = tryDecryptPii(
+      record.pan_number, taxPanContext(record.user_id, record.entity_type), onError,
+    ) || '';
+    const gstin = tryDecryptPii(
+      record.gstin, taxGstinContext(record.user_id, record.entity_type), onError,
+    ) || '';
 
     return {
       id: record.id,
       entityType: record.entity_type,
       taxResidence: record.tax_residence,
       name: mask ? TaxInformationService.maskName(name) : name,
-      panNumber: mask ? TaxInformationService.maskPAN(panNumber) : panNumber,
+      panNumber: TaxInformationService.maskPAN(panNumber),
       hasGSTIN: !!record.has_gstin,
-      gstin: mask && gstin ? TaxInformationService.maskGSTIN(gstin) : gstin,
+      gstin: gstin ? TaxInformationService.maskGSTIN(gstin) : gstin,
       gstinStatus: record.gstin_status || 'PENDING',
       gstinFailureReason: record.gstin_failure_reason || null,
       createdAt: record.created_at,
