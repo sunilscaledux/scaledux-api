@@ -4,8 +4,83 @@ import { Prisma } from '@prisma/client';
 import { paginated } from '@admin/utils/pagination';
 import { userCard, userCardSelect } from '@admin/utils/format';
 import { resolveAdminFiles } from '@admin/utils/attachments';
+import { decryptPii, isEncrypted, identityImageContext } from '@utils/crypto';
+import { Log } from '@services/loggerService';
 
 const VALID = ['APPROVED', 'REJECTED', 'UNDER_REVIEW'];
+
+const ADDRESS_ORDER = [
+  'careOf', 'house', 'street', 'landmark', 'locality', 'postOffice',
+  'vtc', 'subDistrict', 'district', 'state', 'pincode', 'country',
+];
+
+/** DigiLocker stores the address as an object; flatten it to one displayable line. */
+function formatAddress(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== 'object') return String(value).trim() || null;
+
+  const src = value as Record<string, unknown>;
+  const keys = [
+    ...ADDRESS_ORDER.filter((k) => k in src),
+    ...Object.keys(src).filter((k) => !ADDRESS_ORDER.includes(k)),
+  ];
+
+  const seen = new Set<string>();
+  const parts: string[] = [];
+  for (const key of keys) {
+    const part = src[key] == null ? '' : String(src[key]).trim();
+    if (!part || seen.has(part.toLowerCase())) continue;
+    seen.add(part.toLowerCase());
+    parts.push(part);
+  }
+  return parts.join(', ') || null;
+}
+
+/** Document photo is stored encrypted as bare base64; return something an <img> can load. */
+function documentPhoto(value: unknown, userId: number): string | null {
+  if (typeof value !== 'string' || !value) return null;
+
+  let raw = value;
+  if (isEncrypted(value)) {
+    try {
+      raw = decryptPii(value, identityImageContext(userId));
+    } catch (err: any) {
+      Log.error(`[admin][verification] Could not decrypt document photo for user ${userId}`, { message: err?.message });
+      return null;
+    }
+  }
+  if (!raw) return null;
+  return /^(https?:|data:)/i.test(raw) ? raw : `data:image/jpeg;base64,${raw}`;
+}
+
+/**
+ * Only primitives reach the client — a nested object in meta_data used to crash the
+ * review dialog when React tried to render it as a child.
+ */
+function identityMeta(meta: unknown, userId: number): Record<string, unknown> | null {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(meta as Record<string, unknown>)) {
+    if (value == null || value === '') continue;
+    if (key === 'address') { out.address = formatAddress(value); continue; }
+    if (key === 'image') { out.image = documentPhoto(value, userId); continue; }
+
+    if (Array.isArray(value)) {
+      const flat = value.filter((v) => v != null && typeof v !== 'object').map(String).join(', ');
+      if (flat) out[key] = flat;
+    } else if (typeof value === 'object') {
+      out[key] = formatAddress(value);
+    } else {
+      out[key] = value;
+    }
+  }
+
+  for (const key of Object.keys(out)) {
+    if (out[key] == null) delete out[key];
+  }
+  return out;
+}
 
 export interface VerificationListParams {
   page: number;
@@ -36,7 +111,7 @@ export class VerificationService {
       id: r.id,
       verification_type: r.verification_type,
       status: r.status,
-      meta_data: r.meta_data,
+      meta_data: identityMeta(r.meta_data, r.user_id),
       submitted_at: r.submitted_at,
       verified_at: r.verified_at,
       rejection_reason: r.rejection_reason,
