@@ -230,6 +230,30 @@ export async function checkRazorpayEmailStatus(email: string): Promise<
   return { status: 'none' };
 }
 
+/** The 4th PAN character is the holder type; it decides Razorpay's business_type. */
+const PAN_HOLDER_TYPE_BUSINESS_TYPE: Record<string, string> = {
+  P: 'not_yet_registered', // individual / sole proprietor
+  C: 'private_limited',
+  F: 'partnership',        // LLPs also carry the F code
+  T: 'trust',
+  A: 'society',            // association of persons
+  B: 'society',            // body of individuals
+  H: 'other',              // HUF
+  L: 'other',
+  J: 'other',
+  G: 'other',
+};
+
+const panHolderType = (pan?: string | null): string =>
+  ((pan || '').trim().toUpperCase()[3] || '');
+
+/** A stakeholder is a person, so only a 'P' PAN belongs on its KYC. */
+export const isIndividualPan = (pan?: string | null): boolean =>
+  panHolderType(pan) === 'P';
+
+export const routeBusinessTypeForPan = (pan?: string | null): string =>
+  PAN_HOLDER_TYPE_BUSINESS_TYPE[panHolderType(pan)] || 'not_yet_registered';
+
 /**
  * Razorpay Route: create a linked account (sub-merchant) with stakeholder + bank account.
  * Steps: 1) Create account → 2) Add stakeholder (KYC) → 3) Add bank account → 4) Request activation.

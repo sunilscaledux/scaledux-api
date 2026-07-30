@@ -1,7 +1,7 @@
 import { prisma } from "@services/prismaService";
 import { Log } from "@services/loggerService";
 import { verifyBankAccount, isConfigured as isIdtoaiConfigured } from "@services/idtoaiService";
-import { createRouteLinkedAccount, isRazorpayConfigured, checkRazorpayEmailStatus, getRouteAccountActivationStatus } from "@services/razorpayService";
+import { createRouteLinkedAccount, isRazorpayConfigured, checkRazorpayEmailStatus, getRouteAccountActivationStatus, routeBusinessTypeForPan, isIndividualPan } from "@services/razorpayService";
 import { CreateBankInformationInput, UpdateBankInformationInput } from "./BankInformationType";
 import { getResubmitWindow } from "@utils/General";
 import { appConfig } from "@config/app";
@@ -29,7 +29,7 @@ const friendlyRazorpayError = (raw?: string | null): string => {
   if (lower.includes('country pin') || lower.includes('postal') || lower.includes('pincode') || lower.includes('pin code')) {
     return 'The PIN/postal code in your profile address is invalid. Please update it to a valid 6-digit PIN code in your profile and try again.';
   }
-  if (lower.includes('pan')) {
+  if (/\bpan\b/.test(lower)) {
     return 'The PAN on file appears to be invalid. Please check your PAN in your tax information and try again.';
   }
   if (lower.includes('phone') || lower.includes('contact number')) {
@@ -66,7 +66,7 @@ const emailUnavailableReason = async (
     select: { id: true },
   });
   if (otherUser) {
-    return 'This email is already linked to another account. Please use a different email.';
+    return `This email is already linked to another account. Please use a different email for your ${entityLabel(entityType)} bank account.`;
   }
 
   const ownOtherEntity = await (prisma as any).bankInformation.findFirst({
@@ -81,7 +81,7 @@ const emailUnavailableReason = async (
 
   const razorpayStatus = await checkRazorpayEmailStatus(email);
   if (razorpayStatus.status === 'suspended') {
-    return 'This email has a suspended payment account on ScaleDux. Please use a different email to add your bank account.';
+    return `This email has a suspended payment account on ScaleDux. Please use a different email for your ${entityLabel(entityType)} bank account.`;
   }
   if (razorpayStatus.status === 'active') {
     const user = await (prisma as any).user.findUnique({
@@ -851,19 +851,25 @@ export class BankInformationService {
         postalCode: taxAddress.postalCode || info?.zipCode || undefined,
       };
 
+      // A company PAN on the stakeholder is rejected: the stakeholder is a person
+      const businessType = isAgency ? routeBusinessTypeForPan(pan) : 'individual';
+      const stakeholderPan = isIndividualPan(pan) ? pan : undefined;
+
       Log.info(`[ensureRazorpayLinkedAccount] ${existingId ? 'Updating' : 'Creating'} Route linked account for user ${userId} (${entityType})`, {
         addressSource: taxAddress.postalCode ? 'tax_information' : 'personal_info',
+        businessType,
+        stakeholderPan: stakeholderPan ? 'individual' : 'omitted (non-individual PAN)',
       });
 
       const result = await createRouteLinkedAccount({
         email: emailForRazorpay,
         phone: user?.phone || undefined,
         legalBusinessName: legalName,
-        businessType: isAgency ? 'not_yet_registered' : 'individual',
+        businessType,
         pan,
         existingAccountId: existingId || undefined,
         address,
-        stakeholder: { name: legalName, email: emailForRazorpay, phone: user?.phone || undefined, pan },
+        stakeholder: { name: legalName, email: emailForRazorpay, phone: user?.phone || undefined, pan: stakeholderPan },
         bankAccount: { name: bank.name || legalName, ifsc: bank.ifsc, accountNumber: bank.accountNumber },
       });
 
