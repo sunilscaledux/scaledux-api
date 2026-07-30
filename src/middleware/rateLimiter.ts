@@ -7,8 +7,10 @@ import redisClient from "@services/redisService";
  * Create a rate limiter with custom window and limit.
  * @param windowSeconds - Time window in seconds
  * @param max - Max requests per window
+ * @param keyScope - Shared bucket name; defaults to the request URL, so pass this
+ *   when several routes have to draw from the same allowance.
  */
-export function createRateLimiter(windowSeconds: number, max: number) {
+export function createRateLimiter(windowSeconds: number, max: number, keyScope?: string) {
   const windowMs = windowSeconds * 1000;
 
   return rateLimit({
@@ -23,8 +25,8 @@ export function createRateLimiter(windowSeconds: number, max: number) {
     keyGenerator: (req: Request) => {
       const ip = req.ip || req.socket.remoteAddress || 'unknown';
       const userId = (req as any).user?.id;
-      const route = req.originalUrl || req.path;
-      return userId ? `rl:${route}:${ip}:uid:${userId}` : `rl:${route}:${ip}`;
+      const scope = keyScope || req.originalUrl || req.path;
+      return userId ? `rl:${scope}:${ip}:uid:${userId}` : `rl:${scope}:${ip}`;
     },
     standardHeaders: true,
     legacyHeaders: false,
