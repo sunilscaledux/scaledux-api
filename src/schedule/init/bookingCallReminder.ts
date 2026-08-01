@@ -4,6 +4,7 @@ import { dispatch } from "@queues/Queue";
 import { NotificationJob } from "../../jobs/NotificationJob";
 import { NotificationEmailJob } from "../../jobs/NotificationEmailJob";
 import { getMaskedName } from "@utils/General";
+import { formatNotifDate } from "@utils/notifyDate";
 import { appConfig } from "@config/app";
 
 /**
@@ -25,13 +26,6 @@ const MILESTONES = [
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-const NOTIF_TZ = 'Asia/Kolkata';
-function formatNotifDate(date: Date): string {
-  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: NOTIF_TZ }).format(date);
-  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: NOTIF_TZ }).format(date);
-  return `${d} at ${t}`;
 }
 
 async function alreadySent(bookingId: number, key: string): Promise<boolean> {

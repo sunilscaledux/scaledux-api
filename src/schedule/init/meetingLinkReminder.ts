@@ -3,6 +3,7 @@ import { Log } from "@services/loggerService";
 import { dispatch } from "@queues/Queue";
 import { NotificationEmailJob } from "../../jobs/NotificationEmailJob";
 import { appConfig } from "@config/app";
+import { formatNotifDate, notifDateKey } from "@utils/notifyDate";
 
 /**
  * Remind mentors to add a meeting link. Runs every 2 min.
@@ -23,16 +24,6 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-const NOTIF_TZ = 'Asia/Kolkata';
-function formatNotifDate(date: Date): string {
-  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: NOTIF_TZ }).format(date);
-  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: NOTIF_TZ }).format(date);
-  return `${d} at ${t}`;
-}
-
-function todayDateKey(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: NOTIF_TZ }).format(new Date());
-}
 
 async function alreadySent(bookingId: number, key: string): Promise<boolean> {
   const existing = await (prisma as any).bookingActivity.findFirst({
@@ -97,7 +88,7 @@ export async function handle(): Promise<void> {
 
       // 2. Daily, one per calendar day while call is >1 hour away
       if (msUntilCall > 60 * 60 * 1000) {
-        const dailyKey = `LINK_REMINDER_DAILY_${todayDateKey()}`;
+        const dailyKey = `LINK_REMINDER_DAILY_${notifDateKey()}`;
         if (await tryReminder(b, dailyKey, 'Reminder: please add a meeting link for your upcoming call')) sent++;
       }
 

@@ -7,6 +7,7 @@ import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
 import { ConversationService } from '@module/chat/ConversationService';
+import { formatNotifDay } from '@utils/notifyDate';
 import { CHAT_SYSTEM_MESSAGES } from '../../constants/chatSystemMessages';
 import { BillingService } from '@module/billing/BillingService';
 import { ProposalStatus, ProjectStatus, MilestoneStatus, MilestonePaymentStatus, InviteStatus, BillingTransactionType, BillingTransactionStatus } from '@constants/status';
@@ -2772,7 +2773,7 @@ export class ProposalService {
         userId: termRecipientId,
         type: 'CONTRACT_TERMINATION_SCHEDULED' as const,
         notificationTitle: 'Contract termination scheduled',
-        notificationBody: `${actorName} scheduled termination of the contract for "${projectTitle}". It will end on ${terminateAt.toDateString()} unless restored.`,
+        notificationBody: `${actorName} scheduled termination of the contract for "${projectTitle}". It will end on ${formatNotifDay(terminateAt)} unless restored.`,
         notificationLink: `${appConfig.frontendUrl}/project-overview/${proposal.unique_id}`,
         actorId: userId,
         subjectType: 'Proposal' as const,

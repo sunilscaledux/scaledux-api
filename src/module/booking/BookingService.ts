@@ -2,6 +2,7 @@ import { prisma } from '@services/prismaService';
 import { ServiceResponse } from '@utils/ApiResponse';
 import { Log } from '@services/loggerService';
 import { getUserFullName, getMaskedName, getDisplayName } from '@utils/General';
+import { formatNotifDate } from '@utils/notifyDate';
 import { dispatch } from '@queues/Queue';
 import { NotificationJob } from '../../jobs/NotificationJob';
 import { NotificationEmailJob } from '../../jobs/NotificationEmailJob';
@@ -51,18 +52,6 @@ const LATE_CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** "Request Link" button becomes available 2 hours before the call. */
 const MEETING_LINK_REQUEST_WINDOW_MS = 2 * 60 * 60 * 1000;
-
-/**
- * Format a date for notification text (email/DB) in IST.
- * The server typically runs in UTC, but bookings are entered in the user's local time (IST for now),
- * so we format with an explicit timeZone to match what the browser shows on the booking card.
- */
-const NOTIF_TZ = 'Asia/Kolkata';
-function formatNotifDate(date: Date): string {
-  const d = new Intl.DateTimeFormat('en-US', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: NOTIF_TZ }).format(date);
-  const t = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: NOTIF_TZ }).format(date);
-  return `${d} at ${t}`;
-}
 
 /** Escape HTML special characters to prevent XSS in email templates. */
 function escapeHtml(str: string): string {
