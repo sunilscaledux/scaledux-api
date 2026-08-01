@@ -1007,10 +1007,23 @@ export class BookingService {
         return { success: false, message: 'Minutes of meeting can be added once the meeting is completed' };
       }
 
+      const existing = await (prisma as any).bookingMom.findUnique({
+        where: { booking_id_user_id: { booking_id: booking.id, user_id: userId } },
+        select: { id: true },
+      });
+
       const mom = await (prisma as any).bookingMom.upsert({
         where: { booking_id_user_id: { booking_id: booking.id, user_id: userId } },
         create: { booking_id: booking.id, user_id: userId, content: text },
         update: { content: text },
+      });
+
+      await (prisma as any).bookingActivity.create({
+        data: {
+          booking_id: booking.id,
+          action: existing ? 'MOM_UPDATED' : 'MOM_ADDED',
+          acted_by: userId,
+        },
       });
 
       return {
