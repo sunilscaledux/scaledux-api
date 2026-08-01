@@ -2,6 +2,7 @@ import * as scheduledTermination from "./scheduledTermination";
 import * as processWithdrawals from "./processWithdrawals";
 import * as bookingCompletionReminder from "./bookingCompletionReminder";
 import * as meetingLinkReminder from "./meetingLinkReminder";
+import * as bookingCallReminder from "./bookingCallReminder";
 import * as rescheduleAutoCancel from "./rescheduleAutoCancel";
 import * as offerAutoExpiry from "./offerAutoExpiry";
 import * as invoiceAutoApprove from "./invoiceAutoApprove";
@@ -39,6 +40,11 @@ export const tasks: ScheduledTaskDef[] = [
     name: meetingLinkReminder.name,
     schedule: meetingLinkReminder.schedule,
     handle: meetingLinkReminder.handle,
+  },
+  {
+    name: bookingCallReminder.name,
+    schedule: bookingCallReminder.schedule,
+    handle: bookingCallReminder.handle,
   },
   {
     name: rescheduleAutoCancel.name,

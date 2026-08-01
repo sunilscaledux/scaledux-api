@@ -44,6 +44,7 @@ export const NOTIFICATION_EMAIL_TYPES = [
   { type: 'BOOKING_COMPLETE_REMINDER', label: 'Reminder to mark a finished call complete', category: '1:1 Call Bookings' },
   { type: 'MEETING_LINK_REQUESTED', label: 'A founder requests the mentor to add a meeting link', category: '1:1 Call Bookings' },
   { type: 'MEETING_LINK_REMINDER', label: 'Reminder to add a meeting link for an upcoming booking', category: '1:1 Call Bookings' },
+  { type: 'BOOKING_CALL_REMINDER', label: 'Reminders before an upcoming call starts', category: '1:1 Call Bookings' },
   // Ratings & Reviews
   { type: 'REVIEW_RECEIVED', label: 'You receive a new rating or review', category: 'Ratings & Reviews' },
   // Connections
