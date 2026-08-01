@@ -6,3 +6,5 @@ node_modules
 /dist
 /uploads
 /storage/logs/*
+# stray Next.js build output (this is not a Next project)
+.next/
