@@ -108,6 +108,70 @@ export class TransferService {
     return new Map(rows.map((r) => [r.razorpay_transfer_id as string, r]));
   }
 
+  /** Shape one Razorpay transfer for the UI, with whatever our DB knows about it. */
+  private static present(t: any, accounts: Map<string, any>, transactions: Map<string, any>) {
+    const acc = accounts.get(t.recipient) ?? null;
+    const tx = transactions.get(t.id) ?? null;
+    return {
+      id: t.id,
+      recipient: t.recipient,
+      source: t.source ?? null,
+      amount: paise(t.amount),
+      amount_reversed: paise(t.amount_reversed),
+      fees: paise(t.fees),
+      tax: paise(t.tax),
+      currency: t.currency ?? 'INR',
+      status: t.status,
+      settlement_status: t.settlement_status ?? null,
+      on_hold: !!t.on_hold,
+      on_hold_until: unix(t.on_hold_until),
+      recipient_settlement_id: t.recipient_settlement_id ?? null,
+      error: t.error?.description ?? null,
+      created_at: unix(t.created_at),
+      processed_at: unix(t.processed_at),
+      account: acc
+        ? {
+            type: acc.account_type,
+            activation_status: acc.bank?.razorpay_activation_status ?? null,
+            verification_status: acc.bank?.verification_status ?? null,
+          }
+        : null,
+      user: acc?.user ?? null,
+      transaction: tx
+        ? {
+            unique_id: tx.unique_id,
+            type: tx.type,
+            status: tx.status,
+            description: tx.description,
+            subject_type: tx.subject_type,
+            subject_id: tx.subject_id,
+            on_hold: tx.on_hold,
+          }
+        : null,
+    };
+  }
+
+  /** One transfer, read live so status/hold/settlement are current. */
+  static async getTransfer(id: string): Promise<ServiceResponse> {
+    if (!razorpay) {
+      return { success: false, message: 'Razorpay is not configured on this environment', statusCode: 503 };
+    }
+    let transfer: any;
+    try {
+      transfer = await razorpay.transfers.fetch(id);
+    } catch (err: any) {
+      const message = err?.error?.description || err?.message || 'Failed to fetch the transfer from Razorpay';
+      Log.error('Admin: Razorpay transfer fetch failed', { err: message, id });
+      return { success: false, message, statusCode: err?.statusCode === 400 ? 404 : 502 };
+    }
+
+    const [accounts, transactions] = await Promise.all([
+      this.attachAccounts(transfer.recipient ? [transfer.recipient] : []),
+      this.attachTransactions([transfer.id]),
+    ]);
+    return { success: true, message: 'OK', data: this.present(transfer, accounts, transactions) };
+  }
+
   static async listTransfers(p: TransferListParams): Promise<ServiceResponse> {
     if (!razorpay) {
       return { success: false, message: 'Razorpay is not configured on this environment', statusCode: 503 };
@@ -128,47 +192,7 @@ export class TransferService {
       this.attachTransactions([...new Set(all.map((t) => t.id).filter(Boolean))] as string[]),
     ]);
 
-    const rows = all.map((t) => {
-      const acc = accounts.get(t.recipient) ?? null;
-      const tx = transactions.get(t.id) ?? null;
-      return {
-        id: t.id,
-        recipient: t.recipient,
-        source: t.source ?? null,
-        amount: paise(t.amount),
-        amount_reversed: paise(t.amount_reversed),
-        fees: paise(t.fees),
-        tax: paise(t.tax),
-        currency: t.currency ?? 'INR',
-        status: t.status,
-        settlement_status: t.settlement_status ?? null,
-        on_hold: !!t.on_hold,
-        on_hold_until: unix(t.on_hold_until),
-        recipient_settlement_id: t.recipient_settlement_id ?? null,
-        error: t.error?.description ?? null,
-        created_at: unix(t.created_at),
-        processed_at: unix(t.processed_at),
-        account: acc
-          ? {
-              type: acc.account_type,
-              activation_status: acc.bank?.razorpay_activation_status ?? null,
-              verification_status: acc.bank?.verification_status ?? null,
-            }
-          : null,
-        user: acc?.user ?? null,
-        transaction: tx
-          ? {
-              unique_id: tx.unique_id,
-              type: tx.type,
-              status: tx.status,
-              description: tx.description,
-              subject_type: tx.subject_type,
-              subject_id: tx.subject_id,
-              on_hold: tx.on_hold,
-            }
-          : null,
-      };
-    });
+    const rows = all.map((t) => this.present(t, accounts, transactions));
 
     const search = p.search?.toLowerCase();
     const filtered = rows.filter((r) => {

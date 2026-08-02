@@ -4,6 +4,7 @@ import {
   getTransaction,
   getTransactionInvoice,
   listTransfers,
+  getTransfer,
   listInvoices,
   listWithdrawals,
   updateWithdrawalStatus,
@@ -18,6 +19,7 @@ router.use(requireAdmin);
 
 router.get('/transactions', requirePermission(PERMISSIONS.BILLING_VIEW), listTransactions);
 router.get('/transfers', requirePermission(PERMISSIONS.BILLING_VIEW), listTransfers);
+router.get('/transfers/:id', requirePermission(PERMISSIONS.BILLING_VIEW), getTransfer);
 router.get('/transactions/:uniqueId', requirePermission(PERMISSIONS.BILLING_VIEW), getTransaction);
 router.get('/transactions/:uniqueId/invoice', requirePermission(PERMISSIONS.BILLING_VIEW), getTransactionInvoice);
 router.get('/invoices', requirePermission(PERMISSIONS.BILLING_VIEW), listInvoices);

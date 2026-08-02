@@ -90,6 +90,11 @@ export class BillingService {
       subject_type: t.subject_type,
       subject_id: t.subject_id,
       invoices: txInvoices(t),
+      // Payment/order ids live in meta; only the transfer id has its own column.
+      razorpay_transfer_id: t.razorpay_transfer_id,
+      razorpay_payment_id: (t.meta as any)?.razorpay_payment_id ?? null,
+      razorpay_order_id: (t.meta as any)?.razorpay_order_id ?? null,
+      on_hold: t.on_hold,
       created_at: t.created_at,
       from: t.from_type === 'User' ? parties.get(t.from_id) ?? { id: t.from_id } : { type: t.from_type, id: t.from_id },
       to: t.to_type === 'User' ? parties.get(t.to_id) ?? { id: t.to_id } : { type: t.to_type, id: t.to_id },

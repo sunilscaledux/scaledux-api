@@ -51,6 +51,12 @@ export async function listTransfers(req: Request, res: Response) {
   return ApiResponse.success(res, result.data);
 }
 
+export async function getTransfer(req: Request, res: Response) {
+  const result = await TransferService.getTransfer(req.params.id);
+  if (!result.success) return ApiResponse.error(res, result.message, null, result.statusCode ?? 400);
+  return ApiResponse.success(res, result.data);
+}
+
 export async function listInvoices(req: Request, res: Response) {
   const { page, limit, skip, search } = getPageParams(req);
   const result = await BillingService.listInvoices({
