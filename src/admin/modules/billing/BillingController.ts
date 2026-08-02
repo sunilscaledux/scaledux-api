@@ -3,6 +3,7 @@ import { ApiResponse } from '@utils/ApiResponse';
 import { getPageParams, getDateRange } from '@admin/utils/pagination';
 import { auditFromReq } from '@admin/services/auditService';
 import { BillingService } from './BillingService';
+import { TransferService } from './TransferService';
 
 export async function listTransactions(req: Request, res: Response) {
   const { page, limit, skip, search } = getPageParams(req);
@@ -22,6 +23,21 @@ export async function getTransaction(req: Request, res: Response) {
   const { uniqueId } = req.params;
   const result = await BillingService.getTransaction(uniqueId);
   if (!result.success) return ApiResponse.notFound(res, result.message);
+  return ApiResponse.success(res, result.data);
+}
+
+/** Razorpay Route transfers, enriched with the linked account owner + our billing transaction. */
+export async function listTransfers(req: Request, res: Response) {
+  const { page, limit, skip, search } = getPageParams(req);
+  const result = await TransferService.listTransfers({
+    page,
+    limit,
+    skip,
+    search,
+    status: req.query.status as string | undefined,
+    created: getDateRange(req),
+  });
+  if (!result.success) return ApiResponse.error(res, result.message, null, result.statusCode ?? 400);
   return ApiResponse.success(res, result.data);
 }
 

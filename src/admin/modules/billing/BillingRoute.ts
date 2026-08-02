@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   listTransactions,
   getTransaction,
+  listTransfers,
   listInvoices,
   listWithdrawals,
   updateWithdrawalStatus,
@@ -15,6 +16,7 @@ const router = Router();
 router.use(requireAdmin);
 
 router.get('/transactions', requirePermission(PERMISSIONS.BILLING_VIEW), listTransactions);
+router.get('/transfers', requirePermission(PERMISSIONS.BILLING_VIEW), listTransfers);
 router.get('/transactions/:uniqueId', requirePermission(PERMISSIONS.BILLING_VIEW), getTransaction);
 router.get('/invoices', requirePermission(PERMISSIONS.BILLING_VIEW), listInvoices);
 router.get('/withdrawals', requirePermission(PERMISSIONS.BILLING_VIEW), listWithdrawals);
