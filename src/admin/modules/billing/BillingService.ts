@@ -63,7 +63,15 @@ export class BillingService {
     const where: Prisma.BillingTransactionWhereInput = {};
     if (p.type) where.type = p.type as any;
     if (p.status) where.status = p.status as any;
-    if (p.search) where.unique_id = { contains: p.search };
+    // Razorpay ids are indexed columns now, so support pasting any of them into search.
+    if (p.search) {
+      where.OR = [
+        { unique_id: { contains: p.search } },
+        { razorpay_payment_id: { contains: p.search } },
+        { razorpay_order_id: { contains: p.search } },
+        { razorpay_transfer_id: { contains: p.search } },
+      ];
+    }
     if (p.created) where.created_at = p.created;
 
     const [rows, total] = await Promise.all([
@@ -90,10 +98,9 @@ export class BillingService {
       subject_type: t.subject_type,
       subject_id: t.subject_id,
       invoices: txInvoices(t),
-      // Payment/order ids live in meta; only the transfer id has its own column.
       razorpay_transfer_id: t.razorpay_transfer_id,
-      razorpay_payment_id: (t.meta as any)?.razorpay_payment_id ?? null,
-      razorpay_order_id: (t.meta as any)?.razorpay_order_id ?? null,
+      razorpay_payment_id: t.razorpay_payment_id,
+      razorpay_order_id: t.razorpay_order_id,
       on_hold: t.on_hold,
       created_at: t.created_at,
       from: t.from_type === 'User' ? parties.get(t.from_id) ?? { id: t.from_id } : { type: t.from_type, id: t.from_id },
