@@ -629,6 +629,8 @@ export class BookingService {
             razorpay_order_id: data.razorpayOrderId,
             razorpay_payment_id: data.razorpayPaymentId,
           },
+          razorpay_payment_id: data.razorpayPaymentId ?? null,
+          razorpay_order_id: data.razorpayOrderId ?? null,
           platform_fee_amount: founderCalc.platformFee,
           platform_fee_gst: founderCalc.platformFeeGst,
           commission_amount: deductions.serviceFee,
@@ -1187,7 +1189,7 @@ export class BookingService {
               }
 
               // Refund the payment to founder
-              const paymentId = tx.meta?.razorpay_payment_id;
+              const paymentId = tx.razorpay_payment_id ?? tx.meta?.razorpay_payment_id;
               if (paymentId && razorpay) {
                 try {
                   await razorpay.payments.refund(paymentId, {
@@ -1858,19 +1860,20 @@ export class BookingService {
           let transferId = tx.razorpay_transfer_id;
 
           // If transfer ID wasn't stored earlier, try fetching it now from the payment
-          if (!transferId && razorpay && tx.meta?.razorpay_payment_id) {
+          const txPaymentId = tx.razorpay_payment_id ?? tx.meta?.razorpay_payment_id;
+          if (!transferId && razorpay && txPaymentId) {
             try {
-              const transfers = await razorpay.payments.fetchTransfer(tx.meta.razorpay_payment_id);
+              const transfers = await razorpay.payments.fetchTransfer(txPaymentId);
               transferId = transfers?.items?.[0]?.id ?? null;
               if (transferId) {
                 await (prisma as any).billingTransaction.update({
                   where: { id: tx.id },
                   data: { razorpay_transfer_id: transferId },
                 });
-                Log.info('Recovered missing transfer ID from payment', { transferId, paymentId: tx.meta.razorpay_payment_id });
+                Log.info('Recovered missing transfer ID from payment', { transferId, paymentId: txPaymentId });
               }
             } catch (err: any) {
-              Log.error('Failed to recover transfer ID from payment', { err: err?.message, paymentId: tx.meta.razorpay_payment_id });
+              Log.error('Failed to recover transfer ID from payment', { err: err?.message, paymentId: txPaymentId });
             }
           }
 

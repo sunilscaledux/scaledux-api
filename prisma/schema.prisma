@@ -1630,6 +1630,10 @@ model BillingTransaction {
   tcs_amount           Decimal? @db.Decimal(10, 2)
   // Razorpay Route
   razorpay_transfer_id String?  @db.VarChar(50)
+  /** Captured payment that funded this transaction; used for refunds and transfer lookup. */
+  razorpay_payment_id  String?  @db.VarChar(50)
+  /** Order the payment belongs to; used for reconciliation. */
+  razorpay_order_id    String?  @db.VarChar(50)
   on_hold              Boolean  @default(false)
   /** When the freelancer sent Invoice A; used for 24h auto-approve countdown. */
   invoice_sent_at      DateTime?
@@ -1660,6 +1664,9 @@ model BillingTransaction {
   @@index([status])
   @@index([created_at])
   @@index([unique_id])
+  @@index([razorpay_transfer_id])
+  @@index([razorpay_payment_id])
+  @@index([razorpay_order_id])
   @@map("scd_billing_transactions")
 }
 

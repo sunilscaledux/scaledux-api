@@ -231,6 +231,8 @@ export class BillingService {
         type: 'refund',
         status: 'completed',
         description: reason || `Refund of ${original.unique_id}`,
+        razorpay_payment_id: original.razorpay_payment_id,
+        razorpay_order_id: original.razorpay_order_id,
       },
     });
 

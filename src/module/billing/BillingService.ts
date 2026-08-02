@@ -599,6 +599,8 @@ export class BillingService {
         receiver_status: receiverStatus,
         description,
         meta: meta ? (meta as object) : undefined,
+        razorpay_payment_id: meta?.razorpay_payment_id ?? null,
+        razorpay_order_id: meta?.razorpay_order_id ?? null,
         // Fee breakdown
         platform_fee_amount: founder.platformFee,
         platform_fee_gst: founder.platformFeeGst,
@@ -625,7 +627,7 @@ export class BillingService {
     await this.createInvoiceC(row.id);
 
     // Store Razorpay Route transfer ID (for releasing hold on acknowledge)
-    const razorpayPaymentId = (meta as Record<string, string>)?.razorpay_payment_id;
+    const razorpayPaymentId = meta?.razorpay_payment_id;
     if (razorpayPaymentId && razorpay) {
       try {
         const transfers = await razorpay.payments.fetchTransfer(razorpayPaymentId);
