@@ -4,15 +4,18 @@ import { ServiceResponse } from '@utils/ApiResponse';
 import { paginated } from '@admin/utils/pagination';
 import { userCard, userCardSelect, resolveImageRef } from '@admin/utils/format';
 import { resolveAdminUrl } from '@admin/utils/attachments';
+import { INVOICE_LABELS } from './InvoiceService';
 
-/** The 3 invoice docs that can hang off a billing transaction (platform fee / service fee / service). */
+/**
+ * The 3 invoice docs that can hang off a billing transaction (service / service fee / platform fee).
+ * Most have no stored PDF — those are rendered on demand from /invoice, same as the user's own
+ * billing history does — so an invoice is listed whenever its row exists, url or not.
+ */
 const INVOICE_SELECT = { select: { file_url: true, invoice_number: true } } as const;
 function txInvoices(t: any) {
-  return [
-    t.payer_invoice?.file_url && { type: 'C', label: 'Platform Fee Invoice', url: resolveImageRef(t.payer_invoice.file_url), number: t.payer_invoice.invoice_number },
-    t.receiver_invoice?.file_url && { type: 'B', label: 'Service Fee Invoice', url: resolveImageRef(t.receiver_invoice.file_url), number: t.receiver_invoice.invoice_number },
-    t.invoice_a?.file_url && { type: 'A', label: 'Service Invoice', url: resolveImageRef(t.invoice_a.file_url), number: t.invoice_a.invoice_number },
-  ].filter(Boolean);
+  const entry = (type: 'A' | 'B' | 'C', inv: any) =>
+    inv && { type, label: INVOICE_LABELS[type], url: resolveImageRef(inv.file_url), number: inv.invoice_number };
+  return [entry('A', t.invoice_a), entry('B', t.receiver_invoice), entry('C', t.payer_invoice)].filter(Boolean);
 }
 
 /** Resolve {from,to,actor} ids that point at Users into compact cards. */

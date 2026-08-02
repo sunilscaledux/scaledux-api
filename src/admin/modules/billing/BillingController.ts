@@ -4,6 +4,7 @@ import { getPageParams, getDateRange } from '@admin/utils/pagination';
 import { auditFromReq } from '@admin/services/auditService';
 import { BillingService } from './BillingService';
 import { TransferService } from './TransferService';
+import { InvoiceService, type InvoiceVariant } from './InvoiceService';
 
 export async function listTransactions(req: Request, res: Response) {
   const { page, limit, skip, search } = getPageParams(req);
@@ -22,6 +23,15 @@ export async function listTransactions(req: Request, res: Response) {
 export async function getTransaction(req: Request, res: Response) {
   const { uniqueId } = req.params;
   const result = await BillingService.getTransaction(uniqueId);
+  if (!result.success) return ApiResponse.notFound(res, result.message);
+  return ApiResponse.success(res, result.data);
+}
+
+/** Invoice payload (A/B/C) for the admin-side PDF renderer. */
+export async function getTransactionInvoice(req: Request, res: Response) {
+  const type = req.query.type as InvoiceVariant | undefined;
+  if (type && !['A', 'B', 'C'].includes(type)) return ApiResponse.error(res, 'type must be A, B or C', null, 400);
+  const result = await InvoiceService.getInvoiceData(req.params.uniqueId, type);
   if (!result.success) return ApiResponse.notFound(res, result.message);
   return ApiResponse.success(res, result.data);
 }
