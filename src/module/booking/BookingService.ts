@@ -605,6 +605,19 @@ export class BookingService {
       const deductions = calcBookingMentorDeductions(baseAmount);
       const mentorPayout = calcBookingMentorPayout(baseAmount);
 
+      // Match against the order stored at creation, not the one the client sent back
+      const captureCheck = await BillingService.verifyCapturedPayment({
+        razorpayPaymentId: data.razorpayPaymentId,
+        razorpayOrderId: booking.razorpay_order_id ?? data.razorpayOrderId,
+        expectedAmountInr: founderCalc.totalBookerPays,
+      });
+      if (!captureCheck.success) {
+        return { success: false, message: captureCheck.message ?? 'Payment verification failed' };
+      }
+      if (await BillingService.isPaymentAlreadyRecorded(data.razorpayPaymentId)) {
+        return { success: false, message: 'This payment has already been recorded' };
+      }
+
       // Create BillingTransaction for billing history
       const billingTx = await (prisma as any).billingTransaction.create({
         data: {

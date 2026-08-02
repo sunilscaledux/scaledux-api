@@ -235,6 +235,63 @@ export class BillingService {
   }
 
   /**
+   * The signature only proves the order/payment pair came from Razorpay. Fetch the payment
+   * and assert it is captured, belongs to the expected order, and is for the expected amount.
+   */
+  static async verifyCapturedPayment(params: {
+    razorpayPaymentId: string;
+    razorpayOrderId?: string;
+    expectedAmountInr?: number;
+  }): Promise<{ success: boolean; message?: string; payment?: any }> {
+    const { razorpayPaymentId, razorpayOrderId, expectedAmountInr } = params;
+    if (!razorpay) return { success: false, message: 'Razorpay is not configured' };
+    if (!razorpayPaymentId) return { success: false, message: 'razorpayPaymentId is required' };
+
+    let payment: any;
+    try {
+      payment = await razorpay.payments.fetch(razorpayPaymentId);
+    } catch (error: any) {
+      Log.error('Could not fetch Razorpay payment for capture check', { error: error?.message, razorpayPaymentId });
+      return { success: false, message: 'Could not verify the payment with Razorpay. Please try again.' };
+    }
+
+    if (payment?.status !== 'captured') {
+      Log.warn('Rejected payment that is not captured', { razorpayPaymentId, status: payment?.status });
+      return { success: false, message: `Payment is not captured (status: ${payment?.status ?? 'unknown'})` };
+    }
+    if (razorpayOrderId && payment.order_id !== razorpayOrderId) {
+      Log.warn('Rejected payment belonging to a different order', {
+        razorpayPaymentId, expected: razorpayOrderId, actual: payment.order_id
+      });
+      return { success: false, message: 'This payment does not belong to the order being paid' };
+    }
+    if (payment.currency && payment.currency !== 'INR') {
+      Log.warn('Rejected payment in unsupported currency', { razorpayPaymentId, currency: payment.currency });
+      return { success: false, message: 'Unsupported payment currency' };
+    }
+    if (expectedAmountInr != null) {
+      const expectedPaise = Math.round(expectedAmountInr * 100);
+      if (Number(payment.amount) !== expectedPaise) {
+        Log.warn('Rejected payment with mismatched amount', {
+          razorpayPaymentId, expectedPaise, actualPaise: payment.amount
+        });
+        return { success: false, message: 'The amount paid does not match the amount due' };
+      }
+    }
+    return { success: true, payment };
+  }
+
+  /** Guard against the same captured payment being recorded twice. */
+  static async isPaymentAlreadyRecorded(razorpayPaymentId: string): Promise<boolean> {
+    if (!razorpayPaymentId) return false;
+    const existing = await (prisma as any).billingTransaction.findFirst({
+      where: { razorpay_payment_id: razorpayPaymentId },
+      select: { id: true }
+    });
+    return !!existing;
+  }
+
+  /**
    * Get payment breakdown for display and Razorpay order amount.
    * Uses new fee structure: platform fee (flat/%) for founder, commission + processing fee + TCS for freelancer.
    */

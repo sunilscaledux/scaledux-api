@@ -7,6 +7,7 @@ import { createProposalActivity } from "@module/proposal/ProposalActivityService
 import { CHAT_SYSTEM_MESSAGES } from "../../constants/chatSystemMessages";
 import { BillingTransactionStatus, ProposalStatus, MilestonePaymentStatus, ProjectStatus } from "@constants/status";
 import { prisma } from "@services/prismaService";
+import { Log } from "@services/loggerService";
 import { dispatch } from "@queues/Queue";
 import { NotificationJob } from "../../jobs/NotificationJob";
 import { NotificationEmailJob } from "../../jobs/NotificationEmailJob";
@@ -168,6 +169,32 @@ export class BillingController {
     const amount = Number(milestoneRow?.amount ?? 0) || 0;
     if (amount <= 0) {
       ApiResponse.error(res, "Invalid milestone amount", 400);
+      return true;
+    }
+
+    if (!razorpayPaymentId) {
+      ApiResponse.error(res, "razorpayPaymentId is required", 400);
+      return true;
+    }
+    // Recomputed the same way the order amount was, so a captured payment for a different
+    // milestone or a tampered amount cannot be recorded against this one.
+    const expected = await BillingService.getMilestoneOrderAmount(userId, milestoneId, milestoneIndex);
+    if (!expected.success) {
+      Log.warn("Could not recompute milestone order amount at verify time", {
+        milestoneId, reason: expected.message
+      });
+    }
+    const captureCheck = await BillingService.verifyCapturedPayment({
+      razorpayPaymentId,
+      razorpayOrderId,
+      expectedAmountInr: expected.success ? expected.totalFounderPays : undefined
+    });
+    if (!captureCheck.success) {
+      ApiResponse.error(res, captureCheck.message ?? "Payment verification failed", 400);
+      return true;
+    }
+    if (await BillingService.isPaymentAlreadyRecorded(razorpayPaymentId)) {
+      ApiResponse.error(res, "This payment has already been recorded", 409);
       return true;
     }
 
