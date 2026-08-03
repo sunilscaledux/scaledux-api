@@ -1176,6 +1176,27 @@ model ContactSubmission {
   @@map("scd_contact_submissions")
 }
 
+model NewsletterSubscriber {
+  id             Int       @id @default(autoincrement())
+  unique_id      String    @unique @default(cuid())
+  email          String    @unique @db.VarChar(255)
+  /** Audience the subscriber picked: founder, freelancer, mentor, investor. */
+  role           String    @db.VarChar(20)
+  status         String    @default("SUBSCRIBED") @db.VarChar(20) // SUBSCRIBED, UNSUBSCRIBED
+  /** Where the signup came from, e.g. the landing join-community form. */
+  source         String    @default("landing") @db.VarChar(30)
+  /** Origin IP, captured for abuse tracing. */
+  ip_address     String?   @db.VarChar(45)
+  unsubscribed_at DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([role])
+  @@index([created_at])
+  @@map("scd_newsletter_subscribers")
+}
+
 model BlockedUser {
   id              Int       @id @default(autoincrement())
   blocker_id      Int

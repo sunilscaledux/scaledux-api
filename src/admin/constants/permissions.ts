@@ -74,6 +74,10 @@ export const PERMISSIONS = {
   // Contact submissions (public contact form)
   CONTACTS_VIEW: 'contacts.view',
   CONTACTS_MANAGE: 'contacts.manage',
+
+  // Newsletter subscribers (landing join-community form)
+  NEWSLETTER_VIEW: 'newsletter.view',
+  NEWSLETTER_MANAGE: 'newsletter.manage',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -94,6 +98,7 @@ const READ_ONLY = [
   PERMISSIONS.CONSTANTS_VIEW,
   PERMISSIONS.BUG_REPORTS_VIEW,
   PERMISSIONS.CONTACTS_VIEW,
+  PERMISSIONS.NEWSLETTER_VIEW,
 ];
 
 export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
@@ -120,6 +125,7 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.SECURITY_VIEW,
     PERMISSIONS.BUG_REPORTS_MANAGE,
     PERMISSIONS.CONTACTS_MANAGE,
+    PERMISSIONS.NEWSLETTER_MANAGE,
   ],
 
   MODERATOR: [
@@ -145,6 +151,8 @@ export const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     PERMISSIONS.BUG_REPORTS_MANAGE,
     PERMISSIONS.CONTACTS_VIEW,
     PERMISSIONS.CONTACTS_MANAGE,
+    PERMISSIONS.NEWSLETTER_VIEW,
+    PERMISSIONS.NEWSLETTER_MANAGE,
   ],
 
   FINANCE: [

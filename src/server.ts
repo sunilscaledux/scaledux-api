@@ -42,6 +42,7 @@ import { startupPhaseRouter, startupProgressRouter } from './module/startup-phas
 import connectionRoutes from './module/connection/ConnectionRoute';
 import bugReportRoutes from './module/bug-report/BugReportRoute';
 import contactRoutes from './module/contact/ContactRoute';
+import newsletterRoutes from './module/newsletter/NewsletterRoute';
 import sitemapRoutes from './module/sitemap/SitemapRoute';
 
 import path from "path";
@@ -72,9 +73,10 @@ app.use(sitemapRoutes);
 /** Private file download: /files/view/:uniqueId?f=originalName */
 app.get("/files/view/:uniqueId", privateFileAccess, viewProtectedFile);
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
-// Public contact form — must be mounted before the bare "/api/v1" routers
-// (e.g. chat) whose router-level auth guard would otherwise 401 it.
+// Public landing forms — must be mounted before the bare "/api/v1" routers
+// (e.g. chat) whose router-level auth guard would otherwise 401 them.
 app.use("/api/v1/contact", contactRoutes);
+app.use("/api/v1/newsletter", newsletterRoutes);
 app.use("/api/v1", userRoutes);
 app.use("/api/v1/profile", profileRoutes);
 app.use("/api/v1", generalRoutes);
